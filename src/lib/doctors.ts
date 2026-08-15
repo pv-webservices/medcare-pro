@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { ConflictError } from "@/lib/apiHandler";
+import { clinicWhereForActor } from "@/lib/clinicScope";
 import { prisma } from "@/lib/prisma";
 import {
-  accessibleClinicScope,
   assertClinicInTenant,
   can,
   requirePermission,
@@ -187,30 +187,20 @@ export async function listDoctorsForActor(
   actor: ActorContext,
   options: { clinicId?: string | null } = {},
 ): Promise<DoctorSummary[]> {
-  const access = await accessibleClinicScope(actor, "doctor:read");
+  const clinicWhere = await clinicWhereForActor(
+    actor,
+    "doctor:read",
+    options.clinicId,
+  );
 
-  if (access.scope === "none") {
+  if (!clinicWhere) {
     return [];
   }
-
-  const clinicFilter =
-    access.scope === "clinics"
-      ? options.clinicId
-        ? access.clinicIds.includes(options.clinicId)
-          ? { id: options.clinicId }
-          : // Requested a clinic outside scope — match nothing.
-            { id: "__none__" }
-        : { id: { in: [...access.clinicIds] } }
-      : options.clinicId
-        ? { id: options.clinicId }
-        : {};
 
   const today = parseDateOnly(todayDateOnly());
 
   const doctors = await prisma.doctor.findMany({
-    where: {
-      clinic: { tenantId: actor.tenantId, ...clinicFilter },
-    },
+    where: { clinic: clinicWhere },
     orderBy: [{ name: "asc" }],
     select: {
       id: true,

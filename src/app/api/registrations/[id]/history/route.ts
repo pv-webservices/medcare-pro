@@ -1,12 +1,25 @@
-import { notImplemented } from "@/lib/utils";
+import { jsonOk, toErrorResponse } from "@/lib/apiHandler";
+import { listEditHistoryForActor } from "@/lib/registrations";
+import { requireActor } from "@/lib/session";
 
 // Audit trail — PRD §6.3 (FR-3.6). Append-only and read-only: no write method
 // exists here by design (PRD §9 Audit integrity).
-// Requires 'registration:history:read' — Staff hold the edit permission but not
-// this one, and the 403 must come from here, not from a hidden UI tab.
-// Scoping: derive tenantId from the session; never trust a client-supplied
-// tenantId/clinicId. Mutations call requirePermission() from lib/rbac.ts first.
+//
+// Requires `registration:history:read`. Staff hold `registration:edit` but not
+// this one, so their edits are logged and they simply cannot read the log back
+// — and that 403 comes from here, not from a hidden UI tab.
 
-export async function GET() {
-  return notImplemented("GET /api/registrations/[id]/history");
+interface RouteContext {
+  // Next 16 hands route params to the handler as a promise.
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(_request: Request, context: RouteContext) {
+  try {
+    const actor = await requireActor();
+    const { id } = await context.params;
+    return jsonOk(await listEditHistoryForActor(actor, id));
+  } catch (error: unknown) {
+    return toErrorResponse(error, "GET /api/registrations/[id]/history");
+  }
 }

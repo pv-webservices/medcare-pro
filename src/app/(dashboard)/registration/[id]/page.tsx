@@ -1,10 +1,82 @@
-// Registration detail/edit — PRD §6.3 (FR-3.5). Every edit writes an audit log row. SCAFFOLD ONLY.
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import RegistrationDetail from "@/components/registration/RegistrationDetail";
+import { todayDateOnly } from "@/lib/dates";
+import { listDoctorsForActor } from "@/lib/doctors";
+import { can, ScopeError } from "@/lib/rbac";
+import {
+  getRegistrationForActor,
+  listDepartmentsForActor,
+} from "@/lib/registrations";
+import { requireActor, UnauthenticatedError } from "@/lib/session";
 
-export default function RegistrationDetailPage() {
+// Registration detail and edit — PRD §6.3 (FR-3.5, FR-3.6).
+//
+// The "Edit History" link is shown only to roles holding
+// `registration:history:read`, but that is presentation, not protection: the
+// history route enforces the same permission server-side (PRD §9).
+
+interface RegistrationDetailPageProps {
+  // Next 16 hands route params to the page as a promise.
+  params: Promise<{ id: string }>;
+}
+
+export default async function RegistrationDetailPage({
+  params,
+}: RegistrationDetailPageProps) {
+  const { id } = await params;
+
+  let actor;
+  try {
+    actor = await requireActor();
+  } catch (error: unknown) {
+    if (error instanceof UnauthenticatedError) {
+      redirect("/login");
+    }
+    throw error;
+  }
+
+  let registration;
+  try {
+    registration = await getRegistrationForActor(actor, id);
+  } catch (error: unknown) {
+    // Another tenant's registration, an unknown id, and one in a clinic outside
+    // this user's scope all render the same 404 — see src/lib/registrations.ts.
+    if (error instanceof ScopeError) {
+      notFound();
+    }
+    throw error;
+  }
+
+  const [doctors, departments, canEdit, canViewHistory] = await Promise.all([
+    listDoctorsForActor(actor, { clinicId: registration.clinicId }),
+    listDepartmentsForActor(actor, registration.clinicId),
+    can(actor, "registration:edit", registration.clinicId),
+    can(actor, "registration:history:read", registration.clinicId),
+  ]);
+
   return (
     <section>
-      <h1>Registration</h1>
-      <p>Not implemented yet.</p>
+      <Link
+        href="/registration"
+        className="mb-4 inline-block text-sm text-black/60 underline dark:text-white/60"
+      >
+        ← All registrations
+      </Link>
+
+      <RegistrationDetail
+        registration={registration}
+        doctors={doctors.map(({ id: doctorId, name, clinicId, department }) => ({
+          id: doctorId,
+          name,
+          clinicId,
+          department,
+        }))}
+        departments={departments}
+        today={todayDateOnly()}
+        canEdit={canEdit}
+        canViewHistory={canViewHistory}
+      />
     </section>
   );
 }
