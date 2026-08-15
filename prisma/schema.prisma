@@ -22,6 +22,13 @@ datasource db {
 // Field names inside Account/Session/VerificationToken are fixed by
 // @auth/prisma-adapter and must not be renamed.
 // `passwordHash` is the one addition, required by FR-1.1 (email + password).
+//
+// NOTE — `sessions` is currently written by nothing. Auth.js does not support
+// database sessions together with the Credentials provider, so `src/lib/auth.ts`
+// runs the JWT session strategy and the session lives in a signed cookie.
+// The table is kept because PRD §7 specifies it, and because it becomes live the
+// moment a non-credentials provider or the PrismaAdapter is added.
+// The same applies to `accounts` and `verification_tokens` (OAuth / email links).
 // ---------------------------------------------------------------------------
 
 model User {
