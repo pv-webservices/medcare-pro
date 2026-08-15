@@ -1,12 +1,18 @@
-// Clinic Management System — data model.
+// MEDCARE PRO — data model (v2).
 //
-// Source of truth: docs/PRD.md §7. One isolated MySQL database per clinic
-// (docs/PRD.md §10 "Data isolation") — there is deliberately no `clinic_id`
-// column anywhere, tenancy is the deployment, not a filter.
+// Source of truth: docs/PRD.md §7. ONE shared MySQL database for all tenants.
+// Isolation is by column, not by deployment: every account-scoped table carries
+// `tenant_id`, every clinic-scoped table carries `clinic_id`, and every query is
+// filtered in the application layer from the authenticated session.
+// This is a deliberate reversal of the v1 "one database per clinic" model.
 //
 // Naming convention: PascalCase models / camelCase fields (TypeScript side),
 // with @map / @@map preserving the exact snake_case table and column names
 // from PRD §7 in the database.
+//
+// PRD §7 calls the top-level tenant table `accounts`. It is modelled here as
+// `Tenant` / `tenants` to avoid colliding with Auth.js's OAuth adapter model,
+// which is also named `Account` and whose name is not ours to change.
 
 generator client {
   provider = "prisma-client-js"
@@ -18,66 +24,64 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
-// Auth.js (NextAuth) — PRD §7 `users` / `sessions`, standard adapter fields.
-// Field names inside Account/Session/VerificationToken are fixed by
-// @auth/prisma-adapter and must not be renamed.
-// `passwordHash` is the one addition, required by FR-1.1 (email + password).
+// Tenancy & identity — PRD §7 `accounts` / `users`, FR-1.x
 //
-// NOTE — `sessions` is currently written by nothing. Auth.js does not support
-// database sessions together with the Credentials provider, so `src/lib/auth.ts`
-// runs the JWT session strategy and the session lives in a signed cookie.
-// The table is kept because PRD §7 specifies it, and because it becomes live the
-// moment a non-credentials provider or the PrismaAdapter is added.
-// The same applies to `accounts` and `verification_tokens` (OAuth / email links).
+// The Auth.js `Account` and `Session` adapter models are deliberately absent.
+// This app is Credentials-only with the JWT session strategy (see
+// src/lib/auth.config.ts), so neither table would ever be written to.
+// `VerificationToken` is kept, but repurposed for our own FR-1.2 email
+// verification flow rather than Auth.js's built-in magic-link flow.
 // ---------------------------------------------------------------------------
 
+/// The top-level tenant. One signup = one Tenant, which can own many Clinics.
+/// Holds no credentials of its own — see the note on User.passwordHash.
+model Tenant {
+  id           String    @id @default(cuid())
+  businessName String    @map("business_name")
+  /// Contact address collected at signup, and the address the FR-1.2
+  /// verification link is sent to.
+  email        String    @unique
+  /// FR-1.2 / PRD §9 — login is blocked for every User under this Tenant until
+  /// this is set. Verification is a property of the business, not of each
+  /// individual login, so it lives here and not on User.
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  users         User[]
+  roles         Role[]
+  clinics       Clinic[]
+  patients      Patient[]
+  notifications Notification[]
+
+  @@map("tenants")
+}
+
+/// A login within a Tenant. Signup creates exactly one of these (the owner);
+/// further users are invited by an Owner/Admin.
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime? @map("email_verified")
-  image         String?
-  passwordHash  String?   @map("password_hash")
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String?
+  email     String   @unique
+  /// The only password hash in the schema. PRD §7 also lists one on `accounts`,
+  /// but a Tenant is an organisation, not something that logs in — credentials
+  /// live solely on User and login always resolves via User.email.
+  passwordHash String @map("password_hash")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  accounts Account[]
-  sessions Session[]
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  userRoles           UserRole[]
+  registrationsCreated Registration[]        @relation("RegistrationCreatedBy")
+  registrationEdits    RegistrationEditLog[]
+
+  @@index([tenantId])
   @@map("users")
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
-  type              String
-  provider          String
-  providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @map("refresh_token") @db.Text
-  access_token      String? @map("access_token") @db.Text
-  expires_at        Int?    @map("expires_at")
-  token_type        String? @map("token_type")
-  scope             String?
-  id_token          String? @map("id_token") @db.Text
-  session_state     String? @map("session_state")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("sessions")
-}
-
+/// FR-1.2 email verification tokens. Retained from the Auth.js adapter schema
+/// (the shape is a good fit) but written and consumed by our own
+/// api/auth/verify-email route, not by Auth.js.
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -88,88 +92,289 @@ model VerificationToken {
 }
 
 // ---------------------------------------------------------------------------
-// Patient directory — PRD §7 `patients`, FR-2.x
+// RBAC — PRD §7 `roles` / `user_roles`, FR-8.1 / FR-8.2
+// ---------------------------------------------------------------------------
+
+/// Custom and extensible per tenant. Owner/Admin/Staff are seeded defaults
+/// (prisma/seed.ts), not a hardcoded enum — PRD §4.
+model Role {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+  name     String
+  /// Array of permission strings, e.g. ["registration:edit", "doctor:create"].
+  /// Checked server-side by lib/rbac.ts on every mutating request.
+  permissions Json
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userRoles UserRole[]
+
+  /// Role names are unique within a tenant, not globally.
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+/// Assignment of a Role to a User, optionally narrowed to a single Clinic.
+/// A null `clinic_id` means the assignment is tenant-wide. A user may hold
+/// different roles in different clinics under the same tenant.
+model UserRole {
+  id       String  @id @default(cuid())
+  userId   String  @map("user_id")
+  roleId   String  @map("role_id")
+  clinicId String? @map("clinic_id")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, clinicId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([clinicId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// Clinics — PRD §7 `clinics`, FR-2.x / FR-8.3 / FR-8.4
+// ---------------------------------------------------------------------------
+
+model Clinic {
+  id       String  @id @default(cuid())
+  tenantId String  @map("tenant_id")
+  name     String
+  address  String? @db.Text
+  city     String?
+  /// FR-8.3 / FR-8.4 — per-clinic branding overrides.
+  logoUrl    String? @map("logo_url")
+  themeColor String? @map("theme_color") @db.VarChar(9)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  doctors          Doctor[]
+  patients         Patient[]
+  registrations    Registration[]
+  notifications    Notification[]
+  whatsappMessages WhatsappMessage[]
+  userRoles        UserRole[]
+
+  @@index([tenantId])
+  @@map("clinics")
+}
+
+// ---------------------------------------------------------------------------
+// Doctors — PRD §7 `doctors` / `doctor_availability` / `doctor_leave`, FR-4.x
+// ---------------------------------------------------------------------------
+
+model Doctor {
+  id         String  @id @default(cuid())
+  clinicId   String  @map("clinic_id")
+  name       String
+  department String
+  /// Free-text rather than an enum: the PRD does not fix the accepted values,
+  /// and locking them here would require a migration to add one.
+  gender String?
+  age    Int?
+  phone  String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  availability  DoctorAvailability[]
+  leave         DoctorLeave[]
+  registrations Registration[]
+
+  /// FR-4.1 counts doctors per clinic; the registration form filters by department.
+  @@index([clinicId])
+  @@index([department])
+  @@map("doctors")
+}
+
+/// FR-4.3 — calendar-based availability: a specific date plus a time range.
+model DoctorAvailability {
+  id       String   @id @default(cuid())
+  doctorId String   @map("doctor_id")
+  date     DateTime @db.Date
+  /// 24h "HH:mm" clock time. Stored as a string rather than DateTime so a slot
+  /// carries no spurious date/timezone component.
+  startTime String @map("start_time") @db.VarChar(5)
+  endTime   String @map("end_time") @db.VarChar(5)
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@index([date])
+  @@map("doctor_availability")
+}
+
+/// FR-4.4 — optional leave, marks the doctor unavailable across a date range.
+model DoctorLeave {
+  id        String   @id @default(cuid())
+  doctorId  String   @map("doctor_id")
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  reason    String?  @db.Text
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@map("doctor_leave")
+}
+
+// ---------------------------------------------------------------------------
+// Patients & registrations — PRD §7 `patients` / `registrations`, FR-3.x
+//
+// A Patient is the person; a Registration is one visit (and one revenue line).
+// One patient has many registrations.
 // ---------------------------------------------------------------------------
 
 model Patient {
-  id          String   @id @default(cuid())
-  name        String
-  phoneNumber String   @map("phone_number")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id       String @id @default(cuid())
+  /// Denormalised from `clinic.tenant_id` purely so the tenant-wide uniqueness
+  /// of `patient_code` can be enforced by the database (see @@unique below)
+  /// rather than only by application convention. Keep it in step with the
+  /// owning clinic's tenant on every write.
+  tenantId String @map("tenant_id")
+  clinicId String @map("clinic_id")
+  /// FR-3.1 format `PT-YYYY-####`, generated server-side, sequential, and
+  /// unique tenant-wide (not per clinic) per PRD §10. Generated in exactly one
+  /// place: lib/generatePatientCode.ts.
+  patientCode  String  @map("patient_code")
+  name         String
+  age          Int?
+  gender       String?
+  mobileNumber String  @map("mobile_number")
+  address      String? @db.Text
+  city         String?
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  appointments Appointment[]
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
-  // FR-2.2 search by name or phone. Deliberately not @unique: FR-2.1 requires
-  // duplicate phone numbers to be *flagged*, not rejected at the DB level.
+  registrations    Registration[]
+  whatsappMessages WhatsappMessage[]
+
+  /// Tenant-scoped, so two tenants can each independently hold PT-2026-0001.
+  @@unique([tenantId, patientCode])
+  @@index([clinicId])
+  /// FR-3.2 — search by patient name or mobile number.
   @@index([name])
-  @@index([phoneNumber])
+  @@index([mobileNumber])
   @@map("patients")
 }
 
-// ---------------------------------------------------------------------------
-// Appointments — PRD §7 `appointments`, FR-3.x. Drives dashboard metrics.
-// ---------------------------------------------------------------------------
-
-model Appointment {
+model Registration {
   id         String   @id @default(cuid())
+  clinicId   String   @map("clinic_id")
   patientId  String   @map("patient_id")
+  doctorId   String?  @map("doctor_id")
+  /// FR-3.1 — required on the registration form.
+  department String
+  amount     Decimal  @db.Decimal(10, 2)
   visitDate  DateTime @map("visit_date")
-  reason     String   @db.Text
-  amountPaid Decimal  @map("amount_paid") @db.Decimal(10, 2)
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  // onDelete decision: Cascade — deleting a patient (FR-2.4) removes their
-  // appointment history with them, leaving no orphaned rows.
-  // TRADEOFF: this retroactively changes past revenue totals (FR-4.1), since
-  // the dashboard sums appointments by visit_date. Switch to Restrict if
-  // financial history must survive a patient deletion.
+  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  /// Restrict, not Cascade: a doctor leaving must not silently delete the
+  /// revenue history attributed to them (FR-6.4 breaks revenue down by doctor).
+  /// Nullable so a doctor can be detached from past visits instead.
+  doctor  Doctor? @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  creator User    @relation("RegistrationCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  editLog RegistrationEditLog[]
+
+  @@index([clinicId])
+  @@index([patientId])
+  @@index([doctorId])
+  /// FR-6.1 — revenue is aggregated by visit date over daily/weekly/monthly/yearly windows.
+  @@index([visitDate])
+  @@index([department])
+  @@map("registrations")
+}
+
+/// FR-3.6 — immutable audit trail. APPEND-ONLY: never updated, never deleted,
+/// not even by an Owner (PRD §9 Audit integrity). Readable only by Owner/Admin
+/// roles, enforced in the API response and not merely by hiding the UI tab.
+model RegistrationEditLog {
+  id             String @id @default(cuid())
+  registrationId String @map("registration_id")
+  editedByUserId String @map("edited_by_user_id")
+  /// The editor's role name captured at edit time. Denormalised on purpose —
+  /// if the user's role is changed or revoked later, the log must still show
+  /// what they held when they made the edit.
+  roleAtTime String @map("role_at_time")
+  /// Per-field before/after values, e.g.
+  /// {"amount":{"from":"500.00","to":"750.00"}}
+  changedFields Json     @map("changed_fields")
+  timestamp     DateTime @default(now())
+
+  /// Cascade only because a deleted registration's log has nothing left to
+  /// describe. Nothing in the app deletes registrations today.
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  editedBy     User         @relation(fields: [editedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([registrationId])
+  @@index([editedByUserId])
+  @@map("registration_edit_log")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications — PRD §7 `notifications`, FR-7.x
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id       String  @id @default(cuid())
+  tenantId String  @map("tenant_id")
+  /// Null = a tenant-wide notification not tied to any single clinic.
+  clinicId String? @map("clinic_id")
+  /// e.g. "registration.updated", "doctor.created".
+  type            String
+  message         String  @db.Text
+  /// Id of the record the notification refers to. Intentionally not a foreign
+  /// key: it points at whichever table `type` names.
+  relatedRecordId String? @map("related_record_id")
+  read            Boolean @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  /// FR-7.2 — the notifications list queries unread first, scoped to a tenant.
+  @@index([tenantId, read])
+  @@index([clinicId])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp — PRD §7 `whatsapp_messages`, FR-9.x
+// Sent via a third-party BSP (provider TBD — PRD §10).
+// ---------------------------------------------------------------------------
+
+model WhatsappMessage {
+  id        String @id @default(cuid())
+  clinicId  String @map("clinic_id")
+  patientId String @map("patient_id")
+  /// FR-9.1 — only BSP-approved template names are sendable; no free text.
+  templateName String @map("template_name")
+  /// FR-9.2 — delivery status as reported by the BSP. Free-text rather than an
+  /// enum because each provider names its states differently and the provider
+  /// is not yet chosen.
+  status String
+  /// The BSP's own message id, used to make delivery-status webhooks
+  /// idempotent (see the secure-webhooks skill) — the same event can arrive
+  /// more than once.
+  providerMessageId String? @unique @map("provider_message_id")
+  sentAt            DateTime @default(now()) @map("sent_at")
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  // FR-4.1 / FR-4.2 aggregate by visit_date; FR-2.3 lists a patient's history.
+  @@index([clinicId])
   @@index([patientId])
-  @@index([visitDate])
-  @@map("appointments")
-}
-
-// ---------------------------------------------------------------------------
-// Clinic settings — PRD §7 `clinic_settings`, FR-6.1 / FR-6.2.
-// Exactly one row per clinic deployment.
-// ---------------------------------------------------------------------------
-
-model ClinicSettings {
-  id String @id @default(cuid())
-
-  // Per-day opening hours, e.g.
-  // {"MON":{"start":"09:00","end":"18:00"},"SAT":{"start":"09:00","end":"13:00"}}
-  workingDays Json @map("working_days")
-
-  // Clinic-wide default hours in 24h "HH:mm" clock time.
-  // Null = not yet configured; per FR-6.6 the IVR must then fail safe to "closed".
-  officeHoursStart String? @map("office_hours_start") @db.VarChar(5)
-  officeHoursEnd   String? @map("office_hours_end") @db.VarChar(5)
-
-  // FR-6.2 emergency override — forces the IVR on regardless of schedule.
-  manualIvrToggle Boolean @default(false) @map("manual_ivr_toggle")
-
-  @@map("clinic_settings")
-}
-
-// ---------------------------------------------------------------------------
-// After-hours IVR call log — PRD §7 `ivr_logs`, FR-6.4 / FR-6.5 / FR-6.6.
-// ---------------------------------------------------------------------------
-
-enum IvrStatus {
-  pending
-  actioned
-}
-
-model IvrLog {
-  id            String    @id @default(cuid())
-  callerPhone   String    @map("caller_phone")
-  inputReceived String    @map("input_received")
-  timestamp     DateTime  @default(now())
-  status        IvrStatus @default(pending)
-
-  // FR-4.3 dashboard notification list queries status = pending.
-  @@index([status])
-  @@map("ivr_logs")
+  @@map("whatsapp_messages")
 }

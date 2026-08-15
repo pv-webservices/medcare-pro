@@ -17,11 +17,20 @@ const { auth } = NextAuth(authConfig);
  */
 const PROTECTED_PREFIXES = [
   "/dashboard",
-  "/patients",
-  "/appointments",
+  "/registration",
+  "/doctors",
+  "/clinics",
+  "/reports",
+  "/notifications",
   "/messages",
-  "/receptionist",
+  "/settings",
 ] as const;
+
+/**
+ * Reachable without a session. `/signup` and `/verify-email` are part of the
+ * FR-1.1/FR-1.2 flow, which by definition runs before one exists.
+ */
+const PUBLIC_AUTH_PATHS = ["/login", "/signup", "/verify-email"] as const;
 
 const LOGIN_PATH = "/login";
 const DEFAULT_SIGNED_IN_PATH = "/dashboard";
@@ -41,8 +50,11 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(LOGIN_PATH, nextUrl));
   }
 
-  // A signed-in admin has no use for the login screen.
-  if (isSignedIn && nextUrl.pathname === LOGIN_PATH) {
+  // A signed-in user has no use for the signup/login screens.
+  const isPublicAuthPath = PUBLIC_AUTH_PATHS.some(
+    (path) => nextUrl.pathname === path,
+  );
+  if (isSignedIn && isPublicAuthPath) {
     return NextResponse.redirect(new URL(DEFAULT_SIGNED_IN_PATH, nextUrl));
   }
 
@@ -52,9 +64,9 @@ export default auth((req) => {
 export const config = {
   /**
    * Skip Next internals and static assets. API routes are excluded too — the
-   * Twilio and WhatsApp webhooks authenticate by request signature, not by
-   * session (PRD §10), so a session redirect there would break them. Admin API
-   * routes check the session in the handler itself.
+   * WhatsApp BSP delivery-status webhook authenticates by request signature,
+   * not by session (PRD §9), so a session redirect there would break it. Admin
+   * API routes check the session and call lib/rbac.ts in the handler itself.
    */
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

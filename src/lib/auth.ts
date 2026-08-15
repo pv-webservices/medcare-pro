@@ -6,11 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
 
 /**
- * Auth.js (NextAuth) configuration — PRD §6.1 (FR-1.1, FR-1.2).
+ * Auth.js (NextAuth) configuration — PRD §6.1 (FR-1.1 … FR-1.5).
  *
- * Single admin per clinic, provisioned by `prisma/seed.ts`. There is no
- * self-signup in the MVP (PRD §5), so this file only ever verifies an existing
- * credential — it never creates a user.
+ * Users are created by self-signup (`api/auth/signup`), not by seeding. This
+ * file only ever verifies an existing credential — it never creates a user.
+ *
+ * Credentials live solely on `User`; a `Tenant` has no password of its own, so
+ * login always resolves via `User.email`. The FR-1.2 verification flag, however,
+ * lives on the Tenant — see the unverified-account check in `authorize`.
  */
 
 const credentialsSchema = z.object({
@@ -55,7 +58,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const user = await prisma.user.findUnique({
           where: { email },
-          select: { id: true, name: true, email: true, passwordHash: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            passwordHash: true,
+            tenantId: true,
+            tenant: { select: { emailVerifiedAt: true } },
+          },
         });
 
         // Unknown email, or a user row with no password set. Burn the same
@@ -70,10 +80,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // FR-1.2 / PRD §9 — login is blocked until the tenant's email is
+        // verified. Checked only after the password verifies, so an attacker
+        // cannot use this branch to discover which emails are registered.
+        //
+        // FR-1.5 asks for a distinct "please verify your email" message with a
+        // resend option, which a bare `null` cannot express. Throwing here
+        // surfaces the reason to the login page — safe in this position and
+        // this position only, because the caller has already proven they hold
+        // the password.
+        if (!user.tenant.emailVerifiedAt) {
+          throw new Error("EmailNotVerified");
+        }
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
+          tenantId: user.tenantId,
         };
       },
     }),

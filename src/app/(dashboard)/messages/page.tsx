@@ -1,4 +1,4 @@
-// WhatsApp template sender — PRD §6.5 (FR-5.1 … FR-5.4). Stage 3. SCAFFOLD ONLY.
+// WhatsApp template sender — PRD §6.9 (FR-9.1, FR-9.2). SCAFFOLD ONLY.
 
 export default function MessagesPage() {
   return (

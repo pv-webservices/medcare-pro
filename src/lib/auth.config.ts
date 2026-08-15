@@ -25,13 +25,12 @@ export const authConfig = {
     strategy: "jwt",
   },
 
-  // PRD §11 / per-clinic setup: each deployment supplies its own secret.
   // Auth.js v5 reads AUTH_SECRET by default; NEXTAUTH_SECRET is named
   // explicitly here so the variable in .env.example is the one that counts.
   secret: process.env.NEXTAUTH_SECRET,
 
-  // Clinics self-host on Hostinger behind a proxy rather than on Vercel, so the
-  // host header has to be trusted for callback URLs to resolve correctly.
+  // Self-hosted on Hostinger behind a proxy rather than on Vercel, so the host
+  // header has to be trusted for callback URLs to resolve correctly.
   trustHost: true,
 
   // Intentionally empty: the middleware instance only needs to *read* a
@@ -39,17 +38,25 @@ export const authConfig = {
   providers: [],
 
   callbacks: {
-    // Persist the user id on the token so `session.user.id` is available
-    // without a database round-trip on every request.
+    // Persist the user id and tenant id on the token so both are available
+    // without a database round-trip on every request. `tenantId` is what every
+    // API route scopes its queries by — it comes from here, i.e. from the
+    // signed session, and never from the request body or query string.
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.tenantId = user.tenantId;
       }
       return token;
     },
     session({ session, token }) {
-      if (token.id && session.user) {
-        session.user.id = token.id as string;
+      if (session.user) {
+        if (token.id) {
+          session.user.id = token.id as string;
+        }
+        if (token.tenantId) {
+          session.user.tenantId = token.tenantId as string;
+        }
       }
       return session;
     },

@@ -1,60 +1,116 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 /**
- * One-time admin provisioning — PRD §5 (MVP has no self-signup; a single admin
- * is provisioned per clinic deployment).
+ * Seeds the three default roles for a tenant — PRD §4.
  *
- * Run once per clinic, after `prisma migrate deploy`:
- *   ADMIN_EMAIL=... ADMIN_PASSWORD=... npx prisma db seed
+ * v2 has self-signup (FR-1.1), so this script no longer provisions an admin
+ * user by hand. Instead it defines the default role set that every new tenant
+ * starts with; the signup flow calls `seedDefaultRoles` for the tenant it just
+ * created, and the owner User is assigned the Owner role there.
  *
- * Idempotent: if an admin with that email already exists the script exits
- * without touching it. It will never silently reset a live admin's password.
+ * Run directly to backfill a tenant that predates a role change:
+ *   TENANT_ID=<id> npx prisma db seed
  */
-
-const BCRYPT_ROUNDS = 12;
-const MIN_PASSWORD_LENGTH = 12;
 
 const prisma = new PrismaClient();
 
-function readRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is not set. Add it to .env before seeding.`);
+/**
+ * Permission strings are `<resource>:<action>`. lib/rbac.ts matches these
+ * exactly, plus the `*` wildcard which grants everything.
+ */
+export const DEFAULT_ROLES = [
+  {
+    name: "Owner",
+    // Account-wide, everything. PRD §4.
+    permissions: ["*"],
+  },
+  {
+    name: "Admin",
+    permissions: [
+      "clinic:read",
+      "doctor:read",
+      "doctor:create",
+      "doctor:edit",
+      "doctor:delete",
+      "patient:read",
+      "patient:create",
+      "patient:edit",
+      "registration:read",
+      "registration:create",
+      "registration:edit",
+      // FR-3.6 — Admin can see the audit trail; Staff deliberately cannot.
+      "registration:history:read",
+      "report:read",
+      "notification:read",
+      "message:send",
+    ],
+  },
+  {
+    name: "Staff",
+    permissions: [
+      "clinic:read",
+      "doctor:read",
+      "patient:read",
+      "patient:create",
+      "patient:edit",
+      "registration:read",
+      "registration:create",
+      // Staff may edit (the edit is still logged) but cannot read the log back.
+      "registration:edit",
+    ],
+  },
+] as const;
+
+/**
+ * Idempotent: re-running updates each role's permissions in place rather than
+ * creating duplicates, so a permission change here can be replayed safely.
+ */
+export async function seedDefaultRoles(
+  client: PrismaClient,
+  tenantId: string,
+): Promise<void> {
+  for (const role of DEFAULT_ROLES) {
+    await client.role.upsert({
+      where: { tenantId_name: { tenantId, name: role.name } },
+      update: { permissions: [...role.permissions] },
+      create: {
+        tenantId,
+        name: role.name,
+        permissions: [...role.permissions],
+      },
+    });
   }
-  return value;
 }
 
 async function main(): Promise<void> {
-  const email = readRequiredEnv("ADMIN_EMAIL").toLowerCase();
-  const password = readRequiredEnv("ADMIN_PASSWORD");
+  const tenantId = process.env.TENANT_ID?.trim();
 
-  if (!email.includes("@")) {
-    throw new Error("ADMIN_EMAIL is not a valid email address.");
-  }
-
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(
-      `ADMIN_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters.`,
-    );
-  }
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    console.info(`Admin ${email} already exists — nothing to do.`);
+  if (tenantId) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new Error(`No tenant with id ${tenantId}.`);
+    }
+    await seedDefaultRoles(prisma, tenantId);
+    console.info(`Seeded default roles for tenant ${tenantId}.`);
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  // No TENANT_ID given — backfill every existing tenant. On a fresh database
+  // this is a no-op, which is the expected case: roles are created per tenant
+  // at signup, not ahead of time.
+  const tenants = await prisma.tenant.findMany({ select: { id: true } });
 
-  await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-    },
-  });
+  if (tenants.length === 0) {
+    console.info(
+      "No tenants yet — nothing to seed. Roles are created per tenant at signup.",
+    );
+    return;
+  }
 
-  console.info(`Created admin ${email}.`);
+  for (const tenant of tenants) {
+    await seedDefaultRoles(prisma, tenant.id);
+  }
+  console.info(`Seeded default roles for ${tenants.length} tenant(s).`);
 }
 
 main()
