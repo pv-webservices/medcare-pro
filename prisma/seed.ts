@@ -1,86 +1,21 @@
 import { PrismaClient } from "@prisma/client";
+import { seedDefaultRoles } from "../src/lib/defaultRoles";
 
 /**
  * Seeds the three default roles for a tenant — PRD §4.
  *
  * v2 has self-signup (FR-1.1), so this script no longer provisions an admin
- * user by hand. Instead it defines the default role set that every new tenant
- * starts with; the signup flow calls `seedDefaultRoles` for the tenant it just
- * created, and the owner User is assigned the Owner role there.
+ * user by hand. Roles are created per tenant by the signup route; this CLI
+ * exists to backfill tenants that predate a change to the default role set.
  *
- * Run directly to backfill a tenant that predates a role change:
- *   TENANT_ID=<id> npx prisma db seed
+ *   TENANT_ID=<id> npx prisma db seed   # one tenant
+ *   npx prisma db seed                  # every existing tenant
+ *
+ * The role definitions themselves live in src/lib/defaultRoles.ts, so that the
+ * signup route can import them without executing this script.
  */
 
 const prisma = new PrismaClient();
-
-/**
- * Permission strings are `<resource>:<action>`. lib/rbac.ts matches these
- * exactly, plus the `*` wildcard which grants everything.
- */
-export const DEFAULT_ROLES = [
-  {
-    name: "Owner",
-    // Account-wide, everything. PRD §4.
-    permissions: ["*"],
-  },
-  {
-    name: "Admin",
-    permissions: [
-      "clinic:read",
-      "doctor:read",
-      "doctor:create",
-      "doctor:edit",
-      "doctor:delete",
-      "patient:read",
-      "patient:create",
-      "patient:edit",
-      "registration:read",
-      "registration:create",
-      "registration:edit",
-      // FR-3.6 — Admin can see the audit trail; Staff deliberately cannot.
-      "registration:history:read",
-      "report:read",
-      "notification:read",
-      "message:send",
-    ],
-  },
-  {
-    name: "Staff",
-    permissions: [
-      "clinic:read",
-      "doctor:read",
-      "patient:read",
-      "patient:create",
-      "patient:edit",
-      "registration:read",
-      "registration:create",
-      // Staff may edit (the edit is still logged) but cannot read the log back.
-      "registration:edit",
-    ],
-  },
-] as const;
-
-/**
- * Idempotent: re-running updates each role's permissions in place rather than
- * creating duplicates, so a permission change here can be replayed safely.
- */
-export async function seedDefaultRoles(
-  client: PrismaClient,
-  tenantId: string,
-): Promise<void> {
-  for (const role of DEFAULT_ROLES) {
-    await client.role.upsert({
-      where: { tenantId_name: { tenantId, name: role.name } },
-      update: { permissions: [...role.permissions] },
-      create: {
-        tenantId,
-        name: role.name,
-        permissions: [...role.permissions],
-      },
-    });
-  }
-}
 
 async function main(): Promise<void> {
   const tenantId = process.env.TENANT_ID?.trim();

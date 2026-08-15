@@ -1,17 +1,41 @@
-import { notImplemented } from "@/lib/utils";
+import { jsonOk, readJsonBody, toErrorResponse } from "@/lib/apiHandler";
+import { requireActor } from "@/lib/session";
+import {
+  getClinicForActor,
+  updateClinic,
+  updateClinicSchema,
+} from "@/lib/clinics";
 
 // Clinic detail — PRD §6.2 (FR-2.1).
-// Scoping: derive tenantId from the session; never trust a client-supplied
-// tenantId/clinicId. Mutations call requirePermission() from lib/rbac.ts first.
+//
+// An id belonging to another tenant, an unknown id, and an id outside the
+// caller's clinic scope all answer 404 alike (see toErrorResponse): a 403 would
+// confirm the record exists.
+//
+// No DELETE — see the note in ../route.ts.
 
-export async function GET() {
-  return notImplemented("GET /api/clinics/[id]");
+interface RouteContext {
+  // Next 16 hands route params to the handler as a promise.
+  params: Promise<{ id: string }>;
 }
 
-export async function PATCH() {
-  return notImplemented("PATCH /api/clinics/[id]");
+export async function GET(_request: Request, context: RouteContext) {
+  try {
+    const actor = await requireActor();
+    const { id } = await context.params;
+    return jsonOk(await getClinicForActor(actor, id));
+  } catch (error: unknown) {
+    return toErrorResponse(error, "GET /api/clinics/[id]");
+  }
 }
 
-export async function DELETE() {
-  return notImplemented("DELETE /api/clinics/[id]");
+export async function PATCH(request: Request, context: RouteContext) {
+  try {
+    const actor = await requireActor();
+    const { id } = await context.params;
+    const input = updateClinicSchema.parse(await readJsonBody(request));
+    return jsonOk(await updateClinic(actor, id, input));
+  } catch (error: unknown) {
+    return toErrorResponse(error, "PATCH /api/clinics/[id]");
+  }
 }

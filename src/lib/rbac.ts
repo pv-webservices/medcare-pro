@@ -123,6 +123,54 @@ export async function requirePermission(
 }
 
 /**
+ * Which clinics the actor may exercise `permission` in.
+ *
+ * FR-2.3 — every module is scoped by clinic, and a user's reach depends on how
+ * their roles are assigned:
+ *   - a tenant-wide assignment (clinic_id null) reaches every clinic → "all"
+ *   - clinic-scoped assignments reach only those clinics → "clinics"
+ *   - no assignment granting the permission → "none"
+ *
+ * Callers turn this into a Prisma `where` clause. Returning the shape rather
+ * than a list of ids for the tenant-wide case keeps a growing tenant from
+ * paying for an id list on every request.
+ */
+export type ClinicScope =
+  | { scope: "all" }
+  | { scope: "clinics"; clinicIds: readonly string[] }
+  | { scope: "none" };
+
+export async function accessibleClinicScope(
+  actor: ActorContext,
+  permission: string,
+): Promise<ClinicScope> {
+  const assignments = await prisma.userRole.findMany({
+    where: { userId: actor.userId, role: { tenantId: actor.tenantId } },
+    select: { clinicId: true, role: { select: { permissions: true } } },
+  });
+
+  const granting = assignments.filter((assignment) => {
+    const permissions = toPermissionList(assignment.role.permissions);
+    return permissions.includes(WILDCARD) || permissions.includes(permission);
+  });
+
+  if (granting.length === 0) {
+    return { scope: "none" };
+  }
+
+  // A single tenant-wide grant outranks every clinic-scoped one.
+  if (granting.some((assignment) => assignment.clinicId === null)) {
+    return { scope: "all" };
+  }
+
+  const clinicIds = granting
+    .map((assignment) => assignment.clinicId)
+    .filter((id): id is string => id !== null);
+
+  return { scope: "clinics", clinicIds };
+}
+
+/**
  * The role name to record in `registration_edit_log.role_at_time`.
  *
  * Captured at edit time and denormalised into the log, so revoking a role later

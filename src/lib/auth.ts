@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -29,6 +29,22 @@ const credentialsSchema = z.object({
  */
 const DUMMY_PASSWORD_HASH =
   "$2b$12$OJ3jFv9KOzjVHbBcdZHbnek5c4VLp0Mt61tWkWe5kFNRaUQfA5j9q";
+
+/**
+ * FR-1.5 — lets the login page tell "unverified" apart from "wrong password".
+ *
+ * Auth.js collapses every `authorize` failure into a generic CredentialsSignin
+ * error, EXCEPT that a subclass's `code` is copied into the callback URL
+ * (@auth/core/index.js) and surfaced as `code` by `signIn({ redirect: false })`.
+ * That is the only supported channel for distinguishing the two.
+ *
+ * This code does reveal that the address is registered — but it is only ever
+ * reached after the password has already verified, so it tells a caller nothing
+ * they had not already proven.
+ */
+export class EmailNotVerifiedError extends CredentialsSignin {
+  code = "EmailNotVerified";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -83,14 +99,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // FR-1.2 / PRD §9 — login is blocked until the tenant's email is
         // verified. Checked only after the password verifies, so an attacker
         // cannot use this branch to discover which emails are registered.
-        //
-        // FR-1.5 asks for a distinct "please verify your email" message with a
-        // resend option, which a bare `null` cannot express. Throwing here
-        // surfaces the reason to the login page — safe in this position and
-        // this position only, because the caller has already proven they hold
-        // the password.
         if (!user.tenant.emailVerifiedAt) {
-          throw new Error("EmailNotVerified");
+          throw new EmailNotVerifiedError();
         }
 
         return {

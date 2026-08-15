@@ -7,6 +7,13 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  /**
+   * Human-readable note accompanying a *successful* response. Used where the
+   * outcome is deliberately ambiguous — e.g. the verification resend endpoint,
+   * which acknowledges every request identically so it cannot be used to test
+   * whether an address is registered.
+   */
+  message?: string;
 }
 
 /**
