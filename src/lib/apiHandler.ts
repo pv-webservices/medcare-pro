@@ -22,6 +22,18 @@ export class BadRequestError extends Error {
 }
 
 /**
+ * Thrown when a write conflicts with data already stored — e.g. an availability
+ * window overlapping one already set. Maps to 409, and its message is shown to
+ * the user, so phrase it for them.
+ */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConflictError";
+  }
+}
+
+/**
  * Reads and JSON-parses a request body, turning a malformed one into a 400
  * rather than letting the parse error fall through as a 500.
  */
@@ -69,6 +81,11 @@ export function toErrorResponse(
 
   if (error instanceof BadRequestError) {
     return jsonError(error.message, 400);
+  }
+
+  if (error instanceof ConflictError) {
+    // Written for the user, so passed through rather than genericised.
+    return jsonError(error.message, 409);
   }
 
   if (error instanceof ZodError) {
