@@ -1,92 +1,94 @@
-# Automated Clinic Management System
-### Project Structure
-
-This is the template structure for **one clinic instance**. Per the multi-tenant decision, this exact codebase gets cloned and deployed separately for each clinic, each pointing at its own `DATABASE_URL`.
+# MEDCARE PRO — Project Structure v2
+### Supersedes the earlier per-clinic-deployment structure
 
 ```
-clinic-management-system/
+medcare-pro/
 │
 ├── prisma/
-│   ├── schema.prisma              # All DB models: User, Patient, Appointment, ClinicSettings, IvrLog
-│   └── migrations/                # Auto-generated migration history
+│   ├── schema.prisma        # accounts, users, roles, user_roles, clinics, doctors,
+│   │                         # doctor_availability, doctor_leave, patients, registrations,
+│   │                         # registration_edit_log, notifications, whatsapp_messages
+│   └── migrations/
 │
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/
-│   │   │   ├── login/
-│   │   │   │   └── page.tsx       # Admin login screen
+│   │   │   ├── signup/page.tsx          # FR-1.1
+│   │   │   ├── verify-email/page.tsx    # FR-1.2
+│   │   │   ├── login/page.tsx           # FR-1.4/1.5
 │   │   │   └── layout.tsx
 │   │   │
 │   │   ├── (dashboard)/
-│   │   │   ├── layout.tsx         # Shared sidebar/nav for all admin pages
-│   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx       # Revenue + patient counters (Stage 2)
-│   │   │   ├── patients/
-│   │   │   │   ├── page.tsx       # Patient list + search
-│   │   │   │   └── [id]/page.tsx  # Single patient record
-│   │   │   ├── appointments/
-│   │   │   │   └── page.tsx       # Appointment log (Stage 1)
-│   │   │   ├── messages/
-│   │   │   │   └── page.tsx       # WhatsApp template sender (Stage 3)
-│   │   │   └── receptionist/
-│   │   │       └── page.tsx       # Working hours + IVR toggle + call log (Stage 4)
+│   │   │   ├── layout.tsx               # sidebar/nav + clinic switcher
+│   │   │   ├── dashboard/page.tsx        # overview (Stage 2A)
+│   │   │   ├── registration/
+│   │   │   │   ├── page.tsx              # list, search, filter, export (6.3)
+│   │   │   │   ├── new/page.tsx          # create entry
+│   │   │   │   └── [id]/
+│   │   │   │       ├── page.tsx          # view/edit
+│   │   │   │       └── history/page.tsx  # audit trail — admin/owner only
+│   │   │   ├── doctors/
+│   │   │   │   ├── page.tsx              # list + counts (6.4)
+│   │   │   │   └── [id]/page.tsx         # profile, availability calendar, leave
+│   │   │   ├── clinics/
+│   │   │   │   ├── page.tsx              # list (6.5)
+│   │   │   │   └── [id]/page.tsx
+│   │   │   ├── reports/
+│   │   │   │   └── page.tsx              # revenue report (6.6)
+│   │   │   ├── notifications/page.tsx    # (6.7)
+│   │   │   ├── messages/page.tsx         # WhatsApp send (6.9)
+│   │   │   └── settings/
+│   │   │       ├── roles/page.tsx        # role creation/assignment (6.8)
+│   │   │       └── branding/page.tsx     # theme + logo (6.8)
 │   │   │
 │   │   ├── api/
-│   │   │   ├── auth/[...nextauth]/route.ts    # Auth.js handler
-│   │   │   ├── patients/route.ts              # Patient CRUD
-│   │   │   ├── appointments/route.ts          # Appointment CRUD
-│   │   │   ├── clinic-settings/route.ts       # Working hours / toggle
-│   │   │   ├── whatsapp/
-│   │   │   │   ├── send/route.ts              # Fires template message via Meta API
-│   │   │   │   └── webhook/route.ts           # Delivery status callbacks
-│   │   │   └── twilio/
-│   │   │       ├── voice/route.ts             # Incoming call → TwiML response
-│   │   │       └── gather/route.ts            # Captures DTMF keypress → writes ivr_logs
+│   │   │   ├── auth/
+│   │   │   │   ├── [...nextauth]/route.ts
+│   │   │   │   ├── signup/route.ts
+│   │   │   │   └── verify-email/route.ts
+│   │   │   ├── clinics/route.ts
+│   │   │   ├── clinics/[id]/route.ts
+│   │   │   ├── doctors/route.ts
+│   │   │   ├── doctors/[id]/availability/route.ts
+│   │   │   ├── doctors/[id]/leave/route.ts
+│   │   │   ├── registrations/route.ts
+│   │   │   ├── registrations/[id]/route.ts
+│   │   │   ├── registrations/[id]/history/route.ts
+│   │   │   ├── reports/revenue/route.ts
+│   │   │   ├── notifications/route.ts
+│   │   │   ├── roles/route.ts
+│   │   │   └── whatsapp/
+│   │   │       ├── send/route.ts
+│   │   │       └── webhook/route.ts
 │   │   │
 │   │   ├── layout.tsx
 │   │   └── globals.css
 │   │
 │   ├── components/
-│   │   ├── dashboard/              # Revenue/patient counter cards
-│   │   ├── patients/                # Patient table, patient form
-│   │   ├── messages/                # Template picker, send button
-│   │   └── ui/                      # Shared buttons, inputs, modals
+│   │   ├── dashboard/ | registration/ | doctors/ | clinics/ | reports/ | ui/
 │   │
 │   ├── lib/
-│   │   ├── prisma.ts                # Prisma client singleton
-│   │   ├── auth.ts                  # Auth.js config
-│   │   ├── whatsapp.ts              # Meta Cloud API wrapper
-│   │   ├── twilio.ts                # Twilio client + TwiML helpers
+│   │   ├── prisma.ts
+│   │   ├── auth.ts
+│   │   ├── email.ts              # verification emails
+│   │   ├── whatsapp.ts           # third-party BSP wrapper
+│   │   ├── rbac.ts               # permission-check helper, used in every API route
 │   │   └── utils.ts
 │   │
-│   └── types/                       # Shared TypeScript types
+│   └── types/
 │
-├── public/                          # Clinic logo slot, static assets
-├── .env.example                     # DATABASE_URL, NEXTAUTH_SECRET, WHATSAPP_TOKEN, TWILIO_* keys
+├── public/
+├── .env.example        # DATABASE_URL, NEXTAUTH_SECRET, EMAIL_*, WHATSAPP_BSP_*
 ├── next.config.js
 ├── tailwind.config.ts
 ├── package.json
 └── README.md
 ```
 
-## How This Maps to the Feature Stages
+## What changed from v1
 
-| Stage | Folder(s) |
-|---|---|
-| Stage 1 — Patient & Appointment Records | `app/(dashboard)/patients`, `app/(dashboard)/appointments`, `api/patients`, `api/appointments` |
-| Stage 2 — Live Dashboard | `app/(dashboard)/dashboard`, `components/dashboard` |
-| Stage 3 — WhatsApp Communication | `app/(dashboard)/messages`, `api/whatsapp`, `lib/whatsapp.ts` |
-| Stage 4 — Smart Receptionist (IVR) | `app/(dashboard)/receptionist`, `api/twilio`, `lib/twilio.ts` |
-| Stage 5 — Secure Per-Clinic Setup | `.env.example` (per-deployment `DATABASE_URL`), `lib/auth.ts` |
-
-## Per-Clinic Cloning Convention
-
-Each new clinic gets:
-- A fresh copy of this repo (or a shared repo with a clinic-specific branch/deployment)
-- Its own `DATABASE_URL` pointing to a dedicated Hostinger MySQL database
-- Its own `NEXTAUTH_SECRET` and admin credentials
-- Its own subdomain or URL (e.g. `clinicname.yourdomain.com`)
-
----
-
-Ready for PRD and SOP whenever you are.
+- No more per-clinic deployment — this is the entire application, one deployment.
+- `patients/` renamed conceptually to `registration/` to match the client's terminology, but the underlying `Patient` and `Registration` are separate tables (a patient can have multiple registrations/visits).
+- Added `signup`, `verify-email`, `clinics`, `doctors`, `reports`, `notifications`, `settings/roles`, `settings/branding`.
+- `lib/twilio.ts` and `api/twilio/*` removed — IVR is out of MVP scope.
+- `lib/rbac.ts` is new and required — every mutating API route must call it.

@@ -1,102 +1,134 @@
-# Product Requirements Document (PRD)
-## Automated Clinic Management System
+# Product Requirements Document (PRD) — v2
+## MEDCARE PRO
 
 | | |
 |---|---|
-| **Version** | 1.0 |
+| **Version** | 2.0 |
+| **Supersedes** | v1.0 (separate-deployment-per-clinic model — deprecated) |
 | **Owner** | Sitecraf (Pramod Verma) |
-| **Purpose** | Reference document for AI coding agents (Claude, Gemini, etc.) building this project in Antigravity IDE |
+| **Purpose** | Reference document for AI coding agents (Claude, Gemini) building this project in Antigravity IDE |
 
-> **Note to AI agents building this project:** This PRD is the single source of truth for *what* to build and *why*. Follow the data model and functional requirements exactly. Do not introduce features, tables, or pages not listed here without flagging it first.
+> **Note to AI agents:** This is the current source of truth. If you have context from
+> an earlier version of this PRD or the old `prisma-multitenant-mysql` skill, discard
+> it — the multi-tenancy model changed. There is no more "one deployment per clinic."
+
+## Changelog from v1.0
+
+- **Architecture**: single shared platform + single database (was: isolated DB/deployment per clinic)
+- **Auth**: self-signup with email verification (was: admin manually provisioned per clinic, no signup)
+- **New modules**: Doctors, Clinics, Roles/Permissions, Revenue Reports, Notifications, Admin theming
+- **Patient records**: expanded fields + formatted Patient ID + edit audit trail
+- **IVR**: deprioritized, out of MVP scope
+- **WhatsApp**: via a third-party BSP (provider TBD), not direct Meta Cloud API
 
 ---
 
 ## 1. Product Overview
 
-A multi-tenant clinic management web application. Each clinic gets an isolated deployment with its own database, admin login, patient records, WhatsApp messaging, and an after-hours AI/IVR receptionist. Built for small clinics that currently rely on manual, paper-based, or spreadsheet-based operations.
+A multi-clinic SaaS platform. One account (a business/owner) signs up once and can
+manage multiple clinics under that single login — each clinic has its own doctors,
+patients, and revenue tracking, but all live in one shared application and database,
+scoped by `clinicId`.
 
 ## 2. Problem Statement
 
-1. Clinics lose patients to unanswered after-hours calls.
-2. Front-desk staff track revenue and patient counts manually.
-3. Patient communication (reminders, updates) is inconsistent and depends on someone remembering to call.
+1. Clinics track patients and revenue manually, with no shared system across multiple
+   locations under the same owner.
+2. There's no audit trail — anyone can edit a patient record with no accountability.
+3. Owners running more than one clinic have no consolidated view of performance
+   across locations or doctors.
+4. Patient communication (reminders, updates) is inconsistent.
 
 ## 3. Goals
 
-- Give clinic staff one dashboard for daily operations (revenue, patients, appointments).
-- Never lose an after-hours lead — capture it automatically and surface it the next morning.
-- Reduce no-shows via automated WhatsApp reminders.
-- Keep each clinic's data fully isolated (multi-tenant by design, not by shared table with a `clinic_id` filter).
+- One login gives an account owner visibility and control across all their clinics.
+- Every record edit is attributable and visible to admins (transparency, not silent edits).
+- Revenue and growth are viewable at a glance — by clinic, by doctor, by time period.
+- Role-based access so staff only see/do what their role permits.
 
-## 4. Users
+## 4. Users & Roles
 
-| User | Role |
-|---|---|
-| Clinic Admin / Front-desk staff | Logs in daily, manages patients/appointments, sends WhatsApp messages, monitors dashboard |
-| Patient | Indirect user — receives WhatsApp messages, interacts with the IVR when calling after hours |
-| Platform Operator (Sitecraf) | Deploys and maintains each clinic's instance |
+| Role | Scope | Capabilities |
+|---|---|---|
+| **Owner/Super Admin** | Account-wide | Everything — manage clinics, doctors, patients, roles, theme/branding, sees all edit history |
+| **Admin** | Account-wide or clinic-scoped (assignable) | Manage patients/doctors/registrations for assigned scope, sees edit history for their scope |
+| **Staff/Receptionist** | Single clinic | Create/view patient registrations, cannot see edit history, cannot manage doctors/clinics/roles |
+
+Roles are custom and assignable per user — the three above are the default seed set,
+not a hardcoded enum the UI locks to.
 
 ## 5. Scope
 
 ### In Scope (MVP)
-- Admin authentication (single admin login per clinic for MVP)
-- Patient directory (CRUD)
-- Appointment logging (CRUD)
-- Live dashboard: today's revenue, today's patient count, patient search
-- WhatsApp: send pre-approved templates manually + automated 24-hour appointment reminders
-- Clinic working-hours settings + manual emergency toggle
-- Twilio IVR: after-hours call handling, DTMF capture, call logging, dashboard notification
+- Signup (email + password + business name) with email verification gate before login
+- Multi-clinic management under one account
+- Patient registration: full field set, search, filter, export, edit audit trail
+- Doctors: CRUD, availability calendar, optional leave tracking
+- Clinics: CRUD (name, address, city, branding)
+- Revenue reports: daily/weekly/monthly/yearly, filterable by clinic and doctor, with KPIs and a growth graph
+- Notifications on record modification
+- Role creation and assignment (Owner/Admin/Staff seed roles, extensible)
+- Admin settings: theme customization, logo upload
+- WhatsApp messaging via a third-party BSP (provider integration TBD)
 
 ### Out of Scope (MVP) — Future Roadmap
-- Patient self-service booking portal
-- Multi-staff logins with role-based permissions
-- SMS fallback
-- Cross-clinic usage/billing dashboard for the platform operator
+- IVR / after-hours smart receptionist (deprioritized, revisit post-MVP)
 - Native mobile app
+- Patient self-service booking portal
 
 ---
 
 ## 6. Functional Requirements
 
-### 6.1 Authentication
-- **FR-1.1**: Admin can log in with email + password via Auth.js.
-- **FR-1.2**: Sessions persist securely; unauthenticated users are redirected to `/login`.
-- **Acceptance criteria**: Invalid credentials show an error, no stack trace leaked; valid login redirects to `/dashboard`.
+### 6.1 Signup & Authentication
+- **FR-1.1**: User signs up with Business/Clinic Name, Email, Password.
+- **FR-1.2**: Account is inactive until email is verified (verification link sent to the provided email).
+- **FR-1.3**: After verification, user is redirected to `/login`.
+- **FR-1.4**: On login, browser autofill works normally (correct `autocomplete` attributes on email/password fields — no custom JS blocking it).
+- **FR-1.5**: Unverified accounts attempting login see a clear "please verify your email" message with a resend option.
 
-### 6.2 Patient Management
-- **FR-2.1**: Admin can create a patient record (name, phone number, required; created_at auto-set).
-- **FR-2.2**: Admin can view a list of all patients with search-by-name or phone.
-- **FR-2.3**: Admin can view a single patient's record, including their appointment history.
-- **FR-2.4**: Admin can edit or delete a patient record.
-- **Acceptance criteria**: Search returns matches as the admin types (debounced); duplicate phone numbers are flagged, not silently allowed.
+### 6.2 Clinics Module
+- **FR-2.1**: Owner/Admin can create additional clinics under their account (name, address, city, branding).
+- **FR-2.2**: Clinic list view shows all clinics under the account with key stats (patient count, doctor count).
+- **FR-2.3**: Every other module (patients, doctors, reports) is filterable/scoped by clinic.
 
-### 6.3 Appointment Management
-- **FR-3.1**: Admin can log an appointment against an existing patient: visit date, reason, amount paid.
-- **FR-3.2**: Appointments list is filterable by date range.
-- **FR-3.3**: Every appointment logged updates the dashboard's daily revenue/patient totals in real time.
-- **Acceptance criteria**: Amount paid accepts decimal values; a malformed date is rejected client-side before submission.
+### 6.3 Patient Registration
+- **FR-3.1**: New registration form: auto-generated Patient ID (`PT-YYYY-####`, sequential), Patient Name, Age, Gender, Mobile Number, Amount, Address (with City), Doctor (select), Department (**required**).
+- **FR-3.2**: Registration list is searchable by patient name or phone number.
+- **FR-3.3**: Registration list supports filtering (by clinic, doctor, department, date range).
+- **FR-3.4**: Registrations can be exported (CSV at minimum).
+- **FR-3.5**: Registration records are editable.
+- **FR-3.6**: Every edit is logged: who (role + user), when (date/time), what changed. Edit history is visible **only to Admin/Owner roles** — Staff cannot see it.
+- **Acceptance criteria**: Editing a record never silently overwrites without a log entry; Staff role can edit but the edit still gets logged and is just not visible to them afterward.
 
-### 6.4 Dashboard
-- **FR-4.1**: Dashboard shows "Total Revenue (Today)" — sum of `amount_paid` for appointments where `visit_date` = today.
-- **FR-4.2**: Dashboard shows "Total Patients (Today)" — count of distinct patients with an appointment today.
-- **FR-4.3**: Dashboard shows a notification list of unactioned after-hours IVR calls (from `ivr_logs`, status = pending).
-- **Acceptance criteria**: Values recalculate on page load without a manual refresh button; zero-state ("No appointments yet today") is handled gracefully.
+### 6.4 Doctors Module
+- **FR-4.1**: Dashboard shows total doctor count, filterable by clinic.
+- **FR-4.2**: Admin can add a doctor: Name, Department, Gender, Age, Phone (optional), Clinic Location (which clinic they belong to).
+- **FR-4.3**: Doctor availability is calendar-based — specific dates and time ranges.
+- **FR-4.4**: Optional leave form — date range + optional reason, marks the doctor unavailable for that period.
 
-### 6.5 WhatsApp Communication
-- **FR-5.1**: Admin selects a patient + a pre-approved Meta template from a dropdown, clicks Send.
-- **FR-5.2**: Backend route calls the WhatsApp Cloud API with the template payload.
-- **FR-5.3**: System automatically sends a reminder template 24 hours before a logged appointment's `visit_date`.
-- **FR-5.4**: Delivery status (sent/delivered/failed) is logged and visible against the message.
-- **Acceptance criteria**: Only Meta-approved templates are selectable (no free-text messaging in MVP — stays compliant with WhatsApp policy); failed sends show a retry option.
+### 6.5 Clinic Module
+- Follows the same structural pattern as Doctors: list, add/edit form, and detail view scoped to the account.
 
-### 6.6 Smart After-Hours Receptionist (IVR)
-- **FR-6.1**: Admin sets weekly working hours (day + start/end time) in Clinic Settings.
-- **FR-6.2**: Admin can manually toggle IVR "ON" regardless of schedule (emergency override).
-- **FR-6.3**: Incoming call → Twilio webhook hits the API → API checks `clinic_settings` → if closed, play the "Press 1 to request an appointment" TwiML message.
-- **FR-6.4**: DTMF input ('1') is written to `ivr_logs` (caller_phone, input_received, timestamp, status = pending).
-- **FR-6.5**: New `ivr_logs` entry triggers a dashboard notification (FR-4.3).
-- **FR-6.6**: Admin can mark a logged call as "actioned" once they've called the patient back.
-- **Acceptance criteria**: If working hours are not yet configured, IVR defaults to "closed" (fail-safe toward capturing the lead, not losing it).
+### 6.6 Revenue Report
+- **FR-6.1**: Revenue totals selectable by period: Daily, Weekly, Monthly, Yearly.
+- **FR-6.2**: KPI metrics displayed (e.g. total revenue, total registrations, average revenue per patient) for the selected period.
+- **FR-6.3**: Growth graph showing the trend over the selected period.
+- **FR-6.4**: Report is breakable down by clinic and by doctor — not just an account-wide total.
+
+### 6.7 Notifications
+- **FR-7.1**: Any modification to a patient/doctor/clinic record generates a notification visible to Admin/Owner roles.
+- **FR-7.2**: Notifications are marked read/unread.
+
+### 6.8 Admin Settings (Owner/Admin only)
+- **FR-8.1**: Create custom roles and assign granular permissions.
+- **FR-8.2**: Assign roles to users, optionally scoped to a specific clinic.
+- **FR-8.3**: Upload/change the account's logo.
+- **FR-8.4**: Customize theme (at minimum: primary brand color).
+
+### 6.9 WhatsApp Messaging
+- **FR-9.1**: Send template messages to patients via the third-party BSP's API (provider and credentials TBD — see Assumptions).
+- **FR-9.2**: Delivery status logged and visible against the message.
 
 ---
 
@@ -104,62 +136,57 @@ A multi-tenant clinic management web application. Each clinic gets an isolated d
 
 | Table | Key Fields | Notes |
 |---|---|---|
-| `users` / `sessions` | Standard Auth.js fields | Admin credentials, session tokens |
-| `patients` | `id`, `name`, `phone_number`, `created_at` | Core patient directory |
-| `appointments` | `id`, `patient_id` (FK), `visit_date`, `reason`, `amount_paid` | Drives dashboard metrics |
-| `clinic_settings` | `id`, `working_days`, `office_hours_start`, `office_hours_end`, `manual_ivr_toggle` | Single row per clinic instance |
-| `ivr_logs` | `id`, `caller_phone`, `input_received`, `timestamp`, `status` | `status`: pending / actioned |
+| `accounts` | `id`, `business_name`, `email`, `password_hash`, `email_verified_at`, `created_at` | Top-level tenant — one signup = one account |
+| `users` | `id`, `account_id` (FK), `name`, `email`, `password_hash`, `created_at` | A login within an account (owner, admin, or staff) |
+| `roles` | `id`, `account_id` (FK), `name`, `permissions` (JSON) | Custom, extensible; seed with Owner/Admin/Staff |
+| `user_roles` | `user_id` (FK), `role_id` (FK), `clinic_id` (FK, nullable) | Null `clinic_id` = account-wide scope |
+| `clinics` | `id`, `account_id` (FK), `name`, `address`, `city`, `logo_url`, `theme_color` | A clinic belongs to one account |
+| `doctors` | `id`, `clinic_id` (FK), `name`, `department`, `gender`, `age`, `phone` | |
+| `doctor_availability` | `id`, `doctor_id` (FK), `date`, `start_time`, `end_time` | |
+| `doctor_leave` | `id`, `doctor_id` (FK), `start_date`, `end_date`, `reason` | Optional |
+| `patients` | `id`, `clinic_id` (FK), `patient_code` (e.g. `PT-2026-0001`), `name`, `age`, `gender`, `mobile_number`, `address`, `city`, `created_at` | |
+| `registrations` | `id`, `clinic_id` (FK), `patient_id` (FK), `doctor_id` (FK), `department`, `amount`, `visit_date`, `created_by` (user_id) | The appointment/visit + revenue record |
+| `registration_edit_log` | `id`, `registration_id` (FK), `edited_by_user_id`, `role_at_time`, `changed_fields` (JSON), `timestamp` | Immutable audit trail |
+| `notifications` | `id`, `account_id`, `clinic_id` (nullable), `type`, `message`, `related_record_id`, `read`, `created_at` | |
+| `whatsapp_messages` | `id`, `clinic_id`, `patient_id`, `template_name`, `status`, `sent_at` | Logged sends via the BSP |
 
-Each clinic's deployment has its own instance of this schema in its own dedicated MySQL database — no shared tables across clinics.
+**Isolation model**: every clinic-scoped table carries `clinic_id`; every account-scoped
+table carries `account_id`. Row-level scoping is enforced in the application layer
+(every query filtered by the logged-in user's account, and further by clinic where the
+user's role is clinic-scoped) — this is a deliberate reversal of the old
+"isolated database per clinic" model.
 
 ---
 
 ## 8. System Architecture (Reference)
 
-- **Frontend/Backend**: Next.js (React) + Tailwind CSS, single codebase per clinic
-- **Database**: Hostinger MySQL, one isolated instance per clinic
+- **Frontend/Backend**: Next.js (App Router) + Tailwind CSS — single codebase, single deployment
+- **Database**: One Hostinger MySQL database, shared across all accounts/clinics
 - **ORM**: Prisma
-- **Auth**: Auth.js (NextAuth.js)
-- **Messaging**: WhatsApp Cloud API (Meta)
-- **Voice**: Twilio (IVR, DTMF capture)
+- **Auth**: Auth.js (NextAuth.js) with Credentials provider + email verification flow
+- **Messaging**: Third-party WhatsApp BSP (provider TBD)
+- **Roles**: Custom RBAC — permissions checked at the API layer, not just hidden in the UI
 
-Full folder structure is defined in the separate Project Structure document.
+## 9. Non-Functional Requirements
 
-## 9. Key API Endpoints
+- **Data scoping**: Every API route must filter by `accountId`, and by `clinicId` where the requester's role is clinic-scoped. A Staff user for Clinic A must never be able to fetch Clinic B's data by guessing an ID.
+- **Audit integrity**: `registration_edit_log` entries are append-only — never updated or deleted, even by Owner.
+- **RBAC enforcement**: Permission checks happen server-side on every mutating request, not just conditionally rendered in the UI.
+- **Email verification**: Login is blocked until `email_verified_at` is set.
+- **Compliance**: WhatsApp sends only use provider-approved templates.
 
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/api/auth/[...nextauth]` | GET/POST | Auth.js handler |
-| `/api/patients` | GET/POST/PUT/DELETE | Patient CRUD |
-| `/api/appointments` | GET/POST/PUT/DELETE | Appointment CRUD |
-| `/api/clinic-settings` | GET/PUT | Working hours + IVR toggle |
-| `/api/whatsapp/send` | POST | Send a template message |
-| `/api/whatsapp/webhook` | POST | Receive delivery status callbacks |
-| `/api/twilio/voice` | POST | Twilio webhook — incoming call, returns TwiML |
-| `/api/twilio/gather` | POST | Twilio webhook — captures DTMF input |
+## 10. Assumptions & Dependencies
 
----
+- **WhatsApp BSP provider is not yet named.** The PRD assumes a generic BSP with a template-send endpoint and delivery-status webhook — confirm the actual provider (e.g. Interakt, Gupshup, AiSensy, Wati) before building `lib/whatsapp.ts`, since auth method and payload shape differ per provider.
+- **Email verification requires a transactional email service** (e.g. Resend, SendGrid) — not yet selected; needed before Stage 1 (signup) can be finished end-to-end.
+- **Patient ID uniqueness scope**: assumed account-wide (not per-clinic) sequential numbering, resetting yearly. Flag if it should be per-clinic instead.
 
-## 10. Non-Functional Requirements
+## 11. Constraints
 
-- **Data isolation**: One clinic must never be able to query or see another clinic's data, enforced at the database level (separate DB), not just application-level filtering.
-- **Security**: All admin routes require an authenticated session; WhatsApp/Twilio webhook routes must validate the incoming request signature (Meta/Twilio signing secret) before processing.
-- **Compliance**: Only pre-approved WhatsApp templates are sent — no free-form outbound messaging, to stay within Meta's policy.
-- **Reliability**: If the IVR webhook fails to reach the database, the call should still complete gracefully for the caller (no dead air).
-- **Performance**: Dashboard metrics should load in under 2 seconds for a single clinic's typical data volume.
+- Budget-conscious build — avoid stacking additional paid vendors beyond what's confirmed here.
 
-## 11. Assumptions & Dependencies
+## 12. Glossary
 
-- Meta WhatsApp Business/Cloud API access is approved before Phase 3 messaging work begins (approval can take several days — apply early).
-- A Twilio account and phone number are provisioned before IVR work begins.
-- Each clinic has a Hostinger MySQL database provisioned before that clinic's deployment starts.
-
-## 12. Constraints
-
-- Budget-conscious build — avoid stacking additional paid vendors beyond what's specified here (Hostinger, WhatsApp Cloud API, Twilio).
-
-## 13. Glossary
-
-- **DTMF**: Dual-tone multi-frequency — the keypad tones Twilio captures when a caller presses a number.
-- **TwiML**: Twilio's XML-based markup for defining call behavior.
-- **Multi-tenant (this project's model)**: Each clinic = its own isolated database + deployment, not shared tables with a tenant filter.
+- **Account**: the top-level tenant created at signup; can own multiple clinics.
+- **BSP**: WhatsApp Business Solution Provider — a third-party platform that provides API access to WhatsApp Business messaging.
+- **RBAC**: Role-Based Access Control.
