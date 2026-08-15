@@ -1,0 +1,168 @@
+// Clinic Management System — data model.
+//
+// Source of truth: docs/PRD.md §7. One isolated MySQL database per clinic
+// (docs/PRD.md §10 "Data isolation") — there is deliberately no `clinic_id`
+// column anywhere, tenancy is the deployment, not a filter.
+//
+// Naming convention: PascalCase models / camelCase fields (TypeScript side),
+// with @map / @@map preserving the exact snake_case table and column names
+// from PRD §7 in the database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js (NextAuth) — PRD §7 `users` / `sessions`, standard adapter fields.
+// Field names inside Account/Session/VerificationToken are fixed by
+// @auth/prisma-adapter and must not be renamed.
+// `passwordHash` is the one addition, required by FR-1.1 (email + password).
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  passwordHash  String?   @map("password_hash")
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @map("refresh_token") @db.Text
+  access_token      String? @map("access_token") @db.Text
+  expires_at        Int?    @map("expires_at")
+  token_type        String? @map("token_type")
+  scope             String?
+  id_token          String? @map("id_token") @db.Text
+  session_state     String? @map("session_state")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Patient directory — PRD §7 `patients`, FR-2.x
+// ---------------------------------------------------------------------------
+
+model Patient {
+  id          String   @id @default(cuid())
+  name        String
+  phoneNumber String   @map("phone_number")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  appointments Appointment[]
+
+  // FR-2.2 search by name or phone. Deliberately not @unique: FR-2.1 requires
+  // duplicate phone numbers to be *flagged*, not rejected at the DB level.
+  @@index([name])
+  @@index([phoneNumber])
+  @@map("patients")
+}
+
+// ---------------------------------------------------------------------------
+// Appointments — PRD §7 `appointments`, FR-3.x. Drives dashboard metrics.
+// ---------------------------------------------------------------------------
+
+model Appointment {
+  id         String   @id @default(cuid())
+  patientId  String   @map("patient_id")
+  visitDate  DateTime @map("visit_date")
+  reason     String   @db.Text
+  amountPaid Decimal  @map("amount_paid") @db.Decimal(10, 2)
+
+  // onDelete decision: Cascade — deleting a patient (FR-2.4) removes their
+  // appointment history with them, leaving no orphaned rows.
+  // TRADEOFF: this retroactively changes past revenue totals (FR-4.1), since
+  // the dashboard sums appointments by visit_date. Switch to Restrict if
+  // financial history must survive a patient deletion.
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // FR-4.1 / FR-4.2 aggregate by visit_date; FR-2.3 lists a patient's history.
+  @@index([patientId])
+  @@index([visitDate])
+  @@map("appointments")
+}
+
+// ---------------------------------------------------------------------------
+// Clinic settings — PRD §7 `clinic_settings`, FR-6.1 / FR-6.2.
+// Exactly one row per clinic deployment.
+// ---------------------------------------------------------------------------
+
+model ClinicSettings {
+  id String @id @default(cuid())
+
+  // Per-day opening hours, e.g.
+  // {"MON":{"start":"09:00","end":"18:00"},"SAT":{"start":"09:00","end":"13:00"}}
+  workingDays Json @map("working_days")
+
+  // Clinic-wide default hours in 24h "HH:mm" clock time.
+  // Null = not yet configured; per FR-6.6 the IVR must then fail safe to "closed".
+  officeHoursStart String? @map("office_hours_start") @db.VarChar(5)
+  officeHoursEnd   String? @map("office_hours_end") @db.VarChar(5)
+
+  // FR-6.2 emergency override — forces the IVR on regardless of schedule.
+  manualIvrToggle Boolean @default(false) @map("manual_ivr_toggle")
+
+  @@map("clinic_settings")
+}
+
+// ---------------------------------------------------------------------------
+// After-hours IVR call log — PRD §7 `ivr_logs`, FR-6.4 / FR-6.5 / FR-6.6.
+// ---------------------------------------------------------------------------
+
+enum IvrStatus {
+  pending
+  actioned
+}
+
+model IvrLog {
+  id            String    @id @default(cuid())
+  callerPhone   String    @map("caller_phone")
+  inputReceived String    @map("input_received")
+  timestamp     DateTime  @default(now())
+  status        IvrStatus @default(pending)
+
+  // FR-4.3 dashboard notification list queries status = pending.
+  @@index([status])
+  @@map("ivr_logs")
+}
