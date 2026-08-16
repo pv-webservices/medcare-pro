@@ -19,6 +19,41 @@ const FORMATTER = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 });
 
+const LAKH = 100_000;
+const CRORE = 10_000_000;
+const THOUSAND = 1_000;
+
+/**
+ * A short form for axis ticks, where a full figure will not fit.
+ *
+ * Uses the Indian scale — thousand, lakh, crore — to match the en-IN grouping
+ * above. "₹1.2L" is what a clinic in India reads; "₹120K" is not.
+ *
+ * Ticks only. Money the reader has to act on is shown in full by
+ * `formatRupees`: at clinic scale an exact total is short enough to print, and
+ * rounding a revenue figure to one decimal is a worse trade than the space it
+ * saves.
+ */
+export function formatRupeesCompact(amount: string | number): string {
+  const value = typeof amount === "number" ? amount : Number(amount);
+
+  if (!Number.isFinite(value)) {
+    return `${CURRENCY_SYMBOL}0`;
+  }
+
+  const sign = value < 0 ? "-" : "";
+  const magnitude = Math.abs(value);
+
+  const trim = (scaled: number, suffix: string) =>
+    `${sign}${CURRENCY_SYMBOL}${Number(scaled.toFixed(1))}${suffix}`;
+
+  if (magnitude >= CRORE) return trim(magnitude / CRORE, "Cr");
+  if (magnitude >= LAKH) return trim(magnitude / LAKH, "L");
+  if (magnitude >= THOUSAND) return trim(magnitude / THOUSAND, "K");
+
+  return `${sign}${CURRENCY_SYMBOL}${Math.round(magnitude)}`;
+}
+
 /**
  * "500.00" → "₹500.00".
  *

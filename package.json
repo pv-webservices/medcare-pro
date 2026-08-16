@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
-    "verify:registrations": "tsx scripts/verify-registrations.mts"
+    "verify:registrations": "tsx scripts/verify-registrations.mts",
+    "verify:reports": "tsx scripts/verify-reports.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
