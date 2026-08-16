@@ -11,6 +11,10 @@ import {
   parseDateTime,
 } from "@/lib/dates";
 import { generatePatientCode } from "@/lib/generatePatientCode";
+import {
+  notifyRegistrationCreated,
+  notifyRegistrationUpdated,
+} from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import {
   assertClinicInTenant,
@@ -23,8 +27,10 @@ import {
 import {
   diffSnapshots,
   parseChangedFields,
+  FIELD_LABELS,
   type ChangedFields,
   type RegistrationSnapshot,
+  type SnapshotField,
   type RenderedChange,
 } from "@/lib/registrationAudit";
 
@@ -863,7 +869,21 @@ export async function createRegistration(
     snapshot: created,
   });
 
-  return getRegistrationForActor(actor, registrationId);
+  const record = await getRegistrationForActor(actor, registrationId);
+
+  // FR-7.1. Outside the transaction above on purpose — the log row is what has
+  // to be atomic with the write (PRD §9); the notification is a feed entry, and
+  // failing the receptionist's save over one would be the wrong trade.
+  await notifyRegistrationCreated(actor, {
+    registrationId,
+    clinicId: record.clinicId,
+    clinicName: record.clinicName,
+    patientName: record.patientName,
+    patientCode: record.patientCode,
+    isNewPatient: patient === null,
+  });
+
+  return record;
 }
 
 interface InsertOptions {
@@ -1054,5 +1074,25 @@ export async function updateRegistration(
     });
   });
 
-  return getRegistrationForActor(actor, registrationId);
+  const record = await getRegistrationForActor(actor, registrationId);
+
+  // FR-7.1 — the patient-record modification case. The field list is read off
+  // the same diff that was just logged, so the feed and the audit trail can
+  // never name different changes.
+  await notifyRegistrationUpdated(
+    actor,
+    {
+      registrationId,
+      clinicId: record.clinicId,
+      clinicName: record.clinicName,
+      patientName: record.patientName,
+      patientCode: record.patientCode,
+      isNewPatient: false,
+    },
+    Object.keys(changed).map(
+      (field) => FIELD_LABELS[field as SnapshotField] ?? field,
+    ),
+  );
+
+  return record;
 }

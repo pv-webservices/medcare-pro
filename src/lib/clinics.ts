@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { notifyClinicCreated, notifyClinicUpdated } from "@/lib/notifications";
 import {
   accessibleClinicScope,
   assertClinicInTenant,
@@ -196,6 +197,10 @@ export async function createClinic(
     },
   });
 
+  // FR-7.1. After the write, never inside it: a feed row must not be able to
+  // undo a clinic the user already created.
+  await notifyClinicCreated(actor, { clinicId: clinic.id, clinicName: clinic.name });
+
   return { ...clinic, doctorCount: 0, patientCount: 0 };
 }
 
@@ -229,5 +234,11 @@ export async function updateClinic(
 
   // Re-read through the scoped getter so the response is built the same way as
   // every other read, counts included.
-  return getClinicForActor(actor, clinicId);
+  const updated = await getClinicForActor(actor, clinicId);
+
+  // FR-7.1. Named with the clinic's post-edit name — the feed should read the
+  // way the record does now, not the way it did a moment ago.
+  await notifyClinicUpdated(actor, { clinicId, clinicName: updated.name });
+
+  return updated;
 }

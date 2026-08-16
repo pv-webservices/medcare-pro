@@ -39,9 +39,10 @@ created per tenant at signup, so on a fresh database this is a no-op.
 
 ## Status
 
-**Scaffolding only.** The folder structure, Prisma schema and API route wiring
-are in place; every API route currently returns `501 Not Implemented` and every
-page is a placeholder.
+**Built through Stage 6.** Auth, clinics, doctors, patient registration with its
+audit trail, revenue reports and notifications are implemented. Roles/settings
+and WhatsApp are still scaffolding — those routes return `501 Not Implemented`
+and their pages are placeholders.
 
 Two modules are blocked on vendor decisions and are stubbed to throw rather than
 guess (see [`docs/PRD.md`](docs/PRD.md) §10):
@@ -53,16 +54,16 @@ guess (see [`docs/PRD.md`](docs/PRD.md) §10):
 
 Build order (per [`CLAUDE.md`](CLAUDE.md)):
 
-| Stage | Where it lives |
-|---|---|
-| 1 — Auth (signup, verification, login) | `src/app/(auth)`, `src/app/api/auth`, `src/lib/auth.ts`, `src/lib/email.ts` |
-| 2 — Clinics | `src/app/(dashboard)/clinics`, `src/app/api/clinics` |
-| 3 — Doctors | `src/app/(dashboard)/doctors`, `src/app/api/doctors` |
-| 4 — Patient registration + audit trail | `src/app/(dashboard)/registration`, `src/app/api/registrations` |
-| 5 — Revenue reports | `src/app/(dashboard)/reports`, `src/app/api/reports` |
-| 6 — Notifications | `src/app/(dashboard)/notifications`, `src/app/api/notifications` |
-| 7 — Roles & settings | `src/app/(dashboard)/settings`, `src/app/api/roles`, `src/lib/rbac.ts` |
-| 8 — WhatsApp | `src/app/(dashboard)/messages`, `src/app/api/whatsapp`, `src/lib/whatsapp.ts` |
+| Stage | Where it lives | Status |
+|---|---|---|
+| 1 — Auth (signup, verification, login) | `src/app/(auth)`, `src/app/api/auth`, `src/lib/auth.ts`, `src/lib/email.ts` | Built (email send vendor-blocked) |
+| 2 — Clinics | `src/app/(dashboard)/clinics`, `src/app/api/clinics` | Built |
+| 3 — Doctors | `src/app/(dashboard)/doctors`, `src/app/api/doctors` | Built |
+| 4 — Patient registration + audit trail | `src/app/(dashboard)/registration`, `src/app/api/registrations` | Built |
+| 5 — Revenue reports | `src/app/(dashboard)/reports`, `src/app/api/reports` | Built |
+| 6 — Notifications | `src/app/(dashboard)/notifications`, `src/app/api/notifications`, `src/lib/notifications.ts` | Built |
+| 7 — Roles & settings | `src/app/(dashboard)/settings`, `src/app/api/roles`, `src/lib/rbac.ts` | Scaffolding |
+| 8 — WhatsApp | `src/app/(dashboard)/messages`, `src/app/api/whatsapp`, `src/lib/whatsapp.ts` | Scaffolding (vendor-blocked) |
 
 IVR / after-hours smart receptionist is **out of MVP scope** and its Twilio
 scaffolding has been removed.

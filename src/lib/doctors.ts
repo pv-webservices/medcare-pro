@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ConflictError } from "@/lib/apiHandler";
 import { clinicWhereForActor } from "@/lib/clinicScope";
+import { notifyDoctorCreated, notifyDoctorUpdated } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import {
   assertClinicInTenant,
@@ -323,6 +324,15 @@ export async function createDoctor(
   });
 
   const { clinic, ...rest } = doctor;
+
+  // FR-7.1 — after the write, and never allowed to fail it.
+  await notifyDoctorCreated(actor, {
+    doctorId: doctor.id,
+    doctorName: doctor.name,
+    clinicId: doctor.clinicId,
+    clinicName: clinic.name,
+  });
+
   return { ...rest, clinicName: clinic.name, isOnLeaveToday: false };
 }
 
@@ -344,7 +354,20 @@ export async function updateDoctor(
     },
   });
 
-  return getDoctorForActor(actor, doctorId);
+  const updated = await getDoctorForActor(actor, doctorId);
+
+  // FR-7.1. Availability and leave writes deliberately raise nothing: they are
+  // day-to-day scheduling entries, not modifications to the doctor's record,
+  // and notifying on each one would bury the record changes this feed exists
+  // to surface.
+  await notifyDoctorUpdated(actor, {
+    doctorId,
+    doctorName: updated.name,
+    clinicId: updated.clinicId,
+    clinicName: updated.clinicName,
+  });
+
+  return updated;
 }
 
 /**

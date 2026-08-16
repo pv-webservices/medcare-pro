@@ -4,6 +4,7 @@ import DashboardNav from "@/components/dashboard/DashboardNav";
 import ClinicSwitcher from "@/components/dashboard/ClinicSwitcher";
 import SignOutButton from "@/components/dashboard/SignOutButton";
 import { listClinicsForActor } from "@/lib/clinics";
+import { countUnreadForActor } from "@/lib/notifications";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
@@ -32,9 +33,12 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   }
 
   // The switcher only ever offers clinics this user can actually reach.
-  const [clinics, selectedClinicId] = await Promise.all([
+  // `countUnreadForActor` returns 0 rather than throwing for a Staff user, so
+  // the shell renders the same for everyone — only the badge differs.
+  const [clinics, selectedClinicId, unreadNotifications] = await Promise.all([
     listClinicsForActor(actor),
     resolveSelectedClinicId(actor),
+    countUnreadForActor(actor),
   ]);
 
   return (
@@ -51,7 +55,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           </div>
         )}
 
-        <DashboardNav />
+        <DashboardNav unreadNotifications={unreadNotifications} />
 
         <div className="mt-4 md:mt-6">
           <SignOutButton />
