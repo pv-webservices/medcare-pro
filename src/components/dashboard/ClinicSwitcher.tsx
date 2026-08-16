@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Select from "@/components/ui/Select";
 import { SELECTED_CLINIC_COOKIE } from "@/lib/cookieNames";
 
 /**
@@ -48,26 +49,18 @@ export default function ClinicSwitcher({
   }
 
   return (
-    <div>
-      <label
-        htmlFor="clinic-switcher"
-        className="mb-1 block text-xs font-medium text-black/55 dark:text-white/55"
-      >
-        Viewing clinic
-      </label>
-      <select
-        id="clinic-switcher"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        className="block min-h-11 w-full rounded border border-black/20 bg-transparent px-2 text-sm outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60"
-      >
-        <option value="">All clinics</option>
-        {clinics.map((clinic) => (
-          <option key={clinic.id} value={clinic.id}>
-            {clinic.name}
-          </option>
-        ))}
-      </select>
-    </div>
+    <Select
+      id="clinic-switcher"
+      label="Viewing clinic"
+      value={value}
+      onChange={(e) => handleChange(e.target.value)}
+    >
+      <option value="">All clinics</option>
+      {clinics.map((clinic) => (
+        <option key={clinic.id} value={clinic.id}>
+          {clinic.name}
+        </option>
+      ))}
+    </Select>
   );
 }

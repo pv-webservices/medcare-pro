@@ -2,6 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import Input, { Textarea } from "@/components/ui/Input";
+import { useToast } from "@/components/ui/Toast";
 
 /**
  * Add/edit a clinic — PRD §6.2 (FR-2.1).
@@ -36,14 +39,6 @@ const EMPTY: ClinicFormValues = {
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
-const INPUT_INVALID_CLASS =
-  "block min-h-11 w-full rounded border border-red-600 bg-transparent px-3 text-base outline-none dark:border-red-500";
-const LABEL_CLASS = "mb-1 block text-sm font-medium";
-const HINT_CLASS = "mt-1 text-xs text-black/55 dark:text-white/55";
-const FIELD_ERROR_CLASS = "mt-1 text-xs text-red-700 dark:text-red-400";
-
 type FieldErrors = Partial<Record<keyof ClinicFormValues, string>>;
 
 /** Mirrors the zod rules in src/lib/clinics.ts — the server remains authoritative. */
@@ -71,6 +66,7 @@ function validate(values: ClinicFormValues): FieldErrors {
 
 export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
   const router = useRouter();
+  const showToast = useToast();
   const isEdit = Boolean(initial?.id);
 
   const [values, setValues] = useState<ClinicFormValues>(initial ?? EMPTY);
@@ -80,9 +76,14 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
 
   const errors = validate(values);
   const hasErrors = Object.keys(errors).length > 0;
+  const swatch = values.themeColor.trim();
 
   function update(field: keyof ClinicFormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
+  }
+
+  function touch(field: keyof ClinicFormValues) {
+    setTouched((current) => ({ ...current, [field]: true }));
   }
 
   /** Only surface a field error once the user has engaged with that field. */
@@ -126,9 +127,15 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
       }
 
       if (isEdit) {
+        showToast({ tone: "ok", title: "Changes saved." });
         router.refresh();
         onCancel?.();
       } else {
+        showToast({
+          tone: "ok",
+          title: `${values.name.trim()} added.`,
+          detail: "Add doctors next — registrations need one.",
+        });
         // Straight to the new clinic — the next thing staff do is add doctors.
         router.push(`/clinics/${body.data?.id ?? ""}`);
         router.refresh();
@@ -145,156 +152,98 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="mb-4 rounded-md border border-alert/40 bg-alert/8 px-3 py-2.5 text-body text-alert"
         >
           {formError}
         </p>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label htmlFor="clinic-name" className={LABEL_CLASS}>
-            Clinic name
-          </label>
-          <input
-            id="clinic-name"
-            name="name"
-            type="text"
-            autoComplete="organization"
-            value={values.name}
-            onChange={(e) => update("name", e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-            aria-invalid={Boolean(errorFor("name"))}
-            aria-describedby={errorFor("name") ? "clinic-name-error" : undefined}
-            className={errorFor("name") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-          />
-          {errorFor("name") && (
-            <p id="clinic-name-error" className={FIELD_ERROR_CLASS}>
-              {errorFor("name")}
-            </p>
-          )}
-        </div>
+        <Input
+          id="clinic-name"
+          name="name"
+          label="Clinic name"
+          type="text"
+          autoComplete="organization"
+          value={values.name}
+          onChange={(e) => update("name", e.target.value)}
+          onBlur={() => touch("name")}
+          error={errorFor("name")}
+          fieldClassName="sm:col-span-2"
+        />
 
-        <div className="sm:col-span-2">
-          <label htmlFor="clinic-address" className={LABEL_CLASS}>
-            Address
-          </label>
-          <textarea
-            id="clinic-address"
-            name="address"
-            rows={2}
-            autoComplete="street-address"
-            value={values.address}
-            onChange={(e) => update("address", e.target.value)}
-            className="block w-full rounded border border-black/20 bg-transparent px-3 py-2 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60"
-          />
-        </div>
+        <Textarea
+          id="clinic-address"
+          name="address"
+          label="Address"
+          autoComplete="street-address"
+          value={values.address}
+          onChange={(e) => update("address", e.target.value)}
+          fieldClassName="sm:col-span-2"
+        />
 
-        <div>
-          <label htmlFor="clinic-city" className={LABEL_CLASS}>
-            City
-          </label>
-          <input
-            id="clinic-city"
-            name="city"
-            type="text"
-            autoComplete="address-level2"
-            value={values.city}
-            onChange={(e) => update("city", e.target.value)}
-            className={INPUT_CLASS}
-          />
-        </div>
+        <Input
+          id="clinic-city"
+          name="city"
+          label="City"
+          type="text"
+          autoComplete="address-level2"
+          value={values.city}
+          onChange={(e) => update("city", e.target.value)}
+        />
 
-        <div>
-          <label htmlFor="clinic-theme" className={LABEL_CLASS}>
-            Brand colour
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              id="clinic-theme"
-              name="themeColor"
-              type="text"
-              inputMode="text"
-              placeholder="#1D4ED8"
-              value={values.themeColor}
-              onChange={(e) => update("themeColor", e.target.value)}
-              onBlur={() => setTouched((t) => ({ ...t, themeColor: true }))}
-              aria-invalid={Boolean(errorFor("themeColor"))}
-              aria-describedby={
-                errorFor("themeColor") ? "clinic-theme-error" : "clinic-theme-hint"
-              }
-              className={errorFor("themeColor") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-            />
-            {/* Swatch, not decoration: it confirms the code entered is the colour meant. */}
+        <Input
+          id="clinic-theme"
+          name="themeColor"
+          label="Brand colour"
+          type="text"
+          placeholder="#1D4ED8"
+          value={values.themeColor}
+          onChange={(e) => update("themeColor", e.target.value)}
+          onBlur={() => touch("themeColor")}
+          error={errorFor("themeColor")}
+          hint="Optional. Marks this clinic throughout the app."
+          adornment={
+            // A swatch, not decoration: it confirms the code typed is the
+            // colour meant, and previews the rail this clinic will wear.
             <span
-              aria-hidden
-              className="h-11 w-11 shrink-0 rounded border border-black/20 dark:border-white/25"
+              aria-hidden="true"
+              className="h-11 w-11 shrink-0 rounded-md border border-line"
               style={{
-                backgroundColor: HEX_COLOR.test(values.themeColor.trim())
-                  ? values.themeColor.trim()
-                  : "transparent",
+                backgroundColor: HEX_COLOR.test(swatch) ? swatch : "transparent",
               }}
             />
-          </div>
-          {errorFor("themeColor") ? (
-            <p id="clinic-theme-error" className={FIELD_ERROR_CLASS}>
-              {errorFor("themeColor")}
-            </p>
-          ) : (
-            <p id="clinic-theme-hint" className={HINT_CLASS}>
-              Optional. Used for this clinic&apos;s branding.
-            </p>
-          )}
-        </div>
+          }
+        />
 
-        <div className="sm:col-span-2">
-          <label htmlFor="clinic-logo" className={LABEL_CLASS}>
-            Logo URL
-          </label>
-          <input
-            id="clinic-logo"
-            name="logoUrl"
-            type="url"
-            placeholder="https://…"
-            value={values.logoUrl}
-            onChange={(e) => update("logoUrl", e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, logoUrl: true }))}
-            aria-invalid={Boolean(errorFor("logoUrl"))}
-            aria-describedby={errorFor("logoUrl") ? "clinic-logo-error" : undefined}
-            className={errorFor("logoUrl") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-          />
-          {errorFor("logoUrl") && (
-            <p id="clinic-logo-error" className={FIELD_ERROR_CLASS}>
-              {errorFor("logoUrl")}
-            </p>
-          )}
-        </div>
+        <Input
+          id="clinic-logo"
+          name="logoUrl"
+          label="Logo URL"
+          type="url"
+          placeholder="https://…"
+          value={values.logoUrl}
+          onChange={(e) => update("logoUrl", e.target.value)}
+          onBlur={() => touch("logoUrl")}
+          error={errorFor("logoUrl")}
+          fieldClassName="sm:col-span-2"
+        />
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button
+        <Button
           type="submit"
-          disabled={isSaving}
-          className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+          variant="commit"
+          isBusy={isSaving}
+          busyLabel={isEdit ? "Saving…" : "Adding Clinic…"}
         >
-          {isSaving
-            ? isEdit
-              ? "Saving…"
-              : "Adding Clinic…"
-            : isEdit
-              ? "Save Changes"
-              : "Add Clinic"}
-        </button>
+          {isEdit ? "Save Changes" : "Add Clinic"}
+        </Button>
 
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSaving}
-            className="min-h-11 rounded border border-black/20 px-5 text-base font-medium disabled:opacity-60 dark:border-white/25"
-          >
+          <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>

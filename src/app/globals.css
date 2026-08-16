@@ -1,35 +1,197 @@
 @import "tailwindcss";
 @config "../../tailwind.config.ts";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * MEDCARE PRO design tokens — UI Stage 0.
+ *
+ * Two ideas hold the whole system together:
+ *
+ * 1. The shell is neutral. Five cool, faintly green-cast greys carry every
+ *    surface and every piece of text. Nothing in the chrome competes for
+ *    attention, because attention belongs to the data.
+ *
+ * 2. Colour means something. Three status hues (--ok / --warn / --alert) are
+ *    reserved for state that needs a decision, and --accent is reserved for
+ *    clinic identity — it is the *selected clinic's* own themeColor (FR-8.4),
+ *    injected per-request by the dashboard layout, not a fixed brand colour.
+ *    See src/lib/theme.ts for how the accent pair is derived safely.
+ *
+ * Light-first: this is a daytime front-desk tool on a shared tablet. A dark
+ * counterpart is defined for every token so a night shift is not blinded, and
+ * so the pages still on the pre-Stage-0 styling keep working.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+:root {
+  /* --- Neutrals ------------------------------------------------------- */
+  --paper: #f1f4f3; /* page canvas */
+  --surface: #ffffff; /* cards, panels, table body */
+  --surface-sunk: #e9eeec; /* table headers, selected rows, wells */
+  --ink: #0f1a18; /* primary text, primary-action fill */
+  --muted: #5c6b68; /* labels, secondary text — 5.0:1 on paper */
+  --line: #dde4e2; /* rules and borders */
+
+  /* --- Status signals -------------------------------------------------- */
+  --ok: #1f7a4d;
+  --warn: #9a5b00;
+  --alert: #b3261e;
+
+  /*
+   * --- Clinic accent ---------------------------------------------------
+   * Overridden inline per request by src/app/(dashboard)/layout.tsx with the
+   * selected clinic's themeColor. This default is the house teal, used when
+   * the switcher is on "All clinics" or the clinic has set no colour.
+   *
+   * --accent      raw, identity only: rails and swatches, never behind text.
+   * --accent-solid / --accent-ink   a pair guaranteed to clear 4.5:1, for
+   *               anything with a label on it. theme.ts darkens the solid when
+   *               the raw colour cannot carry either white or ink.
+   */
+  --accent: #0f5f6b;
+  --accent-solid: var(--accent);
+  --accent-ink: #ffffff;
+
+  /* Aliases kept for pages not yet migrated to Stage 0 primitives. */
+  --background: var(--paper);
+  --foreground: var(--ink);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #0e1413;
+    --surface: #161d1c;
+    --surface-sunk: #1e2726;
+    --ink: #e8edeb;
+    --muted: #93a19e; /* 6.3:1 on --surface */
+    --line: #2a3432;
+
+    --ok: #5cc28d;
+    --warn: #e0a44a;
+    --alert: #f2938b;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-alert: var(--alert);
+  --color-accent: var(--accent);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-ink: var(--accent-ink);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /*
+   * Two roles only. Anek Latin (Ek Type, Mumbai) for headings; its siblings
+   * cover Devanagari and the South Indian scripts, so Hindi/Marathi labels can
+   * arrive later without a type change. IBM Plex Sans for everything else —
+   * drawn for dense enterprise UI, with true tabular figures.
+   *
+   * Hard rule: Anek never touches a digit. Every number in this app is Plex
+   * with tabular-nums, so columns align down the page.
+   */
+  --font-display: var(--font-anek), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
+
+  /*
+   * Type scale, named by job rather than size. --text-input is 16px on
+   * purpose: anything smaller makes iOS Safari zoom on focus, which is
+   * intolerable on a shared front-desk tablet.
+   */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-micro--letter-spacing: 0.07em;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.125rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.375rem;
+  --text-input: 1rem;
+  --text-input--line-height: 1.5rem;
+  --text-section: 1.0625rem;
+  --text-section--line-height: 1.5rem;
+  --text-section--letter-spacing: -0.005em;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--letter-spacing: -0.015em;
+  --text-metric: 1.75rem;
+  --text-metric--line-height: 2rem;
+  --text-metric--letter-spacing: -0.02em;
+
+  /* Radius: swatches / controls / cards / pills. Nothing else. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* A data tool should not float. shadow-pop is only for true overlays. */
+  --shadow-card: 0 1px 2px rgb(15 26 24 / 0.05);
+  --shadow-raised: 0 1px 3px rgb(15 26 24 / 0.07), 0 1px 2px rgb(15 26 24 / 0.04);
+  --shadow-pop: 0 12px 28px -8px rgb(15 26 24 / 0.22), 0 2px 6px rgb(15 26 24 / 0.07);
+}
+
+/*
+ * Spacing is Tailwind's 4px scale, unchanged. The density rules that matter
+ * are conventions, not tokens, so they are written down here rather than
+ * frozen into names nobody remembers:
+ *
+ *   table row      py-3        (12px — 44px row height at text-body)
+ *   form fields    gap-4       (16px between stacked fields)
+ *   panel padding  p-5         (20px)
+ *   page gutter    p-4 / md:p-6
+ *   tap target     min-h-11    (44px, non-negotiable on tablet)
+ */
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.375rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Focus rings use --ink, never --accent: a safety affordance cannot depend on
+ * a colour the user picked in settings.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Patient IDs (PT-2026-0041) and other serials. Tabular figures with open
+ * tracking, so a staff member can read one aloud over the phone without losing
+ * their place.
+ */
+@utility serial {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  font-weight: 500;
 }
 
 /*
  * Data-visualisation tokens — the revenue report's growth graph (PRD §6.6).
  *
- * One series, so one categorical hue: slot 1 blue, stepped per mode. Both
- * steps were validated against THIS app's surfaces (#ffffff / #0a0a0a) rather
- * than the palette's defaults — lightness band, chroma floor and 3:1 contrast
- * all pass in both modes.
+ * One series, so one categorical hue: slot 1 blue, stepped per mode. Surface,
+ * grid and axis were re-derived in Stage 0 against the new neutral ramp
+ * (--surface / --line); the series hue is unchanged and still clears 3:1
+ * against both surfaces.
  *
  * Only prefers-color-scheme is handled, because that is the only theme signal
  * this app has; there is no theme toggle to out-rank it.
@@ -37,17 +199,17 @@ body {
 .viz-root {
   --viz-series: #2a78d6;
   --viz-surface: #ffffff;
-  --viz-grid: #e1e0d9;
-  --viz-axis: #c3c2b7;
-  --viz-muted: #898781;
+  --viz-grid: #dde4e2;
+  --viz-axis: #b9c5c2;
+  --viz-muted: #5c6b68;
 }
 
 @media (prefers-color-scheme: dark) {
   .viz-root {
     --viz-series: #3987e5;
-    --viz-surface: #0a0a0a;
-    --viz-grid: #2c2c2a;
-    --viz-axis: #383835;
-    --viz-muted: #898781;
+    --viz-surface: #161d1c;
+    --viz-grid: #2a3432;
+    --viz-axis: #3c4947;
+    --viz-muted: #93a19e;
   }
 }

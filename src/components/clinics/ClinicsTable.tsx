@@ -1,123 +1,198 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
+import Card from "@/components/ui/Card";
+import { cx } from "@/components/ui/cx";
+import EmptyState from "@/components/ui/EmptyState";
+import StatusPill from "@/components/ui/StatusPill";
+import Table, { TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import type { ClinicSummary } from "@/lib/clinics";
+import { accentStyle } from "@/lib/theme";
 
 /**
- * Clinic list — PRD §6.2 (FR-2.2), showing each clinic's doctor and patient counts.
+ * Clinic list — PRD §6.2 (FR-2.2), showing each clinic's doctor and patient
+ * counts.
  *
- * This is the list pattern the later stages reuse for doctors and registrations:
- * a table on tablet and up, stacked cards below, counts rendered as the largest
- * text in the row so they read at a glance.
+ * This is the list pattern every later stage reuses: a `Table` on tablet and
+ * up, the same fields as stacked `Card`s below, counts right-aligned in
+ * tabular figures so they read down the column.
+ *
+ * The rail down each row is the clinic's own `themeColor`. It is the same 4px
+ * bar the sidebar wears for the selected clinic, which is what teaches the
+ * colour: you see the rail here, then you recognise it in the shell. A clinic
+ * that has set no colour gets a neutral rail rather than a borrowed one —
+ * absence should look like absence.
  */
 
 interface ClinicsTableProps {
   clinics: readonly ClinicSummary[];
+  /** The switcher's current selection, or null for "All clinics". */
+  selectedClinicId: string | null;
 }
 
-const COUNT_CLASS = "text-xl font-semibold tabular-nums";
-const COUNT_LABEL_CLASS = "text-xs text-black/55 dark:text-white/55";
+/** Counts are the reason this screen exists, so they outrank the row's text. */
+const COUNT_CLASS = "text-section font-semibold tabular-nums text-ink";
 
-export default function ClinicsTable({ clinics }: ClinicsTableProps) {
+/** Falls back to the rule colour, not the house accent — see the note above. */
+function railStyle(themeColor: string | null): CSSProperties {
+  return themeColor
+    ? accentStyle(themeColor)
+    : ({ "--accent": "var(--line)" } as CSSProperties);
+}
+
+function Chevron() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4">
+      <path
+        d="M6 3.5 10.5 8 6 12.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export default function ClinicsTable({
+  clinics,
+  selectedClinicId,
+}: ClinicsTableProps) {
   if (clinics.length === 0) {
     return (
-      <div className="rounded border border-black/15 px-4 py-8 text-center dark:border-white/20">
-        <p className="mb-1 font-medium">No clinics yet</p>
-        <p className="text-sm text-black/60 dark:text-white/60">
-          Add your first clinic to start adding doctors and registering patients.
-        </p>
-      </div>
+      <EmptyState
+        title="No clinics yet"
+        guidance="Add your first clinic to start adding doctors and registering patients. Everything else in MEDCARE PRO is recorded against one."
+      />
     );
   }
 
   return (
     <>
-      {/* Tablet and up. Wrapped so a narrow viewport scrolls the table, not the page. */}
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr className="border-b border-black/15 dark:border-white/20">
-              <th scope="col" className="py-2 pr-4 text-sm font-medium">
-                Clinic
-              </th>
-              <th scope="col" className="py-2 pr-4 text-sm font-medium">
-                City
-              </th>
-              <th scope="col" className="py-2 pr-4 text-right text-sm font-medium">
-                Doctors
-              </th>
-              <th scope="col" className="py-2 pr-4 text-right text-sm font-medium">
-                Patients
-              </th>
-              <th scope="col" className="py-2 text-right text-sm font-medium">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {clinics.map((clinic) => (
-              <tr
-                key={clinic.id}
-                className="border-b border-black/10 dark:border-white/10"
-              >
-                <td className="py-3 pr-4">
-                  <Link href={`/clinics/${clinic.id}`} className="font-medium underline">
-                    {clinic.name}
-                  </Link>
-                  {clinic.address && (
-                    <p className="mt-0.5 text-sm text-black/55 dark:text-white/55">
-                      {clinic.address}
-                    </p>
-                  )}
-                </td>
-                <td className="py-3 pr-4 text-sm">
-                  {clinic.city ?? <span className="text-black/40 dark:text-white/40">—</span>}
-                </td>
-                <td className={`py-3 pr-4 text-right ${COUNT_CLASS}`}>
-                  {clinic.doctorCount}
-                </td>
-                <td className={`py-3 pr-4 text-right ${COUNT_CLASS}`}>
-                  {clinic.patientCount}
-                </td>
-                <td className="py-3 text-right">
-                  <Link
-                    href={`/clinics/${clinic.id}`}
-                    className="inline-flex min-h-11 items-center rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
-                  >
-                    Open
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Tablet and up. The wrapper scrolls, so a narrow viewport never pushes
+          the sidebar off-screen. */}
+      <div className="hidden md:block">
+        <Table caption="Clinics in this account, with their doctor and patient counts">
+          <THead>
+            <TH>Clinic</TH>
+            <TH>City</TH>
+            <TH align="end">Doctors</TH>
+            <TH align="end">Patients</TH>
+            <TH align="end">
+              <span className="sr-only">Open</span>
+            </TH>
+          </THead>
+
+          <TBody>
+            {clinics.map((clinic) => {
+              const isCurrent = clinic.id === selectedClinicId;
+
+              return (
+                <TR
+                  key={clinic.id}
+                  isCurrent={isCurrent}
+                  style={railStyle(clinic.themeColor)}
+                >
+                  <TD hasRail>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/clinics/${clinic.id}`}
+                        className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink"
+                      >
+                        {clinic.name}
+                      </Link>
+                      {isCurrent && (
+                        <StatusPill tone="accent" hasDot={false}>
+                          Viewing
+                        </StatusPill>
+                      )}
+                    </div>
+                    {clinic.address && (
+                      <p className="mt-0.5 text-label text-muted">{clinic.address}</p>
+                    )}
+                  </TD>
+
+                  <TD>
+                    {clinic.city ?? <span className="text-muted">—</span>}
+                  </TD>
+
+                  <TD isNumeric className={COUNT_CLASS}>
+                    {clinic.doctorCount}
+                  </TD>
+
+                  <TD isNumeric className={COUNT_CLASS}>
+                    {clinic.patientCount}
+                  </TD>
+
+                  <TD align="end" className="py-0 pl-0">
+                    <Link
+                      href={`/clinics/${clinic.id}`}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-ink"
+                    >
+                      <span className="sr-only">Open {clinic.name}</span>
+                      <Chevron />
+                    </Link>
+                  </TD>
+                </TR>
+              );
+            })}
+          </TBody>
+        </Table>
       </div>
 
-      {/* Below tablet: the same data as stacked cards. */}
+      {/* Below tablet: the same fields, stacked. */}
       <ul className="grid gap-3 md:hidden">
-        {clinics.map((clinic) => (
-          <li
-            key={clinic.id}
-            className="rounded border border-black/15 px-4 py-3 dark:border-white/20"
-          >
-            <Link href={`/clinics/${clinic.id}`} className="font-medium underline">
-              {clinic.name}
-            </Link>
-            {clinic.city && (
-              <p className="mt-0.5 text-sm text-black/55 dark:text-white/55">
-                {clinic.city}
-              </p>
-            )}
-            <div className="mt-3 flex gap-6">
-              <div>
-                <p className={COUNT_CLASS}>{clinic.doctorCount}</p>
-                <p className={COUNT_LABEL_CLASS}>Doctors</p>
-              </div>
-              <div>
-                <p className={COUNT_CLASS}>{clinic.patientCount}</p>
-                <p className={COUNT_LABEL_CLASS}>Patients</p>
-              </div>
-            </div>
-          </li>
-        ))}
+        {clinics.map((clinic) => {
+          const isCurrent = clinic.id === selectedClinicId;
+
+          return (
+            <li key={clinic.id} style={railStyle(clinic.themeColor)}>
+              <Card
+                isFlush
+                className={cx("overflow-hidden", isCurrent && "bg-surface-sunk")}
+              >
+                <div className="flex items-stretch">
+                  <span aria-hidden="true" className="w-1 shrink-0 bg-accent" />
+
+                  <div className="min-w-0 flex-1 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/clinics/${clinic.id}`}
+                        className="font-medium text-ink underline decoration-line underline-offset-4"
+                      >
+                        {clinic.name}
+                      </Link>
+                      {isCurrent && (
+                        <StatusPill tone="accent" hasDot={false}>
+                          Viewing
+                        </StatusPill>
+                      )}
+                    </div>
+
+                    {clinic.city && (
+                      <p className="mt-0.5 text-label text-muted">{clinic.city}</p>
+                    )}
+
+                    <div className="mt-3 flex gap-8">
+                      <div>
+                        <p className={COUNT_CLASS}>{clinic.doctorCount}</p>
+                        <p className="text-micro font-semibold uppercase text-muted">
+                          Doctors
+                        </p>
+                      </div>
+                      <div>
+                        <p className={COUNT_CLASS}>{clinic.patientCount}</p>
+                        <p className="text-micro font-semibold uppercase text-muted">
+                          Patients
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </li>
+          );
+        })}
       </ul>
     </>
   );

@@ -1,0 +1,111 @@
+# MEDCARE PRO — Agent Instructions (v2)
+
+This file is read automatically by Claude (and referenced by other agents in this
+workspace). Follow it before touching any code.
+
+> **v2 note:** the multi-tenancy model changed. This is now one shared platform,
+> one database — an Account can own multiple Clinics. If any earlier docs, code
+> comments, or skill files in this repo reference "one database per clinic,"
+> they're stale — this file and `/docs/PRD.md` (v2) are current.
+
+## Before doing anything
+
+1. Read `/docs/PRD.md` (v2) in full — product scope, functional requirements,
+   data model, and API endpoints.
+2. Read `/docs/PROJECT_STRUCTURE.md` (v2) in full — the exact folder/file
+   layout to follow.
+
+## What this project is
+
+MEDCARE PRO — a multi-clinic management platform. One account (a business
+owner) signs up once and can manage multiple clinics under that login. Each
+clinic has its own doctors, patients, and revenue tracking, scoped within the
+shared database by `clinicId`. Core features: patient registration with an
+edit audit trail, doctors and clinics management, role-based access control,
+revenue analytics, notifications, and WhatsApp messaging via a third-party BSP.
+
+## Tech stack (do not substitute without asking)
+
+- Next.js (App Router) + TypeScript + Tailwind CSS
+- Prisma ORM
+- MySQL (Hostinger-hosted) — **one shared database**, not one per clinic
+- Auth.js (NextAuth.js) — Credentials provider, with email verification gating login
+- WhatsApp messaging via a third-party BSP (provider TBD — see PRD Section 10)
+
+## Ground rules
+
+- **Follow the PRD exactly.** Don't add tables, fields, pages, or features
+  that aren't in `/docs/PRD.md`. If something is ambiguous or missing, stop
+  and ask instead of guessing.
+- **Scoping, not isolation.** Every clinic-scoped table carries `clinic_id`;
+  every account-scoped table carries `account_id`. Enforce scoping in every
+  API route by deriving the account/clinic from the authenticated session —
+  never trust a client-supplied ID alone. See the `multi-clinic-data-model`
+  skill for the full pattern.
+- **RBAC is server-side.** Every mutating API route calls `lib/rbac.ts`'s
+  permission check before writing. Hiding a button in the UI is not access
+  control.
+- **Audit log is append-only.** Every registration edit writes a
+  `registration_edit_log` row. Never update or delete these rows.
+- **WhatsApp compliance.** Only BSP-approved templates are sendable. No
+  free-text outbound messaging.
+- **Build order.** Unless told otherwise: scaffold → auth (signup + email
+  verification + login) → clinics → doctors → patient registration → revenue
+  reports → notifications → roles/settings → WhatsApp. Each stage depends on
+  schema/data from the one before it.
+- **IVR is out of scope for MVP.** Don't build Twilio integration unless
+  explicitly asked to revisit it.
+
+## When unsure
+
+Ask before assuming. A wrong assumption in the data model or RBAC layer is
+expensive to unwind once real accounts and clinics exist on top of it.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+
+<!-- PERPLEXITY-MCP-START -->
+# Perplexity MCP Server
+
+## Available Tools
+
+- **perplexity_search** — Fast web search with source citations. Use for quick factual lookups. Works with or without authentication.
+- **perplexity_reason** — Step-by-step reasoning with web context. Requires Pro account.
+- **perplexity_research** — Deep multi-section research reports (30-120s). Requires Pro account.
+- **perplexity_ask** — Flexible queries with explicit model/mode/follow-up control.
+- **perplexity_compute** — ASI/Computer mode for complex multi-step tasks. Requires Max account.
+- **perplexity_models** — List available models, account tier, and rate limits.
+- **perplexity_retrieve** — Poll results from pending research/compute tasks.
+- **perplexity_export** — Export a saved history entry as PDF, markdown, or DOCX. Uses Perplexity's native export when available.
+- **perplexity_sync_cloud** — Sync Perplexity cloud history into the local history store.
+- **perplexity_hydrate_cloud_entry** — Hydrate a single cloud-backed history entry by id.
+- **perplexity_list_researches** — List saved research history with status.
+- **perplexity_get_research** — Fetch full content of a saved research.
+- **perplexity_login** — Open browser for Perplexity authentication.
+- **perplexity_doctor** — Run diagnostic checks against your Perplexity MCP install. Returns a Markdown report; pass probe:true for a live search probe.
+
+## Usage Guidelines
+
+1. **Start with perplexity_search** for quick questions. Only escalate to research or reason when depth is needed.
+2. **Check rate limits** with perplexity_models before batch operations.
+3. **Always cite sources** from search results in your responses.
+4. **For multi-turn conversations**, pass the follow_up_context JSON from perplexity_ask responses back in subsequent calls.
+5. **Long-running research**: perplexity_compute may time out. Use perplexity_retrieve with the returned research_id to poll for results.
+6. **Language parameter**: Defaults to en-US. Set explicitly for non-English queries.
+
+## Model Selection
+
+| Tool | Default Model | Best For |
+|------|--------------|----------|
+| perplexity_search | pplx_pro | General web search |
+| perplexity_reason | claude46sonnetthinking | Step-by-step analysis |
+| perplexity_research | pplx_alpha | Deep research reports |
+| perplexity_compute | pplx_asi | Complex multi-step tasks |
+<!-- PERPLEXITY-MCP-END -->
