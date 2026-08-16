@@ -45,18 +45,31 @@ touched.
 
 ## Status
 
-**Built through Stage 7.** Auth, clinics, doctors, patient registration with its
-audit trail, revenue reports, notifications, and roles/settings are implemented.
-WhatsApp is still scaffolding — those routes return `501 Not Implemented` and
-the Messages page is a placeholder.
+**All eight stages built.** Auth, clinics, doctors, patient registration with
+its audit trail, revenue reports, notifications, roles/settings and WhatsApp
+messaging are implemented.
 
-Two modules are blocked on vendor decisions and are stubbed to throw rather than
-guess (see [`docs/PRD.md`](docs/PRD.md) §10):
+One module is still blocked on a vendor decision and is stubbed to throw rather
+than guess (see [`docs/PRD.md`](docs/PRD.md) §10):
 
 | Module | Blocked on |
 |---|---|
 | `src/lib/email.ts` | Transactional email provider — blocks FR-1.2 signup verification end-to-end |
-| `src/lib/whatsapp.ts` | WhatsApp BSP — auth scheme, payload shape and webhook signature format all differ per provider |
+
+**WhatsApp provider: RkvRobo** (`https://bot.rkvrobo.in/api`), configured in
+`.env`. It is a gateway driving real WhatsApp devices, **not an official BSP**,
+which changes two things the PRD assumed:
+
+- **No provider-side template approval.** The approved message set lives in
+  this app (`whatsapp_templates`, editable under Messages) and no endpoint
+  accepts a free-typed body. That is a weaker guarantee than a BSP's review —
+  an admin can write anything into a template — but it keeps outbound traffic
+  to a small reviewed set.
+- **No delivery-status callback.** The provider exposes no webhook and no
+  status lookup, so a send is only ever known as accepted or rejected at the
+  gateway. The UI says "Accepted", never "Delivered".
+  `api/whatsapp/webhook` stays closed and `verifyWebhookSignature` still
+  throws, per the secure-webhooks skill.
 
 Build order (per [`CLAUDE.md`](CLAUDE.md)):
 
@@ -69,7 +82,7 @@ Build order (per [`CLAUDE.md`](CLAUDE.md)):
 | 5 — Revenue reports | `src/app/(dashboard)/reports`, `src/app/api/reports` | Built |
 | 6 — Notifications | `src/app/(dashboard)/notifications`, `src/app/api/notifications`, `src/lib/notifications.ts` | Built |
 | 7 — Roles & settings | `src/app/(dashboard)/settings`, `src/app/api/roles`, `src/lib/roles.ts`, `src/lib/permissions.ts` | Built |
-| 8 — WhatsApp | `src/app/(dashboard)/messages`, `src/app/api/whatsapp`, `src/lib/whatsapp.ts` | Scaffolding (vendor-blocked) |
+| 8 — WhatsApp | `src/app/(dashboard)/messages`, `src/app/api/whatsapp`, `src/lib/whatsapp.ts`, `src/lib/whatsappTemplates.ts` | Built |
 
 IVR / after-hours smart receptionist is **out of MVP scope** and its Twilio
 scaffolding has been removed.
@@ -90,3 +103,7 @@ scaffolding has been removed.
 - **Hiding a nav tab is not access control.** `src/lib/navigation.ts` drops tabs
   a role cannot reach, but every page behind them still checks server-side and
   refuses anyone who types the URL directly.
+- **No free-text WhatsApp.** Sends name a `whatsapp_templates` row and a list of
+  patient ids — never a message body, never a raw phone number. Numbers are read
+  from the patient record server-side, so the account's WhatsApp device cannot
+  be used to message an arbitrary phone.

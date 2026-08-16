@@ -47,11 +47,12 @@ model Tenant {
   emailVerifiedAt DateTime? @map("email_verified_at")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  users         User[]
-  roles         Role[]
-  clinics       Clinic[]
-  patients      Patient[]
-  notifications Notification[]
+  users             User[]
+  roles             Role[]
+  clinics           Clinic[]
+  patients          Patient[]
+  notifications     Notification[]
+  whatsappTemplates WhatsappTemplate[]
 
   @@map("tenants")
 }
@@ -362,29 +363,74 @@ model Notification {
 
 // ---------------------------------------------------------------------------
 // WhatsApp — PRD §7 `whatsapp_messages`, FR-9.x
-// Sent via a third-party BSP (provider TBD — PRD §10).
+//
+// Provider: RkvRobo (https://bot.rkvrobo.in/api) — a gateway driving real
+// WhatsApp devices, NOT an official BSP. There is no provider-side template
+// approval, so the "sendable set" is defined here instead: every send names a
+// WhatsappTemplate row, and no endpoint accepts a free-text body.
 // ---------------------------------------------------------------------------
+
+/// FR-9.1 — the account's approved message set.
+///
+/// Account-scoped, not clinic-scoped: one business writes its wording once and
+/// every clinic under it sends the same approved text. `body` carries
+/// {placeholder} tokens filled from the patient and registration at send time.
+model WhatsappTemplate {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+  /// Stored verbatim into `whatsapp_messages.template_name` on every send, so
+  /// history stays readable even after a template is renamed or deleted.
+  name String
+  body String @db.Text
+  /// Optional footer line, passed through to the gateway.
+  footer String?
+  /// Set together to send as media rather than text: `media_type` is one of
+  /// image, video, audio, document and `media_url` must be a direct link.
+  mediaType String? @map("media_type")
+  mediaUrl  String? @map("media_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Template names are unique within an account, not globally.
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("whatsapp_templates")
+}
 
 model WhatsappMessage {
   id        String @id @default(cuid())
   clinicId  String @map("clinic_id")
   patientId String @map("patient_id")
-  /// FR-9.1 — only BSP-approved template names are sendable; no free text.
+  /// FR-9.1 — the WhatsappTemplate name this send used. Denormalised rather
+  /// than a foreign key: history must survive the template being renamed or
+  /// deleted, the same reasoning as `registration_edit_log.role_at_time`.
   templateName String @map("template_name")
-  /// FR-9.2 — delivery status as reported by the BSP. Free-text rather than an
-  /// enum because each provider names its states differently and the provider
-  /// is not yet chosen.
+  /// FR-9.2 — status as reported by the gateway. Free text rather than an enum
+  /// because the provider defines its own states.
+  ///
+  /// RkvRobo answers a send with {status, msg} and nothing afterwards — it has
+  /// no delivery-status callback — so in practice this holds `sent` (the
+  /// gateway accepted it) or `failed`. It is NOT a WhatsApp delivered/read
+  /// receipt, and the UI says so rather than implying one.
   status String
-  /// The BSP's own message id, used to make delivery-status webhooks
+  /// The WhatsApp message id, read from the gateway's `full=1` response at
+  /// `data.key.id`. Unique so a future delivery-status callback can be made
   /// idempotent (see the secure-webhooks skill) — the same event can arrive
   /// more than once.
   providerMessageId String? @unique @map("provider_message_id")
-  sentAt            DateTime @default(now()) @map("sent_at")
+  /// The gateway's `msg` when a send failed — "device not connected", an
+  /// invalid number, quota exhausted. Without it the front desk sees a red row
+  /// and has no idea what to do next.
+  failureReason String?  @map("failure_reason") @db.Text
+  sentAt        DateTime @default(now()) @map("sent_at")
 
   clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([clinicId])
   @@index([patientId])
+  @@index([clinicId, sentAt])
   @@map("whatsapp_messages")
 }

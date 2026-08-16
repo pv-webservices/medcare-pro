@@ -170,9 +170,14 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
       {
         key: "message:send",
         label: "Send WhatsApp messages",
-        description: "Send an approved template message to a patient.",
-        pending: "stage",
-        pendingNote: "WhatsApp is not built yet — this grants nothing today.",
+        description:
+          "Send an approved template to patients, and see the message history.",
+      },
+      {
+        key: "message:template",
+        label: "Manage message templates",
+        description:
+          "Write and edit the approved message wording. Separate from sending, so the front desk cannot rewrite what goes out.",
       },
     ],
   },
