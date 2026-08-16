@@ -355,10 +355,13 @@ async function main(): Promise<void> {
   );
 
   console.log("\nFR-3.2 / FR-3.3 search and filters");
+  // 5 visits exist for tenant A at this point: four in Clinic A (Ramesh's
+  // three, Sunita's one) and one in Clinic Two. The four rejected creations
+  // above wrote nothing, which is half of what these two counts assert.
   const all = await listRegistrationsForActor(a.ownerActor, {});
-  check("owner sees every visit", all.total === 6, all.total);
+  check("owner sees every visit", all.total === 5, all.total);
   const staffList = await listRegistrationsForActor(a.staffActor, {});
-  check("staff sees only their clinic", staffList.total === 5, staffList.total);
+  check("staff sees only their clinic", staffList.total === 4, staffList.total);
   check("search by name", (await listRegistrationsForActor(a.ownerActor, { search: "sunita" })).total === 1);
   check("search by phone fragment", (await listRegistrationsForActor(a.ownerActor, { search: "43211" })).total === 3);
   check("filter by department", (await listRegistrationsForActor(a.ownerActor, { department: "Dermatology" })).total === 2);
@@ -389,7 +392,9 @@ async function main(): Promise<void> {
   console.log("\nFR-3.4 CSV export");
   const csv = toRegistrationCsv(await listRegistrationsForExport(a.staffActor, {}));
   const lines = csv.split("\r\n").filter((line) => line !== "");
-  check("header + scoped rows only", lines.length === 6, lines.length);
+  // Header plus the staff user's four Clinic A rows — the Clinic Two visit is
+  // outside their scope, and the injected row below does not exist yet.
+  check("header + scoped rows only", lines.length === 5, lines.length);
   check("BOM present", csv.startsWith("﻿"));
   check("amount column is unformatted for summing", csv.includes("Amount (INR)"));
   check("visit time exported", csv.includes("14:30") || csv.includes("15:45"));
