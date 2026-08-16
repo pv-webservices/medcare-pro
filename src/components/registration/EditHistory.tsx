@@ -1,3 +1,4 @@
+import { formatRupees } from "@/lib/money";
 import type { EditLogEntry } from "@/lib/registrations";
 
 /**
@@ -27,6 +28,19 @@ function formatTimestamp(iso: string): string {
 
 function Blank() {
   return <span className="text-black/40 dark:text-white/40">not set</span>;
+}
+
+/**
+ * The log stores raw values, which is right — it is a record of what the field
+ * held, not of how a screen once formatted it. Money is given its symbol back
+ * here, at the point of display.
+ */
+function Value({ field, value }: { field: string; value: string | null }) {
+  if (value === null) {
+    return <Blank />;
+  }
+
+  return <>{field === "amount" ? formatRupees(value) : value}</>;
 }
 
 export default function EditHistory({ entries }: EditHistoryProps) {
@@ -70,14 +84,18 @@ export default function EditHistory({ entries }: EditHistoryProps) {
               <li key={change.field} className="text-sm">
                 <span className="font-medium">{change.label}:</span>{" "}
                 {entry.isCreation ? (
-                  <span>{change.to ?? <Blank />}</span>
+                  <span>
+                    <Value field={change.field} value={change.to} />
+                  </span>
                 ) : (
                   <>
                     <span className="line-through decoration-black/40 dark:decoration-white/40">
-                      {change.from ?? <Blank />}
+                      <Value field={change.field} value={change.from} />
                     </span>{" "}
                     <span aria-hidden="true">→</span>{" "}
-                    <span className="font-medium">{change.to ?? <Blank />}</span>
+                    <span className="font-medium">
+                      <Value field={change.field} value={change.to} />
+                    </span>
                   </>
                 )}
               </li>

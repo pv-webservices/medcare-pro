@@ -5,7 +5,13 @@ import Link from "next/link";
 import RegistrationForm, {
   type DoctorOption,
 } from "@/components/registration/RegistrationForm";
-import type { RegistrationRecord } from "@/lib/registrations";
+import PatientVisits from "@/components/registration/PatientVisits";
+import { formatRupees } from "@/lib/money";
+import {
+  VISIT_TYPE_LABELS,
+  type PatientVisit,
+  type RegistrationRecord,
+} from "@/lib/registrations";
 
 /**
  * One registration — PRD §6.3 (FR-3.5, FR-3.6).
@@ -20,7 +26,10 @@ interface RegistrationDetailProps {
   registration: RegistrationRecord;
   doctors: readonly DoctorOption[];
   departments: readonly string[];
+  /** Every visit by this patient, newest first — includes the one shown here. */
+  visits: readonly PatientVisit[];
   today: string;
+  now: string;
   canEdit: boolean;
   canViewHistory: boolean;
 }
@@ -46,7 +55,9 @@ export default function RegistrationDetail({
   registration,
   doctors,
   departments,
+  visits,
   today,
+  now,
   canEdit,
   canViewHistory,
 }: RegistrationDetailProps) {
@@ -72,9 +83,13 @@ export default function RegistrationDetail({
           doctors={doctors}
           departments={departments}
           today={today}
+          now={now}
           registrationId={registration.id}
           initial={{
             clinicId: registration.clinicId,
+            // Fixed for an edit — the visit already belongs to this patient.
+            patientId: registration.patientId,
+            patientCode: registration.patientCode,
             name: registration.patientName,
             age: registration.age === null ? "" : String(registration.age),
             gender: registration.gender ?? "",
@@ -85,6 +100,8 @@ export default function RegistrationDetail({
             department: registration.department,
             amount: registration.amount,
             visitDate: registration.visitDate,
+            visitTime: registration.visitTime,
+            visitType: registration.visitType,
           }}
           onCancel={() => setIsEditing(false)}
         />
@@ -104,6 +121,22 @@ export default function RegistrationDetail({
             {registration.department}
             {registration.doctorName ? ` · ${registration.doctorName}` : ""} ·{" "}
             {registration.clinicName}
+          </p>
+          <p className="mt-2">
+            <span
+              className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
+                registration.visitType === "FOLLOW_UP"
+                  ? "bg-sky-600/15 text-sky-800 dark:text-sky-300"
+                  : "bg-black/10 text-black/70 dark:bg-white/15 dark:text-white/70"
+              }`}
+            >
+              {VISIT_TYPE_LABELS[registration.visitType]}
+            </span>
+            {visits.length > 1 && (
+              <span className="ml-2 text-sm text-black/55 dark:text-white/55">
+                {visits.length} visits on this record
+              </span>
+            )}
           </p>
         </div>
 
@@ -132,13 +165,13 @@ export default function RegistrationDetail({
         <div>
           <dt className={FIELD_LABEL_CLASS}>Amount</dt>
           <dd className="mt-0.5 text-2xl font-semibold tabular-nums">
-            {registration.amount}
+            {formatRupees(registration.amount)}
           </dd>
         </div>
         <div>
-          <dt className={FIELD_LABEL_CLASS}>Visit date</dt>
+          <dt className={FIELD_LABEL_CLASS}>Visit date &amp; time</dt>
           <dd className="mt-0.5 tabular-nums">
-            {formatVisitDate(registration.visitDate)}
+            {formatVisitDate(registration.visitDate)} at {registration.visitTime}
           </dd>
         </div>
         <div>
@@ -169,6 +202,10 @@ export default function RegistrationDetail({
         Registered by {registration.createdByName ?? registration.createdByEmail}
         .
       </p>
+
+      <div className="mt-8">
+        <PatientVisits visits={visits} currentId={registration.id} />
+      </div>
     </div>
   );
 }

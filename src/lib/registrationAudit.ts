@@ -32,7 +32,10 @@ export interface RegistrationSnapshot {
   department: string;
   /** Always fixed to 2 decimals, so "500" and "500.00" never read as a change. */
   amount: string;
-  visitDate: string;
+  /** "New patient" / "Follow-up", by label rather than by stored code. */
+  visitType: string;
+  /** "YYYY-MM-DD HH:mm" — date and time move as one change, not two. */
+  visitAt: string;
 }
 
 export type SnapshotField = keyof RegistrationSnapshot;
@@ -48,7 +51,8 @@ export const FIELD_LABELS: Record<SnapshotField, string> = {
   doctor: "Doctor",
   department: "Department",
   amount: "Amount",
-  visitDate: "Visit date",
+  visitType: "Visit type",
+  visitAt: "Visit date & time",
 };
 
 const FIELD_ORDER = Object.keys(FIELD_LABELS) as SnapshotField[];

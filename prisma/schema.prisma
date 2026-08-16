@@ -273,7 +273,17 @@ model Registration {
   /// FR-3.1 — required on the registration form.
   department String
   amount     Decimal  @db.Decimal(10, 2)
+  /// Date AND time of the visit. A patient returning for a follow-up needs the
+  /// appointment time recorded, not just the day, so this carries a clock time
+  /// rather than being pinned to midnight like the DATE columns above.
+  /// Stored as the clinic's wall-clock time tagged UTC — see src/lib/dates.ts.
   visitDate  DateTime @map("visit_date")
+  /// "NEW" for a patient's first visit here, "FOLLOW_UP" for a return. Derived
+  /// on create (an existing patient means a follow-up) but overridable by the
+  /// front desk, since a return patient presenting a new complaint is a new
+  /// case. Values live in src/lib/registrations.ts; a String rather than an
+  /// enum so a clinic-specific visit type can be added without a migration.
+  visitType  String   @default("NEW") @map("visit_type") @db.VarChar(20)
   createdBy  String   @map("created_by")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")

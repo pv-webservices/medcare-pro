@@ -93,7 +93,9 @@ not a hardcoded enum the UI locks to.
 - **FR-2.3**: Every other module (patients, doctors, reports) is filterable/scoped by clinic.
 
 ### 6.3 Patient Registration
-- **FR-3.1**: New registration form: auto-generated Patient ID (`PT-YYYY-####`, sequential), Patient Name, Age, Gender, Mobile Number, Amount, Address (with City), Doctor (select), Department (**required**).
+- **FR-3.1**: New registration form: auto-generated Patient ID (`PT-YYYY-####`, sequential), Patient Name, Age, Gender, Mobile Number, Amount, Address (with City), Doctor (select), Department (**required**), Visit Date **and Time**.
+- **FR-3.1a** *(added post-v2.0 — return visits)*: The form can look up an existing patient at the same clinic by name, mobile number or Patient ID. Selecting one attaches the new visit to that patient's existing record — **their Patient ID is reused, not reissued** — and their details are pre-filled and re-saved so corrections are captured. One patient, one ID, many visits.
+- **FR-3.1b** *(added post-v2.0)*: Every registration carries a **Visit Type** — `New patient` or `Follow-up`. It is derived on save (an existing patient means a follow-up) but the front desk can override it, since a returning patient presenting a new complaint is a new case. Follow-ups are badged in the registration list and on the record.
 - **FR-3.2**: Registration list is searchable by patient name or phone number.
 - **FR-3.3**: Registration list supports filtering (by clinic, doctor, department, date range).
 - **FR-3.4**: Registrations can be exported (CSV at minimum).
@@ -145,7 +147,7 @@ not a hardcoded enum the UI locks to.
 | `doctor_availability` | `id`, `doctor_id` (FK), `date`, `start_time`, `end_time` | |
 | `doctor_leave` | `id`, `doctor_id` (FK), `start_date`, `end_date`, `reason` | Optional |
 | `patients` | `id`, `clinic_id` (FK), `patient_code` (e.g. `PT-2026-0001`), `name`, `age`, `gender`, `mobile_number`, `address`, `city`, `created_at` | |
-| `registrations` | `id`, `clinic_id` (FK), `patient_id` (FK), `doctor_id` (FK), `department`, `amount`, `visit_date`, `created_by` (user_id) | The appointment/visit + revenue record |
+| `registrations` | `id`, `clinic_id` (FK), `patient_id` (FK), `doctor_id` (FK), `department`, `amount`, `visit_date`, `visit_type`, `created_by` (user_id) | The appointment/visit + revenue record. `visit_date` carries a **date and time**. `visit_type` is `NEW` or `FOLLOW_UP` (FR-3.1b) |
 | `registration_edit_log` | `id`, `registration_id` (FK), `edited_by_user_id`, `role_at_time`, `changed_fields` (JSON), `timestamp` | Immutable audit trail |
 | `notifications` | `id`, `account_id`, `clinic_id` (nullable), `type`, `message`, `related_record_id`, `read`, `created_at` | |
 | `whatsapp_messages` | `id`, `clinic_id`, `patient_id`, `template_name`, `status`, `sent_at` | Logged sends via the BSP |
@@ -180,6 +182,9 @@ user's role is clinic-scoped) — this is a deliberate reversal of the old
 - **WhatsApp BSP provider is not yet named.** The PRD assumes a generic BSP with a template-send endpoint and delivery-status webhook — confirm the actual provider (e.g. Interakt, Gupshup, AiSensy, Wati) before building `lib/whatsapp.ts`, since auth method and payload shape differ per provider.
 - **Email verification requires a transactional email service** (e.g. Resend, SendGrid) — not yet selected; needed before Stage 1 (signup) can be finished end-to-end.
 - **Patient ID uniqueness scope**: assumed account-wide (not per-clinic) sequential numbering, resetting yearly. Flag if it should be per-clinic instead.
+- **Patient identity is per clinic** *(decided post-v2.0)*: `patients.clinic_id` is not nullable, so a person known at Clinic A is a separate record at Clinic B even under the same account. Return-visit lookup (FR-3.1a) therefore searches within one clinic. Revisit if group-wide patient identity is ever wanted — it is a data-model change, not a UI one.
+- **Currency is Indian rupees (₹)** *(decided post-v2.0)*: amounts are stored as unformatted `Decimal(10, 2)` and rendered with the ₹ symbol and `en-IN` grouping. CSV export stays unformatted under an `Amount (INR)` header so a spreadsheet can sum it.
+- **Server clock = clinic clock** *(decided post-v2.0)*: `visit_date` stores the wall-clock time entered, tagged UTC, and the "now" default is taken from the server. Set `TZ` on the host (e.g. `Asia/Kolkata`) or a late-evening registration defaults to the wrong day.
 
 ## 11. Constraints
 

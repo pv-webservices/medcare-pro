@@ -33,6 +33,28 @@ export function formatDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+/**
+ * "YYYY-MM-DD" + "HH:mm" → the Date stored in `registrations.visit_date`.
+ *
+ * The wall-clock time the front desk types is stored verbatim, tagged UTC — the
+ * same treatment the DATE columns get above. A clinic runs on one local clock,
+ * so converting to a real UTC instant would only introduce drift between what
+ * was typed, what is stored, and what every list and report reads back.
+ */
+export function parseDateTime(date: string, time: string): Date {
+  return new Date(`${date}T${time}:00.000Z`);
+}
+
+/** A Date from `visit_date` → "HH:mm" for JSON and form inputs. */
+export function formatClockTime(value: Date): string {
+  return value.toISOString().slice(11, 16);
+}
+
+/** The current wall-clock time as "HH:mm". */
+export function nowClockTime(now: Date = new Date()): string {
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
 /** Compares "HH:mm" strings; zero-padded 24h times sort lexicographically. */
 export function isBefore(startTime: string, endTime: string): boolean {
   return startTime < endTime;

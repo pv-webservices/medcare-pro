@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import RegistrationDetail from "@/components/registration/RegistrationDetail";
-import { todayDateOnly } from "@/lib/dates";
+import { nowClockTime, todayDateOnly } from "@/lib/dates";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { can, ScopeError } from "@/lib/rbac";
 import {
   getRegistrationForActor,
   listDepartmentsForActor,
+  listPatientVisitsForActor,
 } from "@/lib/registrations";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
@@ -48,12 +49,14 @@ export default async function RegistrationDetailPage({
     throw error;
   }
 
-  const [doctors, departments, canEdit, canViewHistory] = await Promise.all([
-    listDoctorsForActor(actor, { clinicId: registration.clinicId }),
-    listDepartmentsForActor(actor, registration.clinicId),
-    can(actor, "registration:edit", registration.clinicId),
-    can(actor, "registration:history:read", registration.clinicId),
-  ]);
+  const [doctors, departments, visits, canEdit, canViewHistory] =
+    await Promise.all([
+      listDoctorsForActor(actor, { clinicId: registration.clinicId }),
+      listDepartmentsForActor(actor, registration.clinicId),
+      listPatientVisitsForActor(actor, id),
+      can(actor, "registration:edit", registration.clinicId),
+      can(actor, "registration:history:read", registration.clinicId),
+    ]);
 
   return (
     <section>
@@ -73,7 +76,9 @@ export default async function RegistrationDetailPage({
           department,
         }))}
         departments={departments}
+        visits={visits}
         today={todayDateOnly()}
+        now={nowClockTime()}
         canEdit={canEdit}
         canViewHistory={canViewHistory}
       />

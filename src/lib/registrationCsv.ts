@@ -1,4 +1,7 @@
-import type { RegistrationRecord } from "@/lib/registrations";
+import {
+  VISIT_TYPE_LABELS,
+  type RegistrationRecord,
+} from "@/lib/registrations";
 
 /**
  * CSV export of the registration list — PRD §6.3 (FR-3.4).
@@ -31,8 +34,12 @@ const COLUMNS: readonly Column[] = [
   { header: "Clinic", value: (r) => r.clinicName },
   { header: "Doctor", value: (r) => r.doctorName ?? "" },
   { header: "Department", value: (r) => r.department },
-  { header: "Amount", value: (r) => r.amount },
+  { header: "Visit Type", value: (r) => VISIT_TYPE_LABELS[r.visitType] },
+  // Unformatted and unsymboled: a spreadsheet needs to sum this column, so the
+  // currency belongs in the header rather than in every cell.
+  { header: "Amount (INR)", value: (r) => r.amount },
   { header: "Visit Date", value: (r) => r.visitDate },
+  { header: "Visit Time", value: (r) => r.visitTime },
 ];
 
 /**

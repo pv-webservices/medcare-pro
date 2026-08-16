@@ -51,6 +51,7 @@ medcare-pro/
 │   │   │   ├── doctors/route.ts
 │   │   │   ├── doctors/[id]/availability/route.ts
 │   │   │   ├── doctors/[id]/leave/route.ts
+│   │   │   ├── patients/route.ts         # GET only — existing-patient lookup (FR-3.1a)
 │   │   │   ├── registrations/route.ts
 │   │   │   ├── registrations/[id]/route.ts
 │   │   │   ├── registrations/[id]/history/route.ts

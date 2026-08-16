@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { RegistrationRecord } from "@/lib/registrations";
+import { formatRupees } from "@/lib/money";
+import { VISIT_TYPE_LABELS, type RegistrationRecord } from "@/lib/registrations";
 
 /**
  * Registration list — PRD §6.3 (FR-3.2, FR-3.3).
@@ -29,6 +30,18 @@ function formatVisitDate(date: string): string {
 
 function Dash() {
   return <span className="text-black/40 dark:text-white/40">—</span>;
+}
+
+/**
+ * Only follow-ups are badged. A new patient is the default case, so labelling
+ * both would put a coloured chip on every row and mark nothing out.
+ */
+function FollowUpBadge() {
+  return (
+    <span className="inline-block rounded bg-sky-600/15 px-2 py-0.5 text-xs font-medium text-sky-800 dark:text-sky-300">
+      {VISIT_TYPE_LABELS.FOLLOW_UP}
+    </span>
+  );
 }
 
 export default function RegistrationsTable({
@@ -99,7 +112,14 @@ export default function RegistrationsTable({
                     {registration.patientCode}
                   </Link>
                 </td>
-                <td className="py-3 pr-4 text-sm">{registration.patientName}</td>
+                <td className="py-3 pr-4 text-sm">
+                  {registration.patientName}
+                  {registration.visitType === "FOLLOW_UP" && (
+                    <div className="mt-1">
+                      <FollowUpBadge />
+                    </div>
+                  )}
+                </td>
                 <td className="py-3 pr-4 text-sm tabular-nums">
                   {registration.mobileNumber}
                 </td>
@@ -112,9 +132,12 @@ export default function RegistrationsTable({
                 )}
                 <td className="py-3 pr-4 text-sm tabular-nums">
                   {formatVisitDate(registration.visitDate)}
+                  <span className="ml-1 text-black/55 dark:text-white/55">
+                    {registration.visitTime}
+                  </span>
                 </td>
                 <td className="py-3 text-right text-sm font-medium tabular-nums">
-                  {registration.amount}
+                  {formatRupees(registration.amount)}
                 </td>
               </tr>
             ))}
@@ -141,7 +164,7 @@ export default function RegistrationsTable({
                 </p>
               </div>
               <p className="shrink-0 font-medium tabular-nums">
-                {registration.amount}
+                {formatRupees(registration.amount)}
               </p>
             </div>
             <p className="mt-1 text-sm text-black/55 dark:text-white/55">
@@ -150,8 +173,13 @@ export default function RegistrationsTable({
               {showClinic ? ` · ${registration.clinicName}` : ""}
             </p>
             <p className="mt-0.5 text-sm tabular-nums">
-              {formatVisitDate(registration.visitDate)}
+              {formatVisitDate(registration.visitDate)} {registration.visitTime}
             </p>
+            {registration.visitType === "FOLLOW_UP" && (
+              <div className="mt-2">
+                <FollowUpBadge />
+              </div>
+            )}
           </li>
         ))}
       </ul>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import RegistrationForm from "@/components/registration/RegistrationForm";
 import { listClinicsForActor } from "@/lib/clinics";
-import { todayDateOnly } from "@/lib/dates";
+import { nowClockTime, todayDateOnly } from "@/lib/dates";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { accessibleClinicScope } from "@/lib/rbac";
 import { listDepartmentsForActor } from "@/lib/registrations";
@@ -69,9 +69,10 @@ export default async function NewRegistrationPage() {
             department,
           }))}
           departments={departments}
-          // Resolved on the server so "today" matches the UTC dates in storage
-          // rather than the viewer's local clock.
+          // Resolved on the server so the value is identical either side of
+          // hydration, and so "today" matches the UTC dates in storage.
           today={todayDateOnly()}
+          now={nowClockTime()}
         />
       )}
     </section>
