@@ -65,11 +65,19 @@ which changes two things the PRD assumed:
   accepts a free-typed body. That is a weaker guarantee than a BSP's review —
   an admin can write anything into a template — but it keeps outbound traffic
   to a small reviewed set.
-- **No delivery-status callback.** The provider exposes no webhook and no
-  status lookup, so a send is only ever known as accepted or rejected at the
-  gateway. The UI says "Accepted", never "Delivered".
-  `api/whatsapp/webhook` stays closed and `verifyWebhookSignature` still
-  throws, per the secure-webhooks skill.
+- **Webhooks exist, but are unsigned.** RkvRobo posts to a URL pasted per
+  device on its Devices page. It sends no signature, so the only verifiable
+  secret is one we put in the URL ourselves — register
+  `https://<your-app>/api/whatsapp/webhook?token=$WHATSAPP_WEBHOOK_TOKEN` and
+  the route compares it in constant time, failing closed when unset.
+  Its payload shape is undocumented: only shapes evidenced by the provider's
+  own send responses are applied, and anything else is logged by key name (never
+  by value) rather than guessed at.
+
+Endpoint slugs differ from their doc-page titles in several places — verified
+live: "Communicating SMS" **is** `/send-message`, "Device Info" is
+`/info-devices`, "User Info" is `/info-user`, "Generate QR" is `/generate-qr`,
+and "Send Text To Channel" is `/send-text-channel`.
 
 Build order (per [`CLAUDE.md`](CLAUDE.md)):
 

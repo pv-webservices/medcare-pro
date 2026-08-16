@@ -85,6 +85,10 @@ interface StubCall {
 const calls: StubCall[] = [];
 /** Numbers the stub refuses, to exercise the per-recipient failure path. */
 const rejectNumbers = new Set<string>();
+/** Numbers /check-number reports as having no WhatsApp account. */
+const notOnWhatsapp = new Set<string>();
+/** What /info-devices reports, so the connected/disconnected paths both run. */
+let deviceStatus = "Connected";
 /**
  * Never reset, unlike `calls` — real WhatsApp message ids are unique forever,
  * and `whatsapp_messages.provider_message_id` is uniquely indexed to keep a
@@ -115,6 +119,40 @@ const stub = createServer((req: IncomingMessage, res: ServerResponse) => {
         JSON.stringify({
           status: false,
           msg: "Invalid API key. Please provide a valid api_key.",
+        }),
+      );
+      return;
+    }
+
+    // /check-number — msg is an OBJECT here, not a string. The real API does
+    // this too, which is why nothing in the client assumes msg's type.
+    if ((req.url ?? "").includes("/check-number")) {
+      const exists = !notOnWhatsapp.has(String(body.number));
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          status: true,
+          msg: { exists, jid: `${String(body.number)}@s.whatsapp.net` },
+        }),
+      );
+      return;
+    }
+
+    // /info-devices — {status, info:[{...}]}, no msg at all.
+    if ((req.url ?? "").includes("/info-devices")) {
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          status: true,
+          info: [
+            {
+              id: 1,
+              body: String(body.number),
+              webhook: null,
+              status: deviceStatus,
+              message_sent: 2,
+            },
+          ],
         }),
       );
       return;
@@ -279,7 +317,8 @@ async function main(): Promise<void> {
   // key is also replaced, so even a wrong base url cannot authenticate live.
   process.env.WHATSAPP_BSP_API_BASE_URL = baseUrl;
   process.env.WHATSAPP_BSP_API_KEY = "STUB_KEY";
-  process.env.WHATSAPP_BSP_SENDER = "rotate";
+  process.env.WHATSAPP_BSP_SENDER = "919999999999";
+  process.env.WHATSAPP_WEBHOOK_TOKEN = "stub-webhook-token";
   console.log(`  (stub gateway on ${baseUrl} — no live sends)\n`);
 
   const t = await build();
@@ -427,20 +466,25 @@ async function main(): Promise<void> {
     patientIds: [t.ramesh],
   });
   check("one recipient, one send", sent.sent === 1 && sent.failed === 0, sent);
-  check("the gateway was called once", calls.length === 1, calls.length);
-  check("it hit /send-message", calls[0].path.endsWith("/send-message"), calls[0].path);
-  check("the api key came from the environment", calls[0].body.api_key === "STUB_KEY");
-  check("full=1 was requested, so the message id comes back", calls[0].body.full === 1);
-  check("sender defaults to rotate", calls[0].body.sender === "rotate");
+  check("two gateway calls: check then send", calls.length === 2, calls.length);
+  check(
+    "the number is checked before it is messaged",
+    calls[0].path.endsWith("/check-number"),
+    calls.map((call) => call.path),
+  );
+  check("then the send follows", calls[1].path.endsWith("/send-message"));
+  check("the api key came from the environment", calls[1].body.api_key === "STUB_KEY");
+  check("full=1 was requested, so the message id comes back", calls[1].body.full === 1);
+  check("the configured device is named as sender", calls[1].body.sender === "919999999999");
   check(
     "the rendered body carries real values, not placeholders",
-    String(calls[0].body.message).startsWith("Hi Ramesh Kumar, your visit at Alpha Clinic is on 2026-08-10 at 14:30 with Dr Rao."),
-    calls[0].body.message,
+    String(calls[1].body.message).startsWith("Hi Ramesh Kumar, your visit at Alpha Clinic is on 2026-08-10 at 14:30 with Dr Rao."),
+    calls[1].body.message,
   );
   check(
     "the number was reduced to digits",
-    calls[0].body.number === "919800000001",
-    calls[0].body.number,
+    calls[1].body.number === "919800000001",
+    calls[1].body.number,
   );
 
   const logged = await listMessagesForActor(t.ownerActor);
@@ -468,9 +512,11 @@ async function main(): Promise<void> {
   check("the good one still went", batch.sent === 1, batch);
   check("the other two are marked failed", batch.failed === 2, batch);
   check(
+    // Ramesh: check + send. Sunita: nothing, rejected locally. Priya: check +
+    // send (which the gateway then refuses).
     "an unusable number is caught before the gateway is called",
-    calls.length === 2,
-    calls.length,
+    calls.length === 4 && calls.every((call) => !call.body.number?.toString().includes("12345")),
+    calls.map((call) => `${call.path} ${String(call.body.number)}`),
   );
   check(
     "and its reason names the number rather than a generic error",
@@ -512,7 +558,7 @@ async function main(): Promise<void> {
     scopedSend.results.length === 1 && scopedSend.results[0].patientId === t.ramesh,
     scopedSend.results,
   );
-  check("so only one gateway call was made", calls.length === 1, calls.length);
+  check("so only one recipient reached the gateway", calls.length === 2, calls.length);
 
   await expectThrows(
     "and a send to only out-of-reach patients is a 400, not a silent success",
@@ -539,13 +585,13 @@ async function main(): Promise<void> {
     templateId: leaflet.id,
     patientIds: [t.ramesh],
   });
-  check("it hit /send-media", calls[0].path.endsWith("/send-media"), calls[0].path);
-  check("with the media type", calls[0].body.media_type === "document");
-  check("and the direct link", calls[0].body.url === "https://example.com/leaflet.pdf");
+  check("it hit /send-media", calls[1].path.endsWith("/send-media"), calls[1].path);
+  check("with the media type", calls[1].body.media_type === "document");
+  check("and the direct link", calls[1].body.url === "https://example.com/leaflet.pdf");
   check(
     "the rendered text travels as the caption",
-    String(calls[0].body.caption).startsWith("Hi Ramesh Kumar,"),
-    calls[0].body.caption,
+    String(calls[1].body.caption).startsWith("Hi Ramesh Kumar,"),
+    calls[1].body.caption,
   );
 
   console.log("\nHistory survives the template being deleted");
@@ -562,40 +608,108 @@ async function main(): Promise<void> {
     ),
   );
 
-  console.log("\nThe gateway's own error contract");
+  console.log("\nA number with no WhatsApp account is never messaged");
+  calls.length = 0;
+  notOnWhatsapp.add("919800000001");
+  const absent = await sendToPatients(t.ownerActor, {
+    templateId: reminder.id,
+    patientIds: [t.ramesh],
+  });
+  check("it is reported as failed", absent.failed === 1, absent);
+  check(
+    "with a reason the front desk can act on",
+    absent.results[0].failureReason?.includes("not on WhatsApp") === true,
+    absent.results[0],
+  );
+  check(
+    "and no send was attempted",
+    calls.length === 1 && calls[0].path.endsWith("/check-number"),
+    calls.map((call) => call.path),
+  );
+  notOnWhatsapp.delete("919800000001");
+
+  console.log("\nDevice status drives the warning on the Messages page");
+  const { getDeviceStatus } = await import("@/lib/whatsapp");
+  check("a connected device reports connected", (await getDeviceStatus())?.connected === true);
+  deviceStatus = "Disconnect";
+  const offline = await getDeviceStatus();
+  check("a disconnected one does not", offline?.connected === false, offline);
+  check("and its own wording is kept for display", offline?.status === "Disconnect");
+  deviceStatus = "Connected";
+
+  console.log("\nConfiguration errors name what is missing");
   process.env.WHATSAPP_BSP_API_KEY = "";
   await expectThrows(
-    "an unconfigured gateway refuses before any call",
+    "a missing api key refuses before any call",
     () => sendToPatients(t.ownerActor, { templateId: reminder.id, patientIds: [t.ramesh] }),
     (error) => error instanceof Error && error.name === "WhatsappNotConfiguredError",
   );
   process.env.WHATSAPP_BSP_API_KEY = "STUB_KEY";
 
-  console.log("\nFR-9.2 delivery callbacks are not offered by this provider");
-  const { verifyWebhookSignature, parseDeliveryStatusEvent } = await import(
+  process.env.WHATSAPP_BSP_SENDER = "";
+  await expectThrows(
+    // The old default was "rotate", which silently fails on an account whose
+    // devices are all Rotate OFF — which is how they arrive.
+    "a missing sending device refuses too, rather than defaulting to rotate",
+    () => sendToPatients(t.ownerActor, { templateId: reminder.id, patientIds: [t.ramesh] }),
+    (error) =>
+      error instanceof Error &&
+      error.name === "WhatsappNotConfiguredError" &&
+      error.message.includes("WHATSAPP_BSP_SENDER"),
+  );
+  process.env.WHATSAPP_BSP_SENDER = "919999999999";
+
+  console.log("\nFR-9.2 webhook — token verified, never signature-free");
+  const { verifyWebhookToken, parseDeliveryStatusEvent, timingSafeEqual } = await import(
     "@/lib/whatsapp"
   );
+  const url = (token: string) => `https://app.test/api/whatsapp/webhook?token=${token}`;
+
   check(
-    "signature verification fails closed, never returns true",
-    (() => {
-      try {
-        verifyWebhookSignature("{}", new Headers());
-        return false;
-      } catch {
-        return true;
-      }
-    })(),
+    "the right token in the URL is accepted",
+    verifyWebhookToken(url("stub-webhook-token"), new Headers()),
   );
   check(
-    "and so does status parsing",
-    (() => {
-      try {
-        parseDeliveryStatusEvent({});
-        return false;
-      } catch {
-        return true;
-      }
-    })(),
+    "a wrong token is refused",
+    !verifyWebhookToken(url("nope"), new Headers()),
+  );
+  check(
+    "so is no token at all",
+    !verifyWebhookToken("https://app.test/api/whatsapp/webhook", new Headers()),
+  );
+  check(
+    "a header carrying it also works",
+    verifyWebhookToken(
+      "https://app.test/api/whatsapp/webhook",
+      new Headers({ "x-webhook-token": "stub-webhook-token" }),
+    ),
+  );
+  check("comparison is length-safe", !timingSafeEqual("abc", "abcd"));
+
+  process.env.WHATSAPP_WEBHOOK_TOKEN = "";
+  check(
+    "with no token configured it FAILS CLOSED, never open",
+    !verifyWebhookToken(url("stub-webhook-token"), new Headers()) &&
+      !verifyWebhookToken("https://app.test/api/whatsapp/webhook", new Headers()),
+  );
+  process.env.WHATSAPP_WEBHOOK_TOKEN = "stub-webhook-token";
+
+  console.log("\nCallback payloads are validated, never guessed at");
+  check(
+    "the send-response shape is understood",
+    parseDeliveryStatusEvent({ data: { key: { id: "3EB0ABC" }, status: "READ" } })[0]
+      ?.providerMessageId === "3EB0ABC",
+  );
+  check(
+    "so is the ack shape their channel send returns",
+    parseDeliveryStatusEvent({ data: { tag: "ack", attrs: { id: "182xx.7666" } } })[0]
+      ?.status === "ack",
+  );
+  check("an unrecognised shape yields nothing", parseDeliveryStatusEvent({ foo: 1 }).length === 0);
+  check("and so does junk", parseDeliveryStatusEvent("nonsense").length === 0);
+  check(
+    "an id-less event is dropped rather than half-written",
+    parseDeliveryStatusEvent({ data: { key: {} } }).length === 0,
   );
 }
 

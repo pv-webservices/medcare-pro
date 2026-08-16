@@ -6,7 +6,11 @@ import { listClinicsForActor } from "@/lib/clinics";
 import { can, PermissionError } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
-import { isWhatsappConfigured } from "@/lib/whatsapp";
+import {
+  getDeviceStatus,
+  isWhatsappConfigured,
+  type DeviceStatus,
+} from "@/lib/whatsapp";
 import {
   listMessagesForActor,
   type MessageRecord,
@@ -63,11 +67,21 @@ export default async function MessagesPage() {
     );
   }
 
+  const configured = isWhatsappConfigured();
+
   const [clinics, selectedClinicId, canManageTemplates] = await Promise.all([
     listClinicsForActor(actor),
     resolveSelectedClinicId(actor),
     can(actor, "message:template"),
   ]);
+
+  // Asked of the gateway only when there is something to ask about. Null means
+  // "could not tell" — the device is rotating, or the check itself failed —
+  // which is reported as unknown rather than as a problem.
+  let device: DeviceStatus | null = null;
+  if (configured) {
+    device = await getDeviceStatus().catch(() => null);
+  }
 
   // The sidebar switcher only renders when there is more than one clinic, so a
   // single-clinic account has nothing to select and is resolved directly.
@@ -82,6 +96,16 @@ export default async function MessagesPage() {
           Send an approved template to patients on WhatsApp.
         </p>
       </div>
+
+      {device && !device.connected && (
+        <p
+          role="alert"
+          className="mb-6 rounded border border-amber-600/40 bg-amber-600/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-400"
+        >
+          The WhatsApp device is {device.status.toLowerCase()}. Scan its QR code
+          in the provider panel to reconnect — sends will fail until you do.
+        </p>
+      )}
 
       <section aria-labelledby="send-heading" className="mb-8">
         <h2 id="send-heading" className="mb-3 text-lg font-semibold">
@@ -98,7 +122,7 @@ export default async function MessagesPage() {
             templates={templates}
             clinicId={clinicId}
             clinicName={clinicName}
-            isConfigured={isWhatsappConfigured()}
+            isConfigured={configured}
           />
         )}
       </section>

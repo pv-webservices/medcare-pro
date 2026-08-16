@@ -11,10 +11,10 @@ import {
   type ActorContext,
 } from "@/lib/rbac";
 import {
-  isWhatsappConfigured,
+  checkNumber,
+  readWhatsappConfig,
   sendMedia,
   sendText,
-  WhatsappNotConfiguredError,
   type SendResult,
 } from "@/lib/whatsapp";
 import {
@@ -194,6 +194,19 @@ async function loadRecipients(
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * True only when the gateway POSITIVELY reports no WhatsApp account.
+ *
+ * A check that could not be completed — gateway down, unexpected body — lets
+ * the send proceed. Treating an inconclusive check as "no account" would
+ * silently stop messaging real patients whenever the provider hiccuped, which
+ * is a worse failure than one wasted send.
+ */
+async function isNotOnWhatsapp(to: string): Promise<boolean> {
+  const check = await checkNumber(to);
+  return check.checked && !check.exists;
+}
+
+/**
  * FR-9.1 — renders one approved template per recipient and sends it.
  *
  * Every recipient gets its own `whatsapp_messages` row, written whether the
@@ -211,9 +224,9 @@ export async function sendToPatients(
   // own clinic is re-checked in loadRecipients before anything goes out.
   await assertCanSendSomewhere(actor);
 
-  if (!isWhatsappConfigured()) {
-    throw new WhatsappNotConfiguredError();
-  }
+  // Throws with the precise reason — missing key vs missing sending device —
+  // rather than a generic "not configured".
+  readWhatsappConfig();
 
   const template = await getTemplateForActor(actor, input.templateId);
   const recipients = await loadRecipients(actor, input.patientIds);
@@ -240,6 +253,15 @@ export async function sendToPatients(
         ok: false,
         providerMessageId: null,
         message: `${recipient.mobileNumber} is not a valid WhatsApp number.`,
+      };
+    } else if (await isNotOnWhatsapp(to)) {
+      // Checked before sending, not after failing. Repeatedly messaging numbers
+      // with no WhatsApp account is one of the patterns that gets a sending
+      // number flagged — and "not on WhatsApp" tells the front desk what to fix.
+      outcome = {
+        ok: false,
+        providerMessageId: null,
+        message: `${recipient.mobileNumber} is not on WhatsApp.`,
       };
     } else if (template.mediaType && template.mediaUrl) {
       outcome = await sendMedia({
