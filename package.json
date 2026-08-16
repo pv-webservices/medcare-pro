@@ -14,7 +14,8 @@
     "prisma:seed": "prisma db seed",
     "verify:registrations": "tsx scripts/verify-registrations.mts",
     "verify:reports": "tsx scripts/verify-reports.mts",
-    "verify:notifications": "tsx scripts/verify-notifications.mts"
+    "verify:notifications": "tsx scripts/verify-notifications.mts",
+    "verify:roles": "tsx scripts/verify-roles.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

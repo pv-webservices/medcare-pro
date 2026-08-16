@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { ALL_PERMISSIONS } from "@/lib/permissions";
 
 /**
  * The default role set every tenant starts with — PRD §4.
@@ -21,26 +22,22 @@ export const DEFAULT_ROLES = [
   },
   {
     name: "Admin",
-    permissions: [
-      "clinic:read",
-      "clinic:create",
-      "clinic:edit",
-      "doctor:read",
-      "doctor:create",
-      "doctor:edit",
-      "doctor:delete",
-      "patient:read",
-      "patient:create",
-      "patient:edit",
-      "registration:read",
-      "registration:create",
-      "registration:edit",
-      // FR-3.6 — Admin can see the audit trail; Staff deliberately cannot.
-      "registration:history:read",
-      "report:read",
-      "notification:read",
-      "message:send",
-    ],
+    // Owner and Admin both get complete access. The difference is how:
+    //
+    //   Owner holds the WILDCARD, so any permission added to the catalogue in
+    //   future is theirs automatically. It is also the account's lockout
+    //   anchor — lib/roles.ts refuses any edit that would leave nobody holding
+    //   it account-wide — and it is the only thing that can assign the Owner
+    //   role, so an Admin can never mint a new account owner.
+    //
+    //   Admin holds every permission in the catalogue, spelled out. That is
+    //   complete access to every feature that exists, including role
+    //   management, while keeping Owner distinct as the account's root.
+    //
+    // The consequence to remember: a NEW permission added to
+    // lib/permissions.ts reaches Owner for free but must be re-seeded to reach
+    // Admin. `seedDefaultRoles` is idempotent, so re-running it does that.
+    permissions: [...ALL_PERMISSIONS],
   },
   {
     name: "Staff",

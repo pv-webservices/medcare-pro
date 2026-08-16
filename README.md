@@ -37,12 +37,18 @@ npm run dev
 `npm run prisma:seed` seeds the default Owner/Admin/Staff roles. Roles are
 created per tenant at signup, so on a fresh database this is a no-op.
 
+Run it after any change to the default permission sets in
+`src/lib/defaultRoles.ts` — it backfills every existing account. Note that it
+**overwrites** a seeded role's permissions, so hand edits made to Owner, Admin
+or Staff on the Roles screen are reverted by a re-seed. Custom roles are never
+touched.
+
 ## Status
 
-**Built through Stage 6.** Auth, clinics, doctors, patient registration with its
-audit trail, revenue reports and notifications are implemented. Roles/settings
-and WhatsApp are still scaffolding — those routes return `501 Not Implemented`
-and their pages are placeholders.
+**Built through Stage 7.** Auth, clinics, doctors, patient registration with its
+audit trail, revenue reports, notifications, and roles/settings are implemented.
+WhatsApp is still scaffolding — those routes return `501 Not Implemented` and
+the Messages page is a placeholder.
 
 Two modules are blocked on vendor decisions and are stubbed to throw rather than
 guess (see [`docs/PRD.md`](docs/PRD.md) §10):
@@ -62,7 +68,7 @@ Build order (per [`CLAUDE.md`](CLAUDE.md)):
 | 4 — Patient registration + audit trail | `src/app/(dashboard)/registration`, `src/app/api/registrations` | Built |
 | 5 — Revenue reports | `src/app/(dashboard)/reports`, `src/app/api/reports` | Built |
 | 6 — Notifications | `src/app/(dashboard)/notifications`, `src/app/api/notifications`, `src/lib/notifications.ts` | Built |
-| 7 — Roles & settings | `src/app/(dashboard)/settings`, `src/app/api/roles`, `src/lib/rbac.ts` | Scaffolding |
+| 7 — Roles & settings | `src/app/(dashboard)/settings`, `src/app/api/roles`, `src/lib/roles.ts`, `src/lib/permissions.ts` | Built |
 | 8 — WhatsApp | `src/app/(dashboard)/messages`, `src/app/api/whatsapp`, `src/lib/whatsapp.ts` | Scaffolding (vendor-blocked) |
 
 IVR / after-hours smart receptionist is **out of MVP scope** and its Twilio
@@ -77,3 +83,10 @@ scaffolding has been removed.
   `src/lib/rbac.ts` before touching Prisma.
 - **The audit log is append-only.** Every registration edit writes a
   `registration_edit_log` row; nothing updates or deletes one.
+- **No self-escalation through the roles editor.** A user may only grant
+  permissions they hold themselves, the `*` wildcard is never mintable from the
+  UI, and no edit may leave the account without an account-wide owner. See
+  `src/lib/roles.ts`.
+- **Hiding a nav tab is not access control.** `src/lib/navigation.ts` drops tabs
+  a role cannot reach, but every page behind them still checks server-side and
+  refuses anyone who types the URL directly.

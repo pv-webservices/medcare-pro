@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { WILDCARD } from "@/lib/permissions";
 
 /**
  * Server-side permission checks — PRD §9 (RBAC enforcement).
@@ -13,9 +14,6 @@ import { prisma } from "@/lib/prisma";
  * A role assignment with `clinicId = null` is tenant-wide. An assignment with a
  * `clinicId` set grants the permission only within that clinic.
  */
-
-/** Wildcard granting every permission. Held by the seeded Owner role. */
-const WILDCARD = "*";
 
 export interface ActorContext {
   userId: string;
@@ -40,7 +38,7 @@ export class ScopeError extends Error {
   }
 }
 
-function toPermissionList(value: unknown): readonly string[] {
+export function toPermissionList(value: unknown): readonly string[] {
   // `permissions` is a Json column, so Prisma types it as JsonValue. Anything
   // that is not an array of strings is treated as granting nothing rather than
   // being coerced — a malformed row must never widen access.
@@ -168,6 +166,54 @@ export async function accessibleClinicScope(
     .filter((id): id is string => id !== null);
 
   return { scope: "clinics", clinicIds };
+}
+
+/**
+ * Every permission the actor holds in ANY scope.
+ *
+ * Deliberately scope-blind, unlike `can`: this answers "could this user do X
+ * somewhere?", which is the right question for deciding whether to show them a
+ * navigation tab at all. A Staff user whose only role is scoped to Clinic A
+ * still needs the Registrations tab.
+ *
+ * One query for the whole nav, rather than one `can` call per link.
+ *
+ * Showing or hiding a tab is NOT access control — the page behind it does its
+ * own check. This exists so a user is not offered a door that will refuse them.
+ */
+export interface HeldPermissions {
+  /** Holds the wildcard somewhere, so every permission is granted. */
+  all: boolean;
+  keys: ReadonlySet<string>;
+}
+
+export async function permissionsHeldAnywhere(
+  actor: ActorContext,
+): Promise<HeldPermissions> {
+  const assignments = await prisma.userRole.findMany({
+    // Guards against a role assignment left over from a different tenant.
+    where: { userId: actor.userId, role: { tenantId: actor.tenantId } },
+    select: { role: { select: { permissions: true } } },
+  });
+
+  const keys = new Set<string>();
+  let all = false;
+
+  for (const assignment of assignments) {
+    for (const permission of toPermissionList(assignment.role.permissions)) {
+      if (permission === WILDCARD) {
+        all = true;
+        continue;
+      }
+      keys.add(permission);
+    }
+  }
+
+  return { all, keys };
+}
+
+export function holdsAnywhere(held: HeldPermissions, permission: string): boolean {
+  return held.all || held.keys.has(permission);
 }
 
 /**

@@ -2,36 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { NavLink } from "@/lib/navigation";
 
 /**
  * Primary navigation — the modules named in docs/PROJECT_STRUCTURE.md.
  *
- * Labels use the PRD's vocabulary exactly ("Registrations", "Doctors",
- * "Clinics"), so staff never have to translate the interface's words into the
- * clinic's own.
+ * Both the links and the unread count are resolved in the layout, not here:
+ * each needs the session, and this component is a client one. The layout has
+ * already dropped every tab the user's roles cannot reach, and gives 0 unread
+ * to a user without `notification:read`, so the badge never appears for them.
  *
- * The unread count is resolved in the layout, not here: it needs the session,
- * and this component is a client one. A user without `notification:read` is
- * given 0, so the badge simply never appears for them.
+ * Which permission each tab needs lives in src/lib/navigation.ts, along with
+ * the reminder that hiding a tab is a courtesy, not access control — the page
+ * behind it checks for itself.
  */
 
 interface DashboardNavProps {
+  links: readonly NavLink[];
   unreadNotifications: number;
 }
 
-const LINKS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/registration", label: "Registrations" },
-  { href: "/doctors", label: "Doctors" },
-  { href: "/clinics", label: "Clinics" },
-  { href: "/reports", label: "Reports" },
-  { href: "/notifications", label: "Notifications" },
-  { href: "/messages", label: "Messages" },
-  { href: "/settings/roles", label: "Roles" },
-  { href: "/settings/branding", label: "Branding" },
-] as const;
-
-export default function DashboardNav({ unreadNotifications }: DashboardNavProps) {
+export default function DashboardNav({
+  links,
+  unreadNotifications,
+}: DashboardNavProps) {
   const pathname = usePathname();
 
   function isActive(href: string): boolean {
@@ -41,7 +35,7 @@ export default function DashboardNav({ unreadNotifications }: DashboardNavProps)
   return (
     <nav aria-label="Main">
       <ul className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
-        {LINKS.map((link) => (
+        {links.map((link) => (
           <li key={link.href}>
             <Link
               href={link.href}
