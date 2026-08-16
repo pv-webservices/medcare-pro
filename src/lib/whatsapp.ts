@@ -306,17 +306,28 @@ export async function checkNumber(to: string): Promise<NumberCheck> {
   }
 
   const msg = response.payload?.msg;
-  if (typeof msg === "object" && msg !== null) {
-    const exists = (msg as Record<string, unknown>).exists === true;
-    return {
-      exists,
-      checked: true,
-      message: exists ? "On WhatsApp." : "This number is not on WhatsApp.",
-    };
+
+  // The LIVE api answers `{"status":true,"msg":true}` — a plain boolean. Its
+  // docs show `{"msg":{"exists":true,"jid":"…"}}` instead, so both are handled:
+  // the boolean because that is what actually comes back, the object so a
+  // future correction to match their docs does not silently break the check.
+  const exists =
+    typeof msg === "boolean"
+      ? msg
+      : typeof msg === "object" && msg !== null
+        ? (msg as Record<string, unknown>).exists === true
+        : null;
+
+  if (exists === null) {
+    // status:true but an unrecognised body — unverified, NOT absent.
+    return { exists: false, checked: false, message: response.message };
   }
 
-  // status:true but an unrecognised body — treat as unverified, not absent.
-  return { exists: false, checked: false, message: response.message };
+  return {
+    exists,
+    checked: true,
+    message: exists ? "On WhatsApp." : "This number is not on WhatsApp.",
+  };
 }
 
 export interface DeviceStatus {
@@ -336,34 +347,52 @@ export interface DeviceStatus {
  * Shown on the Messages page so "nothing is sending" is answerable before a
  * batch of failures rather than after.
  */
-export async function getDeviceStatus(): Promise<DeviceStatus | null> {
+export type DeviceProbe =
+  | { ok: true; device: DeviceStatus }
+  | { ok: false; message: string };
+
+export async function getDeviceStatus(): Promise<DeviceProbe> {
   const config = readWhatsappConfig();
 
   // Rotation has no single device to report on — the gateway picks per send.
   if (config.sender === ROTATE_SENDER) {
-    return null;
+    return {
+      ok: false,
+      message: "Sending device is set to rotate, so there is no single device to report on.",
+    };
   }
 
   const response = await post(DEVICE_INFO_PATH, { number: config.sender });
 
-  if (!response.ok || !Array.isArray(response.payload?.info)) {
-    return null;
+  if (!response.ok) {
+    // The gateway's own wording is far more useful than a generic failure —
+    // "The number you are trying to reach does not exist, or you do not have
+    // permission." is what a sender in the wrong FORMAT looks like.
+    return { ok: false, message: response.message };
+  }
+
+  if (!Array.isArray(response.payload?.info) || response.payload.info.length === 0) {
+    return { ok: false, message: "The gateway reported no device for that number." };
   }
 
   const entry = response.payload.info[0];
   if (typeof entry !== "object" || entry === null) {
-    return null;
+    return { ok: false, message: "The gateway returned an unreadable device record." };
   }
 
   const row = entry as Record<string, unknown>;
   const status = typeof row.status === "string" ? row.status : "Unknown";
 
   return {
-    status,
-    // The gateway writes "Connected"; anything else is treated as not ready.
-    connected: status.toLowerCase().startsWith("connect"),
-    webhookUrl: typeof row.webhook === "string" && row.webhook !== "" ? row.webhook : null,
-    messagesSent: typeof row.message_sent === "number" ? row.message_sent : null,
+    ok: true,
+    device: {
+      status,
+      // The gateway writes "Connected"; anything else is treated as not ready.
+      connected: status.toLowerCase().startsWith("connect"),
+      webhookUrl:
+        typeof row.webhook === "string" && row.webhook !== "" ? row.webhook : null,
+      messagesSent: typeof row.message_sent === "number" ? row.message_sent : null,
+    },
   };
 }
 
@@ -477,6 +506,15 @@ export function parseDeliveryStatusEvent(
       if (typeof attrs === "object" && attrs !== null) {
         push((attrs as Record<string, unknown>).id, "ack");
       }
+    }
+  }
+
+  // Shape C — flat RkvRobo shape: { event, message_id, status }
+  const event = body.event;
+  const messageId = body.message_id;
+  if (typeof event === "string" && typeof messageId === "string" && messageId.trim() !== "") {
+    if (event !== "message") {
+      push(messageId, body.status ?? event);
     }
   }
 

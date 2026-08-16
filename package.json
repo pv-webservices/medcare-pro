@@ -16,7 +16,8 @@
     "verify:reports": "tsx scripts/verify-reports.mts",
     "verify:notifications": "tsx scripts/verify-notifications.mts",
     "verify:roles": "tsx scripts/verify-roles.mts",
-    "verify:whatsapp": "tsx scripts/verify-whatsapp.mts"
+    "verify:whatsapp": "tsx scripts/verify-whatsapp.mts",
+    "whatsapp:doctor": "tsx scripts/whatsapp-doctor.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

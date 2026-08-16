@@ -90,6 +90,12 @@ const notOnWhatsapp = new Set<string>();
 /** What /info-devices reports, so the connected/disconnected paths both run. */
 let deviceStatus = "Connected";
 /**
+ * Which /check-number body to send back. "boolean" is what the LIVE API does;
+ * "object" is what its docs claim; "unknown" proves an unrecognised shape is
+ * treated as inconclusive rather than as "not on WhatsApp".
+ */
+let checkNumberShape: "boolean" | "object" | "unknown" = "boolean";
+/**
  * Never reset, unlike `calls` — real WhatsApp message ids are unique forever,
  * and `whatsapp_messages.provider_message_id` is uniquely indexed to keep a
  * future delivery callback idempotent. Deriving the id from `calls.length`
@@ -124,15 +130,22 @@ const stub = createServer((req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
-    // /check-number — msg is an OBJECT here, not a string. The real API does
-    // this too, which is why nothing in the client assumes msg's type.
+    // /check-number — `msg` is NOT a string here. The live API returns a plain
+    // BOOLEAN (verified against bot.rkvrobo.in), while its docs show an object;
+    // the stub can produce either, plus an unrecognised shape, so the client is
+    // proven to handle all three.
     if ((req.url ?? "").includes("/check-number")) {
       const exists = !notOnWhatsapp.has(String(body.number));
       res.statusCode = 200;
       res.end(
         JSON.stringify({
           status: true,
-          msg: { exists, jid: `${String(body.number)}@s.whatsapp.net` },
+          msg:
+            checkNumberShape === "boolean"
+              ? exists
+              : checkNumberShape === "object"
+                ? { exists, jid: `${String(body.number)}@s.whatsapp.net` }
+                : "unexpected",
         }),
       );
       return;
@@ -629,13 +642,61 @@ async function main(): Promise<void> {
   notOnWhatsapp.delete("919800000001");
 
   console.log("\nDevice status drives the warning on the Messages page");
-  const { getDeviceStatus } = await import("@/lib/whatsapp");
-  check("a connected device reports connected", (await getDeviceStatus())?.connected === true);
+  const { getDeviceStatus, checkNumber } = await import("@/lib/whatsapp");
+  const online = await getDeviceStatus();
+  check("a connected device reports connected", online.ok && online.device.connected);
+  check(
+    "and its registered webhook comes back",
+    online.ok && online.device.webhookUrl === null,
+    online,
+  );
   deviceStatus = "Disconnect";
   const offline = await getDeviceStatus();
-  check("a disconnected one does not", offline?.connected === false, offline);
-  check("and its own wording is kept for display", offline?.status === "Disconnect");
+  check("a disconnected one does not", offline.ok && !offline.device.connected, offline);
+  check(
+    "and its own wording is kept for display",
+    offline.ok && offline.device.status === "Disconnect",
+  );
   deviceStatus = "Connected";
+
+  console.log("\ncheck-number: the LIVE boolean shape, not just the documented one");
+  // The live API answers {"status":true,"msg":true|false}; its docs show
+  // {"msg":{"exists":true,…}}. Both must work — the boolean because it is what
+  // actually comes back, the object so a correction to match the docs does not
+  // silently turn the check back into a no-op.
+  check(
+    "a boolean true means on WhatsApp",
+    await (async () => {
+      const result = await checkNumber("919800000001");
+      return result.checked && result.exists;
+    })(),
+  );
+  notOnWhatsapp.add("919800000002");
+  check(
+    "a boolean false means not on WhatsApp — and IS conclusive",
+    await (async () => {
+      const result = await checkNumber("919800000002");
+      return result.checked && !result.exists;
+    })(),
+  );
+  notOnWhatsapp.delete("919800000002");
+  checkNumberShape = "object";
+  check(
+    "the documented object shape still works",
+    await (async () => {
+      const result = await checkNumber("919800000001");
+      return result.checked && result.exists;
+    })(),
+  );
+  checkNumberShape = "unknown";
+  check(
+    "an unrecognised shape is inconclusive, never 'not on WhatsApp'",
+    await (async () => {
+      const result = await checkNumber("919800000001");
+      return !result.checked && !result.exists;
+    })(),
+  );
+  checkNumberShape = "boolean";
 
   console.log("\nConfiguration errors name what is missing");
   process.env.WHATSAPP_BSP_API_KEY = "";
@@ -704,6 +765,13 @@ async function main(): Promise<void> {
     "so is the ack shape their channel send returns",
     parseDeliveryStatusEvent({ data: { tag: "ack", attrs: { id: "182xx.7666" } } })[0]
       ?.status === "ack",
+  );
+  check(
+    "so is the flat RkvRobo shape",
+    parseDeliveryStatusEvent({ event: "ack", message_id: "3EB0ABC", status: "read" })[0]
+      ?.providerMessageId === "3EB0ABC" &&
+      parseDeliveryStatusEvent({ event: "ack", message_id: "3EB0ABC", status: "read" })[0]
+        ?.status === "read",
   );
   check("an unrecognised shape yields nothing", parseDeliveryStatusEvent({ foo: 1 }).length === 0);
   check("and so does junk", parseDeliveryStatusEvent("nonsense").length === 0);

@@ -75,12 +75,13 @@ export default async function MessagesPage() {
     can(actor, "message:template"),
   ]);
 
-  // Asked of the gateway only when there is something to ask about. Null means
-  // "could not tell" — the device is rotating, or the check itself failed —
-  // which is reported as unknown rather than as a problem.
+  // Asked of the gateway only when there is something to ask about. A probe
+  // that cannot answer — rotating sender, gateway down — is left as null and
+  // reported as nothing rather than as a fault.
   let device: DeviceStatus | null = null;
   if (configured) {
-    device = await getDeviceStatus().catch(() => null);
+    const probe = await getDeviceStatus().catch(() => null);
+    device = probe?.ok ? probe.device : null;
   }
 
   // The sidebar switcher only renders when there is more than one clinic, so a
