@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import ClinicForm from "@/components/clinics/ClinicForm";
 import Button from "@/components/ui/Button";
+import PageHeader from "@/components/ui/PageHeader";
 import Panel from "@/components/ui/Panel";
 
 /**
@@ -18,23 +19,26 @@ import Panel from "@/components/ui/Panel";
  */
 
 interface AddClinicPanelProps {
-  /** The page's title block, rendered to the left of the button. */
-  heading: ReactNode;
+  /** The page's meta line, rendered under the title. */
+  meta: ReactNode;
 }
 
-export default function AddClinicPanel({ heading }: AddClinicPanelProps) {
+export default function AddClinicPanel({ meta }: AddClinicPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <>
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        {heading}
-        {!isOpen && (
-          <Button variant="commit" onClick={() => setIsOpen(true)}>
-            Add Clinic
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        title="Clinics"
+        meta={meta}
+        actions={
+          !isOpen && (
+            <Button variant="commit" onClick={() => setIsOpen(true)}>
+              Add Clinic
+            </Button>
+          )
+        }
+      />
 
       {isOpen && (
         <Panel

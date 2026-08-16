@@ -3,6 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import PatientLookup from "@/components/registration/PatientLookup";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import Panel from "@/components/ui/Panel";
+import Select from "@/components/ui/Select";
+import { useToast } from "@/components/ui/Toast";
 import { CURRENCY_SYMBOL } from "@/lib/money";
 import {
   VISIT_TYPES,
@@ -15,8 +21,12 @@ import {
  * New / edit registration — PRD §6.3 (FR-3.1, FR-3.5).
  *
  * Fields are exactly the ones the PRD names, in the order the front desk asks
- * for them: who the patient is, then what the visit was. The Patient ID is not
- * a field — it is minted server-side (FR-3.1) and shown back once saved.
+ * for them: who the patient is, then what the visit was. That order is why the
+ * form is two panels rather than one long column — a receptionist finishes the
+ * first before the patient has finished sitting down.
+ *
+ * The Patient ID is not a field — it is minted server-side (FR-3.1) and shown
+ * back once saved.
  *
  * Validation runs as the person types, so a mistyped mobile number is flagged
  * before they reach the button. The server stays authoritative: these rules
@@ -81,14 +91,6 @@ const GENDERS = ["Female", "Male", "Other"] as const;
 
 const MOBILE = /^[+()\d][\d\s()-]{4,24}$/;
 const MAX_AMOUNT = 99_999_999.99;
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
-const INPUT_INVALID_CLASS =
-  "block min-h-11 w-full rounded border border-red-600 bg-transparent px-3 text-base outline-none dark:border-red-500";
-const LABEL_CLASS = "mb-1 block text-sm font-medium";
-const FIELD_ERROR_CLASS = "mt-1 text-xs text-red-700 dark:text-red-400";
-const SECTION_CLASS = "mb-6 rounded border border-black/15 p-4 dark:border-white/20";
 
 type FieldErrors = Partial<Record<keyof RegistrationFormValues, string>>;
 
@@ -169,6 +171,7 @@ export default function RegistrationForm({
   onCancel,
 }: RegistrationFormProps) {
   const router = useRouter();
+  const showToast = useToast();
   const isEdit = Boolean(registrationId);
 
   const [values, setValues] = useState<RegistrationFormValues>(
@@ -190,11 +193,12 @@ export default function RegistrationForm({
   const update = (field: keyof RegistrationFormValues, value: string) =>
     setValues((current) => ({ ...current, [field]: value }));
 
+  const touch = (field: keyof RegistrationFormValues) =>
+    setTouched((current) => ({ ...current, [field]: true }));
+
+  /** Only surface a field error once the user has engaged with that field. */
   const errorFor = (field: keyof RegistrationFormValues) =>
     touched[field] ? errors[field] : undefined;
-
-  const inputClass = (field: keyof RegistrationFormValues) =>
-    errorFor(field) ? INPUT_INVALID_CLASS : INPUT_CLASS;
 
   /**
    * Changing clinic invalidates the doctor and any selected patient — both
@@ -265,6 +269,7 @@ export default function RegistrationForm({
     setFormError(null);
 
     if (Object.keys(errors).length > 0) {
+      // Reveal every outstanding problem at once rather than one per attempt.
       setTouched({
         clinicId: true,
         name: true,
@@ -328,9 +333,22 @@ export default function RegistrationForm({
       }
 
       if (isEdit) {
+        showToast({
+          tone: "ok",
+          title: "Changes saved.",
+          // FR-3.5 / PRD §9 — the desk should know the change is on the record.
+          detail: "The edit is recorded in this registration's history.",
+        });
         router.refresh();
         onCancel?.();
       } else {
+        showToast({
+          tone: "ok",
+          title: `${values.name.trim()} registered.`,
+          detail: values.patientId
+            ? "Added to their existing Patient ID."
+            : "Their new Patient ID is on the record.",
+        });
         // Straight to the record, where the new Patient ID is shown.
         router.push(`/registration/${body.data?.id ?? ""}`);
         router.refresh();
@@ -349,63 +367,58 @@ export default function RegistrationForm({
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="mb-4 rounded-md border border-alert/40 bg-alert/8 px-3 py-2.5 text-body text-alert"
         >
           {formError}
         </p>
       )}
 
-      <section className={SECTION_CLASS} aria-labelledby="patient-heading">
-        <h2 id="patient-heading" className="mb-4 text-lg font-semibold">
-          Patient
-        </h2>
-
+      <Panel
+        title="Patient"
+        description="Check for an existing record first — a returning patient keeps their Patient ID."
+        className="mb-5"
+      >
         {/* Above the lookup, because the lookup searches within a clinic. */}
         {!isEdit && clinics.length > 1 && (
-          <div className="mb-4">
-            <label htmlFor="registration-clinic" className={LABEL_CLASS}>
-              Clinic
-            </label>
-            <select
-              id="registration-clinic"
-              value={values.clinicId}
-              onChange={(e) => handleClinicChange(e.target.value)}
-              onBlur={() => setTouched((t) => ({ ...t, clinicId: true }))}
-              aria-invalid={Boolean(errorFor("clinicId"))}
-              className={inputClass("clinicId")}
-            >
-              <option value="">Choose a clinic…</option>
-              {clinics.map((clinic) => (
-                <option key={clinic.id} value={clinic.id}>
-                  {clinic.name}
-                </option>
-              ))}
-            </select>
-            {errorFor("clinicId") && (
-              <p className={FIELD_ERROR_CLASS}>{errorFor("clinicId")}</p>
-            )}
-          </div>
+          <Select
+            id="registration-clinic"
+            label="Clinic"
+            value={values.clinicId}
+            onChange={(e) => handleClinicChange(e.target.value)}
+            onBlur={() => touch("clinicId")}
+            error={errorFor("clinicId")}
+            fieldClassName="mb-4"
+          >
+            <option value="">Choose a clinic…</option>
+            {clinics.map((clinic) => (
+              <option key={clinic.id} value={clinic.id}>
+                {clinic.name}
+              </option>
+            ))}
+          </Select>
         )}
 
         {!isEdit &&
           (values.patientId ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-black/15 bg-black/[0.03] px-3 py-2 dark:border-white/20 dark:bg-white/[0.06]">
-              <p className="text-sm">
+            <Card
+              isFlush
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-surface-sunk p-3"
+            >
+              <p className="text-body text-ink">
                 Adding a visit to{" "}
                 <span className="font-medium">{values.name}</span>{" "}
-                <span className="tabular-nums text-black/55 dark:text-white/55">
-                  ({values.patientCode})
-                </span>
+                <span className="serial text-muted">({values.patientCode})</span>
                 . Their existing Patient ID is kept.
               </p>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
                 onClick={handlePatientClear}
-                className="min-h-11 shrink-0 rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
               >
                 Register as new patient
-              </button>
-            </div>
+              </Button>
+            </Card>
           ) : (
             <div className="mb-4">
               <PatientLookup
@@ -416,311 +429,201 @@ export default function RegistrationForm({
           ))}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="registration-name" className={LABEL_CLASS}>
-              Patient name
-            </label>
-            <input
-              id="registration-name"
-              type="text"
-              autoComplete="off"
-              value={values.name}
-              onChange={(e) => update("name", e.target.value)}
-              onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-              aria-invalid={Boolean(errorFor("name"))}
-              className={inputClass("name")}
-            />
-            {errorFor("name") && (
-              <p className={FIELD_ERROR_CLASS}>{errorFor("name")}</p>
-            )}
-          </div>
+          <Input
+            id="registration-name"
+            type="text"
+            label="Patient name"
+            autoComplete="off"
+            value={values.name}
+            onChange={(e) => update("name", e.target.value)}
+            onBlur={() => touch("name")}
+            error={errorFor("name")}
+          />
 
-          <div>
-            <label htmlFor="registration-mobile" className={LABEL_CLASS}>
-              Mobile number
-            </label>
-            <input
-              id="registration-mobile"
-              type="tel"
-              inputMode="tel"
-              autoComplete="off"
-              value={values.mobileNumber}
-              onChange={(e) => update("mobileNumber", e.target.value)}
-              onBlur={() => setTouched((t) => ({ ...t, mobileNumber: true }))}
-              aria-invalid={Boolean(errorFor("mobileNumber"))}
-              className={inputClass("mobileNumber")}
-            />
-            {errorFor("mobileNumber") && (
-              <p className={FIELD_ERROR_CLASS}>{errorFor("mobileNumber")}</p>
-            )}
-          </div>
+          <Input
+            id="registration-mobile"
+            type="tel"
+            inputMode="tel"
+            label="Mobile number"
+            autoComplete="off"
+            value={values.mobileNumber}
+            onChange={(e) => update("mobileNumber", e.target.value)}
+            onBlur={() => touch("mobileNumber")}
+            error={errorFor("mobileNumber")}
+          />
 
-          <div>
-            <label htmlFor="registration-age" className={LABEL_CLASS}>
-              Age{" "}
-              <span className="font-normal text-black/55 dark:text-white/55">
-                (optional)
-              </span>
-            </label>
-            <input
-              id="registration-age"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={150}
-              value={values.age}
-              onChange={(e) => update("age", e.target.value)}
-              onBlur={() => setTouched((t) => ({ ...t, age: true }))}
-              aria-invalid={Boolean(errorFor("age"))}
-              className={inputClass("age")}
-            />
-            {errorFor("age") && (
-              <p className={FIELD_ERROR_CLASS}>{errorFor("age")}</p>
-            )}
-          </div>
+          <Input
+            id="registration-age"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={150}
+            label="Age (optional)"
+            value={values.age}
+            onChange={(e) => update("age", e.target.value)}
+            onBlur={() => touch("age")}
+            error={errorFor("age")}
+          />
 
-          <div>
-            <label htmlFor="registration-gender" className={LABEL_CLASS}>
-              Gender
-            </label>
-            <select
-              id="registration-gender"
-              value={values.gender}
-              onChange={(e) => update("gender", e.target.value)}
-              className={INPUT_CLASS}
-            >
-              <option value="">Not recorded</option>
-              {GENDERS.map((gender) => (
-                <option key={gender} value={gender}>
-                  {gender}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            id="registration-gender"
+            label="Gender"
+            value={values.gender}
+            onChange={(e) => update("gender", e.target.value)}
+          >
+            <option value="">Not recorded</option>
+            {GENDERS.map((gender) => (
+              <option key={gender} value={gender}>
+                {gender}
+              </option>
+            ))}
+          </Select>
 
-          <div className="sm:col-span-2">
-            <label htmlFor="registration-address" className={LABEL_CLASS}>
-              Address{" "}
-              <span className="font-normal text-black/55 dark:text-white/55">
-                (optional)
-              </span>
-            </label>
-            <input
-              id="registration-address"
-              type="text"
-              autoComplete="off"
-              value={values.address}
-              onChange={(e) => update("address", e.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
+          <Input
+            id="registration-address"
+            type="text"
+            label="Address (optional)"
+            autoComplete="off"
+            value={values.address}
+            onChange={(e) => update("address", e.target.value)}
+            fieldClassName="sm:col-span-2"
+          />
 
-          <div>
-            <label htmlFor="registration-city" className={LABEL_CLASS}>
-              City{" "}
-              <span className="font-normal text-black/55 dark:text-white/55">
-                (optional)
-              </span>
-            </label>
-            <input
-              id="registration-city"
-              type="text"
-              autoComplete="off"
-              value={values.city}
-              onChange={(e) => update("city", e.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
+          <Input
+            id="registration-city"
+            type="text"
+            label="City (optional)"
+            autoComplete="off"
+            value={values.city}
+            onChange={(e) => update("city", e.target.value)}
+          />
         </div>
-      </section>
+      </Panel>
 
-      <section className={SECTION_CLASS} aria-labelledby="visit-heading">
-        <h2 id="visit-heading" className="mb-4 text-lg font-semibold">
-          Visit
-        </h2>
-
+      <Panel
+        title="Visit"
+        description="What happened at the desk today, and what it came to."
+        className="mb-5"
+      >
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <label htmlFor="registration-visit-type" className={LABEL_CLASS}>
-              Visit type
-            </label>
-            <select
-              id="registration-visit-type"
-              value={values.visitType}
-              onChange={(e) =>
-                setValues((current) => ({
-                  ...current,
-                  visitType: e.target.value as VisitType,
-                }))
-              }
-              className={INPUT_CLASS}
-            >
-              {VISIT_TYPES.map((visitType) => (
-                <option key={visitType} value={visitType}>
-                  {VISIT_TYPE_LABELS[visitType]}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-black/55 dark:text-white/55">
-              {/* Derived from the patient lookup, but the desk can override:
-                  a returning patient with a new complaint is a new case. */}
-              Set automatically when you pick an existing patient — change it if
-              this visit is for something new.
-            </p>
-          </div>
+          <Select
+            id="registration-visit-type"
+            label="Visit type"
+            value={values.visitType}
+            onChange={(e) =>
+              setValues((current) => ({
+                ...current,
+                visitType: e.target.value as VisitType,
+              }))
+            }
+            // Derived from the patient lookup, but the desk can override:
+            // a returning patient with a new complaint is a new case.
+            hint="Set automatically when you pick an existing patient — change it if this visit is for something new."
+            fieldClassName="sm:col-span-2"
+          >
+            {VISIT_TYPES.map((visitType) => (
+              <option key={visitType} value={visitType}>
+                {VISIT_TYPE_LABELS[visitType]}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            id="registration-doctor"
+            label="Doctor (optional)"
+            value={values.doctorId}
+            onChange={(e) => handleDoctorChange(e.target.value)}
+            disabled={!values.clinicId}
+            hint={
+              values.clinicId && clinicDoctors.length === 0
+                ? "No doctors added for this clinic yet."
+                : undefined
+            }
+          >
+            <option value="">Not assigned yet</option>
+            {clinicDoctors.map((doctor) => (
+              <option key={doctor.id} value={doctor.id}>
+                {doctor.name} · {doctor.department}
+              </option>
+            ))}
+          </Select>
 
           <div>
-            <label htmlFor="registration-doctor" className={LABEL_CLASS}>
-              Doctor{" "}
-              <span className="font-normal text-black/55 dark:text-white/55">
-                (optional)
-              </span>
-            </label>
-            <select
-              id="registration-doctor"
-              value={values.doctorId}
-              onChange={(e) => handleDoctorChange(e.target.value)}
-              disabled={!values.clinicId}
-              className={INPUT_CLASS}
-            >
-              <option value="">Not assigned yet</option>
-              {clinicDoctors.map((doctor) => (
-                <option key={doctor.id} value={doctor.id}>
-                  {doctor.name} · {doctor.department}
-                </option>
-              ))}
-            </select>
-            {values.clinicId && clinicDoctors.length === 0 && (
-              <p className="mt-1 text-xs text-black/55 dark:text-white/55">
-                No doctors added for this clinic yet.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="registration-department" className={LABEL_CLASS}>
-              Department
-            </label>
-            <input
+            <Input
               id="registration-department"
               type="text"
+              label="Department"
               list="registration-departments"
               autoComplete="off"
               value={values.department}
               onChange={(e) => update("department", e.target.value)}
-              onBlur={() => setTouched((t) => ({ ...t, department: true }))}
-              aria-invalid={Boolean(errorFor("department"))}
-              className={inputClass("department")}
+              onBlur={() => touch("department")}
+              error={errorFor("department")}
             />
             <datalist id="registration-departments">
               {departments.map((department) => (
                 <option key={department} value={department} />
               ))}
             </datalist>
-            {errorFor("department") && (
-              <p className={FIELD_ERROR_CLASS}>{errorFor("department")}</p>
-            )}
           </div>
 
-          <div>
-            <label htmlFor="registration-amount" className={LABEL_CLASS}>
-              Amount
-            </label>
-            <div className="flex items-stretch">
-              <span
-                aria-hidden="true"
-                className="flex min-h-11 items-center rounded-l border border-r-0 border-black/20 px-3 text-base text-black/60 dark:border-white/25 dark:text-white/60"
-              >
-                {CURRENCY_SYMBOL}
-              </span>
-              <input
-                id="registration-amount"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={values.amount}
-                onChange={(e) => update("amount", e.target.value)}
-                onBlur={() => setTouched((t) => ({ ...t, amount: true }))}
-                aria-invalid={Boolean(errorFor("amount"))}
-                className={`${inputClass("amount")} rounded-l-none`}
-              />
-            </div>
-            {errorFor("amount") && (
-              <p className={FIELD_ERROR_CLASS}>{errorFor("amount")}</p>
-            )}
-          </div>
+          <Input
+            id="registration-amount"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            label={`Amount (${CURRENCY_SYMBOL})`}
+            unit={CURRENCY_SYMBOL}
+            value={values.amount}
+            onChange={(e) => update("amount", e.target.value)}
+            onBlur={() => touch("amount")}
+            error={errorFor("amount")}
+          />
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="registration-date" className={LABEL_CLASS}>
-                Visit date
-              </label>
-              <input
-                id="registration-date"
-                type="date"
-                value={values.visitDate}
-                onChange={(e) => update("visitDate", e.target.value)}
-                onBlur={() => setTouched((t) => ({ ...t, visitDate: true }))}
-                aria-invalid={Boolean(errorFor("visitDate"))}
-                className={inputClass("visitDate")}
-              />
-              {errorFor("visitDate") && (
-                <p className={FIELD_ERROR_CLASS}>{errorFor("visitDate")}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="registration-time" className={LABEL_CLASS}>
-                Visit time
-              </label>
-              <input
-                id="registration-time"
-                type="time"
-                value={values.visitTime}
-                onChange={(e) => update("visitTime", e.target.value)}
-                onBlur={() => setTouched((t) => ({ ...t, visitTime: true }))}
-                aria-invalid={Boolean(errorFor("visitTime"))}
-                className={inputClass("visitTime")}
-              />
-              {errorFor("visitTime") && (
-                <p className={FIELD_ERROR_CLASS}>{errorFor("visitTime")}</p>
-              )}
-            </div>
+            <Input
+              id="registration-date"
+              type="date"
+              label="Visit date"
+              value={values.visitDate}
+              onChange={(e) => update("visitDate", e.target.value)}
+              onBlur={() => touch("visitDate")}
+              error={errorFor("visitDate")}
+            />
+            <Input
+              id="registration-time"
+              type="time"
+              label="Visit time"
+              value={values.visitTime}
+              onChange={(e) => update("visitTime", e.target.value)}
+              onBlur={() => touch("visitTime")}
+              error={errorFor("visitTime")}
+            />
           </div>
         </div>
-      </section>
+      </Panel>
 
       {!isEdit && values.patientId === "" && (
-        <p className="mb-4 text-sm text-black/55 dark:text-white/55">
+        <p className="mb-4 text-label text-muted">
           A Patient ID is assigned automatically when you save.
         </p>
       )}
 
       <div className="flex flex-wrap gap-3">
-        <button
+        <Button
           type="submit"
-          disabled={isSaving}
-          className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+          variant="commit"
+          isBusy={isSaving}
+          busyLabel={isEdit ? "Saving…" : "Registering…"}
         >
-          {isSaving
-            ? isEdit
-              ? "Saving…"
-              : "Registering…"
-            : isEdit
-              ? "Save Changes"
-              : "Register Patient"}
-        </button>
+          {isEdit ? "Save Changes" : "Register Patient"}
+        </Button>
 
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSaving}
-            className="min-h-11 rounded border border-black/20 px-5 text-base font-medium disabled:opacity-60 dark:border-white/25"
-          >
+          <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>

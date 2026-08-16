@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import Card from "@/components/ui/Card";
@@ -37,21 +38,6 @@ function railStyle(themeColor: string | null): CSSProperties {
   return themeColor
     ? accentStyle(themeColor)
     : ({ "--accent": "var(--line)" } as CSSProperties);
-}
-
-function Chevron() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4">
-      <path
-        d="M6 3.5 10.5 8 6 12.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 export default function ClinicsTable({
@@ -130,7 +116,11 @@ export default function ClinicsTable({
                       className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-ink"
                     >
                       <span className="sr-only">Open {clinic.name}</span>
-                      <Chevron />
+                      <ChevronRight
+                        aria-hidden="true"
+                        strokeWidth={1.75}
+                        className="h-4 w-4"
+                      />
                     </Link>
                   </TD>
                 </TR>

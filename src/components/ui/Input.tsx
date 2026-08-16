@@ -85,6 +85,15 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
   hint?: string;
   error?: string;
   adornment?: ReactNode;
+  /**
+   * Sits inside the control's left edge — the rupee sign on an amount. Named
+   * `unit` rather than `prefix` because `prefix` is already an HTML attribute,
+   * and because that is what it is for.
+   *
+   * It is `aria-hidden`, so the unit must also appear in the label: a screen
+   * reader user should not have to infer the currency from a decoration.
+   */
+  unit?: ReactNode;
   /** Applied to the wrapper, not the control — for grid spans. */
   fieldClassName?: string;
 }
@@ -95,10 +104,24 @@ export default function Input({
   hint,
   error,
   adornment,
+  unit,
   fieldClassName,
   className,
   ...rest
 }: InputProps) {
+  const control = (
+    <input
+      id={id}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={error || hint ? `${id}-message` : undefined}
+      className={controlClasses(
+        Boolean(error),
+        cx("min-h-11 pr-3", unit ? "pl-8" : "pl-3", className),
+      )}
+      {...rest}
+    />
+  );
+
   return (
     <FieldShell
       id={id}
@@ -108,13 +131,19 @@ export default function Input({
       adornment={adornment}
       className={fieldClassName}
     >
-      <input
-        id={id}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error || hint ? `${id}-message` : undefined}
-        className={controlClasses(Boolean(error), cx("min-h-11 px-3", className))}
-        {...rest}
-      />
+      {unit ? (
+        <div className="relative">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-input text-muted"
+          >
+            {unit}
+          </span>
+          {control}
+        </div>
+      ) : (
+        control
+      )}
     </FieldShell>
   );
 }

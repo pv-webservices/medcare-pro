@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import type { ReactNode, SelectHTMLAttributes } from "react";
 import { cx } from "@/components/ui/cx";
 import { controlClasses, FieldShell } from "@/components/ui/Input";
@@ -21,25 +22,6 @@ interface SelectProps
   isLabelHidden?: boolean;
   fieldClassName?: string;
   children: ReactNode;
-}
-
-function Chevron() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-    >
-      <path
-        d="M4 6.5 8 10.5 12 6.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 export default function Select({
@@ -68,7 +50,11 @@ export default function Select({
       >
         {children}
       </select>
-      <Chevron />
+      <ChevronDown
+        aria-hidden="true"
+        strokeWidth={1.75}
+        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+      />
     </div>
   );
 

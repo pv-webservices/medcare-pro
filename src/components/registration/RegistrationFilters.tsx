@@ -1,7 +1,12 @@
 "use client";
 
+import { Download, Search, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Button, { buttonClasses } from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Panel from "@/components/ui/Panel";
+import Select from "@/components/ui/Select";
 
 /**
  * Search, filter and export controls — PRD §6.3 (FR-3.2 … FR-3.4).
@@ -13,6 +18,10 @@ import { useRouter } from "next/navigation";
  * Applying a filter navigates rather than fetching, so the resulting list is
  * shareable and survives a refresh — a receptionist can leave "today, Dr Rao"
  * open all morning.
+ *
+ * "Apply" is the `primary` variant, not `commit`. Commit colour marks a write
+ * into a clinic's records; narrowing a list writes nothing, and spending the
+ * clinic's colour on it would blunt the one signal that matters.
  */
 
 export interface DoctorFilterOption {
@@ -39,10 +48,6 @@ interface RegistrationFiltersProps {
    */
   clinicId: string | null;
 }
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
-const LABEL_CLASS = "mb-1 block text-sm font-medium";
 
 const EMPTY: RegistrationFilterValues = {
   search: "",
@@ -107,34 +112,40 @@ export default function RegistrationFilters({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mb-6 rounded border border-black/15 p-4 dark:border-white/20"
+    <Panel
+      title="Find a registration"
+      description="Search by patient name or phone number, then narrow by doctor, department or date."
+      className="mb-5"
+      actions={
+        // FR-3.4 — exports exactly the rows currently listed, which is why it
+        // takes the applied filters rather than what is typed but unapplied.
+        <a
+          href={`/api/registrations?${exportQueryString(initial, clinicId)}`}
+          className={buttonClasses("secondary", "sm")}
+        >
+          <Download aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+          Export CSV
+        </a>
+      }
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="lg:col-span-3">
-          <label htmlFor="registration-search" className={LABEL_CLASS}>
-            Search by patient name or phone number
-          </label>
-          <input
+      <form onSubmit={handleSubmit}>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Input
             id="registration-search"
             type="search"
             autoComplete="off"
+            label="Patient name or phone number"
+            placeholder="Priya, or 98765…"
             value={values.search}
             onChange={(e) => update("search", e.target.value)}
-            className={INPUT_CLASS}
+            fieldClassName="lg:col-span-3"
           />
-        </div>
 
-        <div>
-          <label htmlFor="registration-filter-doctor" className={LABEL_CLASS}>
-            Doctor
-          </label>
-          <select
+          <Select
             id="registration-filter-doctor"
+            label="Doctor"
             value={values.doctorId}
             onChange={(e) => update("doctorId", e.target.value)}
-            className={INPUT_CLASS}
           >
             <option value="">All doctors</option>
             {doctors.map((doctor) => (
@@ -142,18 +153,13 @@ export default function RegistrationFilters({
                 {doctor.name}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
 
-        <div>
-          <label htmlFor="registration-filter-department" className={LABEL_CLASS}>
-            Department
-          </label>
-          <select
+          <Select
             id="registration-filter-department"
+            label="Department"
             value={values.department}
             onChange={(e) => update("department", e.target.value)}
-            className={INPUT_CLASS}
           >
             <option value="">All departments</option>
             {departments.map((department) => (
@@ -161,63 +167,40 @@ export default function RegistrationFilters({
                 {department}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="registration-filter-from" className={LABEL_CLASS}>
-              From
-            </label>
-            <input
+          <div className="grid grid-cols-2 gap-3">
+            <Input
               id="registration-filter-from"
               type="date"
+              label="From"
               value={values.from}
               onChange={(e) => update("from", e.target.value)}
-              className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label htmlFor="registration-filter-to" className={LABEL_CLASS}>
-              To
-            </label>
-            <input
+            <Input
               id="registration-filter-to"
               type="date"
+              label="To"
               value={values.to}
               onChange={(e) => update("to", e.target.value)}
-              className={INPUT_CLASS}
             />
           </div>
         </div>
-      </div>
 
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="submit"
-          className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background"
-        >
-          Apply Filters
-        </button>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button type="submit" variant="primary">
+            <Search aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+            Apply Filters
+          </Button>
 
-        {isFiltered && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="min-h-11 rounded border border-black/20 px-5 text-base font-medium dark:border-white/25"
-          >
-            Clear Filters
-          </button>
-        )}
-
-        {/* FR-3.4 — exports exactly the rows currently listed. */}
-        <a
-          href={`/api/registrations?${exportQueryString(initial, clinicId)}`}
-          className="inline-flex min-h-11 items-center rounded border border-black/20 px-5 text-base font-medium dark:border-white/25"
-        >
-          Export CSV
-        </a>
-      </div>
-    </form>
+          {isFiltered && (
+            <Button variant="quiet" onClick={handleClear}>
+              <X aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+              Clear Filters
+            </Button>
+          )}
+        </div>
+      </form>
+    </Panel>
   );
 }

@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import RegistrationForm from "@/components/registration/RegistrationForm";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { nowClockTime, todayDateOnly } from "@/lib/dates";
 import { listDoctorsForActor } from "@/lib/doctors";
@@ -44,21 +45,25 @@ export default async function NewRegistrationPage() {
 
   return (
     <section>
-      <Link
-        href="/registration"
-        className="mb-4 inline-block text-sm text-black/60 underline dark:text-white/60"
-      >
-        ← All registrations
-      </Link>
-
-      <h1 className="mb-4 text-2xl font-semibold">New registration</h1>
+      <PageHeader
+        title="New registration"
+        meta="A Patient ID is assigned when you save."
+        back={{ href: "/registration", label: "All registrations" }}
+      />
 
       {clinics.length === 0 ? (
-        <p className="rounded border border-black/15 px-4 py-3 text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-          {allClinics.length === 0
-            ? "Add a clinic before registering patients — every registration belongs to one."
-            : "You do not have permission to register patients at any of your clinics."}
-        </p>
+        <EmptyState
+          title={
+            allClinics.length === 0
+              ? "No clinics yet"
+              : "You cannot register patients here"
+          }
+          guidance={
+            allClinics.length === 0
+              ? "Add a clinic before registering patients — every registration belongs to one."
+              : "Your role does not allow registering patients at any of your clinics. Ask an account owner to change it."
+          }
+        />
       ) : (
         <RegistrationForm
           clinics={clinics.map(({ id, name }) => ({ id, name }))}

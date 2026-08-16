@@ -1,7 +1,10 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import RegistrationFilters from "@/components/registration/RegistrationFilters";
 import RegistrationsTable from "@/components/registration/RegistrationsTable";
+import { buttonClasses } from "@/components/ui/Button";
+import PageHeader, { Count } from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { can } from "@/lib/rbac";
@@ -93,25 +96,27 @@ export default async function RegistrationListPage({
 
   return (
     <section>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Registrations</h1>
-          <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-            {result.total === 1 ? "1 registration" : `${result.total} registrations`}
+      <PageHeader
+        title="Registrations"
+        meta={
+          <>
+            <Count>{result.total}</Count>{" "}
+            {result.total === 1 ? "registration" : "registrations"}
             {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
-            {isFiltered ? " matching your filters" : ""}.
-          </p>
-        </div>
-
-        {canCreate && (
-          <Link
-            href="/registration/new"
-            className="inline-flex min-h-11 items-center rounded bg-foreground px-5 text-base font-medium text-background"
-          >
-            New Registration
-          </Link>
-        )}
-      </div>
+            {isFiltered ? " matching your filters" : ""}
+          </>
+        }
+        actions={
+          canCreate && (
+            <Link
+              href="/registration/new"
+              className={buttonClasses("commit", "md")}
+            >
+              New Registration
+            </Link>
+          )
+        }
+      />
 
       <RegistrationFilters
         doctors={doctors.map(({ id, name }) => ({ id, name }))}
@@ -130,6 +135,7 @@ export default async function RegistrationListPage({
         registrations={result.rows}
         showClinic={!selectedClinic}
         isFiltered={isFiltered}
+        canCreate={canCreate}
       />
 
       {lastPage > 1 && (
@@ -137,25 +143,36 @@ export default async function RegistrationListPage({
           aria-label="Registration pages"
           className="mt-4 flex flex-wrap items-center justify-between gap-3"
         >
-          <p className="text-sm text-black/60 dark:text-white/60">
-            Showing {firstOnPage}–{lastOnPage} of {result.total}
+          <p className="text-label text-muted">
+            Showing <Count>{firstOnPage}</Count>–<Count>{lastOnPage}</Count> of{" "}
+            <Count>{result.total}</Count>
           </p>
 
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {result.page > 1 && (
               <Link
                 href={pageHref(params, result.page - 1)}
-                className="inline-flex min-h-11 items-center rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
+                className={buttonClasses("secondary", "md")}
               >
-                ← Previous
+                <ChevronLeft
+                  aria-hidden="true"
+                  strokeWidth={1.75}
+                  className="h-4 w-4"
+                />
+                Previous
               </Link>
             )}
             {result.page < lastPage && (
               <Link
                 href={pageHref(params, result.page + 1)}
-                className="inline-flex min-h-11 items-center rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
+                className={buttonClasses("secondary", "md")}
               >
-                Next →
+                Next
+                <ChevronRight
+                  aria-hidden="true"
+                  strokeWidth={1.75}
+                  className="h-4 w-4"
+                />
               </Link>
             )}
           </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -154,15 +155,7 @@ function ToastCard({
         className="-mr-1 -mt-1 rounded-md p-1.5 text-muted hover:bg-surface-sunk hover:text-ink"
       >
         <span className="sr-only">Dismiss</span>
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4">
-          <path
-            d="M4 4l8 8M12 4l-8 8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        </svg>
+        <X aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
       </button>
     </div>
   );

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
 import type { PatientMatch } from "@/lib/registrations";
 
 /**
@@ -23,9 +26,6 @@ interface PatientLookupProps {
 const MIN_SEARCH_LENGTH = 2;
 /** Long enough to finish typing a phone number, short enough to feel live. */
 const DEBOUNCE_MS = 300;
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
 
 function formatLastVisit(date: string): string {
   return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
@@ -104,63 +104,56 @@ export default function PatientLookup({
 
   return (
     <div>
-      <label htmlFor="patient-lookup" className="mb-1 block text-sm font-medium">
-        Returning patient?{" "}
-        <span className="font-normal text-black/55 dark:text-white/55">
-          Search by name, mobile or Patient ID
-        </span>
-      </label>
-      <input
+      <Input
         id="patient-lookup"
         type="search"
         autoComplete="off"
+        label="Returning patient?"
+        hint={error ? undefined : "Search by name, mobile or Patient ID."}
+        error={error ?? undefined}
         value={term}
         onChange={(e) => setTerm(e.target.value)}
         disabled={!clinicId}
         placeholder={clinicId ? "" : "Choose a clinic first"}
-        className={INPUT_CLASS}
       />
 
-      {error && (
-        <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-400">
-          {error}
-        </p>
-      )}
-
-      {isSearching && (
-        <p className="mt-2 text-sm text-black/55 dark:text-white/55">
-          Searching…
-        </p>
-      )}
+      {isSearching && <p className="mt-2 text-label text-muted">Searching…</p>}
 
       {!isSearching && matches.length > 0 && (
-        <ul className="mt-2 grid gap-2">
+        <ul className="mt-3 grid gap-2">
           {matches.map((patient) => (
-            <li
-              key={patient.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded border border-black/15 px-3 py-2 dark:border-white/20"
-            >
-              <div className="min-w-0">
-                <p className="font-medium">{patient.name}</p>
-                <p className="text-sm tabular-nums text-black/55 dark:text-white/55">
-                  {patient.patientCode} · {patient.mobileNumber}
-                </p>
-                <p className="text-sm text-black/55 dark:text-white/55">
-                  {patient.visitCount === 1
-                    ? "1 visit"
-                    : `${patient.visitCount} visits`}
-                  {patient.lastVisitDate
-                    ? ` · last on ${formatLastVisit(patient.lastVisitDate)}`
-                    : ""}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onSelect(patient)}
-                className="min-h-11 shrink-0 rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
+            <li key={patient.id}>
+              <Card
+                isFlush
+                className="flex flex-wrap items-center justify-between gap-3 p-3"
               >
-                Use this patient
-              </button>
+                <div className="min-w-0">
+                  <p className="font-medium text-ink">{patient.name}</p>
+                  <p className="mt-0.5 text-label text-muted">
+                    <span className="serial text-ink">{patient.patientCode}</span>
+                    <span className="tabular-nums">
+                      {" · "}
+                      {patient.mobileNumber}
+                    </span>
+                  </p>
+                  <p className="text-label text-muted">
+                    {patient.visitCount === 1
+                      ? "1 visit"
+                      : `${patient.visitCount} visits`}
+                    {patient.lastVisitDate
+                      ? ` · last on ${formatLastVisit(patient.lastVisitDate)}`
+                      : ""}
+                  </p>
+                </div>
+
+                <Button
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={() => onSelect(patient)}
+                >
+                  Use this patient
+                </Button>
+              </Card>
             </li>
           ))}
         </ul>
@@ -168,7 +161,7 @@ export default function PatientLookup({
 
       {/* Not shown alongside an error: a failed search is not a "no match". */}
       {!isSearching && !error && hasSearched && matches.length === 0 && (
-        <p className="mt-2 text-sm text-black/55 dark:text-white/55">
+        <p className="mt-2 text-label text-muted">
           No match — fill the details below to register them as a new patient.
         </p>
       )}

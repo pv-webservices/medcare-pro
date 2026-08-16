@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import ClinicsTable from "@/components/clinics/ClinicsTable";
 import AddClinicPanel from "@/components/clinics/AddClinicPanel";
+import PageHeader, { Count } from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { can } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
@@ -36,24 +37,19 @@ export default async function ClinicsListPage() {
   const doctorTotal = clinics.reduce((sum, clinic) => sum + clinic.doctorCount, 0);
   const patientTotal = clinics.reduce((sum, clinic) => sum + clinic.patientCount, 0);
 
-  const heading = (
-    <div>
-      <h1 className="font-display text-title font-semibold text-ink">Clinics</h1>
-      <p className="mt-1 text-label text-muted">
-        <span className="font-medium tabular-nums text-ink">{clinics.length}</span>{" "}
-        {clinics.length === 1 ? "clinic" : "clinics"}
-        {clinics.length > 0 && (
-          <>
-            {" · "}
-            <span className="font-medium tabular-nums text-ink">{doctorTotal}</span>{" "}
-            {doctorTotal === 1 ? "doctor" : "doctors"}
-            {" · "}
-            <span className="font-medium tabular-nums text-ink">{patientTotal}</span>{" "}
-            {patientTotal === 1 ? "patient" : "patients"}
-          </>
-        )}
-      </p>
-    </div>
+  const meta = (
+    <>
+      <Count>{clinics.length}</Count> {clinics.length === 1 ? "clinic" : "clinics"}
+      {clinics.length > 0 && (
+        <>
+          {" · "}
+          <Count>{doctorTotal}</Count> {doctorTotal === 1 ? "doctor" : "doctors"}
+          {" · "}
+          <Count>{patientTotal}</Count>{" "}
+          {patientTotal === 1 ? "patient" : "patients"}
+        </>
+      )}
+    </>
   );
 
   return (
@@ -62,9 +58,9 @@ export default async function ClinicsListPage() {
           the title; the form it opens needs the full width, so the component
           owns both slots rather than being wedged into the header. */}
       {canCreate ? (
-        <AddClinicPanel heading={heading} />
+        <AddClinicPanel meta={meta} />
       ) : (
-        <header className="mb-5">{heading}</header>
+        <PageHeader title="Clinics" meta={meta} />
       )}
 
       <ClinicsTable clinics={clinics} selectedClinicId={selectedClinicId} />

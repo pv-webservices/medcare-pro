@@ -67,9 +67,12 @@ of the same weight:
 1. **The clinic rail** — a 4px vertical bar. It runs down the sidebar's brand
    block at app scale, and down the left edge of each row on the clinics list at
    list scale. Same object, two scales, teaching one relationship.
-2. **Commit buttons** — the primary button that writes a record is filled with
-   the accent, so the clinic you are writing into is visible at the instant you
-   commit.
+2. **Commit buttons** — the button that writes a record is filled with the
+   accent, so the clinic you are writing into is visible at the instant you
+   commit. `commit` means a write into a clinic's records and nothing else: a
+   button that only navigates or narrows a list — "Apply Filters", "Export CSV",
+   pagination — is `primary` or `secondary`. Spending the clinic's colour on
+   those blunts the one signal that matters.
 3. **Selected-row emphasis** on lists, paired with a "Viewing" pill.
 
 Never put the raw accent behind text you did not compute a foreground for.
@@ -114,6 +117,22 @@ zoom on focus, which is intolerable on a shared front-desk tablet.
 - Rupee amounts always go through `formatRupees()` in `src/lib/money.ts`, which
   uses `en-IN` grouping. `₹1,50,000.00`, never `₹150,000.00`. Chart ticks use
   `formatRupeesCompact()` — lakh and crore, never `K`/`M`.
+
+### Icons
+
+`lucide-react`, imported directly at the call site — there is no icon barrel to
+keep in sync. Two sizes only: `h-4 w-4` beside text (buttons, table
+affordances, meta lines) and `h-5 w-5` standing alone. Always
+`strokeWidth={1.75}`, which matches the weight of the type; lucide's default of
+2 reads heavy against IBM Plex at these sizes.
+
+An icon either repeats a word or replaces one. If it repeats — a chevron next
+to "Next", a download next to "Export CSV" — it is `aria-hidden` and the text
+carries the meaning. If it replaces one, the control needs an `sr-only` label
+saying what it does. Never a bare icon button with neither.
+
+No icon is decorative. An icon in a heading, an empty state or a status pill is
+decoration; delete it.
 
 ### Spacing, radius, shadow
 
@@ -161,6 +180,11 @@ overlay (toasts, menus). Nothing else gets a shadow.
   registrations, notifications and messages: a `Table` on tablet and up, the
   same fields as stacked cards below. Staff should recognize a pattern once and
   reuse that knowledge everywhere.
+- **Every screen opens with `PageHeader`.** Title, one meta line, the page's
+  actions. The meta line is what tells staff whether the list in front of them
+  is everything or a slice — how many rows, at which clinic, filtered or not —
+  so it is a sentence in that order, with the numbers in `Count`. A leaf screen
+  passes `back`; a top-level list does not.
 
 ## Forms
 
