@@ -237,15 +237,15 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
         {active && activeIndex !== null && (
           <div
             role="status"
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded border border-black/15 bg-background px-3 py-2 text-xs shadow-sm dark:border-white/20"
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-md"
             style={{
               left: `${(Math.min(Math.max(xFor(activeIndex), 90), WIDTH - 90) / WIDTH) * 100}%`,
               top: `${(yFor(active.value) / HEIGHT) * 100}%`,
             }}
           >
-            <p className="font-medium">{active.fullLabel}</p>
-            <p className="mt-0.5 tabular-nums">{formatRupees(active.revenue)}</p>
-            <p className="text-black/55 dark:text-white/55">
+            <p className="font-semibold text-slate-900">{active.fullLabel}</p>
+            <p className="mt-1 font-medium tabular-nums text-slate-900">{formatRupees(active.revenue)}</p>
+            <p className="text-slate-500 mt-1">
               {active.registrations === 1
                 ? "1 registration"
                 : `${active.registrations} registrations`}
@@ -255,22 +255,23 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
       </div>
 
       {/* The table view twin — every plotted value, reachable without hover. */}
-      <details className="mt-3">
-        <summary className="cursor-pointer text-sm text-black/60 dark:text-white/60">
+      <details className="mt-4 group">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors list-none flex items-center">
+          <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
           View as table
         </summary>
-        <div className="mt-2 overflow-x-auto">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">{caption}</caption>
             <thead>
-              <tr className="border-b border-black/15 dark:border-white/20">
-                <th scope="col" className="py-2 pr-4 text-sm font-medium">
+              <tr className="border-b border-slate-200 bg-slate-50/50">
+                <th scope="col" className="py-3 pl-4 pr-4 text-sm font-semibold text-slate-900">
                   Period
                 </th>
-                <th scope="col" className="py-2 pr-4 text-right text-sm font-medium">
+                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-slate-900">
                   Registrations
                 </th>
-                <th scope="col" className="py-2 text-right text-sm font-medium">
+                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-slate-900">
                   Revenue
                 </th>
               </tr>
@@ -279,13 +280,13 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
               {points.map((point) => (
                 <tr
                   key={point.bucket}
-                  className="border-b border-black/10 dark:border-white/10"
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors"
                 >
-                  <td className="py-2 pr-4 text-sm">{point.fullLabel}</td>
-                  <td className="py-2 pr-4 text-right text-sm tabular-nums">
+                  <td className="py-3 pl-4 pr-4 text-sm font-medium text-slate-900">{point.fullLabel}</td>
+                  <td className="py-3 pr-4 text-right text-sm tabular-nums text-slate-600">
                     {point.registrations}
                   </td>
-                  <td className="py-2 text-right text-sm tabular-nums">
+                  <td className="py-3 pr-4 text-right text-sm font-medium tabular-nums text-slate-900">
                     {formatRupees(point.revenue)}
                   </td>
                 </tr>

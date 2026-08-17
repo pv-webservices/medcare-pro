@@ -32,10 +32,10 @@ export default function StatusFilter({ selected, unreadCount }: StatusFilterProp
               <Link
                 href={status === "all" ? "/notifications" : "/notifications?status=unread"}
                 aria-current={isSelected ? "page" : undefined}
-                className={`inline-flex min-h-11 items-center rounded border px-4 text-sm font-medium ${
+                className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors ${
                   isSelected
-                    ? "border-transparent bg-foreground text-background"
-                    : "border-black/20 dark:border-white/25"
+                    ? "bg-violet-600 text-white shadow-sm"
+                    : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 {label}

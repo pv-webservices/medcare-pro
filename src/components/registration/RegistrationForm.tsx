@@ -89,7 +89,7 @@ interface RegistrationFormProps {
 /** Free text in the database — this list is a shortcut, not a constraint. */
 const GENDERS = ["Female", "Male", "Other"] as const;
 
-const MOBILE = /^[+()\d][\d\s()-]{4,24}$/;
+const MOBILE = /^\d{10}$/;
 const MAX_AMOUNT = 99_999_999.99;
 
 type FieldErrors = Partial<Record<keyof RegistrationFormValues, string>>;
@@ -101,7 +101,7 @@ function validate(values: RegistrationFormValues): FieldErrors {
   if (values.name.trim().length === 0) errors.name = "Enter the patient's name.";
 
   if (!MOBILE.test(values.mobileNumber.trim())) {
-    errors.mobileNumber = "Enter a valid mobile number.";
+    errors.mobileNumber = "Mobile number must be exactly 10 digits.";
   }
 
   if (values.age.trim()) {
@@ -367,7 +367,7 @@ export default function RegistrationForm({
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-md border border-alert/40 bg-alert/8 px-3 py-2.5 text-body text-alert"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {formError}
         </p>
@@ -402,12 +402,12 @@ export default function RegistrationForm({
           (values.patientId ? (
             <Card
               isFlush
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-surface-sunk p-3"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl"
             >
-              <p className="text-body text-ink">
+              <p className="text-sm text-slate-900">
                 Adding a visit to{" "}
-                <span className="font-medium">{values.name}</span>{" "}
-                <span className="serial text-muted">({values.patientCode})</span>
+                <span className="font-semibold">{values.name}</span>{" "}
+                <span className="serial text-slate-500">({values.patientCode})</span>
                 . Their existing Patient ID is kept.
               </p>
               <Button
@@ -443,11 +443,15 @@ export default function RegistrationForm({
           <Input
             id="registration-mobile"
             type="tel"
-            inputMode="tel"
+            inputMode="numeric"
             label="Mobile number"
             autoComplete="off"
+            maxLength={10}
             value={values.mobileNumber}
-            onChange={(e) => update("mobileNumber", e.target.value)}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "");
+              update("mobileNumber", digits);
+            }}
             onBlur={() => touch("mobileNumber")}
             error={errorFor("mobileNumber")}
           />
@@ -605,7 +609,7 @@ export default function RegistrationForm({
       </Panel>
 
       {!isEdit && values.patientId === "" && (
-        <p className="mb-4 text-label text-muted">
+        <p className="mb-4 text-xs text-slate-500">
           A Patient ID is assigned automatically when you save.
         </p>
       )}

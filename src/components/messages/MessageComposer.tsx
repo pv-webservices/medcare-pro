@@ -6,6 +6,9 @@ import type { PatientMatch } from "@/lib/registrations";
 import { renderTemplate } from "@/lib/whatsappTemplateText";
 import type { TemplateRecord } from "@/lib/whatsappTemplates";
 import type { RecipientResult, SendMessageResult } from "@/lib/whatsappMessages";
+import Button from "@/components/ui/Button";
+import Input, { Select } from "@/components/ui/Input";
+import Card from "@/components/ui/Card";
 
 /**
  * Sending an approved template to patients — PRD §6.9 (FR-9.1).
@@ -29,9 +32,6 @@ interface MessageComposerProps {
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MAX_RECIPIENTS = 50;
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
 
 export default function MessageComposer({
   templates,
@@ -145,18 +145,20 @@ export default function MessageComposer({
 
   if (!clinicId) {
     return (
-      <p className="rounded border border-black/15 px-4 py-6 text-center text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-        Pick a clinic in the sidebar to message its patients.
-      </p>
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+        <p className="text-sm font-medium text-slate-500">
+          Pick a clinic in the sidebar to message its patients.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="grid gap-4">
+    <Card className="p-4 sm:p-6 space-y-6">
       {!isConfigured && (
         <p
           role="alert"
-          className="rounded border border-amber-600/40 bg-amber-600/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-400"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700"
         >
           WhatsApp is not connected yet. Set WHATSAPP_BSP_API_KEY in the
           environment before sending.
@@ -166,7 +168,7 @@ export default function MessageComposer({
       {error && (
         <p
           role="alert"
-          className="rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
@@ -175,60 +177,53 @@ export default function MessageComposer({
       {outcome && <SendOutcome outcome={outcome} />}
 
       <div className="max-w-md">
-        <label htmlFor="composer-template" className="mb-1 block text-sm font-medium">
-          Template
-        </label>
-        <select
+        <Select
           id="composer-template"
+          name="templateId"
+          label="Template"
           value={templateId}
           onChange={(event) => {
             setTemplateId(event.target.value);
             setOutcome(null);
           }}
-          className={INPUT_CLASS}
         >
           {templates.map((entry) => (
             <option key={entry.id} value={entry.id}>
               {entry.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="max-w-md">
-        <label htmlFor="composer-search" className="mb-1 block text-sm font-medium">
-          Add patients
-        </label>
-        <input
+        <Input
           id="composer-search"
+          name="search"
+          label="Add patients"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by name, mobile number or Patient ID"
-          aria-describedby="composer-search-help"
-          className={INPUT_CLASS}
-        />
-        <p id="composer-search-help" className="mt-1 text-xs text-black/60 dark:text-white/60">
-          {isSearching
+          hint={isSearching
             ? "Searching…"
             : `Patients at ${clinicName ?? "this clinic"}. Up to ${MAX_RECIPIENTS} per send.`}
-        </p>
+        />
 
         {search.trim().length >= 2 && matches.length > 0 && (
-          <ul className="mt-2 grid gap-1 rounded border border-black/15 p-1 dark:border-white/20">
+          <ul className="mt-2 grid gap-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm max-h-64 overflow-y-auto">
             {matches.map((patient) => (
               <li key={patient.id}>
                 <button
                   type="button"
                   onClick={() => addRecipient(patient)}
-                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded px-3 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-sm hover:bg-slate-50 transition-colors"
                 >
                   <span>
-                    <span className="font-medium">{patient.name}</span>{" "}
-                    <span className="text-black/55 dark:text-white/55">
+                    <span className="font-medium text-slate-900">{patient.name}</span>{" "}
+                    <span className="text-slate-500">
                       {patient.patientCode}
                     </span>
                   </span>
-                  <span className="tabular-nums text-black/55 dark:text-white/55">
+                  <span className="tabular-nums text-slate-500">
                     {patient.mobileNumber}
                   </span>
                 </button>
@@ -240,7 +235,7 @@ export default function MessageComposer({
 
       {recipients.length > 0 && (
         <div>
-          <p className="mb-1 text-sm font-medium">
+          <p className="mb-2 text-sm font-semibold text-slate-900">
             Sending to {recipients.length}{" "}
             {recipients.length === 1 ? "patient" : "patients"}
           </p>
@@ -248,11 +243,11 @@ export default function MessageComposer({
             {recipients.map((patient) => (
               <li
                 key={patient.id}
-                className="flex items-center gap-2 rounded border border-black/15 py-1 pl-3 pr-1 dark:border-white/20"
+                className="flex items-center gap-2 rounded-lg border border-slate-200 py-1.5 pl-3 pr-1.5 bg-slate-50"
               >
-                <span className="text-sm">
+                <span className="text-sm font-medium text-slate-900">
                   {patient.name}{" "}
-                  <span className="text-black/55 dark:text-white/55">
+                  <span className="text-slate-500 font-normal">
                     {patient.patientCode}
                   </span>
                 </span>
@@ -260,7 +255,7 @@ export default function MessageComposer({
                   type="button"
                   onClick={() => removeRecipient(patient.id)}
                   aria-label={`Remove ${patient.name}`}
-                  className="min-h-9 rounded px-2 text-sm text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10"
+                  className="min-h-8 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50 transition-colors"
                 >
                   Remove
                 </button>
@@ -272,21 +267,21 @@ export default function MessageComposer({
 
       {template && (
         <div>
-          <p className="mb-1 text-sm font-medium">Preview</p>
-          <div className="rounded border border-black/15 p-3 dark:border-white/20">
+          <p className="mb-2 text-sm font-semibold text-slate-900">Preview</p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             {template.mediaType && (
-              <p className="mb-2 text-xs text-black/55 dark:text-white/55">
+              <p className="mb-3 text-xs font-medium text-slate-500">
                 With {template.mediaType} attachment
               </p>
             )}
-            <p className="whitespace-pre-wrap text-sm">{preview}</p>
+            <p className="whitespace-pre-wrap text-sm text-slate-900">{preview}</p>
             {template.footer && (
-              <p className="mt-2 text-xs text-black/55 dark:text-white/55">
+              <p className="mt-3 text-xs text-slate-500">
                 {template.footer}
               </p>
             )}
           </div>
-          <p className="mt-1 text-xs text-black/60 dark:text-white/60">
+          <p className="mt-2 text-xs text-slate-500">
             Doctor, department, visit date and amount are filled from each
             patient&apos;s most recent visit when the message is sent.
           </p>
@@ -294,20 +289,20 @@ export default function MessageComposer({
       )}
 
       <div>
-        <button
+        <Button
           type="button"
           onClick={handleSend}
           disabled={!template || recipients.length === 0 || isSending || !isConfigured}
-          className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+          variant="commit"
+          isBusy={isSending}
+          busyLabel={`Sending to ${recipients.length}…`}
         >
-          {isSending
-            ? `Sending to ${recipients.length}…`
-            : recipients.length === 0
-              ? "Send WhatsApp"
-              : `Send WhatsApp to ${recipients.length}`}
-        </button>
+          {recipients.length === 0
+            ? "Send WhatsApp"
+            : `Send WhatsApp to ${recipients.length}`}
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -323,18 +318,18 @@ function SendOutcome({ outcome }: { outcome: SendMessageResult }) {
   return (
     <div
       role="status"
-      className={`rounded border px-3 py-2 text-sm ${
+      className={`rounded-xl border px-4 py-3 text-sm font-medium ${
         failures.length === 0
-          ? "border-green-700/40 bg-green-700/10 text-green-800 dark:text-green-400"
-          : "border-amber-600/40 bg-amber-600/10 text-amber-800 dark:text-amber-400"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-amber-200 bg-amber-50 text-amber-800"
       }`}
     >
-      <p className="font-medium">
+      <p>
         {outcome.sent} sent
         {outcome.failed > 0 && `, ${outcome.failed} failed`} — {outcome.templateName}
       </p>
       {failures.length > 0 && (
-        <ul className="mt-1 grid gap-0.5">
+        <ul className="mt-2 grid gap-1 text-xs">
           {failures.map((result) => (
             <li key={result.patientId}>
               {result.patientName} ({result.patientCode}): {result.failureReason}

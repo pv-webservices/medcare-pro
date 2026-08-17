@@ -1,5 +1,6 @@
 import { formatRupees } from "@/lib/money";
 import type { EditLogEntry } from "@/lib/registrations";
+import Card from "@/components/ui/Card";
 
 /**
  * The registration edit trail — PRD §6.3 (FR-3.6).
@@ -27,7 +28,7 @@ function formatTimestamp(iso: string): string {
 }
 
 function Blank() {
-  return <span className="text-black/40 dark:text-white/40">not set</span>;
+  return <span className="text-slate-400">not set</span>;
 }
 
 /**
@@ -46,9 +47,9 @@ function Value({ field, value }: { field: string; value: string | null }) {
 export default function EditHistory({ entries }: EditHistoryProps) {
   if (entries.length === 0) {
     return (
-      <div className="rounded border border-black/15 px-4 py-8 text-center dark:border-white/20">
-        <p className="mb-1 font-medium">No history recorded</p>
-        <p className="text-sm text-black/60 dark:text-white/60">
+      <div className="rounded-3xl border border-slate-100 bg-white px-6 py-12 text-center shadow-sm">
+        <p className="mb-1 text-lg font-bold text-slate-900">No history recorded</p>
+        <p className="text-sm text-slate-500">
           This registration has not been edited since it was created.
         </p>
       </div>
@@ -58,49 +59,48 @@ export default function EditHistory({ entries }: EditHistoryProps) {
   return (
     <ol className="grid gap-3">
       {entries.map((entry) => (
-        <li
-          key={entry.id}
-          className="rounded border border-black/15 px-4 py-3 dark:border-white/20"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="font-medium">
-              {entry.editedByName ?? entry.editedByEmail}{" "}
-              <span className="font-normal text-black/55 dark:text-white/55">
-                {/* The role held at the time, not the one they hold today. */}
-                as {entry.roleAtTime}
-              </span>
-            </p>
-            <p className="text-sm tabular-nums text-black/55 dark:text-white/55">
-              {formatTimestamp(entry.timestamp)}
-            </p>
-          </div>
+        <li key={entry.id}>
+          <Card isFlush={false}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-semibold text-slate-900">
+                {entry.editedByName ?? entry.editedByEmail}{" "}
+                <span className="font-normal text-slate-500">
+                  {/* The role held at the time, not the one they hold today. */}
+                  as {entry.roleAtTime}
+                </span>
+              </p>
+              <p className="text-sm tabular-nums text-slate-500">
+                {formatTimestamp(entry.timestamp)}
+              </p>
+            </div>
 
-          <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-            {entry.isCreation ? "Registered the patient" : "Edited the registration"}
-          </p>
+            <p className="mt-1 text-sm text-slate-600">
+              {entry.isCreation ? "Registered the patient" : "Edited the registration"}
+            </p>
 
-          <ul className="mt-2 grid gap-1">
-            {entry.changes.map((change) => (
-              <li key={change.field} className="text-sm">
-                <span className="font-medium">{change.label}:</span>{" "}
-                {entry.isCreation ? (
-                  <span>
-                    <Value field={change.field} value={change.to} />
-                  </span>
-                ) : (
-                  <>
-                    <span className="line-through decoration-black/40 dark:decoration-white/40">
-                      <Value field={change.field} value={change.from} />
-                    </span>{" "}
-                    <span aria-hidden="true">→</span>{" "}
-                    <span className="font-medium">
+            <ul className="mt-3 grid gap-1.5">
+              {entry.changes.map((change) => (
+                <li key={change.field} className="text-sm text-slate-900">
+                  <span className="font-medium text-slate-700">{change.label}:</span>{" "}
+                  {entry.isCreation ? (
+                    <span>
                       <Value field={change.field} value={change.to} />
                     </span>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+                  ) : (
+                    <>
+                      <span className="line-through decoration-slate-300 text-slate-500">
+                        <Value field={change.field} value={change.from} />
+                      </span>{" "}
+                      <span aria-hidden="true" className="text-slate-400 mx-1">→</span>{" "}
+                      <span className="font-medium text-slate-900">
+                        <Value field={change.field} value={change.to} />
+                      </span>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
         </li>
       ))}
     </ol>

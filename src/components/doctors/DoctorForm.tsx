@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import Input, { Select } from "@/components/ui/Input";
 
 /**
  * Add/edit a doctor — PRD §6.4 (FR-4.2).
@@ -36,14 +38,7 @@ interface DoctorFormProps {
 /** Free text in the database — this list is a shortcut, not a constraint. */
 const GENDERS = ["Female", "Male", "Other"] as const;
 
-const PHONE = /^[+()\d][\d\s()-]{4,24}$/;
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
-const INPUT_INVALID_CLASS =
-  "block min-h-11 w-full rounded border border-red-600 bg-transparent px-3 text-base outline-none dark:border-red-500";
-const LABEL_CLASS = "mb-1 block text-sm font-medium";
-const FIELD_ERROR_CLASS = "mt-1 text-xs text-red-700 dark:text-red-400";
+const PHONE = /^\d{10}$/
 
 type FieldErrors = Partial<Record<keyof DoctorFormValues, string>>;
 
@@ -65,7 +60,7 @@ function validate(values: DoctorFormValues): FieldErrors {
   }
 
   if (values.phone.trim() && !PHONE.test(values.phone.trim())) {
-    errors.phone = "Enter a valid phone number.";
+    errors.phone = "Phone number must be exactly 10 digits.";
   }
 
   return errors;
@@ -163,7 +158,7 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {formError}
         </p>
@@ -171,146 +166,111 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
 
       <div className="grid gap-4 sm:grid-cols-2">
         {!isEdit && (
-          <div className="sm:col-span-2">
-            <label htmlFor="doctor-clinic" className={LABEL_CLASS}>
-              Clinic
-            </label>
-            <select
-              id="doctor-clinic"
-              value={values.clinicId}
-              onChange={(e) => update("clinicId", e.target.value)}
-              onBlur={() => setTouched((t) => ({ ...t, clinicId: true }))}
-              aria-invalid={Boolean(errorFor("clinicId"))}
-              className={errorFor("clinicId") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-            >
-              <option value="">Choose a clinic…</option>
-              {clinics.map((clinic) => (
-                <option key={clinic.id} value={clinic.id}>
-                  {clinic.name}
-                </option>
-              ))}
-            </select>
-            {errorFor("clinicId") && (
-              <p className={FIELD_ERROR_CLASS}>{errorFor("clinicId")}</p>
-            )}
-          </div>
-        )}
-
-        <div>
-          <label htmlFor="doctor-name" className={LABEL_CLASS}>
-            Name
-          </label>
-          <input
-            id="doctor-name"
-            type="text"
-            autoComplete="name"
-            value={values.name}
-            onChange={(e) => update("name", e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-            aria-invalid={Boolean(errorFor("name"))}
-            className={errorFor("name") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-          />
-          {errorFor("name") && <p className={FIELD_ERROR_CLASS}>{errorFor("name")}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="doctor-department" className={LABEL_CLASS}>
-            Department
-          </label>
-          <input
-            id="doctor-department"
-            type="text"
-            value={values.department}
-            onChange={(e) => update("department", e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, department: true }))}
-            aria-invalid={Boolean(errorFor("department"))}
-            className={errorFor("department") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-          />
-          {errorFor("department") && (
-            <p className={FIELD_ERROR_CLASS}>{errorFor("department")}</p>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="doctor-gender" className={LABEL_CLASS}>
-            Gender
-          </label>
-          <select
-            id="doctor-gender"
-            value={values.gender}
-            onChange={(e) => update("gender", e.target.value)}
-            className={INPUT_CLASS}
+          <Select
+            id="doctor-clinic"
+            name="clinicId"
+            label="Clinic"
+            value={values.clinicId}
+            onChange={(e) => update("clinicId", e.target.value)}
+            onBlur={() => setTouched((t) => ({ ...t, clinicId: true }))}
+            error={errorFor("clinicId")}
+            fieldClassName="sm:col-span-2"
           >
-            <option value="">Not recorded</option>
-            {GENDERS.map((gender) => (
-              <option key={gender} value={gender}>
-                {gender}
+            <option value="">Choose a clinic…</option>
+            {clinics.map((clinic) => (
+              <option key={clinic.id} value={clinic.id}>
+                {clinic.name}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        )}
 
-        <div>
-          <label htmlFor="doctor-age" className={LABEL_CLASS}>
-            Age
-          </label>
-          <input
-            id="doctor-age"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={120}
-            value={values.age}
-            onChange={(e) => update("age", e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, age: true }))}
-            aria-invalid={Boolean(errorFor("age"))}
-            className={errorFor("age") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-          />
-          {errorFor("age") && <p className={FIELD_ERROR_CLASS}>{errorFor("age")}</p>}
-        </div>
+        <Input
+          id="doctor-name"
+          name="name"
+          label="Name"
+          type="text"
+          autoComplete="name"
+          value={values.name}
+          onChange={(e) => update("name", e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+          error={errorFor("name")}
+        />
 
-        <div className="sm:col-span-2">
-          <label htmlFor="doctor-phone" className={LABEL_CLASS}>
-            Phone <span className="font-normal text-black/55 dark:text-white/55">(optional)</span>
-          </label>
-          <input
-            id="doctor-phone"
-            type="tel"
-            autoComplete="tel"
-            value={values.phone}
-            onChange={(e) => update("phone", e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
-            aria-invalid={Boolean(errorFor("phone"))}
-            className={errorFor("phone") ? INPUT_INVALID_CLASS : INPUT_CLASS}
-          />
-          {errorFor("phone") && <p className={FIELD_ERROR_CLASS}>{errorFor("phone")}</p>}
-        </div>
+        <Input
+          id="doctor-department"
+          name="department"
+          label="Department"
+          type="text"
+          value={values.department}
+          onChange={(e) => update("department", e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, department: true }))}
+          error={errorFor("department")}
+        />
+
+        <Select
+          id="doctor-gender"
+          name="gender"
+          label="Gender"
+          value={values.gender}
+          onChange={(e) => update("gender", e.target.value)}
+        >
+          <option value="">Not recorded</option>
+          {GENDERS.map((gender) => (
+            <option key={gender} value={gender}>
+              {gender}
+            </option>
+          ))}
+        </Select>
+
+        <Input
+          id="doctor-age"
+          name="age"
+          label="Age"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={120}
+          value={values.age}
+          onChange={(e) => update("age", e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, age: true }))}
+          error={errorFor("age")}
+        />
+
+        <Input
+          id="doctor-phone"
+          name="phone"
+          label="Phone"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          maxLength={10}
+          value={values.phone}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, "");
+            update("phone", digits);
+          }}
+          onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
+          error={errorFor("phone")}
+          hint="Optional. 10-digit number."
+          fieldClassName="sm:col-span-2"
+        />
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button
+        <Button
           type="submit"
-          disabled={isSaving}
-          className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+          variant="commit"
+          isBusy={isSaving}
+          busyLabel={isEdit ? "Saving…" : "Adding Doctor…"}
         >
-          {isSaving
-            ? isEdit
-              ? "Saving…"
-              : "Adding Doctor…"
-            : isEdit
-              ? "Save Changes"
-              : "Add Doctor"}
-        </button>
+          {isEdit ? "Save Changes" : "Add Doctor"}
+        </Button>
 
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSaving}
-            className="min-h-11 rounded border border-black/20 px-5 text-base font-medium disabled:opacity-60 dark:border-white/25"
-          >
+          <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>

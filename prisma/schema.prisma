@@ -147,7 +147,7 @@ model Clinic {
   address  String? @db.Text
   city     String?
   /// FR-8.3 / FR-8.4 — per-clinic branding overrides.
-  logoUrl    String? @map("logo_url")
+  logoUrl    String? @map("logo_url") @db.LongText
   themeColor String? @map("theme_color") @db.VarChar(9)
   createdAt  DateTime @default(now()) @map("created_at")
 

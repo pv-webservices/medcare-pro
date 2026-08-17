@@ -1,6 +1,7 @@
 import { formatRupees } from "@/lib/money";
 import { PREVIOUS_PERIOD_LABELS, type ReportPeriod } from "@/lib/reportPeriods";
 import type { RevenueKpis } from "@/lib/reports";
+import Card from "@/components/ui/Card";
 
 /**
  * The report's headline numbers — PRD §6.6 (FR-6.2).
@@ -27,14 +28,14 @@ interface TileProps {
 
 function Tile({ label, value, hint, children }: TileProps) {
   return (
-    <div className="rounded border border-black/15 p-4 dark:border-white/20">
-      <p className="text-sm text-black/55 dark:text-white/55">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    <Card className="p-5">
+      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
       {children}
       {hint && (
-        <p className="mt-1 text-xs text-black/55 dark:text-white/55">{hint}</p>
+        <p className="mt-2 text-xs text-slate-400">{hint}</p>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -57,7 +58,7 @@ function RevenueDelta({
 
   if (changePercent === null) {
     return (
-      <p className="mt-1 text-xs text-black/55 dark:text-white/55">
+      <p className="mt-2 text-xs font-medium text-slate-500">
         {/* Growth from zero is not a percentage — say what happened instead. */}
         {Number(previousRevenue) === 0
           ? `No revenue ${against}`
@@ -70,17 +71,17 @@ function RevenueDelta({
   const rounded = Math.abs(changePercent).toFixed(1);
 
   return (
-    <p className="mt-1 text-xs">
+    <p className="mt-2 text-xs font-medium">
       <span
         className={
           isUp
-            ? "font-medium text-green-700 dark:text-green-500"
-            : "font-medium text-red-700 dark:text-red-400"
+            ? "text-emerald-600"
+            : "text-red-600"
         }
       >
         {isUp ? "▲" : "▼"} {rounded}%
       </span>{" "}
-      <span className="text-black/55 dark:text-white/55">vs {against}</span>
+      <span className="text-slate-400 ml-1">vs {against}</span>
     </p>
   );
 }

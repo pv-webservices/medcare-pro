@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import BrandingForm from "@/components/settings/BrandingForm";
+import PageHeader from "@/components/ui/PageHeader";
 import { getClinicForActor, listClinicsForActor } from "@/lib/clinics";
 import { can } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
@@ -34,12 +35,14 @@ export default async function BrandingSettingsPage() {
 
   if (clinics.length === 0) {
     return (
-      <section>
-        <h1 className="mb-4 text-2xl font-semibold">Branding</h1>
-        <p className="rounded border border-black/15 px-4 py-6 text-center text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-          No clinics to brand yet. Add a clinic first — its logo and colour are
-          set here.
-        </p>
+      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+        <PageHeader title="Branding" />
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
+            No clinics to brand yet. Add a clinic first — its logo and colour are
+            set here.
+          </p>
+        </div>
       </section>
     );
   }
@@ -51,12 +54,14 @@ export default async function BrandingSettingsPage() {
 
   if (!clinicId) {
     return (
-      <section>
-        <h1 className="mb-4 text-2xl font-semibold">Branding</h1>
-        <p className="rounded border border-black/15 px-4 py-6 text-center text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-          Pick a clinic in the sidebar to set its logo and colour. Each clinic is
-          branded separately.
-        </p>
+      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+        <PageHeader title="Branding" />
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
+            Pick a clinic in the sidebar to set its logo and colour. Each clinic is
+            branded separately.
+          </p>
+        </div>
       </section>
     );
   }
@@ -67,14 +72,16 @@ export default async function BrandingSettingsPage() {
   const canEdit = await can(actor, "clinic:edit", clinicId);
 
   return (
-    <section>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Branding</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {clinic.name}
-          {clinics.length > 1 && " · switch clinics in the sidebar to brand another"}
-        </p>
-      </div>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-8">
+      <PageHeader
+        title="Branding"
+        meta={
+          <span>
+            {clinic.name}
+            {clinics.length > 1 && " · switch clinics in the sidebar to brand another"}
+          </span>
+        }
+      />
 
       <BrandingForm
         clinicId={clinic.id}

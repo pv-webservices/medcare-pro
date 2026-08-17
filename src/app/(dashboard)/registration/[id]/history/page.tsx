@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import EditHistory from "@/components/registration/EditHistory";
+import PageHeader from "@/components/ui/PageHeader";
 import { PermissionError, ScopeError } from "@/lib/rbac";
 import {
   getRegistrationForActor,
@@ -60,26 +61,18 @@ export default async function RegistrationHistoryPage({
   }
 
   return (
-    <section>
-      <Link
-        href={`/registration/${registration.id}`}
-        className="mb-4 inline-block text-sm text-black/60 underline dark:text-white/60"
-      >
-        ← Back to registration
-      </Link>
-
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Edit history</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {registration.patientCode} · {registration.patientName}
-        </p>
-      </div>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <PageHeader
+        back={{ href: `/registration/${registration.id}`, label: "Back to registration" }}
+        title="Edit history"
+        meta={`${registration.patientCode} · ${registration.patientName}`}
+      />
 
       {entries === null ? (
-        <p className="rounded border border-black/15 px-4 py-3 text-sm text-black/60 dark:border-white/20 dark:text-white/60">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
           Your role cannot view edit history. Ask an admin or the account owner
           if you need to see who changed this registration.
-        </p>
+        </div>
       ) : (
         <EditHistory entries={entries} />
       )}

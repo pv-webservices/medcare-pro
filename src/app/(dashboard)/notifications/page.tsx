@@ -3,6 +3,7 @@ import NotificationList from "@/components/notifications/NotificationList";
 import StatusFilter, {
   type NotificationStatus,
 } from "@/components/notifications/StatusFilter";
+import PageHeader from "@/components/ui/PageHeader";
 import {
   listNotificationsForActor,
   type NotificationFeed,
@@ -60,28 +61,29 @@ export default async function NotificationsPage({
 
   if (!feed) {
     return (
-      <section>
-        <h1 className="mb-4 text-2xl font-semibold">Notifications</h1>
-        <p className="rounded border border-black/15 px-4 py-3 text-sm text-black/60 dark:border-white/20 dark:text-white/60">
+      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+        <PageHeader title="Notifications" />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
           Your role cannot view notifications. Ask an admin or the account owner
           if you need access.
-        </p>
+        </div>
       </section>
     );
   }
 
   return (
-    <section>
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold">Notifications</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          Changes to patients, doctors and clinics.{" "}
-          {/* Stated up front — one account, one read flag (PRD §7). */}
-          Marking an item read clears it for everyone on this account.
-        </p>
-      </div>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <PageHeader
+        title="Notifications"
+        meta={
+          <div className="flex flex-col gap-1">
+            <span>Changes to patients, doctors and clinics.</span>
+            <span>Marking an item read clears it for everyone on this account.</span>
+          </div>
+        }
+      />
 
-      <div className="mb-6">
+      <div className="pt-2">
         <StatusFilter selected={status} unreadCount={feed.unreadCount} />
       </div>
 

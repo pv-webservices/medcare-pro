@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
 
 /**
  * The notifications feed — PRD §6.7 (FR-7.1, FR-7.2).
@@ -102,69 +103,71 @@ export default function NotificationList({
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
       )}
 
       {canMark && unreadCount > 0 && (
-        <div className="mb-4">
-          <button
+        <div className="mb-6">
+          <Button
             type="button"
             onClick={handleMarkAll}
             disabled={isMarkingAll}
-            className="min-h-11 rounded border border-black/20 px-4 text-sm font-medium disabled:opacity-60 dark:border-white/25"
+            isBusy={isMarkingAll}
+            busyLabel="Marking…"
+            variant="secondary"
           >
-            {isMarkingAll ? "Marking…" : `Mark All ${unreadCount} as Read`}
-          </button>
+            Mark All {unreadCount} as Read
+          </Button>
         </div>
       )}
 
       {items.length === 0 ? (
-        <div className="rounded border border-black/15 px-4 py-8 text-center dark:border-white/20">
-          <p className="mb-1 font-medium">Nothing to review</p>
-          <p className="text-sm text-black/60 dark:text-white/60">
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <p className="mb-1 font-semibold text-slate-900">Nothing to review</p>
+          <p className="text-sm text-slate-500">
             Changes to patients, doctors and clinics appear here as staff make
             them.
           </p>
         </div>
       ) : (
-        <ol className="grid gap-3">
+        <ol className="grid gap-4">
           {items.map((item) => (
             <li
               key={item.id}
-              className={`rounded border px-4 py-3 ${
+              className={`rounded-xl border p-5 shadow-sm transition-colors ${
                 item.read
-                  ? "border-black/15 dark:border-white/20"
-                  : "border-amber-600/40 bg-amber-600/5"
+                  ? "border-slate-200 bg-white"
+                  : "border-amber-200 bg-amber-50"
               }`}
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
                 <p className="flex items-center gap-2">
                   {!item.read && (
                     <span
                       aria-hidden="true"
-                      className="inline-block size-2 shrink-0 rounded-full bg-amber-600"
+                      className="inline-block size-2 shrink-0 rounded-full bg-amber-500"
                     />
                   )}
-                  <span className="text-xs font-medium uppercase tracking-wide text-black/55 dark:text-white/55">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${item.read ? "text-slate-500" : "text-amber-700"}`}>
                     {item.typeLabel}
                   </span>
                   {!item.read && <span className="sr-only">Unread</span>}
                 </p>
-                <p className="text-sm tabular-nums text-black/55 dark:text-white/55">
+                <p className={`text-sm tabular-nums ${item.read ? "text-slate-400" : "text-amber-600"}`}>
                   {formatTimestamp(item.createdAt)}
                 </p>
               </div>
 
-              <p className={`mt-1 ${item.read ? "" : "font-medium"}`}>
+              <p className={`text-slate-900 ${item.read ? "font-normal" : "font-semibold"}`}>
                 {item.message}
               </p>
 
-              <div className="mt-2 flex flex-wrap items-center gap-3">
+              <div className="mt-4 flex flex-wrap items-center gap-4">
                 {item.clinicName && (
-                  <span className="text-sm text-black/60 dark:text-white/60">
+                  <span className={`text-sm font-medium ${item.read ? "text-slate-500" : "text-amber-700"}`}>
                     {item.clinicName}
                   </span>
                 )}
@@ -172,7 +175,7 @@ export default function NotificationList({
                 {item.href && (
                   <Link
                     href={item.href}
-                    className="text-sm font-medium underline underline-offset-2"
+                    className={`text-sm font-semibold hover:underline underline-offset-4 ${item.read ? "text-violet-600 hover:text-violet-700" : "text-amber-700 hover:text-amber-800"}`}
                   >
                     Open Record
                   </Link>
@@ -183,7 +186,11 @@ export default function NotificationList({
                     type="button"
                     onClick={() => handleToggle(item)}
                     disabled={pendingId === item.id}
-                    className="min-h-9 rounded px-2 text-sm text-black/60 hover:bg-black/5 disabled:opacity-50 dark:text-white/60 dark:hover:bg-white/10"
+                    className={`min-h-9 rounded-md px-3 text-sm font-medium transition-colors disabled:opacity-50 ml-auto ${
+                      item.read 
+                        ? "text-slate-500 hover:bg-slate-100" 
+                        : "text-amber-700 hover:bg-amber-100"
+                    }`}
                   >
                     {pendingId === item.id
                       ? "…"

@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { LeaveEntry } from "@/lib/doctors";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Card from "@/components/ui/Card";
 
 /**
  * Doctor leave — PRD §6.4 (FR-4.4): a date range plus an optional reason.
@@ -18,9 +21,6 @@ interface LeaveManagerProps {
   /** Today as YYYY-MM-DD, resolved on the server so it matches stored dates. */
   today: string;
 }
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
 
 function formatDay(date: string): string {
   return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
@@ -118,21 +118,21 @@ export default function LeaveManager({
     return (
       <li
         key={entry.id}
-        className={`flex flex-wrap items-center justify-between gap-2 border-b border-black/10 py-3 last:border-b-0 dark:border-white/10 ${
+        className={`flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 py-4 last:border-b-0 ${
           isEnded ? "opacity-60" : ""
         }`}
       >
         <div>
-          <p className="text-sm font-medium">
+          <p className="text-sm font-semibold text-slate-900">
             {formatRange(entry)}
             {isActiveNow && (
-              <span className="ml-2 rounded bg-amber-600/15 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-400">
+              <span className="ml-3 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
                 Away now
               </span>
             )}
           </p>
           {entry.reason && (
-            <p className="mt-0.5 text-sm text-black/60 dark:text-white/60">
+            <p className="mt-1 text-sm text-slate-500">
               {entry.reason}
             </p>
           )}
@@ -143,7 +143,7 @@ export default function LeaveManager({
             onClick={() => handleRemove(entry.id)}
             disabled={removingId === entry.id}
             aria-label={`Remove leave ${formatRange(entry)}`}
-            className="min-h-11 rounded border border-black/20 px-3 text-sm font-medium disabled:opacity-50 dark:border-white/25"
+            className="min-h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 transition-colors"
           >
             {removingId === entry.id ? "Removing…" : "Remove"}
           </button>
@@ -153,31 +153,29 @@ export default function LeaveManager({
   }
 
   return (
-    <section aria-labelledby="leave-heading">
-      <h2 id="leave-heading" className="mb-3 text-lg font-semibold">
+    <section aria-labelledby="leave-heading" className="space-y-4">
+      <h2 id="leave-heading" className="text-lg font-bold text-slate-900">
         Leave
       </h2>
 
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
       )}
 
       {canEdit && (
-        <form
-          onSubmit={handleAdd}
-          className="mb-4 grid gap-3 rounded border border-black/15 p-3 sm:grid-cols-2 dark:border-white/20"
-        >
-          <div>
-            <label htmlFor="leave-start" className="mb-1 block text-sm font-medium">
-              First day away
-            </label>
-            <input
+        <Card isFlush={false} className="p-4 bg-slate-50 border-slate-200">
+          <form
+            onSubmit={handleAdd}
+            className="grid gap-4 sm:grid-cols-2"
+          >
+            <Input
               id="leave-start"
+              label="First day away"
               type="date"
               value={startDate}
               onChange={(e) => {
@@ -186,67 +184,59 @@ export default function LeaveManager({
                 if (e.target.value > endDate) setEndDate(e.target.value);
               }}
               required
-              className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label htmlFor="leave-end" className="mb-1 block text-sm font-medium">
-              Last day away
-            </label>
-            <input
+            <Input
               id="leave-end"
+              label="Last day away"
               type="date"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
               required
-              className={INPUT_CLASS}
             />
-          </div>
-          <div className="sm:col-span-2">
-            <label htmlFor="leave-reason" className="mb-1 block text-sm font-medium">
-              Reason{" "}
-              <span className="font-normal text-black/55 dark:text-white/55">
-                (optional)
-              </span>
-            </label>
-            <input
+            <Input
               id="leave-reason"
+              label="Reason"
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className={INPUT_CLASS}
+              hint="Optional"
+              fieldClassName="sm:col-span-2"
             />
-          </div>
-          <div>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
-            >
-              {isSaving ? "Recording…" : "Record Leave"}
-            </button>
-          </div>
-        </form>
+            <div className="sm:col-span-2">
+              <Button
+                type="submit"
+                variant="commit"
+                isBusy={isSaving}
+                busyLabel="Recording…"
+              >
+                Record Leave
+              </Button>
+            </div>
+          </form>
+        </Card>
       )}
 
       {entries.length === 0 ? (
-        <p className="rounded border border-black/15 px-4 py-6 text-center text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-          No leave recorded.
-        </p>
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
+            No leave recorded.
+          </p>
+        </div>
       ) : (
-        <>
+        <Card isFlush={false} className="p-2 sm:p-4">
           <ul>{current.map((entry) => renderEntry(entry, false))}</ul>
 
           {ended.length > 0 && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-sm text-black/60 dark:text-white/60">
+            <details className="mt-4 border-t border-slate-200 pt-4 group">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors list-none flex items-center">
+                <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
                 Past leave ({ended.length})
               </summary>
-              <ul>{ended.map((entry) => renderEntry(entry, true))}</ul>
+              <ul className="mt-2 pl-4">{ended.map((entry) => renderEntry(entry, true))}</ul>
             </details>
           )}
-        </>
+        </Card>
       )}
     </section>
   );

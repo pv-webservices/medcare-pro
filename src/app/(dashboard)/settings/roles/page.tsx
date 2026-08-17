@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import RoleList from "@/components/settings/RoleList";
 import UserRoleAssignments from "@/components/settings/UserRoleAssignments";
+import PageHeader from "@/components/ui/PageHeader";
 import { PermissionError } from "@/lib/rbac";
 import { getRolesOverview, type RolesOverview } from "@/lib/roles";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
@@ -37,26 +38,24 @@ export default async function RolesSettingsPage() {
 
   if (!overview) {
     return (
-      <section>
-        <h1 className="mb-4 text-2xl font-semibold">Roles &amp; permissions</h1>
-        <p className="rounded border border-black/15 px-4 py-3 text-sm text-black/60 dark:border-white/20 dark:text-white/60">
+      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+        <PageHeader title="Roles & permissions" />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
           Your role cannot view roles and permissions. Ask the account owner if
           you need access.
-        </p>
+        </div>
       </section>
     );
   }
 
   return (
-    <section>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Roles &amp; permissions</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {overview.canManage
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-8">
+      <PageHeader
+        title="Roles & permissions"
+        meta={overview.canManage
             ? "Create roles, choose what each one can do, and assign them to users."
             : "You can see roles and who holds them, but not change them."}
-        </p>
-      </div>
+      />
 
       <div className="mb-8">
         <RoleList

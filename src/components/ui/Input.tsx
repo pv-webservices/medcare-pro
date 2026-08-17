@@ -2,6 +2,7 @@ import type {
   InputHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
+  SelectHTMLAttributes,
 } from "react";
 import { cx } from "@/components/ui/cx";
 
@@ -183,6 +184,46 @@ export function Textarea({
         className={controlClasses(Boolean(error), cx("px-3 py-2.5", className))}
         {...rest}
       />
+    </FieldShell>
+  );
+}
+
+interface SelectProps
+  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "id"> {
+  id: string;
+  label: string;
+  hint?: string;
+  error?: string;
+  fieldClassName?: string;
+}
+
+export function Select({
+  id,
+  label,
+  hint,
+  error,
+  fieldClassName,
+  className,
+  children,
+  ...rest
+}: SelectProps) {
+  return (
+    <FieldShell
+      id={id}
+      label={label}
+      hint={hint}
+      error={error}
+      className={fieldClassName}
+    >
+      <select
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error || hint ? `${id}-message` : undefined}
+        className={controlClasses(Boolean(error), cx("px-3 h-11", className))}
+        {...rest}
+      >
+        {children}
+      </select>
     </FieldShell>
   );
 }

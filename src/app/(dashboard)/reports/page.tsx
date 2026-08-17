@@ -3,6 +3,7 @@ import BreakdownTable from "@/components/reports/BreakdownTable";
 import GrowthChart from "@/components/reports/GrowthChart";
 import KpiTiles from "@/components/reports/KpiTiles";
 import PeriodSelector from "@/components/reports/PeriodSelector";
+import PageHeader from "@/components/ui/PageHeader";
 import { PermissionError } from "@/lib/rbac";
 import { REPORT_PERIOD_LABELS } from "@/lib/reportPeriods";
 import {
@@ -66,12 +67,12 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   if (!report) {
     return (
-      <section>
-        <h1 className="mb-4 text-2xl font-semibold">Revenue report</h1>
-        <p className="rounded border border-black/15 px-4 py-3 text-sm text-black/60 dark:border-white/20 dark:text-white/60">
+      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+        <PageHeader title="Revenue report" />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
           Your role cannot view revenue reports. Ask an admin or the account
           owner if you need access.
-        </p>
+        </div>
       </section>
     );
   }
@@ -80,34 +81,29 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const periodLabel = REPORT_PERIOD_LABELS[report.period].toLowerCase();
 
   return (
-    <section>
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold">Revenue report</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {report.rangeLabel} · {scopeLabel}
-        </p>
-      </div>
-
-      <div className="mb-6">
-        <PeriodSelector selected={report.period} />
-      </div>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <PageHeader
+        title="Revenue report"
+        meta={`${report.rangeLabel} · ${scopeLabel}`}
+        actions={<PeriodSelector selected={report.period} />}
+      />
 
       {!report.hasClinics ? (
-        <p className="rounded border border-black/15 px-4 py-6 text-center text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-          No clinics to report on yet. Add a clinic and start registering
-          patients — revenue appears here as visits are recorded.
-        </p>
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
+            No clinics to report on yet. Add a clinic and start registering
+            patients — revenue appears here as visits are recorded.
+          </p>
+        </div>
       ) : (
         <>
-          <div className="mb-8">
-            <KpiTiles kpis={report.kpis} period={report.period} />
-          </div>
+          <KpiTiles kpis={report.kpis} period={report.period} />
 
-          <section aria-labelledby="growth-heading" className="mb-8">
-            <h2 id="growth-heading" className="mb-1 text-lg font-semibold">
+          <section aria-labelledby="growth-heading" className="pt-4">
+            <h2 id="growth-heading" className="mb-1 text-lg font-semibold text-slate-900">
               Revenue trend
             </h2>
-            <p className="mb-3 text-sm text-black/60 dark:text-white/60">
+            <p className="mb-4 text-sm text-slate-500">
               {/* Names the single series, which is why the chart has no legend. */}
               Revenue per {periodLabel.replace(/ly$/, "")} period across{" "}
               {scopeLabel}, ending with the current one.

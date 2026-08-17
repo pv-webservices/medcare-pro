@@ -9,6 +9,9 @@ import {
   unknownPlaceholders,
 } from "@/lib/whatsappTemplateText";
 import type { TemplateRecord } from "@/lib/whatsappTemplates";
+import Button from "@/components/ui/Button";
+import Input, { Select } from "@/components/ui/Input";
+import Card from "@/components/ui/Card";
 
 /**
  * The approved message set — PRD §6.9 (FR-9.1).
@@ -27,9 +30,6 @@ interface TemplateManagerProps {
   templates: readonly TemplateRecord[];
   canManage: boolean;
 }
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
 
 interface DraftState {
   id: string | null;
@@ -133,46 +133,42 @@ export default function TemplateManager({
 
   return (
     <section aria-labelledby="templates-heading">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-4">
         <div>
-          <h2 id="templates-heading" className="text-lg font-semibold">
+          <h2 id="templates-heading" className="text-lg font-bold text-slate-900">
             Message templates
           </h2>
-          <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+          <p className="mt-1 text-sm text-slate-500">
             Only these can be sent. Nothing else goes out from this account.
           </p>
         </div>
         {canManage && draft === null && (
-          <button
-            type="button"
-            onClick={() => setDraft({ ...EMPTY_DRAFT })}
-            className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background"
-          >
+          <Button onClick={() => setDraft({ ...EMPTY_DRAFT })} variant="commit">
             Add Template
-          </button>
+          </Button>
         )}
       </div>
 
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
       )}
 
       {draft && (
-        <form
-          onSubmit={handleSubmit}
-          className="mb-4 grid gap-3 rounded border border-black/15 p-3 dark:border-white/20"
-        >
-          <div className="max-w-sm">
-            <label htmlFor="template-name" className="mb-1 block text-sm font-medium">
-              Template name
-            </label>
-            <input
+        <Card className="mb-6 p-4 sm:p-6 bg-slate-50 border-slate-200">
+          <form
+            onSubmit={handleSubmit}
+            className="grid gap-6"
+          >
+          <div className="max-w-md">
+            <Input
               id="template-name"
+              name="name"
+              label="Template name"
               value={draft.name}
               onChange={(event) =>
                 setDraft({ ...draft, name: event.target.value })
@@ -180,12 +176,11 @@ export default function TemplateManager({
               required
               maxLength={120}
               placeholder="e.g. Appointment reminder"
-              className={INPUT_CLASS}
             />
           </div>
 
           <div>
-            <label htmlFor="template-body" className="mb-1 block text-sm font-medium">
+            <label htmlFor="template-body" className="mb-1.5 block text-sm font-medium text-slate-700">
               Message
             </label>
             <textarea
@@ -199,14 +194,14 @@ export default function TemplateManager({
               maxLength={4000}
               aria-invalid={badTokens.length > 0}
               aria-describedby="template-body-help"
-              className="block w-full rounded border border-black/20 bg-transparent p-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60"
+              className={`block w-full rounded-md border bg-white px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-violet-600/20 ${badTokens.length > 0 ? "border-red-500 focus:border-red-500" : "border-slate-300 focus:border-violet-600"}`}
             />
             <p
               id="template-body-help"
-              className={`mt-1 text-xs ${
+              className={`mt-2 text-xs ${
                 badTokens.length > 0
-                  ? "text-red-700 dark:text-red-400"
-                  : "text-black/60 dark:text-white/60"
+                  ? "text-red-600"
+                  : "text-slate-500"
               }`}
             >
               {badTokens.length > 0
@@ -214,13 +209,13 @@ export default function TemplateManager({
                 : "Tap a placeholder to insert it. Each is filled per patient when the message is sent."}
             </p>
 
-            <ul className="mt-2 flex flex-wrap gap-2">
+            <ul className="mt-3 flex flex-wrap gap-2">
               {TEMPLATE_PLACEHOLDERS.map((token) => (
                 <li key={token}>
                   <button
                     type="button"
                     onClick={() => insertPlaceholder(token)}
-                    className="min-h-9 rounded border border-black/20 px-2 text-xs font-medium dark:border-white/25"
+                    className="min-h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm"
                   >
                     {PLACEHOLDER_LABELS[token]}
                   </button>
@@ -229,34 +224,31 @@ export default function TemplateManager({
             </ul>
           </div>
 
-          <div className="max-w-sm">
-            <label htmlFor="template-footer" className="mb-1 block text-sm font-medium">
-              Footer <span className="font-normal text-black/55 dark:text-white/55">(optional)</span>
-            </label>
-            <input
+          <div className="max-w-md">
+            <Input
               id="template-footer"
+              name="footer"
+              label="Footer"
+              hint="Optional."
               value={draft.footer}
               onChange={(event) =>
                 setDraft({ ...draft, footer: event.target.value })
               }
               maxLength={255}
               placeholder="e.g. Sent by Alpha Clinic"
-              className={INPUT_CLASS}
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
+          <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
             <div>
-              <label htmlFor="template-media-type" className="mb-1 block text-sm font-medium">
-                Attach
-              </label>
-              <select
+              <Select
                 id="template-media-type"
+                name="mediaType"
+                label="Attach"
                 value={draft.mediaType}
                 onChange={(event) =>
                   setDraft({ ...draft, mediaType: event.target.value })
                 }
-                className={INPUT_CLASS}
               >
                 <option value="">Text only</option>
                 {MEDIA_TYPES.map((type) => (
@@ -264,14 +256,13 @@ export default function TemplateManager({
                     {type.charAt(0).toUpperCase() + type.slice(1)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label htmlFor="template-media-url" className="mb-1 block text-sm font-medium">
-                File link
-              </label>
-              <input
+              <Input
                 id="template-media-url"
+                name="mediaUrl"
+                label="File link"
                 type="url"
                 value={draft.mediaUrl}
                 onChange={(event) =>
@@ -279,82 +270,74 @@ export default function TemplateManager({
                 }
                 maxLength={2000}
                 placeholder="https://example.com/leaflet.pdf"
-                aria-describedby="template-media-help"
-                className={INPUT_CLASS}
+                error={mediaHalfSet ? "Set both the attachment type and the file link, or neither." : undefined}
+                hint={!mediaHalfSet ? "Must be a direct link — a Drive or Dropbox share page will not work." : undefined}
               />
-              <p
-                id="template-media-help"
-                className={`mt-1 text-xs ${
-                  mediaHalfSet
-                    ? "text-red-700 dark:text-red-400"
-                    : "text-black/60 dark:text-white/60"
-                }`}
-              >
-                {mediaHalfSet
-                  ? "Set both the attachment type and the file link, or neither."
-                  : "Must be a direct link — a Drive or Dropbox share page will not work."}
-              </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Button
               type="submit"
               disabled={!canSave || isSaving}
-              className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+              variant="commit"
+              isBusy={isSaving}
+              busyLabel="Saving…"
             >
-              {isSaving ? "Saving…" : draft.id ? "Save Template" : "Create Template"}
-            </button>
-            <button
+              {draft.id ? "Save Template" : "Create Template"}
+            </Button>
+            <Button
               type="button"
               onClick={() => setDraft(null)}
-              className="min-h-11 rounded border border-black/20 px-5 text-base font-medium dark:border-white/25"
+              variant="secondary"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
+        </Card>
       )}
 
       {templates.length === 0 ? (
-        <div className="rounded border border-black/15 px-4 py-8 text-center dark:border-white/20">
-          <p className="mb-1 font-medium">No templates yet</p>
-          <p className="text-sm text-black/60 dark:text-white/60">
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <p className="mb-1 font-semibold text-slate-900">No templates yet</p>
+          <p className="text-sm text-slate-500">
             {canManage
               ? "Add one before anything can be sent to patients."
               : "Ask an admin to add one before you can message patients."}
           </p>
         </div>
       ) : (
-        <ul className="grid gap-3">
+        <ul className="grid gap-4 sm:grid-cols-2">
           {templates.map((template) => (
             <li
               key={template.id}
-              className="rounded border border-black/15 px-4 py-3 dark:border-white/20"
+              className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="font-medium">{template.name}</p>
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                <p className="font-semibold text-slate-900">{template.name}</p>
                 {template.mediaType && (
-                  <span className="rounded bg-black/10 px-2 py-0.5 text-xs font-medium dark:bg-white/15">
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 border border-slate-200">
                     {template.mediaType}
                   </span>
                 )}
               </div>
 
-              <p className="mt-1 whitespace-pre-wrap text-sm text-black/70 dark:text-white/70">
+              <p className="whitespace-pre-wrap text-sm text-slate-700">
                 {template.body}
               </p>
 
               {template.footer && (
-                <p className="mt-1 text-xs text-black/55 dark:text-white/55">
+                <p className="mt-3 text-xs text-slate-400">
                   {template.footer}
                 </p>
               )}
 
               {canManage && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
+                <div className="mt-5 flex flex-wrap gap-2 pt-4 border-t border-slate-100">
+                  <Button
                     type="button"
+                    variant="secondary"
                     onClick={() =>
                       setDraft({
                         id: template.id,
@@ -365,15 +348,14 @@ export default function TemplateManager({
                         mediaUrl: template.mediaUrl ?? "",
                       })
                     }
-                    className="min-h-11 rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
                   >
                     Edit Template
-                  </button>
+                  </Button>
                   <button
                     type="button"
                     onClick={() => handleDelete(template.id)}
                     disabled={removingId === template.id}
-                    className="min-h-11 rounded px-3 text-sm text-black/60 hover:bg-black/5 disabled:opacity-50 dark:text-white/60 dark:hover:bg-white/10"
+                    className="min-h-10 rounded-md px-3 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50 transition-colors"
                   >
                     {removingId === template.id ? "Removing…" : "Remove"}
                   </button>

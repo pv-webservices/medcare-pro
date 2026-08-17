@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Input, { Textarea } from "@/components/ui/Input";
@@ -54,10 +54,14 @@ function validate(values: ClinicFormValues): FieldErrors {
   }
 
   if (values.logoUrl.trim()) {
-    try {
-      new URL(values.logoUrl.trim());
-    } catch {
-      errors.logoUrl = "Enter a full URL, starting with https://";
+    const trimmed = values.logoUrl.trim();
+    // Accept both remote URLs and base64 data URLs from file upload
+    if (!trimmed.startsWith("data:image/")) {
+      try {
+        new URL(trimmed);
+      } catch {
+        errors.logoUrl = "Enter a full URL, starting with https://";
+      }
     }
   }
 
@@ -73,10 +77,12 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
   const [touched, setTouched] = useState<Partial<Record<keyof ClinicFormValues, boolean>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const errors = validate(values);
   const hasErrors = Object.keys(errors).length > 0;
   const swatch = values.themeColor.trim();
+  const hasUploadedLogo = values.logoUrl.startsWith("data:image/");
 
   function update(field: keyof ClinicFormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -84,6 +90,33 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
 
   function touch(field: keyof ClinicFormValues) {
     setTouched((current) => ({ ...current, [field]: true }));
+  }
+
+  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Only allow image files
+    if (!file.type.startsWith("image/")) {
+      setFormError("Please select an image file (PNG, JPG, SVG, etc.).");
+      return;
+    }
+
+    // Cap at 2 MB to keep the payload reasonable
+    if (file.size > 2 * 1024 * 1024) {
+      setFormError("Logo must be under 2 MB.");
+      return;
+    }
+
+    setFormError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        update("logoUrl", reader.result);
+        touch("logoUrl");
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   /** Only surface a field error once the user has engaged with that field. */
@@ -152,7 +185,7 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-md border border-alert/40 bg-alert/8 px-3 py-2.5 text-body text-alert"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {formError}
         </p>
@@ -208,7 +241,7 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
             // colour meant, and previews the rail this clinic will wear.
             <span
               aria-hidden="true"
-              className="h-11 w-11 shrink-0 rounded-md border border-line"
+              className="h-11 w-11 shrink-0 rounded-md border border-slate-200 shadow-sm"
               style={{
                 backgroundColor: HEX_COLOR.test(swatch) ? swatch : "transparent",
               }}
@@ -216,18 +249,78 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
           }
         />
 
-        <Input
-          id="clinic-logo"
-          name="logoUrl"
-          label="Logo URL"
-          type="url"
-          placeholder="https://…"
-          value={values.logoUrl}
-          onChange={(e) => update("logoUrl", e.target.value)}
-          onBlur={() => touch("logoUrl")}
-          error={errorFor("logoUrl")}
-          fieldClassName="sm:col-span-2"
-        />
+        <div className="sm:col-span-2">
+          <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+            Logo
+          </label>
+
+          {/* Hidden native file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Preview of uploaded logo */}
+          {hasUploadedLogo && (
+            <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={values.logoUrl}
+                alt="Uploaded logo"
+                className="h-12 w-auto max-w-[120px] rounded object-contain"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900">Logo uploaded</p>
+                <p className="text-xs text-slate-500">Image loaded from your device</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  update("logoUrl", "");
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          )}
+
+          {/* Upload button + URL input */}
+          {!hasUploadedLogo && (
+            <>
+              <div className="flex gap-3 mb-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 text-slate-500">
+                    <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
+                    <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+                  </svg>
+                  Upload from device
+                </button>
+                <span className="self-center text-xs text-slate-400">or</span>
+              </div>
+              <Input
+                id="clinic-logo"
+                name="logoUrl"
+                label="Logo URL"
+                type="url"
+                placeholder="https://…"
+                value={values.logoUrl}
+                onChange={(e) => update("logoUrl", e.target.value)}
+                onBlur={() => touch("logoUrl")}
+                error={errorFor("logoUrl")}
+                hint="Paste a web address or upload an image from your device. Max 2 MB."
+              />
+            </>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">

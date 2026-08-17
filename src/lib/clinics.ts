@@ -36,7 +36,22 @@ export const createClinicSchema = z.object({
   name: z.string().trim().min(1, "Clinic name is required.").max(255),
   address: z.string().trim().max(1000).optional().or(z.literal("")),
   city: z.string().trim().max(255).optional().or(z.literal("")),
-  logoUrl: z.url("Enter a valid URL.").max(2000).optional().or(z.literal("")),
+  logoUrl: z
+    .string()
+    .trim()
+    .max(3_000_000, "Logo image is too large.")
+    .refine((val) => {
+      if (val === "") return true;
+      if (val.startsWith("data:image/")) return true;
+      try {
+        const url = new URL(val);
+        return url.protocol === "http:" || url.protocol === "https:";
+      } catch {
+        return false;
+      }
+    }, "Enter a valid URL or upload an image.")
+    .optional()
+    .or(z.literal("")),
   themeColor: themeColorSchema.optional().or(z.literal("")),
 });
 

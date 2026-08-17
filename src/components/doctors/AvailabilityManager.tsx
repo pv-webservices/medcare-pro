@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { AvailabilityEntry } from "@/lib/doctors";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Card from "@/components/ui/Card";
 
 /**
  * Doctor availability — PRD §6.4 (FR-4.3): specific dates with time ranges.
@@ -19,9 +22,6 @@ interface AvailabilityManagerProps {
   /** Today as YYYY-MM-DD, resolved on the server so it matches stored dates. */
   today: string;
 }
-
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
 
 function formatDayLabel(date: string): string {
   // Parsed as UTC to match how the date is stored, so the label cannot slip a day.
@@ -128,21 +128,21 @@ export default function AvailabilityManager({
     return (
       <li
         key={group.date}
-        className={`border-b border-black/10 py-3 last:border-b-0 dark:border-white/10 ${
+        className={`border-b border-slate-200 py-4 last:border-b-0 ${
           isPast ? "opacity-60" : ""
         }`}
       >
-        <p className="text-sm font-medium">{formatDayLabel(group.date)}</p>
-        <ul className="mt-1 flex flex-wrap items-center gap-2">
+        <p className="text-sm font-semibold text-slate-900">{formatDayLabel(group.date)}</p>
+        <ul className="mt-2 flex flex-wrap items-center gap-2">
           {group.slots
             .slice()
             .sort((a, b) => a.startTime.localeCompare(b.startTime))
             .map((slot) => (
               <li
                 key={slot.id}
-                className="flex items-center gap-2 rounded border border-black/15 py-1 pl-3 pr-1 dark:border-white/20"
+                className="flex items-center gap-2 rounded-lg border border-slate-200 py-1.5 pl-3 pr-1.5 bg-slate-50"
               >
-                <span className="text-sm tabular-nums">
+                <span className="text-sm tabular-nums text-slate-900 font-medium">
                   {slot.startTime}–{slot.endTime}
                 </span>
                 {canEdit && (
@@ -151,7 +151,7 @@ export default function AvailabilityManager({
                     onClick={() => handleRemove(slot.id)}
                     disabled={removingId === slot.id}
                     aria-label={`Remove ${slot.startTime} to ${slot.endTime} on ${formatDayLabel(group.date)}`}
-                    className="min-h-9 rounded px-2 text-sm text-black/60 hover:bg-black/5 disabled:opacity-50 dark:text-white/60 dark:hover:bg-white/10"
+                    className="min-h-8 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50 transition-colors"
                   >
                     {removingId === slot.id ? "…" : "Remove"}
                   </button>
@@ -164,91 +164,82 @@ export default function AvailabilityManager({
   }
 
   return (
-    <section aria-labelledby="availability-heading">
-      <h2 id="availability-heading" className="mb-3 text-lg font-semibold">
+    <section aria-labelledby="availability-heading" className="space-y-4">
+      <h2 id="availability-heading" className="text-lg font-bold text-slate-900">
         Availability
       </h2>
 
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
       )}
 
       {canEdit && (
-        <form
-          onSubmit={handleAdd}
-          className="mb-4 grid gap-3 rounded border border-black/15 p-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end dark:border-white/20"
-        >
-          <div>
-            <label htmlFor="availability-date" className="mb-1 block text-sm font-medium">
-              Date
-            </label>
-            <input
+        <Card isFlush={false} className="p-4 bg-slate-50 border-slate-200">
+          <form
+            onSubmit={handleAdd}
+            className="grid gap-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
+          >
+            <Input
               id="availability-date"
+              label="Date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
-              className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label htmlFor="availability-start" className="mb-1 block text-sm font-medium">
-              From
-            </label>
-            <input
+            <Input
               id="availability-start"
+              label="From"
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
               required
-              className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label htmlFor="availability-end" className="mb-1 block text-sm font-medium">
-              To
-            </label>
-            <input
+            <Input
               id="availability-end"
+              label="To"
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
               required
-              className={INPUT_CLASS}
             />
-          </div>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
-          >
-            {isSaving ? "Adding…" : "Add Hours"}
-          </button>
-        </form>
+            <Button
+              type="submit"
+              variant="commit"
+              isBusy={isSaving}
+              busyLabel="Adding…"
+            >
+              Add Hours
+            </Button>
+          </form>
+        </Card>
       )}
 
       {entries.length === 0 ? (
-        <p className="rounded border border-black/15 px-4 py-6 text-center text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-          No availability set. Add the dates and hours this doctor is in.
-        </p>
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
+            No availability set. Add the dates and hours this doctor is in.
+          </p>
+        </div>
       ) : (
-        <>
+        <Card isFlush={false} className="p-2 sm:p-4">
           <ul>{upcoming.map((group) => renderGroup(group, false))}</ul>
 
           {past.length > 0 && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-sm text-black/60 dark:text-white/60">
+            <details className="mt-4 border-t border-slate-200 pt-4 group">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors list-none flex items-center">
+                <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
                 Past dates ({past.length})
               </summary>
-              <ul>{past.map((group) => renderGroup(group, true))}</ul>
+              <ul className="mt-2 pl-4">{past.map((group) => renderGroup(group, true))}</ul>
             </details>
           )}
-        </>
+        </Card>
       )}
     </section>
   );

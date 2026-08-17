@@ -56,7 +56,7 @@ export default function PageHeader({
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
             {title}
           </h1>
-          {meta && <p className="mt-1.5 text-sm text-slate-500">{meta}</p>}
+          {meta && <div className="mt-1.5 text-sm text-slate-500">{meta}</div>}
         </div>
 
         {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}

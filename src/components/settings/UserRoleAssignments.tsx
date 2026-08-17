@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import { Select } from "@/components/ui/Input";
 import type { AccountUser, RoleSummary } from "@/lib/roles";
 
 /**
@@ -23,9 +25,6 @@ interface UserRoleAssignmentsProps {
   clinics: readonly { id: string; name: string }[];
   canManage: boolean;
 }
-
-const SELECT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
 
 export default function UserRoleAssignments({
   users,
@@ -72,11 +71,11 @@ export default function UserRoleAssignments({
   }
 
   return (
-    <section aria-labelledby="assignments-heading">
-      <h2 id="assignments-heading" className="mb-1 text-lg font-semibold">
+    <section aria-labelledby="assignments-heading" className="mt-12 border-t border-slate-200 pt-8">
+      <h2 id="assignments-heading" className="mb-1 text-lg font-bold text-slate-900">
         Users
       </h2>
-      <p className="mb-3 text-sm text-black/60 dark:text-white/60">
+      <p className="mb-6 text-sm text-slate-500">
         A role with no clinic applies across the whole account. Naming a clinic
         limits it to that clinic only.
       </p>
@@ -84,44 +83,46 @@ export default function UserRoleAssignments({
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
       )}
 
-      <ul className="grid gap-3">
+      <ul className="grid gap-4">
         {users.map((user) => (
           <li
             key={user.id}
-            className="rounded border border-black/15 px-4 py-3 dark:border-white/20"
+            className={`rounded-xl border p-5 shadow-sm transition-colors ${
+              openUserId === user.id ? "border-violet-200 bg-violet-50/30" : "border-slate-200 bg-white"
+            }`}
           >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="font-medium">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+              <p className="font-semibold text-slate-900">
                 {user.name ?? user.email}
                 {user.isSelf && (
-                  <span className="ml-2 rounded bg-black/10 px-2 py-0.5 text-xs font-medium dark:bg-white/15">
+                  <span className="ml-3 rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
                     You
                   </span>
                 )}
               </p>
-              <p className="text-sm text-black/60 dark:text-white/60">{user.email}</p>
+              <p className="text-sm font-medium text-slate-500">{user.email}</p>
             </div>
 
             {user.assignments.length === 0 ? (
-              <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+              <p className="text-sm text-slate-500 italic">
                 No roles. This user can sign in but cannot reach any module.
               </p>
             ) : (
-              <ul className="mt-2 flex flex-wrap gap-2">
+              <ul className="flex flex-wrap gap-2">
                 {user.assignments.map((assignment) => (
                   <li
                     key={assignment.id}
-                    className="flex items-center gap-2 rounded border border-black/15 py-1 pl-3 pr-1 dark:border-white/20"
+                    className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-3 pr-1.5"
                   >
-                    <span className="text-sm">
+                    <span className="text-sm font-medium text-slate-900">
                       {assignment.roleName}
-                      <span className="text-black/55 dark:text-white/55">
+                      <span className="text-slate-500 font-normal">
                         {" · "}
                         {assignment.clinicName ?? "all clinics"}
                       </span>
@@ -139,7 +140,7 @@ export default function UserRoleAssignments({
                         aria-label={`Remove ${assignment.roleName} in ${
                           assignment.clinicName ?? "all clinics"
                         } from ${user.name ?? user.email}`}
-                        className="min-h-9 rounded px-2 text-sm text-black/60 hover:bg-black/5 disabled:opacity-50 dark:text-white/60 dark:hover:bg-white/10"
+                        className="min-h-8 rounded-md px-2.5 text-xs font-medium text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors disabled:opacity-50 ml-2"
                       >
                         {pending === assignment.id ? "…" : "Remove"}
                       </button>
@@ -151,19 +152,13 @@ export default function UserRoleAssignments({
 
             {canManage &&
               (openUserId === user.id ? (
-                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <div className="mt-5 pt-5 border-t border-slate-200/60 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                   <div>
-                    <label
-                      htmlFor={`role-${user.id}`}
-                      className="mb-1 block text-sm font-medium"
-                    >
-                      Role
-                    </label>
-                    <select
+                    <Select
                       id={`role-${user.id}`}
+                      label="Role"
                       value={roleId}
                       onChange={(event) => setRoleId(event.target.value)}
-                      className={SELECT_CLASS}
                     >
                       <option value="">Select a role</option>
                       {roles.map((role) => (
@@ -171,21 +166,15 @@ export default function UserRoleAssignments({
                           {role.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div>
-                    <label
-                      htmlFor={`clinic-${user.id}`}
-                      className="mb-1 block text-sm font-medium"
-                    >
-                      Clinic
-                    </label>
-                    <select
+                    <Select
                       id={`clinic-${user.id}`}
+                      label="Clinic"
                       value={clinicId}
                       onChange={(event) => setClinicId(event.target.value)}
-                      className={SELECT_CLASS}
                     >
                       <option value="">All clinics (account-wide)</option>
                       {clinics.map((clinic) => (
@@ -193,11 +182,11 @@ export default function UserRoleAssignments({
                           {clinic.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
-                  <div className="flex gap-2">
-                    <button
+                  <div className="flex flex-wrap gap-2 pb-0.5">
+                    <Button
                       type="button"
                       disabled={roleId === "" || pending === user.id}
                       onClick={() =>
@@ -211,31 +200,35 @@ export default function UserRoleAssignments({
                           user.id,
                         )
                       }
-                      className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+                      variant="commit"
+                      isBusy={pending === user.id}
+                      busyLabel="Assigning…"
                     >
-                      {pending === user.id ? "Assigning…" : "Assign Role"}
-                    </button>
-                    <button
+                      Assign Role
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => setOpenUserId(null)}
-                      className="min-h-11 rounded border border-black/20 px-4 text-base font-medium dark:border-white/25"
+                      variant="secondary"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenUserId(user.id);
-                    setRoleId("");
-                    setClinicId("");
-                  }}
-                  className="mt-2 min-h-11 rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
-                >
-                  Add Role
-                </button>
+                <div className="mt-5 pt-4 border-t border-slate-100">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setOpenUserId(user.id);
+                      setRoleId("");
+                      setClinicId("");
+                    }}
+                  >
+                    Add Role
+                  </Button>
+                </div>
               ))}
           </li>
         ))}

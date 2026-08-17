@@ -44,7 +44,7 @@ export default async function NewRegistrationPage() {
         : [];
 
   return (
-    <section>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
       <PageHeader
         title="New registration"
         meta="A Patient ID is assigned when you save."

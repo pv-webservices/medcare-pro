@@ -40,14 +40,7 @@ export default async function ClinicDetailPage({ params }: ClinicDetailPageProps
   const canEdit = await can(actor, "clinic:edit", clinic.id);
 
   return (
-    <section>
-      <Link
-        href="/clinics"
-        className="mb-4 inline-block text-sm text-black/60 underline dark:text-white/60"
-      >
-        ← All clinics
-      </Link>
-
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
       <ClinicDetail clinic={clinic} canEdit={canEdit} />
     </section>
   );

@@ -53,7 +53,7 @@ export default async function ClinicsListPage() {
   );
 
   return (
-    <section>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
       {/* Adding a clinic is the only action on this page. The button lives with
           the title; the form it opens needs the full width, so the component
           owns both slots rather than being wedged into the header. */}

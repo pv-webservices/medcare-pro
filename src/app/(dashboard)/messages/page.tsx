@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import MessageComposer from "@/components/messages/MessageComposer";
 import MessageHistory from "@/components/messages/MessageHistory";
 import TemplateManager from "@/components/messages/TemplateManager";
+import PageHeader from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { can, PermissionError } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
@@ -57,12 +58,12 @@ export default async function MessagesPage() {
 
   if (!templates) {
     return (
-      <section>
-        <h1 className="mb-4 text-2xl font-semibold">Messages</h1>
-        <p className="rounded border border-black/15 px-4 py-3 text-sm text-black/60 dark:border-white/20 dark:text-white/60">
+      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+        <PageHeader title="Messages" />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
           Your role cannot send WhatsApp messages. Ask an admin or the account
           owner if you need access.
-        </p>
+        </div>
       </section>
     );
   }
@@ -90,34 +91,34 @@ export default async function MessagesPage() {
   const clinicName = clinics.find((clinic) => clinic.id === clinicId)?.name ?? null;
 
   return (
-    <section>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Messages</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          Send an approved template to patients on WhatsApp.
-        </p>
-      </div>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-8">
+      <PageHeader
+        title="Messages"
+        meta="Send an approved template to patients on WhatsApp."
+      />
 
       {device && !device.connected && (
         <p
           role="alert"
-          className="mb-6 rounded border border-amber-600/40 bg-amber-600/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-400"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 font-medium"
         >
           The WhatsApp device is {device.status.toLowerCase()}. Scan its QR code
           in the provider panel to reconnect — sends will fail until you do.
         </p>
       )}
 
-      <section aria-labelledby="send-heading" className="mb-8">
-        <h2 id="send-heading" className="mb-3 text-lg font-semibold">
+      <section aria-labelledby="send-heading" className="space-y-4">
+        <h2 id="send-heading" className="text-lg font-bold text-slate-900">
           Send a message
         </h2>
         {templates.length === 0 ? (
-          <p className="rounded border border-black/15 px-4 py-6 text-center text-sm text-black/60 dark:border-white/20 dark:text-white/60">
-            {canManageTemplates
-              ? "Add a template below before you can message patients."
-              : "No templates yet. Ask an admin to add one before you can message patients."}
-          </p>
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              {canManageTemplates
+                ? "Add a template below before you can message patients."
+                : "No templates yet. Ask an admin to add one before you can message patients."}
+            </p>
+          </div>
         ) : (
           <MessageComposer
             templates={templates}
@@ -128,12 +129,12 @@ export default async function MessagesPage() {
         )}
       </section>
 
-      <div className="mb-8">
+      <div className="pt-2">
         <TemplateManager templates={templates} canManage={canManageTemplates} />
       </div>
 
-      <section aria-labelledby="history-heading">
-        <h2 id="history-heading" className="mb-3 text-lg font-semibold">
+      <section aria-labelledby="history-heading" className="space-y-4 pt-2">
+        <h2 id="history-heading" className="text-lg font-bold text-slate-900">
           Message history
         </h2>
         <MessageHistory messages={messages} />

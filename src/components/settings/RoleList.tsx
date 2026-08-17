@@ -2,6 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Card from "@/components/ui/Card";
 import { PERMISSION_GROUPS } from "@/lib/permissions";
 import type { RoleSummary } from "@/lib/roles";
 
@@ -26,9 +29,6 @@ interface RoleListProps {
   canManage: boolean;
 }
 
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
-
 function PermissionCheckboxes({
   idPrefix,
   selected,
@@ -41,11 +41,11 @@ function PermissionCheckboxes({
   onToggle: (key: string, checked: boolean) => void;
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-6 sm:grid-cols-2">
       {PERMISSION_GROUPS.map((group) => (
         <fieldset key={group.module} className="min-w-0">
-          <legend className="mb-1 text-sm font-semibold">{group.module}</legend>
-          <ul className="grid gap-1">
+          <legend className="mb-2 text-sm font-bold text-slate-900">{group.module}</legend>
+          <ul className="grid gap-2">
             {group.permissions.map((permission) => {
               const id = `${idPrefix}-${permission.key}`;
               const isGrantable = grantable.has(permission.key);
@@ -54,8 +54,8 @@ function PermissionCheckboxes({
                 <li key={permission.key}>
                   <label
                     htmlFor={id}
-                    className={`flex min-h-11 items-start gap-2 rounded px-1 py-1 ${
-                      isGrantable ? "" : "opacity-60"
+                    className={`flex items-start gap-3 rounded-md p-2 transition-colors ${
+                      isGrantable ? "hover:bg-slate-50 cursor-pointer" : "opacity-60 cursor-not-allowed"
                     }`}
                   >
                     <input
@@ -66,24 +66,24 @@ function PermissionCheckboxes({
                       onChange={(event) =>
                         onToggle(permission.key, event.target.checked)
                       }
-                      className="mt-1 size-4 shrink-0"
+                      className="mt-1 size-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-600/20"
                     />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-slate-900">
                         {permission.label}
                       </span>
-                      <span className="block text-xs text-black/60 dark:text-white/60">
+                      <span className="block text-xs text-slate-500">
                         {permission.description}
                       </span>
                       {permission.pendingNote && (
                         // Says so rather than implying protection that does not
                         // exist yet — ticking this box changes nothing today.
-                        <span className="mt-0.5 block text-xs text-amber-800 dark:text-amber-400">
+                        <span className="mt-1 block text-xs text-amber-700 font-medium">
                           {permission.pendingNote}
                         </span>
                       )}
                       {!isGrantable && (
-                        <span className="mt-0.5 block text-xs text-black/60 dark:text-white/60">
+                        <span className="mt-1 block text-xs text-slate-400">
                           You do not hold this permission, so you cannot grant it.
                         </span>
                       )}
@@ -186,94 +186,93 @@ export default function RoleList({
 
   return (
     <section aria-labelledby="roles-heading">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="roles-heading" className="text-lg font-semibold">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-4">
+        <h2 id="roles-heading" className="text-lg font-bold text-slate-900">
           Roles
         </h2>
         {canManage && !isAdding && (
-          <button
-            type="button"
-            onClick={() => setIsAdding(true)}
-            className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background"
-          >
+          <Button onClick={() => setIsAdding(true)} variant="commit">
             Add Role
-          </button>
+          </Button>
         )}
       </div>
 
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
       )}
 
       {isAdding && (
-        <form
-          onSubmit={handleCreate}
-          className="mb-4 rounded border border-black/15 p-3 dark:border-white/20"
-        >
-          <div className="mb-3 max-w-sm">
-            <label htmlFor="new-role-name" className="mb-1 block text-sm font-medium">
-              Role name
-            </label>
-            <input
-              id="new-role-name"
-              value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-              required
-              maxLength={255}
-              placeholder="e.g. Billing Desk"
-              className={INPUT_CLASS}
-            />
-          </div>
+        <Card className="mb-6 p-4 sm:p-6 bg-slate-50 border-slate-200">
+          <form onSubmit={handleCreate} className="grid gap-6">
+            <div className="max-w-md">
+              <Input
+                id="new-role-name"
+                name="name"
+                label="Role name"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                required
+                maxLength={255}
+                placeholder="e.g. Billing Desk"
+              />
+            </div>
 
-          <PermissionCheckboxes
-            idPrefix="new-role"
-            selected={newPermissions}
-            grantable={grantable}
-            onToggle={(key, checked) =>
-              setNewPermissions((current) => toggle(current, key, checked))
-            }
-          />
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <PermissionCheckboxes
+                idPrefix="new-role"
+                selected={newPermissions}
+                grantable={grantable}
+                onToggle={(key, checked) =>
+                  setNewPermissions((current) => toggle(current, key, checked))
+                }
+              />
+            </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
-            >
-              {isSaving ? "Creating…" : "Create Role"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdding(false);
-                setNewPermissions(new Set());
-                setNewName("");
-              }}
-              className="min-h-11 rounded border border-black/20 px-5 text-base font-medium dark:border-white/25"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button
+                type="submit"
+                disabled={isSaving}
+                variant="commit"
+                isBusy={isSaving}
+                busyLabel="Creating…"
+              >
+                Create Role
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setIsAdding(false);
+                  setNewPermissions(new Set());
+                  setNewName("");
+                }}
+                variant="secondary"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
       )}
 
-      <ul className="grid gap-3">
+      <ul className="grid gap-4 sm:grid-cols-2">
         {roles.map((role) => {
           const isEditing = editing?.id === role.id;
 
           return (
             <li
               key={role.id}
-              className="rounded border border-black/15 px-4 py-3 dark:border-white/20"
+              className={`rounded-xl border p-5 shadow-sm transition-colors ${
+                isEditing ? "border-violet-200 bg-violet-50/30" : "border-slate-200 bg-white"
+              }`}
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="font-medium">{role.name}</p>
-                <p className="text-sm text-black/60 dark:text-white/60">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                <p className="font-semibold text-slate-900">{role.name}</p>
+                <p className="text-sm font-medium text-slate-500">
                   {role.assignmentCount === 1
                     ? "1 assignment"
                     : `${role.assignmentCount} assignments`}
@@ -281,12 +280,12 @@ export default function RoleList({
               </div>
 
               {role.isWildcard ? (
-                <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                <p className="text-sm text-slate-600">
                   Full access to everything. Permissions for this role are not
                   editable here — create a custom role instead.
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                <p className="text-sm text-slate-600">
                   {role.permissions.length === 0
                     ? "No permissions — this role can sign in and do nothing else."
                     : `${role.permissions.length} permission${
@@ -296,50 +295,56 @@ export default function RoleList({
               )}
 
               {canManage && !role.isWildcard && !isEditing && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setEditing({ id: role.id, permissions: new Set(role.permissions) })
-                  }
-                  className="mt-2 min-h-11 rounded border border-black/20 px-4 text-sm font-medium dark:border-white/25"
-                >
-                  Edit Permissions
-                </button>
+                <div className="mt-5 pt-4 border-t border-slate-100">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      setEditing({ id: role.id, permissions: new Set(role.permissions) })
+                    }
+                  >
+                    Edit Permissions
+                  </Button>
+                </div>
               )}
 
               {isEditing && editing && (
-                <div className="mt-3">
-                  <PermissionCheckboxes
-                    idPrefix={`role-${role.id}`}
-                    selected={editing.permissions}
-                    grantable={grantable}
-                    onToggle={(key, checked) =>
-                      setEditing((current) =>
-                        current === null
-                          ? current
-                          : {
-                              ...current,
-                              permissions: toggle(current.permissions, key, checked),
-                            },
-                      )
-                    }
-                  />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
+                <div className="mt-6 pt-6 border-t border-slate-200/60">
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5 shadow-sm">
+                    <PermissionCheckboxes
+                      idPrefix={`role-${role.id}`}
+                      selected={editing.permissions}
+                      grantable={grantable}
+                      onToggle={(key, checked) =>
+                        setEditing((current) =>
+                          current === null
+                            ? current
+                            : {
+                                ...current,
+                                permissions: toggle(current.permissions, key, checked),
+                              },
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
                       type="button"
                       onClick={() => handleSaveRole(role.id)}
                       disabled={savingRoleId === role.id}
-                      className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+                      variant="commit"
+                      isBusy={savingRoleId === role.id}
+                      busyLabel="Saving…"
                     >
-                      {savingRoleId === role.id ? "Saving…" : "Save Permissions"}
-                    </button>
-                    <button
+                      Save Permissions
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => setEditing(null)}
-                      className="min-h-11 rounded border border-black/20 px-5 text-base font-medium dark:border-white/25"
+                      variant="secondary"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

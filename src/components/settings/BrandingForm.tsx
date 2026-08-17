@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Card from "@/components/ui/Card";
 
 /**
  * Clinic branding — PRD §6.8 (FR-8.3, FR-8.4).
@@ -29,11 +32,12 @@ interface BrandingFormProps {
   canEdit: boolean;
 }
 
-const INPUT_CLASS =
-  "block min-h-11 w-full rounded border border-black/20 bg-transparent px-3 text-base outline-none focus:border-black/60 dark:border-white/25 dark:focus:border-white/60";
-
 function validateLogoUrl(value: string): string | null {
   if (value === "") {
+    return null;
+  }
+  // Accept base64 data URLs from file upload
+  if (value.startsWith("data:image/")) {
     return null;
   }
   try {
@@ -68,6 +72,35 @@ export default function BrandingForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const hasUploadedLogo = logo.startsWith("data:image/");
+
+  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file (PNG, JPG, SVG, etc.).");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Logo must be under 2 MB.");
+      return;
+    }
+
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setLogo(reader.result);
+        setLogoLoadFailed(false);
+        setSaved(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 
   const logoError = validateLogoUrl(logo);
   const colourError = validateThemeColor(colour);
@@ -113,11 +146,11 @@ export default function BrandingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
           {error}
         </p>
@@ -126,7 +159,7 @@ export default function BrandingForm({
       {saved && (
         <p
           role="status"
-          className="mb-3 rounded border border-green-700/40 bg-green-700/10 px-3 py-2 text-sm text-green-800 dark:text-green-400"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
         >
           Branding saved for {clinicName}.
         </p>
@@ -135,58 +168,109 @@ export default function BrandingForm({
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="grid gap-4">
           <div>
-            <label htmlFor="logo-url" className="mb-1 block text-sm font-medium">
-              Logo address
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Logo
             </label>
+
+            {/* Hidden native file input */}
             <input
-              id="logo-url"
-              type="url"
-              inputMode="url"
-              value={logo}
-              onChange={(event) => {
-                setLogo(event.target.value);
-                setLogoLoadFailed(false);
-                setSaved(false);
-              }}
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
               disabled={!canEdit}
-              maxLength={2000}
-              placeholder="https://example.com/logo.png"
-              aria-invalid={logoError !== null}
-              aria-describedby="logo-url-help"
-              className={INPUT_CLASS}
+              className="hidden"
             />
-            <p
-              id="logo-url-help"
-              className={`mt-1 text-xs ${
-                logoError
-                  ? "text-red-700 dark:text-red-400"
-                  : "text-black/60 dark:text-white/60"
-              }`}
-            >
-              {logoError ??
-                "Paste the web address of an image you already host. Leave blank for no logo."}
-            </p>
+
+            {/* Preview of uploaded logo */}
+            {hasUploadedLogo && (
+              <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={logo}
+                  alt="Uploaded logo"
+                  className="h-12 w-auto max-w-[120px] rounded object-contain"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900">Logo uploaded</p>
+                  <p className="text-xs text-slate-500">Image loaded from your device</p>
+                </div>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLogo("");
+                      setSaved(false);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Upload button + URL input */}
+            {!hasUploadedLogo && (
+              <>
+                {canEdit && (
+                  <div className="flex gap-3 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 text-slate-500">
+                        <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
+                        <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+                      </svg>
+                      Upload from device
+                    </button>
+                    <span className="self-center text-xs text-slate-400">or</span>
+                  </div>
+                )}
+                <Input
+                  id="logo-url"
+                  name="logoUrl"
+                  label="Logo URL"
+                  type="url"
+                  inputMode="url"
+                  value={logo}
+                  onChange={(event) => {
+                    setLogo(event.target.value);
+                    setLogoLoadFailed(false);
+                    setSaved(false);
+                  }}
+                  disabled={!canEdit}
+                  maxLength={2000}
+                  placeholder="https://example.com/logo.png"
+                  error={logoError ?? undefined}
+                  hint={!logoError ? "Paste a web address or upload from your device. Max 2 MB." : undefined}
+                />
+              </>
+            )}
           </div>
 
           <div>
-            <label htmlFor="theme-colour" className="mb-1 block text-sm font-medium">
-              Primary colour
-            </label>
             <div className="flex gap-2">
-              <input
-                id="theme-colour"
-                value={colour}
-                onChange={(event) => {
-                  setColour(event.target.value);
-                  setSaved(false);
-                }}
-                disabled={!canEdit}
-                maxLength={9}
-                placeholder="#1D4ED8"
-                aria-invalid={colourError !== null}
-                aria-describedby="theme-colour-help"
-                className={INPUT_CLASS}
-              />
+              <div className="flex-1">
+                <Input
+                  id="theme-colour"
+                  name="themeColor"
+                  label="Primary colour"
+                  value={colour}
+                  onChange={(event) => {
+                    setColour(event.target.value);
+                    setSaved(false);
+                  }}
+                  disabled={!canEdit}
+                  maxLength={9}
+                  placeholder="#1D4ED8"
+                  error={colourError ?? undefined}
+                  hint={!colourError ? "Hex value, e.g. #1D4ED8. Leave blank for no colour." : undefined}
+                />
+              </div>
               <input
                 type="color"
                 value={swatch}
@@ -196,25 +280,15 @@ export default function BrandingForm({
                 }}
                 disabled={!canEdit}
                 aria-label="Pick the primary colour"
-                className="min-h-11 w-14 shrink-0 rounded border border-black/20 bg-transparent dark:border-white/25"
+                className="mt-0.5 min-h-11 w-14 shrink-0 rounded-md border border-slate-200 bg-white cursor-pointer"
               />
             </div>
-            <p
-              id="theme-colour-help"
-              className={`mt-1 text-xs ${
-                colourError
-                  ? "text-red-700 dark:text-red-400"
-                  : "text-black/60 dark:text-white/60"
-              }`}
-            >
-              {colourError ?? "Hex value, e.g. #1D4ED8. Leave blank for no colour."}
-            </p>
           </div>
         </div>
 
         <div>
-          <p className="mb-1 text-sm font-medium">Preview</p>
-          <div className="rounded border border-black/15 p-4 dark:border-white/20">
+          <p className="mb-2 text-sm font-semibold text-slate-900">Preview</p>
+          <Card className="p-5">
             <div className="flex items-center gap-3">
               {logo !== "" && logoError === null && !logoLoadFailed ? (
                 // Plain <img>: the address is user-supplied and arbitrary, which
@@ -227,23 +301,23 @@ export default function BrandingForm({
                   className="h-10 w-auto max-w-32 object-contain"
                 />
               ) : (
-                <span className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-black/25 text-xs text-black/50 dark:border-white/30 dark:text-white/50">
+                <span className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-300 text-xs text-slate-400 bg-slate-50">
                   {logoLoadFailed ? "!" : "—"}
                 </span>
               )}
-              <span className="font-semibold">{clinicName}</span>
+              <span className="font-semibold text-slate-900">{clinicName}</span>
             </div>
 
             {logoLoadFailed && (
-              <p className="mt-2 text-xs text-amber-800 dark:text-amber-400">
+              <p className="mt-2 text-xs text-amber-700">
                 That address did not load an image. Check the link is public.
               </p>
             )}
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <span
                 aria-hidden="true"
-                className="inline-block size-8 rounded border border-black/15 dark:border-white/20"
+                className="inline-block size-8 rounded-md border border-slate-200"
                 style={{ backgroundColor: colourError ? "transparent" : swatch }}
               />
               <button
@@ -252,31 +326,33 @@ export default function BrandingForm({
                 style={
                   colourError ? undefined : { backgroundColor: swatch, color: "#fff" }
                 }
-                className="min-h-11 rounded px-5 text-base font-medium disabled:opacity-100"
+                className="min-h-11 rounded-md px-5 text-sm font-medium shadow-sm"
               >
                 Log Appointment
               </button>
             </div>
-            <p className="mt-2 text-xs text-black/60 dark:text-white/60">
+            <p className="mt-3 text-xs text-slate-500">
               An example button, so the colour can be judged against a real
               control rather than a swatch alone.
             </p>
-          </div>
+          </Card>
         </div>
       </div>
 
       {canEdit ? (
-        <div className="mt-4">
-          <button
+        <div className="pt-2">
+          <Button
             type="submit"
             disabled={isSaving || hasErrors}
-            className="min-h-11 rounded bg-foreground px-5 text-base font-medium text-background disabled:opacity-60"
+            variant="commit"
+            isBusy={isSaving}
+            busyLabel="Saving…"
           >
-            {isSaving ? "Saving…" : "Save Branding"}
-          </button>
+            Save Branding
+          </Button>
         </div>
       ) : (
-        <p className="mt-4 rounded border border-black/15 px-4 py-3 text-sm text-black/60 dark:border-white/20 dark:text-white/60">
+        <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
           Your role cannot edit this clinic&apos;s branding. Ask an admin or the
           account owner if you need access.
         </p>
