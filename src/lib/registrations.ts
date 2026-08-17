@@ -647,12 +647,13 @@ export async function findPatientsForActor(
   actor: ActorContext,
   clinicId: string,
   search: string,
+  date?: string,
 ): Promise<PatientMatch[]> {
   await requirePermission(actor, "patient:read", clinicId);
 
   const term = search.trim();
 
-  if (term.length < MIN_SEARCH_LENGTH) {
+  if (term.length < MIN_SEARCH_LENGTH && !date) {
     return [];
   }
 
@@ -660,15 +661,27 @@ export async function findPatientsForActor(
     where: {
       tenantId: actor.tenantId,
       clinicId,
-      OR: [
-        { name: { contains: term } },
-        { mobileNumber: { contains: term } },
-        // Staff often have the printed card in hand — let them type the code.
-        { patientCode: { contains: term } },
-      ],
+      ...(term.length >= MIN_SEARCH_LENGTH ? {
+        OR: [
+          { name: { contains: term } },
+          { mobileNumber: { contains: term } },
+          // Staff often have the printed card in hand — let them type the code.
+          { patientCode: { contains: term } },
+        ],
+      } : {}),
+      ...(date ? {
+        registrations: {
+          some: {
+            visitDate: {
+              gte: parseDateOnly(date),
+              lt: dayAfter(parseDateOnly(date)),
+            },
+          },
+        },
+      } : {}),
     },
     orderBy: { createdAt: "desc" },
-    take: MAX_MATCHES,
+    take: date ? 50 : MAX_MATCHES,
     select: {
       id: true,
       patientCode: true,

@@ -120,7 +120,13 @@ interface Recipient {
 function toDigits(mobileNumber: string): string {
   // The gateway wants digits only, e.g. 919812345678. Anything the front desk
   // typed for readability — spaces, +, hyphens, brackets — is stripped.
-  return mobileNumber.replace(/\D/g, "");
+  const digits = mobileNumber.replace(/\D/g, "");
+  
+  if (digits.length === 10) {
+    return `91${digits}`;
+  }
+  
+  return digits;
 }
 
 async function loadRecipients(

@@ -42,6 +42,7 @@ export default function MessageComposer({
   const router = useRouter();
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [matches, setMatches] = useState<PatientMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [recipients, setRecipients] = useState<PatientMatch[]>([]);
@@ -58,7 +59,7 @@ export default function MessageComposer({
     // The too-short case is handled inside the timer rather than in the effect
     // body, so nothing sets state synchronously during the effect.
     const handle = setTimeout(async () => {
-      if (!clinicId || term.length < 2) {
+      if (!clinicId || (term.length < 2 && !dateFilter)) {
         setMatches([]);
         return;
       }
@@ -66,7 +67,7 @@ export default function MessageComposer({
       setIsSearching(true);
       try {
         const response = await fetch(
-          `/api/patients?clinicId=${encodeURIComponent(clinicId)}&search=${encodeURIComponent(term)}`,
+          `/api/patients?clinicId=${encodeURIComponent(clinicId)}&search=${encodeURIComponent(term)}&date=${encodeURIComponent(dateFilter)}`,
         );
         const payload: { success?: boolean; data?: PatientMatch[] } = await response
           .json()
@@ -80,7 +81,7 @@ export default function MessageComposer({
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(handle);
-  }, [search, clinicId]);
+  }, [search, dateFilter, clinicId]);
 
   function addRecipient(patient: PatientMatch) {
     setOutcome(null);
@@ -137,9 +138,14 @@ export default function MessageComposer({
   const previewFor = recipients[0];
   const preview = template
     ? renderTemplate(template.body, {
-        patientName: previewFor?.name,
-        patientCode: previewFor?.patientCode,
-        clinicName: clinicName ?? undefined,
+        patientName: previewFor?.name ?? "John Doe",
+        patientCode: previewFor?.patientCode ?? "PT-2026-0001",
+        clinicName: clinicName ?? "Demo Clinic",
+        doctorName: "Dr. Smith",
+        department: "General",
+        visitDate: "15 Aug 2026",
+        visitTime: "10:30 AM",
+        amount: "₹ 500.00",
       })
     : "";
 
@@ -195,42 +201,100 @@ export default function MessageComposer({
         </Select>
       </div>
 
-      <div className="max-w-md">
-        <Input
-          id="composer-search"
-          name="search"
-          label="Add patients"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by name, mobile number or Patient ID"
-          hint={isSearching
-            ? "Searching…"
-            : `Patients at ${clinicName ?? "this clinic"}. Up to ${MAX_RECIPIENTS} per send.`}
-        />
+      <div className="max-w-md space-y-4">
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-900">
+            Filter by visit date
+          </label>
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button
+              type="button"
+              variant={dateFilter === "" ? "primary" : "secondary"}
+              onClick={() => setDateFilter("")}
+              className="text-xs px-3 py-1.5 min-h-[32px] h-8"
+            >
+              Any
+            </Button>
+            <Button
+              type="button"
+              variant={dateFilter === new Date().toISOString().split('T')[0] ? "primary" : "secondary"}
+              onClick={() => setDateFilter(new Date().toISOString().split('T')[0])}
+              className="text-xs px-3 py-1.5 min-h-[32px] h-8"
+            >
+              Today
+            </Button>
+            <Button
+              type="button"
+              variant={dateFilter === new Date(Date.now() - 86400000).toISOString().split('T')[0] ? "primary" : "secondary"}
+              onClick={() => setDateFilter(new Date(Date.now() - 86400000).toISOString().split('T')[0])}
+              className="text-xs px-3 py-1.5 min-h-[32px] h-8"
+            >
+              Yesterday
+            </Button>
+            <input
+              type="date"
+              className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 h-8"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+          </div>
+        </div>
 
-        {search.trim().length >= 2 && matches.length > 0 && (
-          <ul className="mt-2 grid gap-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm max-h-64 overflow-y-auto">
-            {matches.map((patient) => (
-              <li key={patient.id}>
+        <div>
+          <Input
+            id="composer-search"
+            name="search"
+            label="Add patients"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name, mobile number or Patient ID"
+            hint={isSearching
+              ? "Searching…"
+              : `Patients at ${clinicName ?? "this clinic"}. Up to ${MAX_RECIPIENTS} per send.`}
+          />
+
+          {(search.trim().length >= 2 || dateFilter !== "") && matches.length > 0 && (
+            <div className="mt-2">
+              <div className="flex justify-between items-center px-1 mb-1">
+                <span className="text-xs font-medium text-slate-500">{matches.length} patients found</span>
                 <button
                   type="button"
-                  onClick={() => addRecipient(patient)}
-                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-sm hover:bg-slate-50 transition-colors"
+                  onClick={() => {
+                    setOutcome(null);
+                    setRecipients(matches);
+                    setSearch("");
+                    setMatches([]);
+                    setDateFilter("");
+                  }}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
                 >
-                  <span>
-                    <span className="font-medium text-slate-900">{patient.name}</span>{" "}
-                    <span className="text-slate-500">
-                      {patient.patientCode}
-                    </span>
-                  </span>
-                  <span className="tabular-nums text-slate-500">
-                    {patient.mobileNumber}
-                  </span>
+                  Select All
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
+              </div>
+              <ul className="grid gap-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm max-h-64 overflow-y-auto">
+                {matches.map((patient) => (
+                  <li key={patient.id}>
+                    <button
+                      type="button"
+                      onClick={() => addRecipient(patient)}
+                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-sm hover:bg-slate-50 transition-colors"
+                    >
+                      <span>
+                        <span className="font-medium text-slate-900">{patient.name}</span>{" "}
+                        <span className="text-slate-500">
+                          {patient.patientCode}
+                        </span>
+                      </span>
+                      <span className="tabular-nums text-slate-500">
+                        {patient.mobileNumber}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
 
       {recipients.length > 0 && (

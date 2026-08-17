@@ -28,8 +28,9 @@ export async function GET(request: Request) {
     }
 
     const search = params.get("search") ?? "";
+    const date = params.get("date") ?? undefined;
 
-    return jsonOk(await findPatientsForActor(actor, clinicId, search));
+    return jsonOk(await findPatientsForActor(actor, clinicId, search, date));
   } catch (error: unknown) {
     return toErrorResponse(error, "GET /api/patients");
   }
