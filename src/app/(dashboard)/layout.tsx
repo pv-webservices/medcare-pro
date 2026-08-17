@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import DashboardNav from "@/components/dashboard/DashboardNav";
 import ClinicSwitcher from "@/components/dashboard/ClinicSwitcher";
 import SignOutButton from "@/components/dashboard/SignOutButton";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { ToastProvider } from "@/components/ui";
 import { listClinicsForActor } from "@/lib/clinics";
 import { visibleNavLinks } from "@/lib/navigation";
@@ -11,7 +12,6 @@ import { prisma } from "@/lib/prisma";
 import { holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
-import { accentStyle } from "@/lib/theme";
 import { Plus } from "lucide-react";
 
 /**
@@ -71,11 +71,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   const selectedClinic = clinics.find((clinic) => clinic.id === selectedClinicId);
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900" style={accentStyle(selectedClinic?.themeColor)}>
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
       {/* Sidebar */}
       <aside className="hidden w-[280px] flex-col border-r border-slate-200 bg-white md:flex z-10 shadow-sm relative">
         <div className="flex items-center gap-3 px-6 py-6 border-b border-slate-100">
-           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-primary">
              <Plus className="h-6 w-6 stroke-[3]" />
            </div>
            <div>
@@ -99,8 +99,9 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
         {/* User profile / Logout at bottom */}
         <div className="border-t border-slate-100 p-4">
+          <ThemeSwitcher />
           <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 font-bold">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary font-bold">
               {userName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">

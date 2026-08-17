@@ -23,7 +23,7 @@ const SIZES: Record<ButtonSize, string> = {
 };
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  commit: "bg-[#6B46C1] text-white hover:bg-[#5a3aa6] shadow-sm",
+  commit: "bg-primary text-primary-foreground hover:bg-primary-hover shadow-sm",
   primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-sm",
   secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm",
   quiet: "text-slate-500 hover:bg-slate-50 hover:text-slate-900",

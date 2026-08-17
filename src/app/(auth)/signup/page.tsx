@@ -217,7 +217,7 @@ function SignupContent() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-4 flex w-full justify-center rounded-xl bg-[#6B46C1] hover:bg-[#5a3aa6] py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#6B46C1] focus:ring-offset-2 disabled:opacity-70 transition-colors"
+                className="mt-4 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 transition-colors"
               >
                 {isSubmitting ? "Creating Account..." : "Create Account"}
               </button>
@@ -255,15 +255,15 @@ function SignupContent() {
 
             {/* Top Left floating card */}
             <div className="absolute top-16 left-8 rounded-2xl bg-white/95 backdrop-blur-md px-5 py-4 shadow-xl border border-white/30 flex items-center gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-[#6B46C1]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-light text-primary">
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
                 <div className="text-xs font-medium text-slate-500 mb-0.5">Today's Appointments</div>
-                <div className="text-[15px] font-bold text-[#6B46C1]">8 Scheduled</div>
+                <div className="text-[15px] font-bold text-primary">8 Scheduled</div>
               </div>
               {/* Little purple dot */}
-              <div className="absolute top-3 right-3 h-2 w-2 rounded-full bg-[#6B46C1]" />
+              <div className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
             </div>
 
             {/* Bottom Left floating card */}
@@ -312,12 +312,12 @@ function SignupContent() {
             </div>
 
             {/* Bottom Right Quote card */}
-            <div className="absolute bottom-16 right-8 rounded-3xl bg-[#6B46C1] p-7 shadow-xl w-60 text-white border border-white/10">
+            <div className="absolute bottom-16 right-8 rounded-3xl bg-primary p-7 shadow-xl w-60 text-white border border-white/10">
               {/* Avatars */}
               <div className="flex -space-x-3 mb-6 relative -top-12 -mt-2">
-                <img src="https://ui-avatars.com/api/?name=J+D&background=e0e7ff&color=4f46e5&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-[#6B46C1] bg-white object-cover shadow-sm" />
-                <img src="https://ui-avatars.com/api/?name=A+S&background=dcfce7&color=16a34a&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-[#6B46C1] bg-white object-cover shadow-sm" />
-                <img src="https://ui-avatars.com/api/?name=M+R&background=fce7f3&color=db2777&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-[#6B46C1] bg-white object-cover shadow-sm" />
+                <img src="https://ui-avatars.com/api/?name=J+D&background=e0e7ff&color=4f46e5&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
+                <img src="https://ui-avatars.com/api/?name=A+S&background=dcfce7&color=16a34a&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
+                <img src="https://ui-avatars.com/api/?name=M+R&background=fce7f3&color=db2777&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
               </div>
               <div className="text-5xl font-serif leading-none mb-2 text-white opacity-80">&ldquo;</div>
               <p className="text-base font-medium leading-relaxed mb-6 -mt-2">

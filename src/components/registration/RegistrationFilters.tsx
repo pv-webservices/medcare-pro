@@ -188,7 +188,7 @@ export default function RegistrationFilters({
         </div>
 
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="commit">
             <Search aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
             Apply Filters
           </Button>

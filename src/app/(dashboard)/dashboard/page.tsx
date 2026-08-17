@@ -39,7 +39,7 @@ export default function DashboardPage() {
         {/* Card 1 */}
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
               <Building2 className="h-6 w-6" />
             </div>
           </div>
@@ -59,7 +59,7 @@ export default function DashboardPage() {
         {/* Card 2 */}
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
               <Stethoscope className="h-6 w-6" />
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function DashboardPage() {
         {/* Card 3 */}
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
               <Users className="h-6 w-6" />
             </div>
           </div>
@@ -99,7 +99,7 @@ export default function DashboardPage() {
         {/* Card 4 */}
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
               <Calendar className="h-6 w-6" />
             </div>
           </div>
@@ -135,11 +135,11 @@ export default function DashboardPage() {
             {/* Legend */}
             <div className="flex items-center gap-6 mb-8 text-xs font-medium text-slate-500">
               <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-sm bg-violet-600"></div>
+                <div className="h-2.5 w-2.5 rounded-sm bg-primary"></div>
                 Completed
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-sm bg-violet-200"></div>
+                <div className="h-2.5 w-2.5 rounded-sm bg-primary/40"></div>
                 Pending
               </div>
               <div className="flex items-center gap-2">
@@ -172,50 +172,50 @@ export default function DashboardPage() {
                 {/* Bar 1 */}
                 <div className="relative flex flex-col justify-end w-8 h-[60%] group">
                   <div className="w-full bg-slate-200 rounded-t-sm h-[20%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-200 h-[30%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-600 rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary/40 h-[30%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
                   <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 16</span>
                 </div>
                 {/* Bar 2 */}
                 <div className="relative flex flex-col justify-end w-8 h-[55%] group">
                   <div className="w-full bg-slate-200 rounded-t-sm h-[25%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-200 h-[25%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-600 rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary/40 h-[25%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
                   <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 17</span>
                 </div>
                 {/* Bar 3 */}
                 <div className="relative flex flex-col justify-end w-8 h-[80%] group">
                   <div className="w-full bg-slate-200 rounded-t-sm h-[15%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-200 h-[35%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-600 rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary/40 h-[35%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
                   <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 18</span>
                 </div>
                 {/* Bar 4 */}
                 <div className="relative flex flex-col justify-end w-8 h-[65%] group">
                   <div className="w-full bg-slate-200 rounded-t-sm h-[20%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-200 h-[40%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-600 rounded-b-sm h-[40%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary/40 h-[40%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary rounded-b-sm h-[40%] transition-opacity group-hover:opacity-80"></div>
                   <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 19</span>
                 </div>
                 {/* Bar 5 */}
                 <div className="relative flex flex-col justify-end w-8 h-[58%] group">
                   <div className="w-full bg-slate-200 rounded-t-sm h-[10%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-200 h-[40%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-600 rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary/40 h-[40%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
                   <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 20</span>
                 </div>
                 {/* Bar 6 */}
                 <div className="relative flex flex-col justify-end w-8 h-[62%] group">
                   <div className="w-full bg-slate-200 rounded-t-sm h-[15%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-200 h-[35%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-600 rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary/40 h-[35%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
                   <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 21</span>
                 </div>
                 {/* Bar 7 */}
                 <div className="relative flex flex-col justify-end w-8 h-[85%] group">
                   <div className="w-full bg-slate-200 rounded-t-sm h-[20%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-200 h-[35%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-violet-600 rounded-b-sm h-[45%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary/40 h-[35%] transition-opacity group-hover:opacity-80"></div>
+                  <div className="w-full bg-primary rounded-b-sm h-[45%] transition-opacity group-hover:opacity-80"></div>
                   <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-900 font-bold whitespace-nowrap">May 22</span>
                 </div>
               </div>
@@ -226,7 +226,7 @@ export default function DashboardPage() {
           <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-base font-bold text-slate-900">Notifications</h3>
-              <div className="text-sm font-medium text-violet-600 cursor-pointer hover:text-violet-700 transition-colors">
+              <div className="text-sm font-medium text-primary cursor-pointer hover:text-primary-hover transition-colors">
                 View all
               </div>
             </div>
@@ -248,7 +248,7 @@ export default function DashboardPage() {
               
               {/* Notif 2 */}
               <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary">
                   <Users className="h-4 w-4" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -285,7 +285,7 @@ export default function DashboardPage() {
           <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-base font-bold text-slate-900">Recent Registrations</h3>
-              <div className="text-sm font-medium text-violet-600 cursor-pointer hover:text-violet-700 transition-colors">
+              <div className="text-sm font-medium text-primary cursor-pointer hover:text-primary-hover transition-colors">
                 View all
               </div>
             </div>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
           </div>
           
           {/* Promo Card */}
-          <div className="rounded-3xl bg-violet-50 p-8 shadow-sm border border-violet-100 overflow-hidden relative">
+          <div className="rounded-3xl bg-primary-light p-8 shadow-sm border border-primary-light overflow-hidden relative">
             <div className="relative z-10 w-[60%]">
               <h3 className="text-xl font-bold text-slate-900 leading-tight mb-3">
                 Delivering better care, every day.
@@ -358,7 +358,7 @@ export default function DashboardPage() {
               <p className="text-sm text-slate-600 mb-6">
                 Manage your clinics, doctors and patients all in one place.
               </p>
-              <button className="rounded-xl bg-[#6B46C1] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#5a3aa6] transition-colors">
+              <button className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary-hover transition-colors">
                 Explore Features
               </button>
             </div>

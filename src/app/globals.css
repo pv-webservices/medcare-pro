@@ -53,21 +53,28 @@
   /* Aliases kept for pages not yet migrated to Stage 0 primitives. */
   --background: var(--paper);
   --foreground: var(--ink);
+
+  /* --- Brand Primary (Theme aware) --- */
+  --primary: #6B46C1; /* Violet-600 */
+  --primary-hover: #5a3aa6;
+  --primary-light: #ede9fe; /* Violet-100 */
+  --primary-foreground: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0e1413;
-    --surface: #161d1c;
-    --surface-sunk: #1e2726;
-    --ink: #e8edeb;
-    --muted: #93a19e; /* 6.3:1 on --surface */
-    --line: #2a3432;
+/* Butter Yellow Theme (Light mode only base) */
+[data-theme="butter"] {
+  --primary: #fffd74; /* Butter Yellow */
+  --primary-hover: #fce83a; /* Darker Butter */
+  --primary-light: #fefce8; /* Very Light Yellow */
+  --primary-foreground: #0f172a; /* Slate 900 for text contrast on yellow */
+}
 
-    --ok: #5cc28d;
-    --warn: #e0a44a;
-    --alert: #f2938b;
-  }
+/* Emerald Theme (Light mode only base) */
+[data-theme="emerald"] {
+  --primary: #059669; /* Emerald-600 */
+  --primary-hover: #047857; /* Emerald-700 */
+  --primary-light: #d1fae5; /* Emerald-100 */
+  --primary-foreground: #ffffff;
 }
 
 @theme inline {
@@ -85,6 +92,12 @@
   --color-accent-ink: var(--accent-ink);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* New theme colors */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-primary-foreground: var(--primary-foreground);
 
   /*
    * Two roles only. Anek Latin (Ek Type, Mumbai) for headings; its siblings
@@ -204,12 +217,4 @@ body {
   --viz-muted: #5c6b68;
 }
 
-@media (prefers-color-scheme: dark) {
-  .viz-root {
-    --viz-series: #3987e5;
-    --viz-surface: #161d1c;
-    --viz-grid: #2a3432;
-    --viz-axis: #3c4947;
-    --viz-muted: #93a19e;
-  }
-}
+

@@ -34,7 +34,7 @@ interface DashboardNavProps {
 }
 
 function getIconForHref(href: string, isActive: boolean) {
-  const className = `h-5 w-5 ${isActive ? "text-[#6B46C1]" : "text-slate-400 group-hover:text-slate-600"}`;
+  const className = `h-5 w-5 ${isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"}`;
   switch (href) {
     case "/dashboard": return <LayoutDashboard className={className} />;
     case "/registration": return <Users className={className} />;
@@ -71,15 +71,15 @@ export default function DashboardNav({
                 aria-current={active ? "page" : undefined}
                 className={`group flex min-h-[44px] items-center gap-3 rounded-xl px-4 text-[14px] transition-colors ${
                   active
-                    ? "bg-violet-50 text-[#6B46C1] font-semibold"
-                    : "text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-primary-light text-primary font-semibold"
+                    : "text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-200"
                 }`}
               >
                 {getIconForHref(link.href, active)}
                 <span className="flex-1">{link.label}</span>
                 {link.href === "/notifications" && unreadNotifications > 0 && (
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
-                    active ? "bg-violet-200/50 text-violet-700" : "bg-violet-100 text-violet-600"
+                    active ? "bg-primary text-white" : "bg-primary-light text-primary"
                   }`}>
                     {unreadNotifications}
                     <span className="sr-only"> unread</span>

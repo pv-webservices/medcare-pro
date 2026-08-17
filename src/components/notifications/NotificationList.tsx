@@ -175,7 +175,7 @@ export default function NotificationList({
                 {item.href && (
                   <Link
                     href={item.href}
-                    className={`text-sm font-semibold hover:underline underline-offset-4 ${item.read ? "text-violet-600 hover:text-violet-700" : "text-amber-700 hover:text-amber-800"}`}
+                    className={`text-sm font-semibold hover:underline underline-offset-4 ${item.read ? "text-primary hover:text-primary-hover" : "text-amber-700 hover:text-amber-800"}`}
                   >
                     Open Record
                   </Link>

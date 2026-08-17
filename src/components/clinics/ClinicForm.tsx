@@ -49,9 +49,7 @@ function validate(values: ClinicFormValues): FieldErrors {
     errors.name = "Enter the clinic name.";
   }
 
-  if (values.themeColor.trim() && !HEX_COLOR.test(values.themeColor.trim())) {
-    errors.themeColor = "Use a hex colour like #1D4ED8.";
-  }
+
 
   if (values.logoUrl.trim()) {
     const trimmed = values.logoUrl.trim();
@@ -130,7 +128,7 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
 
     if (hasErrors) {
       // Reveal every outstanding problem at once rather than one per attempt.
-      setTouched({ name: true, address: true, city: true, logoUrl: true, themeColor: true });
+      setTouched({ name: true, address: true, city: true, logoUrl: true });
       return;
     }
 
@@ -146,7 +144,6 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
             address: values.address.trim(),
             city: values.city.trim(),
             logoUrl: values.logoUrl.trim(),
-            themeColor: values.themeColor.trim(),
           }),
         },
       );
@@ -225,29 +222,7 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
           onChange={(e) => update("city", e.target.value)}
         />
 
-        <Input
-          id="clinic-theme"
-          name="themeColor"
-          label="Brand colour"
-          type="text"
-          placeholder="#1D4ED8"
-          value={values.themeColor}
-          onChange={(e) => update("themeColor", e.target.value)}
-          onBlur={() => touch("themeColor")}
-          error={errorFor("themeColor")}
-          hint="Optional. Marks this clinic throughout the app."
-          adornment={
-            // A swatch, not decoration: it confirms the code typed is the
-            // colour meant, and previews the rail this clinic will wear.
-            <span
-              aria-hidden="true"
-              className="h-11 w-11 shrink-0 rounded-md border border-slate-200 shadow-sm"
-              style={{
-                backgroundColor: HEX_COLOR.test(swatch) ? swatch : "transparent",
-              }}
-            />
-          }
-        />
+
 
         <div className="sm:col-span-2">
           <label className="mb-1.5 block text-sm font-semibold text-slate-700">

@@ -35,7 +35,7 @@ export default function PeriodSelector({ selected }: PeriodSelectorProps) {
                 aria-current={isSelected ? "page" : undefined}
                 className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors ${
                   isSelected
-                    ? "bg-violet-600 text-white shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
                 }`}
               >

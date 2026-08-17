@@ -51,12 +51,7 @@ function validateLogoUrl(value: string): string | null {
   }
 }
 
-function validateThemeColor(value: string): string | null {
-  if (value === "") {
-    return null;
-  }
-  return HEX_COLOR.test(value) ? null : "Use a hex colour like #1D4ED8.";
-}
+
 
 export default function BrandingForm({
   clinicId,
@@ -67,7 +62,6 @@ export default function BrandingForm({
 }: BrandingFormProps) {
   const router = useRouter();
   const [logo, setLogo] = useState(logoUrl ?? "");
-  const [colour, setColour] = useState(themeColor ?? "");
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -103,12 +97,7 @@ export default function BrandingForm({
   }
 
   const logoError = validateLogoUrl(logo);
-  const colourError = validateThemeColor(colour);
-  const hasErrors = logoError !== null || colourError !== null;
-
-  // type="color" only understands #rrggbb, so an unset or 8-digit value falls
-  // back rather than resetting the swatch to black.
-  const swatch = /^#[0-9a-fA-F]{6}$/.test(colour) ? colour : FALLBACK_COLOR;
+  const hasErrors = logoError !== null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -125,7 +114,7 @@ export default function BrandingForm({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         // Empty string clears the field — the server maps it to null.
-        body: JSON.stringify({ logoUrl: logo, themeColor: colour }),
+        body: JSON.stringify({ logoUrl: logo }),
       });
       const payload: { success?: boolean; error?: string } = await response
         .json()
@@ -165,8 +154,8 @@ export default function BrandingForm({
         </p>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="grid gap-4">
+      <div className="grid gap-6">
+        <div className="grid gap-4 max-w-2xl">
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-slate-700">
               Logo
@@ -251,91 +240,6 @@ export default function BrandingForm({
               </>
             )}
           </div>
-
-          <div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  id="theme-colour"
-                  name="themeColor"
-                  label="Primary colour"
-                  value={colour}
-                  onChange={(event) => {
-                    setColour(event.target.value);
-                    setSaved(false);
-                  }}
-                  disabled={!canEdit}
-                  maxLength={9}
-                  placeholder="#1D4ED8"
-                  error={colourError ?? undefined}
-                  hint={!colourError ? "Hex value, e.g. #1D4ED8. Leave blank for no colour." : undefined}
-                />
-              </div>
-              <input
-                type="color"
-                value={swatch}
-                onChange={(event) => {
-                  setColour(event.target.value);
-                  setSaved(false);
-                }}
-                disabled={!canEdit}
-                aria-label="Pick the primary colour"
-                className="mt-0.5 min-h-11 w-14 shrink-0 rounded-md border border-slate-200 bg-white cursor-pointer"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm font-semibold text-slate-900">Preview</p>
-          <Card className="p-5">
-            <div className="flex items-center gap-3">
-              {logo !== "" && logoError === null && !logoLoadFailed ? (
-                // Plain <img>: the address is user-supplied and arbitrary, which
-                // next/image would need a configured remote host for.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logo}
-                  alt=""
-                  onError={() => setLogoLoadFailed(true)}
-                  className="h-10 w-auto max-w-32 object-contain"
-                />
-              ) : (
-                <span className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-300 text-xs text-slate-400 bg-slate-50">
-                  {logoLoadFailed ? "!" : "—"}
-                </span>
-              )}
-              <span className="font-semibold text-slate-900">{clinicName}</span>
-            </div>
-
-            {logoLoadFailed && (
-              <p className="mt-2 text-xs text-amber-700">
-                That address did not load an image. Check the link is public.
-              </p>
-            )}
-
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <span
-                aria-hidden="true"
-                className="inline-block size-8 rounded-md border border-slate-200"
-                style={{ backgroundColor: colourError ? "transparent" : swatch }}
-              />
-              <button
-                type="button"
-                disabled
-                style={
-                  colourError ? undefined : { backgroundColor: swatch, color: "#fff" }
-                }
-                className="min-h-11 rounded-md px-5 text-sm font-medium shadow-sm"
-              >
-                Log Appointment
-              </button>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">
-              An example button, so the colour can be judged against a real
-              control rather than a swatch alone.
-            </p>
-          </Card>
         </div>
       </div>
 
