@@ -9,6 +9,7 @@ import type { RecipientResult, SendMessageResult } from "@/lib/whatsappMessages"
 import Button from "@/components/ui/Button";
 import Input, { Select } from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
+import { cx } from "@/components/ui/cx";
 
 /**
  * Sending an approved template to patients — PRD §6.9 (FR-9.1).
@@ -209,25 +210,25 @@ export default function MessageComposer({
           <div className="flex flex-wrap gap-2 items-center">
             <Button
               type="button"
-              variant={dateFilter === "" ? "primary" : "secondary"}
+              variant={dateFilter === "" ? "commit" : "secondary"}
               onClick={() => setDateFilter("")}
-              className="text-xs px-3 py-1.5 min-h-[32px] h-8"
+              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", dateFilter === "" && "ring-2 ring-primary ring-offset-2")}
             >
               Any
             </Button>
             <Button
               type="button"
-              variant={dateFilter === new Date().toISOString().split('T')[0] ? "primary" : "secondary"}
+              variant={dateFilter === new Date().toISOString().split('T')[0] ? "commit" : "secondary"}
               onClick={() => setDateFilter(new Date().toISOString().split('T')[0])}
-              className="text-xs px-3 py-1.5 min-h-[32px] h-8"
+              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", dateFilter === new Date().toISOString().split('T')[0] && "ring-2 ring-primary ring-offset-2")}
             >
               Today
             </Button>
             <Button
               type="button"
-              variant={dateFilter === new Date(Date.now() - 86400000).toISOString().split('T')[0] ? "primary" : "secondary"}
+              variant={dateFilter === new Date(Date.now() - 86400000).toISOString().split('T')[0] ? "commit" : "secondary"}
               onClick={() => setDateFilter(new Date(Date.now() - 86400000).toISOString().split('T')[0])}
-              className="text-xs px-3 py-1.5 min-h-[32px] h-8"
+              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", dateFilter === new Date(Date.now() - 86400000).toISOString().split('T')[0] && "ring-2 ring-primary ring-offset-2")}
             >
               Yesterday
             </Button>
