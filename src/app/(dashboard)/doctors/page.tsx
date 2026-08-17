@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import DoctorsTable from "@/components/doctors/DoctorsTable";
 import AddDoctorPanel from "@/components/doctors/AddDoctorPanel";
+import PageHeader from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { can } from "@/lib/rbac";
@@ -39,22 +40,22 @@ export default async function DoctorsListPage() {
     : undefined;
 
   return (
-    <section>
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold">Doctors</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {/* FR-4.1 — the total, reflecting the current clinic filter. */}
-          {doctors.length === 1 ? "1 doctor" : `${doctors.length} doctors`}
-          {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}.
-        </p>
-      </div>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <PageHeader
+        title="Doctors"
+        meta={
+          <>
+            {/* FR-4.1 — the total, reflecting the current clinic filter. */}
+            {doctors.length === 1 ? "1 doctor" : `${doctors.length} doctors`}
+            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}.
+          </>
+        }
+      />
 
       {canCreate && (
-        <div className="mb-6">
-          <AddDoctorPanel
-            clinics={clinics.map(({ id, name }) => ({ id, name }))}
-          />
-        </div>
+        <AddDoctorPanel
+          clinics={clinics.map(({ id, name }) => ({ id, name }))}
+        />
       )}
 
       <DoctorsTable doctors={doctors} showClinic={!selectedClinic} />

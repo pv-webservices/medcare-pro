@@ -3,6 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { NavLink } from "@/lib/navigation";
+import { 
+  LayoutDashboard, 
+  Users, 
+  Stethoscope, 
+  Building2, 
+  FileText, 
+  Bell, 
+  MessageSquare, 
+  ShieldCheck, 
+  Settings 
+} from "lucide-react";
 
 /**
  * Primary navigation — the modules named in docs/PROJECT_STRUCTURE.md.
@@ -22,6 +33,22 @@ interface DashboardNavProps {
   unreadNotifications: number;
 }
 
+function getIconForHref(href: string, isActive: boolean) {
+  const className = `h-5 w-5 ${isActive ? "text-[#6B46C1]" : "text-slate-400 group-hover:text-slate-600"}`;
+  switch (href) {
+    case "/dashboard": return <LayoutDashboard className={className} />;
+    case "/registration": return <Users className={className} />;
+    case "/doctors": return <Stethoscope className={className} />;
+    case "/clinics": return <Building2 className={className} />;
+    case "/reports": return <FileText className={className} />;
+    case "/notifications": return <Bell className={className} />;
+    case "/messages": return <MessageSquare className={className} />;
+    case "/roles": return <ShieldCheck className={className} />;
+    case "/branding": return <Settings className={className} />;
+    default: return <FileText className={className} />;
+  }
+}
+
 export default function DashboardNav({
   links,
   unreadNotifications,
@@ -33,32 +60,35 @@ export default function DashboardNav({
   }
 
   return (
-    <nav aria-label="Main">
-      <ul className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
-        {links.map((link) => (
-          <li key={link.href}>
-            <Link
-              href={link.href}
-              aria-current={isActive(link.href) ? "page" : undefined}
-              className={`flex min-h-11 items-center gap-2 whitespace-nowrap rounded px-3 text-sm font-medium ${
-                isActive(link.href)
-                  ? "bg-black/10 dark:bg-white/15"
-                  : "text-black/70 hover:bg-black/5 dark:text-white/70 dark:hover:bg-white/10"
-              }`}
-            >
-              {link.label}
-              {link.href === "/notifications" && unreadNotifications > 0 && (
-                // Amber, the same "needs a look" colour used for a doctor on
-                // leave. Counted, not a bare dot: "12 unread" and "1 unread" are
-                // different mornings for a front desk.
-                <span className="rounded bg-amber-600/15 px-1.5 py-0.5 text-xs font-medium tabular-nums text-amber-800 dark:text-amber-400">
-                  {unreadNotifications}
-                  <span className="sr-only"> unread</span>
-                </span>
-              )}
-            </Link>
-          </li>
-        ))}
+    <nav aria-label="Main" className="space-y-1">
+      <ul className="flex flex-col gap-1.5">
+        {links.map((link) => {
+          const active = isActive(link.href);
+          return (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                aria-current={active ? "page" : undefined}
+                className={`group flex min-h-[44px] items-center gap-3 rounded-xl px-4 text-[14px] transition-colors ${
+                  active
+                    ? "bg-violet-50 text-[#6B46C1] font-semibold"
+                    : "text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                {getIconForHref(link.href, active)}
+                <span className="flex-1">{link.label}</span>
+                {link.href === "/notifications" && unreadNotifications > 0 && (
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+                    active ? "bg-violet-200/50 text-violet-700" : "bg-violet-100 text-violet-600"
+                  }`}>
+                    {unreadNotifications}
+                    <span className="sr-only"> unread</span>
+                  </span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

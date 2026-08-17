@@ -95,7 +95,7 @@ export default async function RegistrationListPage({
   const lastOnPage = Math.min(result.page * result.pageSize, result.total);
 
   return (
-    <section>
+    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
       <PageHeader
         title="Registrations"
         meta={

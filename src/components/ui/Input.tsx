@@ -18,15 +18,15 @@ import { cx } from "@/components/ui/cx";
  */
 
 const CONTROL_BASE =
-  "block w-full rounded-md border bg-surface text-input text-ink " +
-  "placeholder:text-muted/70 transition-colors disabled:opacity-55";
+  "block w-full rounded-xl border bg-white text-sm text-slate-900 " +
+  "placeholder:text-slate-400 transition-colors disabled:opacity-55 focus:outline-none focus:ring-4";
 
 export const controlClasses = (isInvalid: boolean, extra?: string) =>
   cx(
     CONTROL_BASE,
     isInvalid
-      ? "border-alert hover:border-alert"
-      : "border-line hover:border-muted/60",
+      ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+      : "border-slate-200 focus:border-violet-500 hover:border-slate-300 focus:ring-violet-500/10",
     extra,
   );
 
@@ -53,7 +53,7 @@ export function FieldShell({
 }: FieldShellProps) {
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1.5 block text-label font-medium text-ink">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-slate-700">
         {label}
       </label>
 
@@ -67,11 +67,11 @@ export function FieldShell({
       )}
 
       {error ? (
-        <p id={`${id}-message`} className="mt-1.5 text-label text-alert">
+        <p id={`${id}-message`} className="mt-1.5 text-xs text-red-500">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-message`} className="mt-1.5 text-label text-muted">
+        <p id={`${id}-message`} className="mt-1.5 text-xs text-slate-500">
           {hint}
         </p>
       ) : null}

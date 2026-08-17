@@ -35,23 +35,23 @@ export default function Panel({
     <section
       aria-label={title}
       className={cx(
-        "rounded-lg border border-line bg-surface shadow-card",
+        "rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden",
         className,
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
-        <div className="min-w-0">
-          <Heading className="font-display text-section font-semibold text-ink">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-50 px-6 py-5">
+        <div className="min-w-0 flex-1">
+          <Heading className="text-base font-bold text-slate-900">
             {title}
           </Heading>
           {description && (
-            <p className="mt-0.5 text-label text-muted">{description}</p>
+            <p className="mt-1 text-sm text-slate-500">{description}</p>
           )}
         </div>
-        {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
+        {actions && <div className="flex shrink-0 items-center gap-3">{actions}</div>}
       </div>
 
-      <div className="p-5">{children}</div>
+      <div className="p-6">{children}</div>
     </section>
   );
 }

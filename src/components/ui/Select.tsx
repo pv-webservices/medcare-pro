@@ -53,7 +53,7 @@ export default function Select({
       <ChevronDown
         aria-hidden="true"
         strokeWidth={1.75}
-        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
       />
     </div>
   );
@@ -66,8 +66,8 @@ export default function Select({
           <p
             id={`${id}-message`}
             className={cx(
-              "mt-1.5 text-label",
-              error ? "text-alert" : "text-muted",
+              "mt-1.5 text-xs",
+              error ? "text-red-500" : "text-slate-500",
             )}
           >
             {error ?? hint}

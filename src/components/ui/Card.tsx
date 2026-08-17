@@ -22,8 +22,8 @@ export default function Card({
   return (
     <div
       className={cx(
-        "rounded-lg border border-line bg-surface shadow-card",
-        !isFlush && "p-5",
+        "rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden",
+        !isFlush && "p-6",
         className,
       )}
       {...rest}

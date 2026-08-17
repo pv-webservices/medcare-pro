@@ -20,10 +20,10 @@ interface EmptyStateProps {
 
 export default function EmptyState({ title, guidance, action }: EmptyStateProps) {
   return (
-    <div className="rounded-lg border border-dashed border-line bg-surface px-6 py-12 text-center">
-      <p className="font-display text-section font-semibold text-ink">{title}</p>
-      <p className="mx-auto mt-1 max-w-sm text-body text-muted">{guidance}</p>
-      {action && <div className="mt-5 flex justify-center">{action}</div>}
+    <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
+      <p className="text-xl font-bold text-slate-900">{title}</p>
+      <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">{guidance}</p>
+      {action && <div className="mt-6 flex justify-center">{action}</div>}
     </div>
   );
 }

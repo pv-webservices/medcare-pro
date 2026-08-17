@@ -43,7 +43,7 @@ function formatVisitDate(date: string): string {
 }
 
 function Dash() {
-  return <span className="text-muted">—</span>;
+  return <span className="text-slate-400">—</span>;
 }
 
 /**
@@ -60,7 +60,7 @@ function FollowUpPill() {
 }
 
 function PatientCode({ children }: { children: ReactNode }) {
-  return <span className="serial text-ink">{children}</span>;
+  return <span className="serial font-semibold text-slate-900">{children}</span>;
 }
 
 export default function RegistrationsTable({
@@ -117,7 +117,7 @@ export default function RegistrationsTable({
                 <TD>
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                    className="underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                   >
                     <PatientCode>{registration.patientCode}</PatientCode>
                   </Link>
@@ -125,12 +125,12 @@ export default function RegistrationsTable({
 
                 <TD>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-ink">
+                    <span className="font-semibold text-slate-900">
                       {registration.patientName}
                     </span>
                     {registration.visitType === "FOLLOW_UP" && <FollowUpPill />}
                   </div>
-                  <p className="mt-0.5 text-label tabular-nums text-muted">
+                  <p className="mt-0.5 text-xs tabular-nums text-slate-500">
                     {registration.mobileNumber}
                   </p>
                 </TD>
@@ -145,19 +145,19 @@ export default function RegistrationsTable({
                   <span className="tabular-nums">
                     {formatVisitDate(registration.visitDate)}
                   </span>
-                  <p className="mt-0.5 text-label tabular-nums text-muted">
+                  <p className="mt-0.5 text-xs tabular-nums text-slate-500">
                     {registration.visitTime}
                   </p>
                 </TD>
 
-                <TD isNumeric className="font-medium text-ink">
+                <TD isNumeric className="font-bold text-slate-900">
                   {formatRupees(registration.amount)}
                 </TD>
 
                 <TD align="end" className="py-0 pl-0">
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-ink"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-400 hover:text-slate-900 transition-colors"
                   >
                     <span className="sr-only">
                       Open registration {registration.patientCode}
@@ -185,11 +185,11 @@ export default function RegistrationsTable({
                 <div className="min-w-0">
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="font-medium text-ink underline decoration-line underline-offset-4"
+                    className="font-semibold text-slate-900 underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                   >
                     {registration.patientName}
                   </Link>
-                  <p className="mt-0.5 text-label text-muted">
+                  <p className="mt-0.5 text-xs text-slate-500">
                     <PatientCode>{registration.patientCode}</PatientCode>
                     <span className="tabular-nums">
                       {" · "}
@@ -197,19 +197,19 @@ export default function RegistrationsTable({
                     </span>
                   </p>
                 </div>
-                <p className="shrink-0 font-medium tabular-nums text-ink">
+                <p className="shrink-0 font-bold tabular-nums text-slate-900">
                   {formatRupees(registration.amount)}
                 </p>
               </div>
 
-              <p className="mt-2 text-label text-muted">
+              <p className="mt-2 text-xs text-slate-500">
                 {registration.department}
                 {registration.doctorName ? ` · ${registration.doctorName}` : ""}
                 {showClinic ? ` · ${registration.clinicName}` : ""}
               </p>
 
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <p className="text-label tabular-nums text-muted">
+                <p className="text-xs tabular-nums text-slate-500">
                   {formatVisitDate(registration.visitDate)}{" "}
                   {registration.visitTime}
                 </p>

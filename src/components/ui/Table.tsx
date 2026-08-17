@@ -34,11 +34,11 @@ export default function Table({ caption, className, children }: TableProps) {
   return (
     <div
       className={cx(
-        "overflow-x-auto rounded-lg border border-line bg-surface shadow-card",
+        "overflow-x-auto rounded-3xl border border-slate-100 bg-white shadow-sm",
         className,
       )}
     >
-      <table className="w-full border-collapse text-left text-body">
+      <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         {children}
       </table>
@@ -48,8 +48,8 @@ export default function Table({ caption, className, children }: TableProps) {
 
 export function THead({ children }: { children: ReactNode }) {
   return (
-    <thead className="bg-surface-sunk">
-      <tr className="border-b border-line">{children}</tr>
+    <thead className="bg-slate-50/50">
+      <tr className="border-b border-slate-100">{children}</tr>
     </thead>
   );
 }
@@ -72,8 +72,8 @@ export function TR({ isCurrent = false, style, className, children }: TRProps) {
     <tr
       style={style}
       className={cx(
-        "border-b border-line last:border-b-0",
-        isCurrent ? "bg-surface-sunk" : "hover:bg-surface-sunk/60",
+        "border-b border-slate-100 last:border-b-0 transition-colors",
+        isCurrent ? "bg-slate-50" : "hover:bg-slate-50/80",
         className,
       )}
     >
@@ -92,7 +92,7 @@ export function TH({ align = "start", className, children, ...rest }: THProps) {
     <th
       scope="col"
       className={cx(
-        "px-4 py-2.5 text-micro font-semibold uppercase text-muted",
+        "px-6 py-4 text-xs font-semibold text-slate-500",
         align === "end" ? "text-right" : "text-left",
         className,
       )}
@@ -128,10 +128,10 @@ export function TD({
   return (
     <td
       className={cx(
-        "px-4 py-3 align-middle",
+        "px-6 py-4 align-middle text-sm text-slate-700",
         hasRail && "relative pl-6",
         resolved === "end" ? "text-right" : "text-left",
-        isNumeric && "tabular-nums",
+        isNumeric && "tabular-nums font-medium text-slate-900",
         className,
       )}
       {...rest}
@@ -139,7 +139,7 @@ export function TD({
       {hasRail && (
         <span
           aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-1 bg-accent"
+          className="absolute inset-y-0 left-0 w-1 bg-[#6B46C1]"
         />
       )}
       {children}

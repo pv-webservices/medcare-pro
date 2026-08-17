@@ -18,16 +18,16 @@ import { cx } from "@/components/ui/cx";
 export type StatusTone = "ok" | "warn" | "alert" | "neutral" | "accent";
 
 const TONES: Record<StatusTone, { pill: string; dot: string }> = {
-  ok: { pill: "border-ok/35 bg-ok/10 text-ok", dot: "bg-ok" },
-  warn: { pill: "border-warn/35 bg-warn/10 text-warn", dot: "bg-warn" },
-  alert: { pill: "border-alert/35 bg-alert/10 text-alert", dot: "bg-alert" },
+  ok: { pill: "border-emerald-200 bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  warn: { pill: "border-amber-200 bg-amber-50 text-amber-700", dot: "bg-amber-500" },
+  alert: { pill: "border-red-200 bg-red-50 text-red-700", dot: "bg-red-500" },
   neutral: {
-    pill: "border-line bg-surface-sunk text-muted",
-    dot: "bg-muted",
+    pill: "border-slate-200 bg-slate-50 text-slate-600",
+    dot: "bg-slate-400",
   },
   accent: {
-    pill: "border-accent/40 bg-accent/12 text-ink",
-    dot: "bg-accent",
+    pill: "border-violet-200 bg-violet-50 text-violet-700",
+    dot: "bg-violet-500",
   },
 };
 
@@ -51,7 +51,7 @@ export default function StatusPill({
     <span
       className={cx(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5",
-        "text-micro font-semibold uppercase",
+        "text-[10px] font-bold uppercase tracking-wider",
         pill,
         className,
       )}

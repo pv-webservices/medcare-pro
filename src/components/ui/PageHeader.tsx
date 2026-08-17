@@ -29,7 +29,7 @@ interface PageHeaderProps {
  * and they are tabular, so a count that changes does not shift the line.
  */
 export function Count({ children }: { children: ReactNode }) {
-  return <span className="font-medium tabular-nums text-ink">{children}</span>;
+  return <span className="font-bold tabular-nums text-slate-900">{children}</span>;
 }
 
 export default function PageHeader({
@@ -40,26 +40,26 @@ export default function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header className={cx("mb-5", className)}>
+    <header className={cx("mb-6 md:mb-8", className)}>
       {back && (
         <Link
           href={back.href}
-          className="mb-2 inline-flex items-center gap-1.5 text-label text-muted hover:text-ink"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
         >
-          <ArrowLeft aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" strokeWidth={2} />
           {back.label}
         </Link>
       )}
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-display text-title font-semibold text-ink">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
             {title}
           </h1>
-          {meta && <p className="mt-1 text-label text-muted">{meta}</p>}
+          {meta && <p className="mt-1.5 text-sm text-slate-500">{meta}</p>}
         </div>
 
-        {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
       </div>
     </header>
   );

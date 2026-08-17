@@ -2,13 +2,9 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
 
 /**
- * The one button in this app.
+ * The unified button for the application.
  *
- * `commit` is the variant that writes a record, and it is filled with the
- * selected clinic's own colour — so the clinic you are writing into is visible
- * at the instant you commit, which is the failure mode a multi-clinic account
- * actually has. Everything else stays neutral.
- *
+ * `commit` is the variant that writes a record. Now uses the primary violet theme.
  * `buttonClasses` is exported so a `<Link>` that behaves like a button can wear
  * the same clothes without a second implementation.
  */
@@ -17,23 +13,21 @@ export type ButtonVariant = "commit" | "primary" | "secondary" | "quiet" | "dang
 export type ButtonSize = "md" | "sm";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-md font-medium " +
+  "inline-flex items-center justify-center gap-2 rounded-xl font-medium " +
   "transition-colors disabled:cursor-not-allowed disabled:opacity-55";
 
 /** 44px minimum — this is used on a shared tablet at a front desk. */
 const SIZES: Record<ButtonSize, string> = {
-  md: "min-h-11 px-5 text-body",
-  sm: "min-h-9 px-3.5 text-label",
+  md: "min-h-11 px-5 text-sm",
+  sm: "min-h-9 px-3.5 text-xs",
 };
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  commit:
-    "bg-accent-solid text-accent-ink hover:brightness-110 active:brightness-95",
-  primary: "bg-ink text-surface hover:opacity-90",
-  secondary:
-    "border border-line bg-surface text-ink hover:bg-surface-sunk",
-  quiet: "text-muted hover:bg-surface-sunk hover:text-ink",
-  danger: "border border-alert/45 bg-alert/8 text-alert hover:bg-alert/14",
+  commit: "bg-[#6B46C1] text-white hover:bg-[#5a3aa6] shadow-sm",
+  primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-sm",
+  secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm",
+  quiet: "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+  danger: "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100",
 };
 
 export function buttonClasses(
