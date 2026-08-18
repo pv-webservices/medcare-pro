@@ -9,7 +9,7 @@ import { listClinicsForActor } from "@/lib/clinics";
 import { visibleNavLinks } from "@/lib/navigation";
 import { countUnreadForActor } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
+import { holdsAnywhere, permissionsHeldAnywhere, resolveRoleNameAtTime } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
@@ -46,15 +46,16 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   // The switcher only ever offers clinics this user can actually reach.
   // `countUnreadForActor` returns 0 rather than throwing for a Staff user, so
   // the shell renders the same for everyone — only the badge differs.
-  const [clinics, selectedClinicId, unreadNotifications, held, currentUser] = await Promise.all([
+  const selectedClinicId = await resolveSelectedClinicId(actor);
+  const [clinics, unreadNotifications, held, currentUser, roleName] = await Promise.all([
     listClinicsForActor(actor),
-    resolveSelectedClinicId(actor),
     countUnreadForActor(actor),
     permissionsHeldAnywhere(actor),
     prisma.user.findFirst({
       where: { id: actor.userId, tenantId: actor.tenantId },
       select: { name: true },
     }),
+    resolveRoleNameAtTime(actor, selectedClinicId ?? undefined),
   ]);
 
   const userName = currentUser?.name ?? "Admin User";
@@ -67,7 +68,8 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   // No extra query: the switcher's own list already carries every clinic's
   // branding. "All clinics" leaves themeColor undefined, which resolveAccent
   // answers with the house teal.
-  const selectedClinic = clinics.find((clinic) => clinic.id === selectedClinicId);
+  const activeClinic = clinics.find((clinic) => clinic.id === selectedClinicId) ?? (clinics.length === 1 ? clinics[0] : null);
+  const displayName = activeClinic?.name ?? userName;
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -97,12 +99,20 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         <div className="border-t border-slate-100 p-4">
           <ThemeSwitcher />
           <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary font-bold">
-              {userName.charAt(0).toUpperCase()}
-            </div>
+            {activeClinic?.logoUrl ? (
+              <img
+                src={activeClinic.logoUrl}
+                alt={`${displayName} logo`}
+                className="h-10 w-10 shrink-0 rounded-full object-cover border border-slate-200"
+              />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary font-bold">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-900">{userName}</p>
-              <p className="truncate text-xs text-slate-500">Super Admin</p>
+              <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
+              <p className="truncate text-xs text-slate-500 capitalize">{roleName}</p>
             </div>
           </div>
           <SignOutButton />
