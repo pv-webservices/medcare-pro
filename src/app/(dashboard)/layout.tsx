@@ -12,7 +12,6 @@ import { prisma } from "@/lib/prisma";
 import { holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
-import { Plus } from "lucide-react";
 
 /**
  * Shared shell for all signed-in pages — sidebar nav plus the FR-2.3 clinic
@@ -75,9 +74,6 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       {/* Sidebar */}
       <aside className="hidden w-[280px] flex-col border-r border-slate-200 bg-white md:flex z-10 shadow-sm relative">
         <div className="flex items-center gap-3 px-6 py-6 border-b border-slate-100">
-           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-primary">
-             <Plus className="h-6 w-6 stroke-[3]" />
-           </div>
            <div>
              <div className="font-bold text-slate-900 text-lg tracking-tight leading-none">Medicare Pro</div>
              <div className="text-[10px] text-slate-500 font-medium mt-1 tracking-wide uppercase">Smart Clinic Management</div>

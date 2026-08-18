@@ -16,6 +16,7 @@ import {
   type PatientMatch,
   type VisitType,
 } from "@/lib/registrations";
+import { todayDateOnly, nowClockTime } from "@/lib/dates";
 
 /**
  * New / edit registration — PRD §6.3 (FR-3.1, FR-3.5).
@@ -299,8 +300,8 @@ export default function RegistrationForm({
         doctorId: values.doctorId === "" ? null : values.doctorId,
         department: values.department.trim(),
         amount: Number(values.amount),
-        visitDate: values.visitDate,
-        visitTime: values.visitTime,
+        visitDate: isEdit ? values.visitDate : todayDateOnly(),
+        visitTime: isEdit ? values.visitTime : nowClockTime(),
         visitType: values.visitType,
         // The clinic is fixed after creation — moving a visit between clinics
         // would move its revenue with it. So is the patient: re-pointing a
@@ -584,27 +585,6 @@ export default function RegistrationForm({
             onBlur={() => touch("amount")}
             error={errorFor("amount")}
           />
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              id="registration-date"
-              type="date"
-              label="Visit date"
-              value={values.visitDate}
-              onChange={(e) => update("visitDate", e.target.value)}
-              onBlur={() => touch("visitDate")}
-              error={errorFor("visitDate")}
-            />
-            <Input
-              id="registration-time"
-              type="time"
-              label="Visit time"
-              value={values.visitTime}
-              onChange={(e) => update("visitTime", e.target.value)}
-              onBlur={() => touch("visitTime")}
-              error={errorFor("visitTime")}
-            />
-          </div>
         </div>
       </Panel>
 

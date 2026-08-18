@@ -28,9 +28,10 @@ export async function GET(request: Request) {
     }
 
     const search = params.get("search") ?? "";
-    const date = params.get("date") ?? undefined;
+    const startDate = params.get("startDate") ?? undefined;
+    const endDate = params.get("endDate") ?? undefined;
 
-    return jsonOk(await findPatientsForActor(actor, clinicId, search, date));
+    return jsonOk(await findPatientsForActor(actor, clinicId, search, startDate, endDate));
   } catch (error: unknown) {
     return toErrorResponse(error, "GET /api/patients");
   }

@@ -45,6 +45,10 @@ export default auth((req) => {
   const { nextUrl } = req;
   const isSignedIn = Boolean(req.auth);
 
+  if (nextUrl.pathname === "/") {
+    return NextResponse.redirect(new URL(isSignedIn ? DEFAULT_SIGNED_IN_PATH : LOGIN_PATH, nextUrl));
+  }
+
   // FR-1.2 — unauthenticated users are redirected to /login.
   if (!isSignedIn && isProtectedPath(nextUrl.pathname)) {
     return NextResponse.redirect(new URL(LOGIN_PATH, nextUrl));

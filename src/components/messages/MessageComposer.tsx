@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import Input, { Select } from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
 import { cx } from "@/components/ui/cx";
+import { todayDateOnly } from "@/lib/dates";
 
 /**
  * Sending an approved template to patients — PRD §6.9 (FR-9.1).
@@ -43,13 +44,17 @@ export default function MessageComposer({
   const router = useRouter();
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [search, setSearch] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const [matches, setMatches] = useState<PatientMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [recipients, setRecipients] = useState<PatientMatch[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [outcome, setOutcome] = useState<SendMessageResult | null>(null);
+
+  const todayStr = todayDateOnly();
+  const yesterdayStr = todayDateOnly(new Date(Date.now() - 86400000));
 
   const template = templates.find((entry) => entry.id === templateId) ?? null;
 
@@ -60,7 +65,7 @@ export default function MessageComposer({
     // The too-short case is handled inside the timer rather than in the effect
     // body, so nothing sets state synchronously during the effect.
     const handle = setTimeout(async () => {
-      if (!clinicId || (term.length < 2 && !dateFilter)) {
+      if (!clinicId || (term.length < 2 && !startDateFilter && !endDateFilter)) {
         setMatches([]);
         return;
       }
@@ -68,7 +73,7 @@ export default function MessageComposer({
       setIsSearching(true);
       try {
         const response = await fetch(
-          `/api/patients?clinicId=${encodeURIComponent(clinicId)}&search=${encodeURIComponent(term)}&date=${encodeURIComponent(dateFilter)}`,
+          `/api/patients?clinicId=${encodeURIComponent(clinicId)}&search=${encodeURIComponent(term)}&startDate=${encodeURIComponent(startDateFilter)}&endDate=${encodeURIComponent(endDateFilter)}`,
         );
         const payload: { success?: boolean; data?: PatientMatch[] } = await response
           .json()
@@ -82,7 +87,7 @@ export default function MessageComposer({
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(handle);
-  }, [search, dateFilter, clinicId]);
+  }, [search, startDateFilter, endDateFilter, clinicId]);
 
   function addRecipient(patient: PatientMatch) {
     setOutcome(null);
@@ -202,46 +207,55 @@ export default function MessageComposer({
         </Select>
       </div>
 
-      <div className="max-w-md space-y-4">
-        <div>
+      <div className="space-y-6">
+        <div className="max-w-3xl">
           <label className="mb-2 block text-sm font-semibold text-slate-900">
             Filter by visit date
           </label>
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex items-center gap-3 py-1">
             <Button
               type="button"
-              variant={dateFilter === "" ? "commit" : "secondary"}
-              onClick={() => setDateFilter("")}
-              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", dateFilter === "" && "ring-2 ring-primary ring-offset-2")}
+              variant={startDateFilter === "" && endDateFilter === "" ? "commit" : "secondary"}
+              onClick={() => { setStartDateFilter(""); setEndDateFilter(""); }}
+              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === "" && endDateFilter === "" && "ring-2 ring-primary ring-offset-2")}
             >
               Any
             </Button>
             <Button
               type="button"
-              variant={dateFilter === new Date().toISOString().split('T')[0] ? "commit" : "secondary"}
-              onClick={() => setDateFilter(new Date().toISOString().split('T')[0])}
-              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", dateFilter === new Date().toISOString().split('T')[0] && "ring-2 ring-primary ring-offset-2")}
+              variant={startDateFilter === todayStr && endDateFilter === todayStr ? "commit" : "secondary"}
+              onClick={() => { setStartDateFilter(todayStr); setEndDateFilter(todayStr); }}
+              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === todayStr && endDateFilter === todayStr && "ring-2 ring-primary ring-offset-2")}
             >
               Today
             </Button>
             <Button
               type="button"
-              variant={dateFilter === new Date(Date.now() - 86400000).toISOString().split('T')[0] ? "commit" : "secondary"}
-              onClick={() => setDateFilter(new Date(Date.now() - 86400000).toISOString().split('T')[0])}
-              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", dateFilter === new Date(Date.now() - 86400000).toISOString().split('T')[0] && "ring-2 ring-primary ring-offset-2")}
+              variant={startDateFilter === yesterdayStr && endDateFilter === yesterdayStr ? "commit" : "secondary"}
+              onClick={() => { setStartDateFilter(yesterdayStr); setEndDateFilter(yesterdayStr); }}
+              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === yesterdayStr && endDateFilter === yesterdayStr && "ring-2 ring-primary ring-offset-2")}
             >
               Yesterday
             </Button>
-            <input
-              type="date"
-              className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 h-8"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 h-8"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+              />
+              <span className="text-slate-500 text-sm">to</span>
+              <input
+                type="date"
+                className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 h-8"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
-        <div>
+        <div className="max-w-md">
           <Input
             id="composer-search"
             name="search"
@@ -254,7 +268,7 @@ export default function MessageComposer({
               : `Patients at ${clinicName ?? "this clinic"}. Up to ${MAX_RECIPIENTS} per send.`}
           />
 
-          {(search.trim().length >= 2 || dateFilter !== "") && matches.length > 0 && (
+          {(search.trim().length >= 2 || startDateFilter !== "" || endDateFilter !== "") && matches.length > 0 && (
             <div className="mt-2">
               <div className="flex justify-between items-center px-1 mb-1">
                 <span className="text-xs font-medium text-slate-500">{matches.length} patients found</span>
@@ -265,7 +279,8 @@ export default function MessageComposer({
                     setRecipients(matches);
                     setSearch("");
                     setMatches([]);
-                    setDateFilter("");
+                    setStartDateFilter("");
+                    setEndDateFilter("");
                   }}
                   className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
                 >

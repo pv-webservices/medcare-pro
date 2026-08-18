@@ -60,7 +60,9 @@ export function isBefore(startTime: string, endTime: string): boolean {
   return startTime < endTime;
 }
 
-/** Today as "YYYY-MM-DD", in UTC to match how the dates are stored. */
 export function todayDateOnly(now: Date = new Date()): string {
-  return formatDateOnly(now);
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }

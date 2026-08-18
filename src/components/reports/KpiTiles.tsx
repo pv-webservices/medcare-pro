@@ -88,7 +88,7 @@ function RevenueDelta({
 
 export default function KpiTiles({ kpis, period }: KpiTilesProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <Tile label="Total revenue" value={formatRupees(kpis.totalRevenue)}>
         <RevenueDelta
           changePercent={kpis.revenueChangePercent}
@@ -101,12 +101,6 @@ export default function KpiTiles({ kpis, period }: KpiTilesProps) {
         label="Registrations"
         value={String(kpis.registrationCount)}
         hint="Visits recorded in this period"
-      />
-
-      <Tile
-        label="Patients seen"
-        value={String(kpis.patientCount)}
-        hint="Distinct people — a follow-up is not a second patient"
       />
 
       <Tile
