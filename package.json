@@ -7,11 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
+    "stage1:backfill": "tsx scripts/backfill-stage1.mts",
+    "stage1:verify": "tsx scripts/verify-stage1-schema.mts",
     "verify:registrations": "tsx scripts/verify-registrations.mts",
     "verify:reports": "tsx scripts/verify-reports.mts",
     "verify:notifications": "tsx scripts/verify-notifications.mts",
@@ -44,6 +48,7 @@
     "prisma": "^6.19.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

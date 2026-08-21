@@ -36,47 +36,197 @@ datasource db {
 /// The top-level tenant. One signup = one Tenant, which can own many Clinics.
 /// Holds no credentials of its own — see the note on User.passwordHash.
 model Tenant {
-  id           String    @id @default(cuid())
-  businessName String    @map("business_name")
+  id              String    @id @default(cuid())
+  businessName    String    @map("business_name")
   /// Contact address collected at signup, and the address the FR-1.2
   /// verification link is sent to.
-  email        String    @unique
+  email           String    @unique
   /// FR-1.2 / PRD §9 — login is blocked for every User under this Tenant until
   /// this is set. Verification is a property of the business, not of each
   /// individual login, so it lives here and not on User.
   emailVerifiedAt DateTime? @map("email_verified_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
+  // --- Stage 1: platform lifecycle (Owner-controlled) ---------------------
+  /// URL-safe identifier for this organisation. Used for the cosmetic half of
+  /// an invitation link (/invite/<slug>/<token>) and nothing else — the slug is
+  /// NEVER an authorisation input. See src/lib/tenantSlug.ts.
+  ///
+  /// NULLable in Stage 1 and no further. The backfill generates one for every
+  /// existing tenant and the constrain migration adds the UNIQUE index, but the
+  /// column stays nullable because making it required would change the type of
+  /// prisma.tenant.create() and force an edit to api/auth/signup — which is out
+  /// of scope for Stage 1. Stage 3 rewrites signup to generate a slug, and
+  /// tightens this to NOT NULL at the same time.
+  slug       String?
+  /// Owner-controlled approval lifecycle. A tenant is unusable until ACTIVE.
+  /// Only src/lib/platform/* may write this — see the note on
+  /// User.accountStatus about the two statuses never being merged.
+  status     TenantStatus @default(PENDING)
+  /// True for the single reserved row that exists solely so Platform Owner
+  /// users can satisfy the non-null users.tenant_id foreign key. It is NOT a
+  /// customer: every customer-facing query must filter isPlatform = false.
+  /// Compose src/lib/platformTenant.ts's CUSTOMER_TENANT_WHERE rather than
+  /// spelling the filter out by hand.
+  isPlatform Boolean      @default(false) @map("is_platform")
+  /// The plan whose PlanFeature rows form this tenant's baseline entitlement.
+  /// Restrict, not SetNull: retiring a plan that tenants still sit on would
+  /// silently strip every feature they are paying for. Retire via Plan.isActive.
+  planId     String?      @map("plan_id")
+
+  /// Registration details collected at signup (FR-1.1 collects only
+  /// businessName + email today; these are the Stage 3 additions).
+  city                String?
+  phone               String?
+  address             String?   @db.Text
+  /// Optional, and INTENTIONALLY different from 'email': 'email' is the
+  /// organisation's identity — unique, the login resolution key, and the
+  /// address FR-1.2 verification is sent to. This one is a display/notification
+  /// address a business may want to differ (e.g. billing@). It is never used
+  /// for identity, login, or verification.
+  primaryContactEmail String?   @map("primary_contact_email")
+  /// Stage 3 requires an explicit terms/privacy consent at registration.
+  termsAcceptedAt     DateTime? @map("terms_accepted_at")
+
+  /// Approval / rejection / suspension actors are denormalised pointers for
+  /// display. The authoritative, append-only record of who did what is
+  /// AuditLog — which is why these are SetNull while AuditLog is Restrict.
+  approvedById     String?   @map("approved_by_id")
+  approvedAt       DateTime? @map("approved_at")
+  rejectedById     String?   @map("rejected_by_id")
+  rejectedAt       DateTime? @map("rejected_at")
+  rejectionReason  String?   @map("rejection_reason") @db.Text
+  suspendedById    String?   @map("suspended_by_id")
+  suspendedAt      DateTime? @map("suspended_at")
+  suspensionReason String?   @map("suspension_reason") @db.Text
+
+  /// NOT NULL here because this schema is the FINAL state. @updatedAt emits a
+  /// NOT NULL column with no default, which MySQL cannot add to a table that
+  /// already holds rows — so the expand migration adds it nullable, the backfill
+  /// sets it to created_at, and the constrain migration makes it NOT NULL.
+  updatedAt         DateTime                @updatedAt @map("updated_at")
   users             User[]
   roles             Role[]
   clinics           Clinic[]
   patients          Patient[]
   notifications     Notification[]
   whatsappTemplates WhatsappTemplate[]
+  plan              Plan?                   @relation(fields: [planId], references: [id], onDelete: Restrict)
+  approvedBy        User?                   @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy        User?                   @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  suspendedBy       User?                   @relation("TenantSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
+  featureOverrides  TenantFeatureOverride[]
+  invitations       Invitation[]
+  sessions          AppSession[]
+  auditLogs         AuditLog[]
 
+  /// Enforced from the constrain migration onward, once the backfill has
+  /// generated and validated a slug for every existing row.
+  @@unique([slug])
+  @@index([status])
+  @@index([isPlatform])
+  @@index([planId])
+  @@index([approvedById])
+  @@index([rejectedById])
+  @@index([suspendedById])
   @@map("tenants")
 }
 
 /// A login within a Tenant. Signup creates exactly one of these (the owner);
 /// further users are invited by an Owner/Admin.
 model User {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  name      String?
-  email     String   @unique
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  name         String?
+  email        String   @unique
   /// The only password hash in the schema. PRD §7 also lists one on `accounts`,
   /// but a Tenant is an organisation, not something that logs in — credentials
   /// live solely on User and login always resolves via User.email.
-  passwordHash String @map("password_hash")
-  createdAt DateTime @default(now()) @map("created_at")
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  userRoles           UserRole[]
+  // --- Stage 1: identity, status and platform role ------------------------
+  phone           String?
+  /// Verification of THIS individual's address, distinct from
+  /// Tenant.emailVerifiedAt which verifies the organisation's address.
+  ///   - the first Tenant Admin needs both;
+  ///   - an invited team member needs only their own.
+  /// Backfilled from the owning tenant for pre-Stage-1 users, as a documented
+  /// grandfathering decision. A newly invited member is NEVER treated as
+  /// verified without their own confirmation.
+  emailVerifiedAt DateTime? @map("email_verified_at")
+
+  /// PLATFORM-controlled account status. Written ONLY by src/lib/platform/*.
+  /// A Tenant Admin must never be able to change this.
+  accountStatus    UserAccountStatus @default(PENDING) @map("account_status")
+  /// TENANT-controlled access status, managed by the Tenant Admin.
+  /// Platform Owner code must never silently clear it.
+  ///
+  /// The two are deliberately NOT merged. Access requires BOTH to be ACTIVE
+  /// (src/lib/accessStatus.ts), so a user the Owner suspended cannot regain
+  /// access just because a Tenant Admin flips membershipStatus back to ACTIVE,
+  /// and vice versa. Merging them would let each side undo the other.
+  membershipStatus MembershipStatus  @default(PENDING) @map("membership_status")
+
+  /// Null = an ordinary customer user, which is almost everyone. Never
+  /// settable through any customer-facing API; set only by the guarded
+  /// create-owner provisioning command (Stage 2).
+  platformRole PlatformRole? @map("platform_role")
+  lastLoginAt  DateTime?     @map("last_login_at")
+
+  /// Denormalised display pointers; AuditLog holds the authoritative trail.
+  approvedById     String?   @map("approved_by_id")
+  approvedAt       DateTime? @map("approved_at")
+  rejectedById     String?   @map("rejected_by_id")
+  rejectedAt       DateTime? @map("rejected_at")
+  rejectionReason  String?   @map("rejection_reason") @db.Text
+  suspendedById    String?   @map("suspended_by_id")
+  suspendedAt      DateTime? @map("suspended_at")
+  suspensionReason String?   @map("suspension_reason") @db.Text
+  removedAt        DateTime? @map("removed_at")
+
+  /// Added nullable, backfilled, then constrained — see the note on
+  /// Tenant.updatedAt for the three-step path.
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  userRoles            UserRole[]
   registrationsCreated Registration[]        @relation("RegistrationCreatedBy")
   registrationEdits    RegistrationEditLog[]
 
+  // --- Stage 1 relations ---------------------------------------------------
+  approvedBy  User? @relation("UserApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy  User? @relation("UserRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  suspendedBy User? @relation("UserSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
+
+  usersApproved  User[] @relation("UserApprovedBy")
+  usersRejected  User[] @relation("UserRejectedBy")
+  usersSuspended User[] @relation("UserSuspendedBy")
+
+  tenantsApproved  Tenant[] @relation("TenantApprovedBy")
+  tenantsRejected  Tenant[] @relation("TenantRejectedBy")
+  tenantsSuspended Tenant[] @relation("TenantSuspendedBy")
+
+  sessions        AppSession[] @relation("SessionUser")
+  sessionsRevoked AppSession[] @relation("SessionRevokedBy")
+  loginCodes      LoginCode[]
+
+  invitationsSent     Invitation[] @relation("InvitationInvitedBy")
+  invitationsRevoked  Invitation[] @relation("InvitationRevokedBy")
+  invitationsAccepted Invitation[] @relation("InvitationAcceptedBy")
+
+  rolesAssigned          UserRole[]              @relation("UserRoleAssignedBy")
+  featureFlagsChanged    Feature[]               @relation("FeatureGlobalChangedBy")
+  tenantOverridesChanged TenantFeatureOverride[] @relation("TenantOverrideChangedBy")
+  auditLogs              AuditLog[]
+
   @@index([tenantId])
+  @@index([accountStatus])
+  @@index([membershipStatus])
+  @@index([platformRole])
+  @@index([approvedById])
+  @@index([rejectedById])
+  @@index([suspendedById])
   @@map("users")
 }
 
@@ -87,8 +237,23 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
+  /// Which flow issued this token: "TENANT_EMAIL" verifies the organisation's
+  /// address (Tenant.emailVerifiedAt), "USER_EMAIL" verifies one individual
+  /// (User.emailVerifiedAt). At signup the two addresses are identical, so
+  /// without this discriminator a token minted for one flow could be redeemed
+  /// by the other. Consumption must require the expected purpose (Stage 3).
+  ///
+  /// A String rather than an enum: the column default backfills every existing
+  /// row correctly, and the accepted values are pinned in TypeScript by
+  /// VERIFICATION_PURPOSES in src/lib/verificationPurpose.ts (Stage 3).
+  purpose    String   @default("TENANT_EMAIL")
 
   @@unique([identifier, token])
+  /// A plain index, NOT a unique: the existing @unique(token) and
+  /// @@unique([identifier, token]) above are preserved exactly, and adding
+  /// uniqueness here would forbid a tenant and its owner — who share an
+  /// address — from holding one outstanding token each.
+  @@index([identifier, purpose])
   @@map("verification_tokens")
 }
 
@@ -99,19 +264,44 @@ model VerificationToken {
 /// Custom and extensible per tenant. Owner/Admin/Staff are seeded defaults
 /// (prisma/seed.ts), not a hardcoded enum — PRD §4.
 model Role {
-  id       String @id @default(cuid())
-  tenantId String @map("tenant_id")
-  name     String
+  id          String @id @default(cuid())
+  tenantId    String @map("tenant_id")
+  name        String
   /// Array of permission strings, e.g. ["registration:edit", "doctor:create"].
   /// Checked server-side by lib/rbac.ts on every mutating request.
   permissions Json
 
+  // --- Stage 1: role metadata ----------------------------------------------
+  /// Stable machine identifier for a seeded role, so code never has to match a
+  /// display name a tenant is free to rename. NULL for custom roles.
+  ///
+  /// It is metadata for migration and seeding ONLY. Authorisation is decided by
+  /// the permissions array, never by this key and never by name — the Clinic
+  /// Admin check in Stage 6/7 is a permission check, not a name comparison.
+  key         String?
+  description String? @db.Text
+  /// True for the seeded set. Reserved for a future "cannot be deleted" rule;
+  /// nothing enforces it in Stage 1.
+  isSystem    Boolean @default(false) @map("is_system")
+
+  /// Added nullable, backfilled from the owning tenant's created_at (an
+  /// approximation — the true creation time was never recorded), then
+  /// constrained to NOT NULL.
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  userRoles UserRole[]
+  userRoles     UserRole[]
+  featureAccess RoleFeatureAccess[]
+  invitations   Invitation[]
 
   /// Role names are unique within a tenant, not globally.
   @@unique([tenantId, name])
+  /// Added by the constrain migration. MySQL treats NULLs as distinct, so any
+  /// number of custom roles (key = NULL) coexist under one tenant — which is
+  /// the wanted behaviour here, unlike the user_roles case noted below.
+  @@unique([tenantId, key])
   @@index([tenantId])
   @@map("roles")
 }
@@ -120,19 +310,33 @@ model Role {
 /// A null `clinic_id` means the assignment is tenant-wide. A user may hold
 /// different roles in different clinics under the same tenant.
 model UserRole {
-  id       String  @id @default(cuid())
-  userId   String  @map("user_id")
-  roleId   String  @map("role_id")
-  clinicId String? @map("clinic_id")
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  roleId       String   @map("role_id")
+  /// Stage 1, additive. NULL on every pre-existing row: the original actor was
+  /// never recorded and is not invented here.
+  assignedById String?  @map("assigned_by_id")
+  /// Stage 1, additive. Backfilled to the owning user's created_at, which is an
+  /// approximation, not the true assignment time.
+  createdAt    DateTime @default(now()) @map("created_at")
+  clinicId     String?  @map("clinic_id")
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   role   Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
   clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
+  assignedBy User? @relation("UserRoleAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
   @@unique([userId, roleId, clinicId])
   @@index([userId])
   @@index([roleId])
   @@index([clinicId])
+  /// KNOWN QUIRK, deliberately left alone in Stage 1: MySQL treats NULLs as
+  /// distinct, so the unique above does NOT prevent two identical tenant-wide
+  /// rows. lib/roles.ts checks for that explicitly before inserting. Fixing it
+  /// at the database level would need a sentinel value or a generated column —
+  /// migration risk for no functional gain.
+  @@index([assignedById])
   @@map("user_roles")
 }
 
@@ -141,14 +345,14 @@ model UserRole {
 // ---------------------------------------------------------------------------
 
 model Clinic {
-  id       String  @id @default(cuid())
-  tenantId String  @map("tenant_id")
-  name     String
-  address  String? @db.Text
-  city     String?
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  name       String
+  address    String?  @db.Text
+  city       String?
   /// FR-8.3 / FR-8.4 — per-clinic branding overrides.
-  logoUrl    String? @map("logo_url") @db.LongText
-  themeColor String? @map("theme_color") @db.VarChar(9)
+  logoUrl    String?  @map("logo_url") @db.LongText
+  themeColor String?  @map("theme_color") @db.VarChar(9)
   createdAt  DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -159,6 +363,7 @@ model Clinic {
   notifications    Notification[]
   whatsappMessages WhatsappMessage[]
   userRoles        UserRole[]
+  invitations      Invitation[]
 
   @@index([tenantId])
   @@map("clinics")
@@ -175,9 +380,9 @@ model Doctor {
   department String
   /// Free-text rather than an enum: the PRD does not fix the accepted values,
   /// and locking them here would require a migration to add one.
-  gender String?
-  age    Int?
-  phone  String?
+  gender     String?
+  age        Int?
+  phone      String?
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -195,13 +400,13 @@ model Doctor {
 
 /// FR-4.3 — calendar-based availability: a specific date plus a time range.
 model DoctorAvailability {
-  id       String   @id @default(cuid())
-  doctorId String   @map("doctor_id")
-  date     DateTime @db.Date
+  id        String   @id @default(cuid())
+  doctorId  String   @map("doctor_id")
+  date      DateTime @db.Date
   /// 24h "HH:mm" clock time. Stored as a string rather than DateTime so a slot
   /// carries no spurious date/timezone component.
-  startTime String @map("start_time") @db.VarChar(5)
-  endTime   String @map("end_time") @db.VarChar(5)
+  startTime String   @map("start_time") @db.VarChar(5)
+  endTime   String   @map("end_time") @db.VarChar(5)
 
   doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
@@ -232,22 +437,22 @@ model DoctorLeave {
 // ---------------------------------------------------------------------------
 
 model Patient {
-  id       String @id @default(cuid())
+  id           String   @id @default(cuid())
   /// Denormalised from `clinic.tenant_id` purely so the tenant-wide uniqueness
   /// of `patient_code` can be enforced by the database (see @@unique below)
   /// rather than only by application convention. Keep it in step with the
   /// owning clinic's tenant on every write.
-  tenantId String @map("tenant_id")
-  clinicId String @map("clinic_id")
+  tenantId     String   @map("tenant_id")
+  clinicId     String   @map("clinic_id")
   /// FR-3.1 format `PT-YYYY-####`, generated server-side, sequential, and
   /// unique tenant-wide (not per clinic) per PRD §10. Generated in exactly one
   /// place: lib/generatePatientCode.ts.
-  patientCode  String  @map("patient_code")
+  patientCode  String   @map("patient_code")
   name         String
   age          Int?
   gender       String?
-  mobileNumber String  @map("mobile_number")
-  address      String? @db.Text
+  mobileNumber String   @map("mobile_number")
+  address      String?  @db.Text
   city         String?
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -312,17 +517,17 @@ model Registration {
 /// not even by an Owner (PRD §9 Audit integrity). Readable only by Owner/Admin
 /// roles, enforced in the API response and not merely by hiding the UI tab.
 model RegistrationEditLog {
-  id             String @id @default(cuid())
-  registrationId String @map("registration_id")
-  editedByUserId String @map("edited_by_user_id")
+  id             String   @id @default(cuid())
+  registrationId String   @map("registration_id")
+  editedByUserId String   @map("edited_by_user_id")
   /// The editor's role name captured at edit time. Denormalised on purpose —
   /// if the user's role is changed or revoked later, the log must still show
   /// what they held when they made the edit.
-  roleAtTime String @map("role_at_time")
+  roleAtTime     String   @map("role_at_time")
   /// Per-field before/after values, e.g.
   /// {"amount":{"from":"500.00","to":"750.00"}}
-  changedFields Json     @map("changed_fields")
-  timestamp     DateTime @default(now())
+  changedFields  Json     @map("changed_fields")
+  timestamp      DateTime @default(now())
 
   /// Cascade only because a deleted registration's log has nothing left to
   /// describe. Nothing in the app deletes registrations today.
@@ -339,17 +544,17 @@ model RegistrationEditLog {
 // ---------------------------------------------------------------------------
 
 model Notification {
-  id       String  @id @default(cuid())
-  tenantId String  @map("tenant_id")
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
   /// Null = a tenant-wide notification not tied to any single clinic.
-  clinicId String? @map("clinic_id")
+  clinicId        String?  @map("clinic_id")
   /// e.g. "registration.updated", "doctor.created".
   type            String
-  message         String  @db.Text
+  message         String   @db.Text
   /// Id of the record the notification refers to. Intentionally not a foreign
   /// key: it points at whichever table `type` names.
-  relatedRecordId String? @map("related_record_id")
-  read            Boolean @default(false)
+  relatedRecordId String?  @map("related_record_id")
+  read            Boolean  @default(false)
   createdAt       DateTime @default(now()) @map("created_at")
 
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -376,18 +581,18 @@ model Notification {
 /// every clinic under it sends the same approved text. `body` carries
 /// {placeholder} tokens filled from the patient and registration at send time.
 model WhatsappTemplate {
-  id       String @id @default(cuid())
-  tenantId String @map("tenant_id")
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
   /// Stored verbatim into `whatsapp_messages.template_name` on every send, so
   /// history stays readable even after a template is renamed or deleted.
-  name String
-  body String @db.Text
+  name      String
+  body      String   @db.Text
   /// Optional footer line, passed through to the gateway.
-  footer String?
+  footer    String?
   /// Set together to send as media rather than text: `media_type` is one of
   /// image, video, audio, document and `media_url` must be a direct link.
-  mediaType String? @map("media_type")
-  mediaUrl  String? @map("media_url")
+  mediaType String?  @map("media_type")
+  mediaUrl  String?  @map("media_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -400,13 +605,13 @@ model WhatsappTemplate {
 }
 
 model WhatsappMessage {
-  id        String @id @default(cuid())
-  clinicId  String @map("clinic_id")
-  patientId String @map("patient_id")
+  id                String   @id @default(cuid())
+  clinicId          String   @map("clinic_id")
+  patientId         String   @map("patient_id")
   /// FR-9.1 — the WhatsappTemplate name this send used. Denormalised rather
   /// than a foreign key: history must survive the template being renamed or
   /// deleted, the same reasoning as `registration_edit_log.role_at_time`.
-  templateName String @map("template_name")
+  templateName      String   @map("template_name")
   /// FR-9.2 — status as reported by the gateway. Free text rather than an enum
   /// because the provider defines its own states.
   ///
@@ -414,17 +619,17 @@ model WhatsappMessage {
   /// no delivery-status callback — so in practice this holds `sent` (the
   /// gateway accepted it) or `failed`. It is NOT a WhatsApp delivered/read
   /// receipt, and the UI says so rather than implying one.
-  status String
+  status            String
   /// The WhatsApp message id, read from the gateway's `full=1` response at
   /// `data.key.id`. Unique so a future delivery-status callback can be made
   /// idempotent (see the secure-webhooks skill) — the same event can arrive
   /// more than once.
-  providerMessageId String? @unique @map("provider_message_id")
+  providerMessageId String?  @unique @map("provider_message_id")
   /// The gateway's `msg` when a send failed — "device not connected", an
   /// invalid number, quota exhausted. Without it the front desk sees a red row
   /// and has no idea what to do next.
-  failureReason String?  @map("failure_reason") @db.Text
-  sentAt        DateTime @default(now()) @map("sent_at")
+  failureReason     String?  @map("failure_reason") @db.Text
+  sentAt            DateTime @default(now()) @map("sent_at")
 
   clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -433,4 +638,489 @@ model WhatsappMessage {
   @@index([patientId])
   @@index([clinicId, sentAt])
   @@map("whatsapp_messages")
+}
+
+// ===========================================================================
+// STAGE 1 — platform ownership, sessions, invitations, entitlements, audit
+//
+// Everything below this line is added by Stage 1 and is NOT wired into any
+// runtime code path yet: the schema foundation lands first, the enforcement
+// follows in Stages 2-8. Nothing here changes how an existing request is
+// authorised today.
+//
+// Vocabulary, fixed for all new code:
+//   Tenant   = the customer / clinic organisation (the thing that registers,
+//              is approved, holds a plan, and is entitled to features)
+//   Clinic   = an operational site beneath a Tenant
+//   UserRole = the existing user-to-tenant role, optionally narrowed to one
+//              Clinic. This IS the membership mechanism; there is deliberately
+//              no separate Membership table.
+//
+// CURRENT-SCHEMA LIMITATION, recorded here so it is discoverable at the point
+// of change: `users.tenant_id` is non-null, so one User belongs to exactly one
+// Tenant. Supporting a person who works for several organisations would need a
+// separate Membership table and a rewrite of every `actor.tenantId` call site.
+// That is explicitly NOT designed for here.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Closed lifecycle and security states.
+//
+// These are native enums, departing from the String convention used for
+// `visit_type`, `gender` and `whatsapp_messages.status` above. That convention
+// exists because those are OPEN sets a clinic may extend without a migration.
+// These are CLOSED sets guarding access: an unrecognised value must never be
+// interpretable as "active" or "authorised", so the database rejects it.
+//
+// MIGRATION COST of adding a value later: each addition is an
+// `ALTER TABLE ... MODIFY COLUMN ENUM(...)` on every table using the enum,
+// which rewrites the column definition and takes a metadata lock. Cheap at this
+// scale. REMOVING or renaming a value is breaking and needs a data backfill
+// first. Accept that cost only for states that genuinely gate access.
+// ---------------------------------------------------------------------------
+
+/// Platform staff. Absent (NULL) on every ordinary customer user.
+enum PlatformRole {
+  SUPER_ADMIN
+  /// Reserved for Stage 13. Nothing grants it yet.
+  SUPPORT_ADMIN
+}
+
+/// Owner-controlled lifecycle of a customer organisation.
+enum TenantStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+  ARCHIVED
+}
+
+/// Owner-controlled lifecycle of an individual login.
+enum UserAccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+/// Tenant-Admin-controlled lifecycle of a person's access to their tenant.
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+  REMOVED
+}
+
+enum InvitationStatus {
+  CREATED
+  OPENED
+  EXPIRED
+  REVOKED
+  ACCEPTED
+}
+
+enum FeatureTier {
+  CORE
+  PREMIUM
+  BETA
+  INTERNAL
+}
+
+// ---------------------------------------------------------------------------
+// Sessions — Stage 2/4.
+//
+// NOT an Auth.js database session. Auth.js only supports the JWT strategy with
+// the Credentials provider, so this is our own registry alongside it: login
+// mints a row here and puts its id in the JWT as `sid`. requireActor() then
+// re-checks the row on every request, which is what makes revocation, "sign out
+// all devices", and immediate lockout on suspension possible at all — a signed
+// JWT on its own is valid until it expires and cannot be withdrawn.
+//
+// Authorisation claims are never read from the JWT. The JWT carries an opaque
+// pointer; the database is the authority.
+// ---------------------------------------------------------------------------
+model AppSession {
+  /// The value carried as the `sid` JWT claim. A missing or unknown sid must be
+  /// treated as unauthenticated, never as "skip the check".
+  id String @id @default(cuid())
+
+  userId   String @map("user_id")
+  /// Denormalised from the user so an Owner can revoke a whole organisation's
+  /// sessions in one statement without a join.
+  tenantId String @map("tenant_id")
+
+  /// Only lengthens the session's own expiry. It NEVER means "remember the
+  /// six-digit code" — codes are single-use and short-lived regardless.
+  rememberMe Boolean @default(false) @map("remember_me")
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  expiresAt  DateTime @map("expires_at")
+
+  revokedAt    DateTime? @map("revoked_at")
+  revokedById  String?   @map("revoked_by_id")
+  revokeReason String?   @map("revoke_reason") @db.Text
+
+  /// IPv6 fits in 45 characters.
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
+  user      User   @relation("SessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  revokedBy User?  @relation("SessionRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([expiresAt])
+  /// The hot path: "is this sid still live for this user?"
+  @@index([userId, revokedAt])
+  @@index([revokedById])
+  @@map("app_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Six-digit login codes — Stage 4.
+//
+// Generated by our own backend with node:crypto, never by an external OTP
+// vendor. The plaintext code is mailed and then discarded: it is never stored,
+// never logged, and never placed in a URL.
+// ---------------------------------------------------------------------------
+model LoginCode {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+
+  /// Hash of the six-digit code. Sized at 255 so Stage 4 can choose between a
+  /// bcrypt hash (60 chars) and an HMAC-SHA256 digest (64 chars).
+  ///
+  /// A six-digit code carries only ~20 bits of entropy, so a plain unsalted
+  /// SHA-256 of it is reversible from a database dump by brute force in
+  /// milliseconds. Stage 4 must therefore use either bcrypt or HMAC-SHA256
+  /// keyed with a server-side pepper that does NOT live in this database.
+  codeHash String @map("code_hash") @db.VarChar(255)
+
+  expiresAt    DateTime  @map("expires_at")
+  /// Set the moment the code is redeemed. Single use: a consumed row can never
+  /// satisfy another verification.
+  consumedAt   DateTime? @map("consumed_at")
+  /// Incremented on every failed verification; the code dies past the limit.
+  attemptCount Int       @default(0) @map("attempt_count")
+
+  requestIp String?  @map("request_ip") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "The newest unconsumed code for this user" — the lookup every verify does.
+  @@index([userId, consumedAt])
+  /// Sweeping expired rows.
+  @@index([expiresAt])
+  @@map("login_codes")
+}
+
+// ---------------------------------------------------------------------------
+// Invitations — Stage 5.
+//
+// Created by a Tenant Admin for their OWN tenant. Owner approval is deliberately
+// not part of this flow: routine staff onboarding belongs to the tenant.
+// ---------------------------------------------------------------------------
+model Invitation {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+
+  /// Optional narrowing to one operational site, mirroring UserRole.clinicId
+  /// exactly: NULL invites the person tenant-wide, a value invites them to that
+  /// clinic. On acceptance this becomes the new UserRole.clinicId.
+  ///
+  /// It narrows scope; it never SUPPLIES authority. Tenant authorisation is
+  /// resolved from tenantId, and acceptance is authorised by tokenHash alone.
+  clinicId String? @map("clinic_id")
+
+  /// Optional target address. When set, only that address may accept.
+  email  String?
+  /// The role proposed by the inviter. The Tenant Admin can still change it at
+  /// approval time (Stage 6), so this is a proposal, not a grant.
+  roleId String  @map("role_id")
+
+  /// SHA-256 of a cryptographically random token. The raw token exists only in
+  /// the invitation email; a database leak yields no usable invitation link.
+  /// THIS is the only thing that authorises acceptance — never the tenant slug
+  /// in the URL, which is cosmetic.
+  tokenHash String @map("token_hash") @db.VarChar(64)
+
+  status    InvitationStatus @default(CREATED)
+  expiresAt DateTime         @map("expires_at")
+
+  invitedById String?  @map("invited_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  openedAt         DateTime? @map("opened_at")
+  acceptedAt       DateTime? @map("accepted_at")
+  /// The user created (or matched) by accepting. This is the ONE authoritative
+  /// direction of the user-invitation link: there is deliberately no
+  /// `User.acceptedInvitationId`, because two foreign keys between the same
+  /// pair of tables can disagree with each other.
+  acceptedByUserId String?   @map("accepted_by_user_id")
+  revokedAt        DateTime? @map("revoked_at")
+  revokedById      String?   @map("revoked_by_id")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  /// Restrict: deleting a role must not leave a pending invitation pointing at
+  /// nothing, which would either fail or silently grant the wrong access.
+  role   Role    @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  invitedBy      User? @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  revokedBy      User? @relation("InvitationRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+  acceptedByUser User? @relation("InvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  /// Unique so a token resolves to exactly one invitation, and so a replayed
+  /// token cannot match a second row.
+  @@unique([tokenHash])
+  @@index([tenantId, status])
+  @@index([email])
+  @@index([roleId])
+  @@index([clinicId])
+  @@index([acceptedByUserId])
+  @@index([invitedById])
+  @@index([revokedById])
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Feature entitlements — Stage 8.
+//
+// Four layers, resolved in this order (src/lib/featureResolution.ts):
+//
+//   1. Feature.globalEnabled       — Owner kill switch, platform-wide
+//   2. PlanFeature                 — the tenant's plan baseline
+//      + TenantFeatureOverride     — an explicit per-tenant grant or revoke,
+//                                    which OVERRIDES the plan in both directions
+//   3. RoleFeatureAccess           — the Tenant Admin's per-role choice
+//   4. the action permission        — lib/rbac.ts, unchanged
+//
+// Layers 1 and 2 belong to the Owner; layer 3 belongs to the Tenant Admin. A
+// Tenant Admin therefore cannot reach past a global kill switch or grant a
+// feature the tenant is not entitled to: layer 3 is an AND, never a fallback.
+//
+// Role ACTION permissions (lib/permissions.ts) and feature ENTITLEMENTS are
+// deliberately separate systems. A permission says what an action is; an
+// entitlement says whether the organisation bought the module it lives in.
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id          String   @id @default(cuid())
+  /// Stable machine key, e.g. "standard". Referenced by seeds and code.
+  key         String
+  name        String
+  description String?  @db.Text
+  /// Retire a plan by clearing this rather than deleting the row — tenants
+  /// point at it, and the foreign key is Restrict for exactly that reason.
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenants  Tenant[]
+  features PlanFeature[]
+
+  @@unique([key])
+  @@map("plans")
+}
+
+model Feature {
+  id          String      @id @default(cuid())
+  /// Stable machine key, e.g. "registrations". Code checks this, never `name`.
+  key         String
+  name        String
+  description String?     @db.Text
+  tier        FeatureTier @default(CORE)
+
+  /// Layer 1 — the Owner's platform-wide kill switch. False disables the
+  /// feature for EVERY tenant regardless of plan or override. No Tenant Admin
+  /// can reach past it.
+  globalEnabled      Boolean   @default(true) @map("global_enabled")
+  /// Who last flipped the switch and why. Stage 9 requires a reason for a
+  /// manual change; the full history lives in AuditLog, not here.
+  globalChangedById  String?   @map("global_changed_by_id")
+  globalChangedAt    DateTime? @map("global_changed_at")
+  globalChangeReason String?   @map("global_change_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  globalChangedBy User? @relation("FeatureGlobalChangedBy", fields: [globalChangedById], references: [id], onDelete: SetNull)
+
+  plans           PlanFeature[]
+  tenantOverrides TenantFeatureOverride[]
+  roleAccess      RoleFeatureAccess[]
+
+  @@unique([key])
+  @@index([tier])
+  @@index([globalEnabled])
+  @@index([globalChangedById])
+  @@map("features")
+}
+
+/// Layer 2a — what a plan includes by default.
+model PlanFeature {
+  id        String   @id @default(cuid())
+  planId    String   @map("plan_id")
+  featureId String   @map("feature_id")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureId])
+  @@index([featureId])
+  @@map("plan_features")
+}
+
+/// Layer 2b — an Owner's explicit decision for ONE tenant, which overrides the
+/// plan in both directions: it can grant a feature the plan omits, and revoke
+/// one the plan includes.
+model TenantFeatureOverride {
+  id        String  @id @default(cuid())
+  tenantId  String  @map("tenant_id")
+  featureId String  @map("feature_id")
+  enabled   Boolean
+
+  /// Required, not optional: a manual override that contradicts the plan must
+  /// carry an explanation, or nobody can tell later whether it was deliberate.
+  reason      String   @db.Text
+  changedById String?  @map("changed_by_id")
+  changedAt   DateTime @default(now()) @map("changed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  feature   Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation("TenantOverrideChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, featureId])
+  @@index([featureId])
+  @@index([changedById])
+  @@map("tenant_feature_overrides")
+}
+
+/// Layer 3 — the Tenant Admin's per-role choice, within what the tenant already
+/// has. Writing a row here can only ever NARROW access: the tenant entitlement
+/// is checked first and independently.
+///
+/// DEFAULT WHEN NO ROW EXISTS: the role inherits the tenant entitlement.
+/// Absence means "the Tenant Admin has expressed no opinion", not "denied".
+/// Deny-by-default would require a row for every (role x feature) pair and
+/// would silently lock out every role the moment a new feature is added.
+model RoleFeatureAccess {
+  id        String   @id @default(cuid())
+  roleId    String   @map("role_id")
+  featureId String   @map("feature_id")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  feature Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, featureId])
+  @@index([featureId])
+  @@map("role_feature_access")
+}
+
+// ---------------------------------------------------------------------------
+// Application audit log — Stage 11.
+//
+// APPEND-ONLY, the same contract as registration_edit_log: never updated,
+// never deleted, not even by an Owner.
+//
+// Stage 1 establishes the table only; nothing writes to it yet.
+//
+// NEVER put in `beforeValue`, `afterValue` or `reason`:
+//   plaintext login codes, invitation tokens, password hashes, patient records,
+//   or any clinical detail. This table is read by platform staff across every
+//   tenant, so it must carry decisions, not data.
+// ---------------------------------------------------------------------------
+model AuditLog {
+  id String @id @default(cuid())
+
+  /// Null for an action taken by the system rather than a person.
+  actorUserId       String?       @map("actor_user_id")
+  /// Captured at the time of the action and denormalised on purpose: if the
+  /// actor's platform role changes later, the log must still show what they
+  /// held when they acted. Same reasoning as registration_edit_log.role_at_time.
+  actorPlatformRole PlatformRole? @map("actor_platform_role")
+  /// The tenant the actor was acting within, or null for a platform-wide action.
+  actorTenantId     String?       @map("actor_tenant_id")
+
+  /// e.g. "CLINIC_APPROVED", "LOGIN_FAILED", "ROLE_CHANGED".
+  action     String  @db.VarChar(64)
+  /// e.g. "Tenant", "User", "Invitation".
+  targetType String  @map("target_type") @db.VarChar(64)
+  /// Not a foreign key: it points at whichever table `targetType` names.
+  targetId   String? @map("target_id")
+
+  beforeValue Json?   @map("before_value")
+  afterValue  Json?   @map("after_value")
+  reason      String? @db.Text
+
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+  requestId String? @map("request_id") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// Restrict on both, matching registration_edit_log.edited_by. An audit trail
+  /// that a delete can erase is not an audit trail. The consequence is
+  /// deliberate: tenants and users are ARCHIVED, never hard-deleted.
+  actor       User?   @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorTenant Tenant? @relation(fields: [actorTenantId], references: [id], onDelete: Restrict)
+
+  @@index([actorTenantId, createdAt])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting — Stage 4/12 foundation.
+//
+// Durable and database-backed rather than in-process, so a restart cannot reset
+// an attacker's counter. No Redis: PRD section 11 rules out stacking another
+// paid vendor, and this is one indexed row per subject.
+//
+// KNOWN CEILING: a single MySQL table serialises writes on the hottest keys and
+// will become a bottleneck under real load or across multiple app instances.
+// The interface Stage 4 builds on top must stay swappable so it can be moved to
+// Redis or an in-memory tier later without touching the call sites.
+//
+// Stage 1 establishes the table only; nothing reads or writes it yet.
+// ---------------------------------------------------------------------------
+model RateLimitBucket {
+  id String @id @default(cuid())
+
+  /// The throttled subject, namespaced by dimension so one table serves all of
+  /// them, e.g. "login-code:request:email:a@b.com", "login-code:verify:ip:1.2.3.4",
+  /// "invite:create:tenant:<id>". Stage 4 owns the key format.
+  key String
+
+  windowStartedAt DateTime  @map("window_started_at")
+  count           Int       @default(0)
+  /// Set when a subject trips the limit; requests are refused until it passes.
+  blockedUntil    DateTime? @map("blocked_until")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Unique so an increment can be a single atomic upsert rather than a
+  /// read-then-write race between two concurrent login attempts.
+  @@unique([key])
+  @@index([blockedUntil])
+  @@index([windowStartedAt])
+  @@map("rate_limit_buckets")
 }

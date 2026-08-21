@@ -152,6 +152,22 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         label: "View revenue reports",
         description: "See revenue totals, KPIs and the growth graph.",
       },
+      {
+        key: "reports:view",
+        label: "View reports",
+        description: "See the revenue report.",
+        pending: "covered-elsewhere",
+        pendingNote:
+          "report:read is the permission the reports page and API actually check. This key exists so the newer reports:* naming resolves, but granting it alone opens nothing.",
+      },
+      {
+        key: "reports:export",
+        label: "Export reports",
+        description: "Download report data as CSV.",
+        pending: "stage",
+        pendingNote:
+          "Export is gated by report:read today; a separate export gate arrives in Stage 7.",
+      },
     ],
   },
   {
@@ -195,6 +211,106 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         description:
           "Create roles, change their permissions, and assign them to users.",
       },
+      {
+        key: "settings:view",
+        label: "View settings",
+        description: "See this organisation's settings.",
+        pending: "stage",
+        pendingNote:
+          "Clinic settings arrive in Stage 10. Branding is gated by clinic:edit today.",
+      },
+      {
+        key: "settings:manage",
+        label: "Manage settings",
+        description: "Change this organisation's operational settings.",
+        pending: "stage",
+        pendingNote:
+          "Clinic settings arrive in Stage 10. Branding is gated by clinic:edit today.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // Stage 1 additions.
+  //
+  // Every key below is `pending` because nothing checks it yet: the modules that
+  // enforce them arrive in Stages 6-9. Per this file's own rule, a string listed
+  // here that no call site checks grants NOTHING — it is listed now so the roles
+  // editor and the seeded Admin role carry it from the start, rather than
+  // needing a re-seed the day the call site lands.
+  // -------------------------------------------------------------------------
+  {
+    module: "Team",
+    permissions: [
+      {
+        key: "team:view",
+        label: "View team",
+        description: "See the people in this organisation and their roles.",
+        pending: "stage",
+        pendingNote: "Team management arrives in Stage 6.",
+      },
+      {
+        key: "team:invite",
+        label: "Invite team members",
+        description: "Create and revoke invitations to join this organisation.",
+        pending: "stage",
+        pendingNote: "Invitations arrive in Stage 5.",
+      },
+      {
+        key: "team:approve",
+        label: "Approve team members",
+        description:
+          "Approve or reject someone who has accepted an invitation. Scoped to this organisation only.",
+        pending: "stage",
+        pendingNote: "Team approval arrives in Stage 6.",
+      },
+      {
+        key: "team:manage",
+        label: "Manage team members",
+        description:
+          "Assign and change roles, suspend, reactivate, and revoke sessions. This is the permission that makes someone a Clinic Admin.",
+        pending: "stage",
+        pendingNote: "Team management arrives in Stage 6.",
+      },
+    ],
+  },
+  {
+    module: "Features",
+    permissions: [
+      {
+        key: "feature:view",
+        label: "View feature access",
+        description:
+          "See which features this organisation is entitled to, and which are locked.",
+        pending: "stage",
+        pendingNote: "Feature entitlements arrive in Stage 8.",
+      },
+      {
+        key: "feature:manage",
+        label: "Manage feature access",
+        description:
+          "Choose which of the organisation's entitled features each role may use. Cannot grant a feature the organisation does not hold, and cannot override a platform-wide switch.",
+        pending: "stage",
+        pendingNote: "Feature entitlements arrive in Stage 8.",
+      },
+    ],
+  },
+  {
+    module: "Marketing",
+    permissions: [
+      {
+        key: "marketing:view",
+        label: "View marketing",
+        description: "See marketing campaigns and their results.",
+        pending: "stage",
+        pendingNote: "The marketing module is not built yet.",
+      },
+      {
+        key: "marketing:manage",
+        label: "Manage marketing",
+        description: "Create and edit marketing campaigns.",
+        pending: "stage",
+        pendingNote: "The marketing module is not built yet.",
+      },
     ],
   },
 ] as const;
@@ -230,4 +346,70 @@ export function describePermission(key: string): string {
     return "Everything";
   }
   return BY_KEY.get(key)?.label ?? key;
+}
+
+/**
+ * The catalogue exactly as it stood BEFORE the Stage 1 additions above.
+ *
+ * This is a frozen snapshot and must never be edited again — not to add a
+ * permission, not to reorder one. Its only job is to answer one question during
+ * the Stage 1 backfill: "is this seeded Admin role still untouched?"
+ *
+ * `seedDefaultRoles` gives a new tenant's Admin role a copy of ALL_PERMISSIONS,
+ * so a tenant that never edited theirs holds a set exactly equal to this list.
+ * A tenant that DID edit theirs — added a key, removed one — will not match, and
+ * the backfill leaves them alone rather than overwriting a deliberate choice.
+ *
+ * Comparing against the live ALL_PERMISSIONS would be useless here: it already
+ * contains the new keys, so nothing would ever match.
+ */
+export const HISTORICAL_ALL_PERMISSIONS: readonly string[] = [
+  "clinic:read",
+  "clinic:create",
+  "clinic:edit",
+  "doctor:read",
+  "doctor:create",
+  "doctor:edit",
+  "doctor:delete",
+  "patient:read",
+  "patient:create",
+  "patient:edit",
+  "registration:read",
+  "registration:create",
+  "registration:edit",
+  "registration:history:read",
+  "report:read",
+  "notification:read",
+  "message:send",
+  "message:template",
+  "role:read",
+  "role:manage",
+];
+
+/**
+ * Everything added to the catalogue by Stage 1 — the difference between
+ * HISTORICAL_ALL_PERMISSIONS and ALL_PERMISSIONS.
+ *
+ * Derived rather than hand-listed so the two can never drift: adding a key to a
+ * group above puts it here automatically.
+ */
+export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
+  (permission) => !HISTORICAL_ALL_PERMISSIONS.includes(permission),
+);
+
+/**
+ * True when `permissions` is exactly the pre-Stage-1 full catalogue — i.e. a
+ * seeded Admin role nobody has customised.
+ *
+ * Order-insensitive and duplicate-tolerant, because the roles editor dedupes and
+ * does not preserve catalogue order.
+ */
+export function isUntouchedHistoricalAdminSet(
+  permissions: readonly string[],
+): boolean {
+  const held = new Set(permissions);
+  return (
+    held.size === HISTORICAL_ALL_PERMISSIONS.length &&
+    HISTORICAL_ALL_PERMISSIONS.every((permission) => held.has(permission))
+  );
 }
