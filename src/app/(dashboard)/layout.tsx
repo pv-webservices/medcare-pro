@@ -38,7 +38,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     actor = await requireActor();
   } catch (error: unknown) {
     if (error instanceof UnauthenticatedError) {
-      redirect("/login");
+      // A Platform Owner belongs to the reserved platform tenant, which
+      // requireActor() refuses to scope to (Stage 2). Sending them to /login
+      // would loop: the middleware bounces a signed-in user off /login and
+      // straight back here. They go to their own surface instead.
+      redirect(error.reason === "platform-tenant" ? "/owner/dashboard" : "/login");
     }
     throw error;
   }

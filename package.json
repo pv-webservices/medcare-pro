@@ -16,10 +16,12 @@
     "prisma:seed": "prisma db seed",
     "stage1:backfill": "tsx scripts/backfill-stage1.mts",
     "stage1:verify": "tsx scripts/verify-stage1-schema.mts",
+    "create-owner": "tsx scripts/create-owner.mts",
     "verify:registrations": "tsx scripts/verify-registrations.mts",
     "verify:reports": "tsx scripts/verify-reports.mts",
     "verify:notifications": "tsx scripts/verify-notifications.mts",
     "verify:roles": "tsx scripts/verify-roles.mts",
+    "verify:owner": "tsx scripts/verify-owner-access.mts",
     "verify:whatsapp": "tsx scripts/verify-whatsapp.mts",
     "whatsapp:doctor": "tsx scripts/whatsapp-doctor.mts"
   },

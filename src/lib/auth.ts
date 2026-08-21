@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
+import { createAppSession } from "@/lib/appSession";
+import { evaluateAccessStatus } from "@/lib/accessStatus";
 
 /**
  * Auth.js (NextAuth) configuration — PRD §6.1 (FR-1.1 … FR-1.5).
@@ -46,6 +48,22 @@ export class EmailNotVerifiedError extends CredentialsSignin {
   code = "EmailNotVerified";
 }
 
+/**
+ * Best-effort client IP for the session record.
+ *
+ * Self-hosted behind a proxy, so `x-forwarded-for` is the only source there is;
+ * its first entry is the original client. It is client-controllable and is
+ * therefore recorded for the "your devices" list and incident review ONLY —
+ * nothing authorizes on it.
+ */
+function readClientIp(request: Request | undefined): string | null {
+  const forwarded = request?.headers?.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() ?? null;
+  }
+  return request?.headers?.get("x-real-ip") ?? null;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
@@ -64,7 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
        * renders as "Invalid email or password". Never throw a descriptive error
        * here: it would surface the reason to the client.
        */
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) {
           return null;
@@ -80,7 +98,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: true,
             passwordHash: true,
             tenantId: true,
-            tenant: { select: { emailVerifiedAt: true } },
+            accountStatus: true,
+            membershipStatus: true,
+            tenant: {
+              select: { emailVerifiedAt: true, status: true, isPlatform: true },
+            },
           },
         });
 
@@ -103,11 +125,47 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           throw new EmailNotVerifiedError();
         }
 
+        // Stage 2 — the core authorization rule, applied at the door as well as
+        // on every request. Without it a suspended user would sign in
+        // successfully and then be bounced by requireActor() on the very next
+        // navigation, which reads as a broken app rather than a locked account.
+        //
+        // Returns the same generic null as a wrong password: which of the three
+        // statuses refused is not something an unauthenticated caller may learn.
+        // The platform tenant is exempt from the tenant-status gate because it
+        // has no approval lifecycle (see lib/platform/context.ts).
+        const access = evaluateAccessStatus({
+          tenantStatus: user.tenant.isPlatform ? "ACTIVE" : user.tenant.status,
+          accountStatus: user.accountStatus,
+          membershipStatus: user.membershipStatus,
+        });
+        if (!access.allowed) {
+          return null;
+        }
+
+        // The session registry row is created here, at the one point where a
+        // credential has actually been proven. Its id becomes the `sid` claim;
+        // a token without one is unauthenticated (lib/sessionPolicy.ts).
+        const now = new Date();
+        const sid = await createAppSession(prisma, {
+          userId: user.id,
+          tenantId: user.tenantId,
+          ip: readClientIp(request),
+          userAgent: request?.headers?.get("user-agent") ?? null,
+          now,
+        });
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: now },
+        });
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           tenantId: user.tenantId,
+          sid,
         };
       },
     }),

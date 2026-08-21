@@ -38,14 +38,19 @@ export const authConfig = {
   providers: [],
 
   callbacks: {
-    // Persist the user id and tenant id on the token so both are available
-    // without a database round-trip on every request. `tenantId` is what every
-    // API route scopes its queries by — it comes from here, i.e. from the
-    // signed session, and never from the request body or query string.
+    // Persists the user id, tenant id and — since Stage 2 — the session
+    // registry id.
+    //
+    // `sid` is the only claim that authorizes anything, and it does so only by
+    // pointing at an `app_sessions` row that is then read from the database
+    // (lib/session.ts). `id` and `tenantId` ride along so that non-authorizing
+    // code can avoid a round-trip, but requireActor() re-derives `tenantId`
+    // from the session row rather than trusting the copy here.
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.tenantId = user.tenantId;
+        token.sid = user.sid;
       }
       return token;
     },
@@ -56,6 +61,9 @@ export const authConfig = {
         }
         if (token.tenantId) {
           session.user.tenantId = token.tenantId as string;
+        }
+        if (token.sid) {
+          session.user.sid = token.sid as string;
         }
       }
       return session;

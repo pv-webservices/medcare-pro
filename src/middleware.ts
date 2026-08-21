@@ -27,6 +27,20 @@ const PROTECTED_PREFIXES = [
 ] as const;
 
 /**
+ * The platform surface (Stage 2). Kept out of PROTECTED_PREFIXES because it
+ * bounces to a different login screen, and out of PUBLIC_AUTH_PATHS because a
+ * signed-in clinic user must NOT be redirected away from it — being redirected
+ * would itself confirm that /owner is real.
+ *
+ * This is a presence check and nothing more. Whether the session belongs to an
+ * Owner is decided in the page by requirePlatformOwner(), against the database.
+ * The middleware runs on the edge and can only see the JWT, which by decision
+ * carries no authorization we are willing to trust.
+ */
+const OWNER_PREFIX = "/owner";
+const OWNER_LOGIN_PATH = "/owner/login";
+
+/**
  * Reachable without a session. `/signup` and `/verify-email` are part of the
  * FR-1.1/FR-1.2 flow, which by definition runs before one exists.
  */
@@ -44,6 +58,16 @@ function isProtectedPath(pathname: string): boolean {
 export default auth((req) => {
   const { nextUrl } = req;
   const isSignedIn = Boolean(req.auth);
+
+  if (nextUrl.pathname.startsWith(OWNER_PREFIX)) {
+    // Only the coarse check belongs here: no session at all cannot possibly be
+    // an Owner, so send it to the Owner login screen. Everything else falls
+    // through to the page's own database-backed check.
+    if (!isSignedIn && nextUrl.pathname !== OWNER_LOGIN_PATH) {
+      return NextResponse.redirect(new URL(OWNER_LOGIN_PATH, nextUrl));
+    }
+    return NextResponse.next();
+  }
 
   if (nextUrl.pathname === "/") {
     return NextResponse.redirect(new URL(isSignedIn ? DEFAULT_SIGNED_IN_PATH : LOGIN_PATH, nextUrl));
