@@ -88,6 +88,24 @@ async function expectThrows(
 
 const TEST_TENANT_NAME = "verify-stage8";
 
+/**
+ * The gated modules that existed BEFORE entitlements were enforced — AP-1.
+ *
+ * FROZEN, and the same list `tests/unit/moduleFeatures.test.ts` keeps for the
+ * same reason. These are the modules "nothing an existing organisation had is
+ * lost" is actually about. A module added later does not join it: whether a new
+ * module reaches a role is its own stage's product decision.
+ */
+const PRE_ENTITLEMENT_MODULES: readonly string[] = [
+  "registrations",
+  "doctors",
+  "clinics",
+  "reports",
+  "notifications",
+  "whatsapp",
+  "team",
+];
+
 /** A throwaway feature, so the real catalogue is never edited by a test. */
 const PREMIUM_KEY = "verify-stage8-premium";
 
@@ -277,10 +295,37 @@ async function main(): Promise<void> {
     ["front-desk staff", t.staffActor],
   ] as const) {
     const modules = await resolveModulesForActor(actor);
-    const denied = Object.values(MODULE_FEATURES).filter(
+    // NARROWED IN AP-1, from "every module in MODULE_FEATURES" to the modules
+    // an organisation ALREADY HAD. The section header states the property this
+    // is really about — "nothing an existing organisation had is lost" — and
+    // appointments is not something any of them had.
+    //
+    // The list is frozen. A module added from AP-1 onward does not join it;
+    // whether a NEW module reaches a role is a product decision its own stage
+    // has to make, and for appointments the answer is deliberately no. See the
+    // PREMIUM check immediately below, which pins that.
+    const denied = PRE_ENTITLEMENT_MODULES.filter(
       (key) => modules.get(key)?.allowed !== true,
     );
-    check(`${label} keeps every gated module`, denied.length === 0, denied);
+    check(`${label} keeps every gated module it already had`, denied.length === 0, denied);
+  }
+
+  // The other half of the same property, and the reason the list above is
+  // frozen rather than derived: a PREMIUM module must NOT appear for a role
+  // just because the organisation is entitled to it. Silence at layer 3 denies,
+  // so a Clinic Admin has to switch it on per role. Owner is exempt — layer 3
+  // cannot touch a wildcard holder.
+  for (const [label, actor, expected] of [
+    ["the owner", t.ownerActor, true],
+    ["the admin", t.adminActor, false],
+    ["front-desk staff", t.staffActor, false],
+  ] as const) {
+    const verdict = await resolveModuleForActor(actor, MODULE_FEATURES.appointments);
+    check(
+      `${label} ${expected ? "keeps" : "does NOT get"} the PREMIUM appointments module without a layer-3 row`,
+      verdict.allowed === expected,
+      verdict,
+    );
   }
 
   console.log("\nLayer 3 — the Tenant Admin's switch");

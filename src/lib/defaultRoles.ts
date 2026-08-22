@@ -1,5 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
-import { ALL_PERMISSIONS, WILDCARD } from "@/lib/permissions";
+import {
+  ALL_PERMISSIONS,
+  PRE_APPOINTMENTS_PERMISSIONS,
+  WILDCARD,
+} from "@/lib/permissions";
 
 /**
  * The default role set every tenant starts with — PRD §4.
@@ -107,6 +111,11 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "patient:read",
       "registration:read",
       "notification:read",
+      // --- AP-1 ---
+      // Read only, matching the rest of this role. A doctor looks at their own
+      // day; they do not run the booking desk. Notably NOT appointment:cancel —
+      // a doctor deciding a slot is free is a front-desk decision.
+      "appointment:read",
     ],
   },
   {
@@ -128,9 +137,128 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "registration:edit",
       "notification:read",
       "message:send",
+      // --- AP-1 ---
+      // The whole booking desk: the front desk is who books, moves, cancels,
+      // checks in and converts. Deliberately WITHOUT appointment:type:manage —
+      // taking bookings is not the same as setting the price list, and that one
+      // is Admin's. See the note on ADMIN-only keys in lib/permissions.ts.
+      "appointment:read",
+      "appointment:create",
+      "appointment:update",
+      "appointment:reschedule",
+      "appointment:cancel",
+      "appointment:checkin",
+      "appointment:convert",
     ],
   },
 ];
+
+// ---------------------------------------------------------------------------
+// AP-1 — frozen pre-appointment snapshots, for the backfill's "untouched?" test
+// ---------------------------------------------------------------------------
+
+/**
+ * Each seeded role's permission array EXACTLY as it stood before AP-1.
+ *
+ * FROZEN LITERALS. Never edit these again — not to add a permission, not to
+ * reorder one. Their only job is to answer one question during
+ * scripts/backfill-ap1-appointments.mts: "is this seeded role still untouched?"
+ *
+ * This mirrors HISTORICAL_ALL_PERMISSIONS in lib/permissions.ts, which does the
+ * same job for the Admin role alone. AP-1 needs the same guarantee for
+ * Receptionist and Doctor, which have no such snapshot yet — comparing them
+ * against the LIVE arrays above would be useless, since those already contain
+ * the appointment keys and so would match nothing.
+ *
+ * Admin's entry is derived rather than spelled out: it holds the whole
+ * catalogue by definition, and PRE_APPOINTMENTS_PERMISSIONS is precisely
+ * "the whole catalogue minus what AP-1 added".
+ *
+ * A role whose stored set does not equal its entry here is left byte-for-byte
+ * alone, because a tenant edited it deliberately.
+ */
+export const PRE_APPOINTMENTS_ROLE_PERMISSIONS: Readonly<
+  Record<RoleKey, readonly string[]>
+> = {
+  // Holds the wildcard, so AP-1's keys are already theirs. Never topped up.
+  [ROLE_KEYS.OWNER]: [WILDCARD],
+  [ROLE_KEYS.CLINIC_ADMIN]: PRE_APPOINTMENTS_PERMISSIONS,
+  [ROLE_KEYS.DOCTOR]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "registration:read",
+    "notification:read",
+  ],
+  [ROLE_KEYS.RECEPTIONIST]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "patient:create",
+    "patient:edit",
+    "registration:read",
+    "registration:create",
+    "registration:edit",
+    "notification:read",
+    "message:send",
+  ],
+  // Unchanged by AP-1 and never topped up. Present so this record is complete
+  // and a future stage cannot mistake its absence for an oversight.
+  [ROLE_KEYS.STAFF]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "patient:create",
+    "patient:edit",
+    "registration:read",
+    "registration:create",
+    "registration:edit",
+  ],
+};
+
+/**
+ * What the AP-1 backfill appends to each seeded role it finds untouched.
+ *
+ * Derived from DEFAULT_ROLES minus the frozen snapshot above, so it can never
+ * drift from what a NEW tenant is seeded with. Adding a permission to a role
+ * array above updates this automatically, and a unit test checks the two agree.
+ *
+ * STAFF and OWNER are absent, deliberately: Staff gains nothing from AP-1, and
+ * Owner already holds everything through the wildcard.
+ */
+export const APPOINTMENT_ROLE_TOP_UPS: Readonly<
+  Partial<Record<RoleKey, readonly string[]>>
+> = Object.fromEntries(
+  DEFAULT_ROLES.filter(
+    (role) => role.key !== ROLE_KEYS.OWNER && role.key !== ROLE_KEYS.STAFF,
+  ).map((role) => {
+    const before = new Set(PRE_APPOINTMENTS_ROLE_PERMISSIONS[role.key]);
+    return [
+      role.key,
+      role.permissions.filter((permission) => !before.has(permission)),
+    ] as const;
+  }),
+);
+
+/**
+ * True when `permissions` is exactly what this seeded role held before AP-1.
+ *
+ * Order-insensitive and duplicate-tolerant, matching
+ * `isUntouchedHistoricalAdminSet` — the roles editor dedupes and does not
+ * preserve catalogue order, so a byte comparison would report false negatives
+ * on roles nobody had actually touched.
+ */
+export function isUntouchedPreAppointmentsRole(
+  key: RoleKey,
+  permissions: readonly string[],
+): boolean {
+  const before = PRE_APPOINTMENTS_ROLE_PERMISSIONS[key];
+  const held = new Set(permissions);
+  return (
+    held.size === before.length &&
+    before.every((permission) => held.has(permission))
+  );
+}
 
 /** The role assigned to the user created at signup — FR-1.1. */
 export const OWNER_ROLE_NAME = "Owner";

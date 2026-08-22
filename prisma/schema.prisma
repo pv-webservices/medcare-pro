@@ -119,6 +119,10 @@ model Tenant {
   sessions          AppSession[]
   auditLogs         AuditLog[]
 
+  // --- AP-1 relations (back-relations only; no column on this table) -------
+  appointments     Appointment[]
+  appointmentTypes AppointmentType[]
+
   /// Enforced from the constrain migration onward, once the backfill has
   /// generated and validated a slug for every existing row.
   @@unique([slug])
@@ -218,6 +222,15 @@ model User {
   featureFlagsChanged    Feature[]               @relation("FeatureGlobalChangedBy")
   tenantOverridesChanged TenantFeatureOverride[] @relation("TenantOverrideChangedBy")
   auditLogs              AuditLog[]
+
+  // --- AP-1 relations (back-relations only; no column on this table) -------
+  /// Restrict on the owning side, matching Registration.creator: the person who
+  /// booked a slot is part of the record, not a detachable pointer.
+  appointmentsBooked    Appointment[] @relation("AppointmentBookedBy")
+  /// SetNull on the owning side — denormalised display pointers, exactly like
+  /// the approvedBy/suspendedBy pairs above. AuditLog holds the real trail.
+  appointmentsCheckedIn Appointment[] @relation("AppointmentCheckedInBy")
+  appointmentsCancelled Appointment[] @relation("AppointmentCancelledBy")
 
   @@index([tenantId])
   @@index([accountStatus])
@@ -364,6 +377,10 @@ model Clinic {
   userRoles        UserRole[]
   invitations      Invitation[]
 
+  // --- AP-1 relations (back-relations only; no column on this table) -------
+  appointments     Appointment[]
+  appointmentTypes AppointmentType[]
+
   @@index([tenantId])
   @@map("clinics")
 }
@@ -390,6 +407,12 @@ model Doctor {
   availability  DoctorAvailability[]
   leave         DoctorLeave[]
   registrations Registration[]
+
+  // --- AP-1 relations (back-relations only; no column on this table) -------
+  /// Restrict on the owning side: an appointment is history once booked.
+  appointments  Appointment[]
+  /// Cascade on the owning side — these rows carry no data, only a lock.
+  scheduleLocks DoctorScheduleLock[]
 
   /// FR-4.1 counts doctors per clinic; the registration form filters by department.
   @@index([clinicId])
@@ -461,6 +484,13 @@ model Patient {
   registrations    Registration[]
   whatsappMessages WhatsappMessage[]
 
+  // --- AP-1 relations (back-relations only; no column on this table) -------
+  /// SetNull on the owning side, deliberately UNLIKE `registrations` above,
+  /// which cascades. An appointment must survive as a record of what was booked
+  /// even if the patient row it was later linked to is deleted — the
+  /// denormalised name/mobileNumber on the appointment keep it readable.
+  appointments Appointment[]
+
   /// Tenant-scoped, so two tenants can each independently hold PT-2026-0001.
   @@unique([tenantId, patientCode])
   @@index([clinicId])
@@ -493,16 +523,36 @@ model Registration {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  // --- AP-1: the appointment this visit came from, if any -----------------
+  /// NULL on every registration created before appointments existed, and NULL
+  /// on every walk-in afterwards. AP-5 sets it when it converts an appointment;
+  /// AP-1 never populates it and does not change how registrations are created.
+  ///
+  /// This is the ONLY link between the two tables. There is deliberately no
+  /// matching `convertedRegistrationId` on Appointment: two columns describing
+  /// one fact would form a circular foreign key and could drift apart with
+  /// nothing able to detect it. Ask the question from the other side instead —
+  /// `appointment.registration` — which Prisma answers through this same column.
+  appointmentId String? @map("appointment_id")
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   /// Restrict, not Cascade: a doctor leaving must not silently delete the
   /// revenue history attributed to them (FR-6.4 breaks revenue down by doctor).
   /// Nullable so a doctor can be detached from past visits instead.
-  doctor  Doctor? @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-  creator User    @relation("RegistrationCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  doctor      Doctor?      @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  creator     User         @relation("RegistrationCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  /// Restrict: an appointment that produced revenue must not be deletable, and
+  /// nothing deletes appointments anyway — they retire by status.
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
 
   editLog RegistrationEditLog[]
 
+  /// One registration per appointment. This is the database-level guard against
+  /// converting the same appointment twice: AP-5's second attempt hits this
+  /// index rather than racing past an application check. Unlimited rows may
+  /// hold NULL, which is what every pre-AP-1 registration holds.
+  @@unique([appointmentId])
   @@index([clinicId])
   @@index([patientId])
   @@index([doctorId])
@@ -1125,4 +1175,274 @@ model RateLimitBucket {
   @@index([blockedUntil])
   @@index([windowStartedAt])
   @@map("rate_limit_buckets")
+}
+
+// ---------------------------------------------------------------------------
+// Appointments — AP-1.
+//
+// SCHEMA ONLY. Nothing reads or writes these tables yet: AP-2 computes slots,
+// AP-3 books, AP-4 reschedules/cancels/checks in, AP-5 converts. The tables and
+// the permission catalogue land first so the migration is a one-time event
+// rather than something each later stage has to re-run over live data.
+//
+// Three rules govern everything below, and every later stage inherits them:
+//
+//   1. NO APPOINTMENT ROW IS EVER DELETED. Cancel, no-show, reschedule and
+//      conversion are all STATUS TRANSITIONS. The audit trail and any future
+//      utilisation reporting depend on the retired rows still being there.
+//
+//   2. slot_start / slot_end ARE NEVER UPDATED after insert. Rescheduling
+//      creates a NEW row pointing back at the old one; it does not move the old
+//      one. That is what keeps the history honest and what makes
+//      `active_slot_start` a pure function of `status`.
+//
+//   3. OCCUPANCY IS DERIVED FROM STATUS, IN EXACTLY ONE COLUMN.
+//        active_slot_start = slot_start  when status is
+//                            SCHEDULED | CONFIRMED | CHECKED_IN | CONVERTED
+//        active_slot_start IS NULL       when status is
+//                            CANCELLED | NO_SHOW | RESCHEDULED
+//      src/lib/appointmentRules.ts is the single source of that mapping and
+//      scripts/verify-ap1-appointments-schema.mts asserts it over real rows.
+// ---------------------------------------------------------------------------
+
+/// The appointment lifecycle.
+///
+/// A native enum, not the String-with-constants treatment `visit_type` gets.
+/// The difference is that `visit_type` is deliberately open — a clinic may want
+/// its own — whereas this set is closed: every value here changes whether the
+/// doctor's time is occupied, so an unrecognised one would be a correctness bug
+/// rather than a harmless label.
+///
+/// CONVERTED OCCUPIES THE SLOT. A converted appointment is a patient who
+/// arrived and was seen, so the time was genuinely consumed. Releasing it would
+/// let a second booking land where a visit demonstrably happened.
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  CONVERTED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+/// A bookable service: its name, how long it takes, and what it costs.
+model AppointmentType {
+  id       String  @id @default(cuid())
+  tenantId String  @map("tenant_id")
+  /// NULL = offered at every clinic under this tenant; set = that site only.
+  /// This is the same nullable-clinic convention `user_roles.clinic_id` uses,
+  /// reused rather than reinvented.
+  ///
+  /// MySQL treats NULLs as DISTINCT in a unique index, so the @@unique below
+  /// does NOT stop two tenant-wide types sharing a name — exactly the quirk
+  /// documented on UserRole. The duplicate check must be done in application
+  /// code before insert, the way src/lib/roles.ts already does it. AP-6/AP-7
+  /// owns that check; AP-1 only records the constraint and this warning.
+  clinicId String? @map("clinic_id")
+
+  name            String
+  durationMinutes Int     @map("duration_minutes")
+  /// Seeds Appointment.amount at booking time. The booked amount is copied onto
+  /// the appointment rather than read through this relation, so re-pricing a
+  /// type never rewrites money that was already quoted to a patient.
+  ///
+  /// NO DATABASE DEFAULT, deliberately: a type created without a price should
+  /// fail loudly rather than silently become free.
+  defaultAmount   Decimal @map("default_amount") @db.Decimal(10, 2)
+  /// Retire a type by clearing this, never by deleting the row — appointments
+  /// point at it and the foreign key is Restrict for exactly that reason. Same
+  /// pattern as Plan.isActive.
+  isActive        Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  appointments Appointment[]
+
+  @@unique([tenantId, clinicId, name])
+  @@index([tenantId])
+  @@index([clinicId])
+  /// The booking form's lookup: this tenant's live types.
+  @@index([tenantId, isActive])
+  @@map("appointment_types")
+}
+
+/// One booked slot in a doctor's day.
+model Appointment {
+  id       String @id @default(cuid())
+  /// Denormalised from `clinic.tenant_id`, following the Patient precedent: it
+  /// makes tenant filtering one indexed column rather than a join. Keep it in
+  /// step with the owning clinic's tenant on every write.
+  tenantId String @map("tenant_id")
+  clinicId String @map("clinic_id")
+
+  doctorId          String  @map("doctor_id")
+  appointmentTypeId String  @map("appointment_type_id")
+  /// NULL = someone who is not a patient here yet. Booking never mints a
+  /// Patient row or a PT-YYYY-#### code; AP-5 conversion does, which keeps the
+  /// code sequence free of people who only ever cancelled.
+  patientId         String? @map("patient_id")
+
+  // Patient details, named EXACTLY as on `patients` so the booking form can
+  // reuse the registration form's fieldset and AP-5 can copy across without a
+  // translation layer. Deliberately not `patientName` / `patientPhone`.
+  name         String
+  mobileNumber String  @map("mobile_number")
+  age          Int?
+  gender       String?
+  address      String? @db.Text
+  city         String?
+
+  amount Decimal @db.Decimal(10, 2)
+
+  /// Half-open [slotStart, slotEnd): two appointments touching end-to-start do
+  /// NOT overlap. Same convention lib/doctors.ts already uses for availability.
+  ///
+  /// Wall-clock time tagged UTC, exactly like registrations.visit_date — see
+  /// src/lib/dates.ts. No real timezone conversion happens anywhere.
+  ///
+  /// NEVER UPDATED AFTER INSERT — see rule 2 in the header above.
+  slotStart DateTime @map("slot_start")
+  slotEnd   DateTime @map("slot_end")
+
+  /// Mirrors slot_start while this appointment occupies the doctor's time, and
+  /// is NULL the moment it releases it.
+  ///
+  /// MySQL has no partial unique index, so this is how @@unique([doctor_id,
+  /// active_slot_start]) is made to constrain only LIVE rows: MySQL treats
+  /// NULLs as distinct, so any number of retired appointments may share a
+  /// doctor and a start time while at most one live one can. The same
+  /// NULL-distinct behaviour roles(tenant_id, key) already relies on.
+  ///
+  /// THIS INDEX IS A BACKSTOP, NOT THE CONCURRENCY CONTROL. It catches exact
+  /// duplicate starts only; a 30-minute slot at 09:00 and a 15-minute one at
+  /// 09:15 have different starts and would slip past it. DoctorScheduleLock
+  /// plus the overlap query is the real guard — see that model.
+  activeSlotStart DateTime? @map("active_slot_start")
+
+  status AppointmentStatus @default(SCHEDULED)
+
+  bookedById String @map("booked_by_id")
+
+  checkedInAt   DateTime? @map("checked_in_at")
+  checkedInById String?   @map("checked_in_by_id")
+
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancelledById      String?   @map("cancelled_by_id")
+  cancellationReason String?   @map("cancellation_reason") @db.Text
+
+  /// Set on the NEW row created by a reschedule, pointing back at the row it
+  /// replaced. Walk it backwards with `rescheduledFrom` and forwards with
+  /// `rescheduledTo`; an appointment moved N times is a linked list ending in
+  /// the one live row.
+  rescheduledFromId String? @map("rescheduled_from_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic          Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  /// Restrict, matching Registration.doctor: a doctor leaving must not silently
+  /// delete the schedule history attributed to them.
+  doctor          Doctor          @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  /// Restrict — retire a type with isActive, do not delete it.
+  appointmentType AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Restrict)
+  /// SetNull, NOT Cascade. Deleting a patient must never delete an appointment
+  /// (see rule 1). The denormalised name/mobileNumber above keep the orphaned
+  /// row readable.
+  patient         Patient?        @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  /// Restrict, matching Registration.creator — who booked it is part of the
+  /// record.
+  bookedBy    User  @relation("AppointmentBookedBy", fields: [bookedById], references: [id], onDelete: Restrict)
+  /// SetNull — denormalised display pointers, like Tenant.approvedBy. AuditLog
+  /// holds the authoritative, append-only trail of who did what.
+  checkedInBy User? @relation("AppointmentCheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)
+  cancelledBy User? @relation("AppointmentCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  rescheduledFrom Appointment?  @relation("AppointmentReschedule", fields: [rescheduledFromId], references: [id], onDelete: Restrict)
+  rescheduledTo   Appointment[] @relation("AppointmentReschedule")
+
+  /// Written by AP-5. Back-relation only — the column lives on `registrations`,
+  /// and its UNIQUE is what stops a second conversion. See Registration above.
+  registration Registration?
+
+  /// The backstop described on `activeSlotStart`. Not the primary guard.
+  @@unique([doctorId, activeSlotStart])
+  /// The appointment list: this clinic's board, filtered by state.
+  @@index([tenantId, clinicId, status])
+  /// The overlap query in AP-3 and the day view in AP-6.
+  @@index([doctorId, slotStart])
+  @@index([clinicId, slotStart])
+  @@index([patientId])
+  @@index([appointmentTypeId])
+  @@index([rescheduledFromId])
+  @@index([bookedById])
+  @@index([checkedInById])
+  @@index([cancelledById])
+  @@map("appointments")
+}
+
+/// One row per doctor per calendar day, existing solely to be locked — AP-1.
+///
+/// It carries no data and is never read for its contents. Its job is to give
+/// every write that can occupy or release a doctor's time a single row to
+/// serialise on, because the check-then-insert those writes perform is a race
+/// otherwise. An application-level "is this slot free?" query is NOT
+/// concurrency-safe on its own; two requests can both read "free" and both
+/// insert. The lock is what closes that window.
+///
+/// PROTOCOL — every booking, reschedule, cancel and check-in path in AP-3/AP-4
+/// must follow this, inside one transaction set to READ COMMITTED:
+///
+///   1. INSERT the (doctor_id, date) row ... ON DUPLICATE KEY UPDATE, so it
+///      exists and is exclusively locked. NOT `INSERT IGNORE`, which takes a
+///      SHARED lock and deadlocks when two bookings both try to upgrade it to
+///      the exclusive lock step 2 needs. Verified by racing real transactions —
+///      see prisma/migrations/APPOINTMENT_NOTES.md.
+///   2. SELECT ... FOR UPDATE it. This is the serialisation point; a competing
+///      transaction blocks here until the first commits or rolls back.
+///   3. Run the overlap query AS A LOCKING READ:
+///        existing.slot_start < requested.slot_end
+///        AND existing.slot_end > requested.slot_start
+///        AND status IN (SCHEDULED, CONFIRMED, CHECKED_IN, CONVERTED)
+///      It MUST be FOR UPDATE, and the transaction MUST be READ COMMITTED.
+///      Under REPEATABLE READ this read takes GAP LOCKS over the range it
+///      scans even when it matches nothing, so two bookings for DIFFERENT
+///      doctors at the same time of day deadlock each other. READ COMMITTED
+///      takes no gap locks, and gives every statement the latest committed
+///      data rather than a snapshot pinned at the transaction's first read.
+///      Do every scope/validation read BEFORE the transaction opens anyway.
+///   4. Only then insert or update.
+///
+/// LOCK ORDERING — acquire in ascending (doctorId, date). Booking touches one
+/// doctor-day so it cannot deadlock; a reschedule may touch two (old and new,
+/// possibly different doctors) and would deadlock against its mirror image
+/// without a deterministic order.
+///
+/// An appointment cannot span two calendar dates (asserted in
+/// appointmentRules.ts), which is what makes (doctorId, date) a complete key:
+/// two conflicting appointments necessarily share a date and therefore this row.
+///
+/// Rows are created on demand and never cleaned up. One row per doctor per
+/// booked day is negligible, and deleting them would reintroduce the race.
+model DoctorScheduleLock {
+  id       String   @id @default(cuid())
+  doctorId String   @map("doctor_id")
+  date     DateTime @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  /// The lock key. Also what makes step 1's INSERT IGNORE safe under a race:
+  /// the loser is rejected by this index rather than creating a second row that
+  /// would split the lock in two.
+  @@unique([doctorId, date])
+  @@map("doctor_schedule_locks")
 }

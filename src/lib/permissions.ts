@@ -315,6 +315,93 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
       },
     ],
   },
+  // -------------------------------------------------------------------------
+  // AP-1 addition — appointments.
+  //
+  // All eight are `pending`: AP-1 lands the catalogue and the schema, and the
+  // call sites arrive in AP-3 (book), AP-4 (reschedule/cancel/check in),
+  // AP-5 (convert) and AP-6/AP-7 (manage types). Per this file's own rule, a
+  // string here that no call site checks grants NOTHING — the marks come off
+  // one at a time as each stage builds its gate, and a unit test holds them to
+  // that.
+  //
+  // Listing them now rather than per stage means ONE permission backfill over
+  // live tenants instead of four. scripts/backfill-ap1-appointments.mts tops up
+  // only roles that still match their frozen pre-AP-1 snapshot exactly.
+  //
+  // Note also that holding one of these grants nothing on its own even once the
+  // call sites exist: `appointments` is a PREMIUM feature, so an organisation
+  // must be entitled to it AND a Clinic Admin must switch it on for the role.
+  // See src/lib/defaultFeatures.ts.
+  // -------------------------------------------------------------------------
+  {
+    module: "Appointments",
+    permissions: [
+      {
+        key: "appointment:read",
+        label: "View appointments",
+        description:
+          "See the appointment board and each booking's details, within the clinics this person can reach.",
+        pending: "stage",
+        pendingNote: "AP-3 builds the first call site that checks this.",
+      },
+      {
+        key: "appointment:create",
+        label: "Book appointments",
+        description:
+          "Book a patient into a doctor's free slot. Booking does not create a patient record — converting does.",
+        pending: "stage",
+        pendingNote: "AP-3 builds the booking endpoint.",
+      },
+      {
+        key: "appointment:update",
+        label: "Edit appointments",
+        description:
+          "Correct a booking's patient details or amount without moving it to a different slot.",
+        pending: "stage",
+        pendingNote: "AP-4 builds the edit endpoint.",
+      },
+      {
+        key: "appointment:reschedule",
+        label: "Reschedule appointments",
+        description:
+          "Move a booking to a different slot. The original is kept and marked rescheduled, never deleted.",
+        pending: "stage",
+        pendingNote: "AP-4 builds the reschedule endpoint.",
+      },
+      {
+        key: "appointment:cancel",
+        label: "Cancel appointments",
+        description:
+          "Cancel a booking or mark it a no-show, freeing the slot. The record is kept either way.",
+        pending: "stage",
+        pendingNote: "AP-4 builds the cancel endpoint.",
+      },
+      {
+        key: "appointment:checkin",
+        label: "Check patients in",
+        description: "Mark a patient as arrived for their appointment.",
+        pending: "stage",
+        pendingNote: "AP-4 builds the check-in endpoint.",
+      },
+      {
+        key: "appointment:convert",
+        label: "Convert appointments",
+        description:
+          "Turn an arrived appointment into a registration, creating the patient record and code if this is their first visit.",
+        pending: "stage",
+        pendingNote: "AP-5 builds the conversion endpoint.",
+      },
+      {
+        key: "appointment:type:manage",
+        label: "Manage appointment types",
+        description:
+          "Create, rename, re-price, activate and deactivate the bookable services and their durations. Separate from booking: the front desk books appointments, it does not set the price list.",
+        pending: "stage",
+        pendingNote: "AP-6/AP-7 build the appointment types screen.",
+      },
+    ],
+  },
   {
     module: "Marketing",
     permissions: [
@@ -411,6 +498,29 @@ export const HISTORICAL_ALL_PERMISSIONS: readonly string[] = [
 export const STAGE_11_PERMISSIONS: readonly string[] = ["audit:read"];
 
 /**
+ * Everything AP-1 added to the catalogue.
+ *
+ * Hand-listed like STAGE_11_PERMISSIONS rather than derived, because the
+ * derivation would be circular: the lists below subtract this one from
+ * ALL_PERMISSIONS, and ALL_PERMISSIONS already contains these keys. Declared
+ * ABOVE the lists that filter on it — these are `const`, so a reference from a
+ * module-scope initialiser that ran first would throw.
+ *
+ * A unit test holds this against the catalogue, so a key added to the
+ * Appointments group without being added here fails `npm test`.
+ */
+export const STAGE_AP1_PERMISSIONS: readonly string[] = [
+  "appointment:read",
+  "appointment:create",
+  "appointment:update",
+  "appointment:reschedule",
+  "appointment:cancel",
+  "appointment:checkin",
+  "appointment:convert",
+  "appointment:type:manage",
+];
+
+/**
  * Everything added to the catalogue by Stage 1.
  *
  * Derived rather than hand-listed so the two can never drift: adding a key to a
@@ -422,11 +532,14 @@ export const STAGE_11_PERMISSIONS: readonly string[] = ["audit:read"];
  * untouched pre-Stage-1 Admin roles — would silently start doing Stage 11's job
  * under Stage 1's name. Every future stage that adds a key must be subtracted
  * here too; the unit tests check that the lists stay disjoint and complete.
+ *
+ * AP-1's eight appointment keys are the third filter, for the same reason.
  */
 export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
   (permission) =>
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
-    !STAGE_11_PERMISSIONS.includes(permission),
+    !STAGE_11_PERMISSIONS.includes(permission) &&
+    !STAGE_AP1_PERMISSIONS.includes(permission),
 );
 
 /**
@@ -458,9 +571,20 @@ export function isUntouchedHistoricalAdminSet(
  * live catalogue in the same change; this one is simply "everything except what
  * Stage 11 added", which stays correct on its own as long as STAGE_11_PERMISSIONS
  * is accurate — and a unit test checks that it is.
+ *
+ * AP-1'S KEYS MUST BE SUBTRACTED HERE TOO, and the reason is easy to miss.
+ * `isUntouchedPreStage11AdminSet` compares an Admin's stored permissions to
+ * this list by EXACT SET EQUALITY. A pre-Stage-11 Admin holds the catalogue as
+ * it stood before `audit:read` — which, of course, contains no appointment keys
+ * either. Leave them in this list and that comparison never matches again, so
+ * scripts/backfill-stage11.mts silently stops handing out `audit:read` to the
+ * organisations still owed it, reporting them as "customised" instead. Nothing
+ * would fail; the backfill would just quietly do nothing.
  */
 export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
-  (permission) => !STAGE_11_PERMISSIONS.includes(permission),
+  (permission) =>
+    !STAGE_11_PERMISSIONS.includes(permission) &&
+    !STAGE_AP1_PERMISSIONS.includes(permission),
 );
 
 /**
@@ -479,5 +603,43 @@ export function isUntouchedPreStage11AdminSet(
   return (
     held.size === PRE_STAGE_11_PERMISSIONS.length &&
     PRE_STAGE_11_PERMISSIONS.every((permission) => held.has(permission))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AP-1 — eight new keys, and the same top-up rule Stage 1 established.
+// ---------------------------------------------------------------------------
+
+/**
+ * The catalogue exactly as it stood BEFORE AP-1 — i.e. including `audit:read`,
+ * which Stage 11 had already added by then.
+ *
+ * Derived, like PRE_STAGE_11_PERMISSIONS and for the same reason: it is simply
+ * "everything except what AP-1 added", which stays correct on its own as long
+ * as STAGE_AP1_PERMISSIONS is accurate. A unit test checks that it is.
+ */
+export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
+  ALL_PERMISSIONS.filter(
+    (permission) => !STAGE_AP1_PERMISSIONS.includes(permission),
+  );
+
+/**
+ * True when `permissions` is exactly the pre-AP-1 catalogue — i.e. a seeded
+ * Admin role nobody has customised since the Stage 11 backfill.
+ *
+ * A role that does NOT match is left byte-for-byte alone. That deliberately
+ * includes an Admin still stuck at an earlier rung — one holding only the
+ * pre-Stage-1 twenty, or the pre-Stage-11 set. Those need their own backfill
+ * first; appending appointment keys to them would leave them in a state no seed
+ * ever produced, which is harder to reason about later than simply being behind.
+ * Run the backfills in order: stage1, then stage11, then this one.
+ */
+export function isUntouchedPreAppointmentsAdminSet(
+  permissions: readonly string[],
+): boolean {
+  const held = new Set(permissions);
+  return (
+    held.size === PRE_APPOINTMENTS_PERMISSIONS.length &&
+    PRE_APPOINTMENTS_PERMISSIONS.every((permission) => held.has(permission))
   );
 }

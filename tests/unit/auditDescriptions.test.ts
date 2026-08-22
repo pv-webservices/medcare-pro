@@ -14,6 +14,7 @@ import {
   PRE_STAGE_11_PERMISSIONS,
   STAGE_1_PERMISSIONS,
   STAGE_11_PERMISSIONS,
+  STAGE_AP1_PERMISSIONS,
   findPermission,
   isUntouchedPreStage11AdminSet,
 } from "@/lib/permissions";
@@ -164,8 +165,16 @@ describe("the audit:read permission", () => {
     }
   });
 
-  it("leaves the two stage lists disjoint and, together, complete", () => {
-    const combined = [...STAGE_1_PERMISSIONS, ...STAGE_11_PERMISSIONS];
+  it("leaves the stage lists disjoint and, together, complete", () => {
+    // AP-1 added a THIRD stage list. This assertion is why: it failed the
+    // moment the appointment keys entered the catalogue without one, which is
+    // the guardrail doing its job rather than a test that needed relaxing.
+    // Every future stage joins this array too.
+    const combined = [
+      ...STAGE_1_PERMISSIONS,
+      ...STAGE_11_PERMISSIONS,
+      ...STAGE_AP1_PERMISSIONS,
+    ];
     expect(new Set(combined).size).toBe(combined.length);
 
     // Every catalogue key belongs either to the frozen pre-Stage-1 snapshot or
@@ -182,10 +191,22 @@ describe("the audit:read permission", () => {
   it("is the only difference between the catalogue and its pre-Stage-11 snapshot", () => {
     // PRE_STAGE_11_PERMISSIONS is derived, not frozen, so this is what keeps it
     // honest — and the backfill depends on it being exactly right.
+    //
+    // AP-1's keys are subtracted from it as well, and must be discounted here
+    // too. The reason is easy to miss: isUntouchedPreStage11AdminSet compares
+    // by EXACT SET EQUALITY against this list, and a genuine pre-Stage-11 Admin
+    // holds no appointment keys either. Leaving them in would mean that
+    // comparison never matches again and scripts/backfill-stage11.mts silently
+    // stops handing out audit:read to the organisations still owed it.
     expect(PRE_STAGE_11_PERMISSIONS.length).toBe(
-      ALL_PERMISSIONS.length - STAGE_11_PERMISSIONS.length,
+      ALL_PERMISSIONS.length -
+        STAGE_11_PERMISSIONS.length -
+        STAGE_AP1_PERMISSIONS.length,
     );
-    for (const permission of STAGE_11_PERMISSIONS) {
+    for (const permission of [
+      ...STAGE_11_PERMISSIONS,
+      ...STAGE_AP1_PERMISSIONS,
+    ]) {
       expect(PRE_STAGE_11_PERMISSIONS).not.toContain(permission);
     }
   });

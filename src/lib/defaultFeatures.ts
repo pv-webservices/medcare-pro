@@ -101,6 +101,31 @@ export const DEFAULT_FEATURES: readonly DefaultFeatureDefinition[] = [
     globalEnabled: true,
     inDefaultPlan: true,
   },
+  // --- AP-1 ---------------------------------------------------------------
+  {
+    key: "appointments",
+    name: "Appointments",
+    description:
+      "Book, reschedule, cancel and check in appointments, and convert them into registrations.",
+    // PREMIUM, and every other module here is CORE — the difference matters and
+    // is deliberate. The tier decides what an ABSENT RoleFeatureAccess row
+    // means: CORE inherits (silence allows), PREMIUM does not (silence denies).
+    //
+    // CORE is right for the seven modules above because clinics already depend
+    // on them; making them PREMIUM would lock every existing role out on the
+    // day enforcement landed. Nobody depends on appointments — it does not
+    // exist yet — so there is nothing to break, and PREMIUM is what lets a
+    // Clinic Admin decide which roles get it instead of it appearing for
+    // everyone at once.
+    //
+    // THE CONSEQUENCE, and it will look like a bug if you forget it: after this
+    // ships, nobody sees Appointments until an admin turns it on per role under
+    // Settings -> Features. That is the design, not a misconfiguration. Owner is
+    // the exception, since layer 3 cannot touch a wildcard holder.
+    tier: "PREMIUM",
+    globalEnabled: true,
+    inDefaultPlan: true,
+  },
   {
     key: "marketing",
     name: "Marketing campaigns",

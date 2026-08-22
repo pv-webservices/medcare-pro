@@ -29,6 +29,10 @@ export const MODULE_FEATURES = {
   notifications: "notifications",
   whatsapp: "whatsapp",
   team: "team",
+  // AP-1. Gated like every other module, but the only PREMIUM one — see the
+  // note on its catalogue entry. Silence at layer 3 DENIES here, so a role sees
+  // nothing until a Clinic Admin enables it.
+  appointments: "appointments",
 } as const;
 
 export type ModuleFeatureKey = (typeof MODULE_FEATURES)[keyof typeof MODULE_FEATURES];
