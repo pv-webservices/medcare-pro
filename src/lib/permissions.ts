@@ -241,35 +241,30 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
     module: "Team",
     permissions: [
+      // Stage 6 built the module these four describe, so the `pending` marks
+      // are gone: every one of them is now checked by lib/team.ts or
+      // lib/invitations.ts before anything is written.
       {
         key: "team:view",
         label: "View team",
         description: "See the people in this organisation and their roles.",
-        pending: "stage",
-        pendingNote: "Team management arrives in Stage 6.",
       },
       {
         key: "team:invite",
         label: "Invite team members",
         description: "Create and revoke invitations to join this organisation.",
-        pending: "stage",
-        pendingNote: "Invitations arrive in Stage 5.",
       },
       {
         key: "team:approve",
         label: "Approve team members",
         description:
-          "Approve or reject someone who has accepted an invitation. Scoped to this organisation only.",
-        pending: "stage",
-        pendingNote: "Team approval arrives in Stage 6.",
+          "Approve or reject someone whose access is pending. Scoped to this organisation only.",
       },
       {
         key: "team:manage",
         label: "Manage team members",
         description:
-          "Assign and change roles, suspend, reactivate, and revoke sessions. This is the permission that makes someone a Clinic Admin.",
-        pending: "stage",
-        pendingNote: "Team management arrives in Stage 6.",
+          "Suspend, reactivate and remove people, ending their sessions. This is the permission that makes someone a Clinic Admin. Changing which roles they hold is separate — that is “Manage roles”.",
       },
     ],
   },

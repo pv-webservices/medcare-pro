@@ -37,6 +37,7 @@ export const NAV_LINKS: readonly NavLink[] = [
   { href: "/reports", label: "Reports", permission: "report:read" },
   { href: "/notifications", label: "Notifications", permission: "notification:read" },
   { href: "/messages", label: "Messages", permission: "message:send" },
+  { href: "/team", label: "Team", permission: "team:view" },
   { href: "/settings/roles", label: "Roles", permission: "role:read" },
 ] as const;
 

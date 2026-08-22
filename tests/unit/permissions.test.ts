@@ -10,6 +10,18 @@ import {
   WILDCARD,
 } from "@/lib/permissions";
 
+/**
+ * Stage 1 catalogued a batch of keys ahead of the modules that would check
+ * them. These are the ones a later stage has since wired up: lib/team.ts and
+ * lib/invitations.ts check all four before writing anything.
+ */
+const ENFORCED_SINCE_STAGE_1 = [
+  "team:view",
+  "team:invite",
+  "team:approve",
+  "team:manage",
+] as const;
+
 describe("the catalogue", () => {
   it("has no duplicate keys", () => {
     expect(new Set(ALL_PERMISSIONS).size).toBe(ALL_PERMISSIONS.length);
@@ -78,11 +90,28 @@ describe("STAGE_1_PERMISSIONS", () => {
     ]);
   });
 
-  it("marks every new key as pending, since nothing enforces them yet", () => {
+  it("marks every key nothing enforces yet as pending", () => {
     // A catalogue string no call site checks grants nothing. Saying so on screen
     // is the difference between a roadmap and a false promise of protection.
+    //
+    // The corollary is that a key which HAS gained a call site must lose the
+    // mark, or the screen starts understating what a role can do. This list is
+    // the record of which Stage 1 keys have since been built.
+    const enforced = new Set<string>(ENFORCED_SINCE_STAGE_1);
+
     for (const key of STAGE_1_PERMISSIONS) {
+      if (enforced.has(key)) {
+        continue;
+      }
       expect(findPermission(key)?.pending).toBeDefined();
+    }
+  });
+
+  it("has dropped the pending mark from every key that is now enforced", () => {
+    for (const key of ENFORCED_SINCE_STAGE_1) {
+      expect(STAGE_1_PERMISSIONS).toContain(key);
+      expect(findPermission(key)?.pending).toBeUndefined();
+      expect(findPermission(key)?.pendingNote).toBeUndefined();
     }
   });
 

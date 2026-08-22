@@ -238,6 +238,82 @@ async function assertOwnerRemains(
   }
 }
 
+/**
+ * Rules 1 and 2 as one call, for a caller that hands out an EXISTING role.
+ *
+ * Stage 6 needs this: an invitation names the role its holder will get on
+ * acceptance, so issuing one is handing out reach and must obey the same limit
+ * as assigning it directly — you cannot invite someone into a role you could
+ * not assign them yourself, and nobody but an account owner can invite an owner.
+ *
+ * Exported so there is exactly ONE implementation of "may this actor grant this
+ * role". A second copy in the invitations module would be the weaker door the
+ * moment either changed.
+ *
+ * Deliberately does NOT re-validate the role's permissions against the
+ * catalogue, matching `assignRole`: handing out an existing role is not
+ * authoring one, and a legacy string on a seeded role must not block a
+ * legitimate grant.
+ */
+export async function assertRoleGrantableBy(
+  actor: ActorContext,
+  rolePermissions: readonly string[],
+): Promise<void> {
+  const held = await accountWidePermissions(actor);
+
+  if (rolePermissions.includes(WILDCARD) && !held.has(WILDCARD)) {
+    throw new BadRequestError("Only an account owner can assign the owner role.");
+  }
+
+  assertHeld(held, rolePermissions);
+}
+
+export interface GrantableRole {
+  id: string;
+  name: string;
+  /** Holds `*`. Only another wildcard holder may hand it out. */
+  isWildcard: boolean;
+}
+
+/**
+ * The roles this actor could actually hand to somebody — the read-side
+ * counterpart of `assertRoleGrantableBy`, for a form that has to render a
+ * choice before anyone submits it.
+ *
+ * Offering a role the write side would refuse is how a user learns to distrust
+ * the interface, so the two are computed from the same held set.
+ */
+export async function listGrantableRoles(
+  actor: ActorContext,
+): Promise<GrantableRole[]> {
+  const [roles, held] = await Promise.all([
+    prisma.role.findMany({
+      where: { tenantId: actor.tenantId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, permissions: true },
+    }),
+    accountWidePermissions(actor),
+  ]);
+
+  const hasWildcard = held.has(WILDCARD);
+
+  return roles
+    .map((role) => {
+      const permissions = toPermissionList(role.permissions);
+      return {
+        id: role.id,
+        name: role.name,
+        isWildcard: permissions.includes(WILDCARD),
+        canGrant:
+          hasWildcard ||
+          (!permissions.includes(WILDCARD) &&
+            permissions.every((permission) => held.has(permission))),
+      };
+    })
+    .filter((role) => role.canGrant)
+    .map(({ id, name, isWildcard }) => ({ id, name, isWildcard }));
+}
+
 function isUniqueConstraintError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -458,13 +534,7 @@ export async function assignRole(
   // Rule 1. The role's permissions are NOT re-validated against the catalogue
   // here — assigning an existing role is not authoring it, and a legacy string
   // on a seeded role should not block a legitimate assignment.
-  const rolePermissions = [...toPermissionList(role.permissions)];
-  const held = await accountWidePermissions(actor);
-
-  if (rolePermissions.includes(WILDCARD) && !held.has(WILDCARD)) {
-    throw new BadRequestError("Only an account owner can assign the owner role.");
-  }
-  assertHeld(held, rolePermissions);
+  await assertRoleGrantableBy(actor, [...toPermissionList(role.permissions)]);
 
   // MySQL treats NULLs as distinct, so the @@unique on
   // (user_id, role_id, clinic_id) does NOT stop a duplicate account-wide row.

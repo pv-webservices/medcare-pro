@@ -25,6 +25,7 @@
     "verify:stage3": "tsx scripts/verify-stage3-registration.mts",
     "verify:stage4": "tsx scripts/verify-stage4-login-code.mts",
     "verify:stage5": "tsx scripts/verify-stage5-auth-ui.mts",
+    "verify:stage6": "tsx scripts/verify-stage6-team.mts",
     "verify:whatsapp": "tsx scripts/verify-whatsapp.mts",
     "whatsapp:doctor": "tsx scripts/whatsapp-doctor.mts"
   },

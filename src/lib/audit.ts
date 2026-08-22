@@ -61,6 +61,29 @@ export const AUDIT_ACTIONS = {
   LOGIN_CODE_RATE_LIMITED: "LOGIN_CODE_RATE_LIMITED",
   /** The user signed out of every device at once. */
   SESSIONS_REVOKED_ALL: "SESSIONS_REVOKED_ALL",
+
+  // --- Stage 6: invitations and the tenant-side membership lifecycle -------
+  //
+  // `targetId` carries the Invitation row id or the User id. NEVER the token or
+  // its hash: assertSafeAuditMetadata throws on a metadata key containing
+  // "token", which is what keeps a bearer credential out of a table that is
+  // never deleted and is read during support work.
+  TEAM_INVITATION_CREATED: "TEAM_INVITATION_CREATED",
+  /** A new invitation to the same address superseded an outstanding one. */
+  TEAM_INVITATION_SUPERSEDED: "TEAM_INVITATION_SUPERSEDED",
+  TEAM_INVITATION_REVOKED: "TEAM_INVITATION_REVOKED",
+  TEAM_INVITATION_ACCEPTED: "TEAM_INVITATION_ACCEPTED",
+  /**
+   * The platform axis of an invited login was opened under the delegated grant
+   * described in src/lib/platform/memberActivation.ts. Written ONLY there.
+   */
+  MEMBER_ACCOUNT_ACTIVATED: "MEMBER_ACCOUNT_ACTIVATED",
+  /** Tenant-side membership decisions. `users.membership_status` moves only here. */
+  TEAM_MEMBER_APPROVED: "TEAM_MEMBER_APPROVED",
+  TEAM_MEMBER_REJECTED: "TEAM_MEMBER_REJECTED",
+  TEAM_MEMBER_SUSPENDED: "TEAM_MEMBER_SUSPENDED",
+  TEAM_MEMBER_REACTIVATED: "TEAM_MEMBER_REACTIVATED",
+  TEAM_MEMBER_REMOVED: "TEAM_MEMBER_REMOVED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

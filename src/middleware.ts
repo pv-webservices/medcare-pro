@@ -23,6 +23,7 @@ const PROTECTED_PREFIXES = [
   "/reports",
   "/notifications",
   "/messages",
+  "/team",
   "/settings",
 ] as const;
 

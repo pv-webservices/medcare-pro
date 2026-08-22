@@ -82,13 +82,32 @@ describe("buildRateLimitKey", () => {
 });
 
 describe("RATE_LIMIT_POLICIES", () => {
-  it("holds the four Stage 4 dimensions", () => {
+  it("holds every dimension, and drops none as stages are added", () => {
     expect(Object.keys(RATE_LIMIT_POLICIES).sort()).toEqual([
+      // Stage 6 — invitations.
+      "acceptInvitationByIp",
+      "inviteByEmail",
+      "inviteByTenant",
+      // Stage 4 — login codes.
       "requestByEmail",
       "requestByIp",
       "verifyByEmail",
       "verifyByIp",
     ]);
+  });
+
+  it("matches the approved Stage 6 invitation policy", () => {
+    expect(RATE_LIMIT_POLICIES.inviteByEmail.maxCount).toBe(3);
+    expect(RATE_LIMIT_POLICIES.inviteByTenant.maxCount).toBe(20);
+    expect(RATE_LIMIT_POLICIES.acceptInvitationByIp.maxCount).toBe(20);
+  });
+
+  it("limits invitations to one address more tightly than a whole tenant", () => {
+    // Harm concentrates on one victim's inbox, not on the sender — the same
+    // reasoning as the login-code limits above.
+    expect(RATE_LIMIT_POLICIES.inviteByEmail.maxCount).toBeLessThan(
+      RATE_LIMIT_POLICIES.inviteByTenant.maxCount,
+    );
   });
 
   it("matches the approved Stage 4 policy", () => {

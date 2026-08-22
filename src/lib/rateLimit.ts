@@ -91,6 +91,38 @@ export const RATE_LIMIT_POLICIES = {
     maxCount: 50,
     blockMs: FIFTEEN_MINUTES_MS,
   },
+
+  // --- Stage 6: invitations -------------------------------------------------
+  //
+  // Sending an invitation is an AUTHENTICATED action, so these are not there to
+  // stop an anonymous attacker — they stop our own mail domain being used to
+  // flood an inbox by a tenant admin, or by whoever took their session. The
+  // per-address limit is the tight one for the same reason it is on login
+  // codes: harm concentrates on one victim's inbox, not on the sender.
+  inviteByEmail: {
+    name: "team:invite:email",
+    windowMs: FIFTEEN_MINUTES_MS,
+    maxCount: 3,
+    blockMs: FIFTEEN_MINUTES_MS,
+  },
+  /** A clinic onboarding its whole front desk at once should not trip this. */
+  inviteByTenant: {
+    name: "team:invite:tenant",
+    windowMs: FIFTEEN_MINUTES_MS,
+    maxCount: 20,
+    blockMs: FIFTEEN_MINUTES_MS,
+  },
+  /**
+   * The accept endpoint is public. A 256-bit token is not guessable, so this is
+   * not the defence against forgery — it is what stops the endpoint being used
+   * as a free user-creation or timing oracle by an unauthenticated caller.
+   */
+  acceptInvitationByIp: {
+    name: "invitation:accept:ip",
+    windowMs: FIFTEEN_MINUTES_MS,
+    maxCount: 20,
+    blockMs: FIFTEEN_MINUTES_MS,
+  },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitPolicyName = keyof typeof RATE_LIMIT_POLICIES;
