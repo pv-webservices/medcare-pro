@@ -214,6 +214,8 @@ async function build() {
     data: {
       businessName: TEST_TENANT_NAME,
       email: `${TEST_TENANT_NAME}-${Date.now()}@example.test`,
+      // Stage 3 made tenants.slug NOT NULL. Mirrors the email's uniqueness.
+      slug: `${TEST_TENANT_NAME}-${Date.now()}`,
       emailVerifiedAt: new Date(),
     },
     select: { id: true },
@@ -449,6 +451,8 @@ async function main(): Promise<void> {
     data: {
       businessName: TEST_TENANT_NAME,
       email: `${TEST_TENANT_NAME}-other-${Date.now()}@example.test`,
+      // Stage 3 made tenants.slug NOT NULL. Mirrors the email's uniqueness.
+      slug: `${TEST_TENANT_NAME}-other-${Date.now()}`,
       emailVerifiedAt: new Date(),
     },
     select: { id: true },

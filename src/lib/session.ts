@@ -4,6 +4,7 @@ import { evaluateAccessStatus } from "@/lib/accessStatus";
 import { evaluateSession, type SessionDenialReason } from "@/lib/sessionPolicy";
 import type { AccessDenialReason } from "@/lib/accessStatus";
 import type { ActorContext } from "@/lib/rbac";
+import type { TenantStatus } from "@prisma/client";
 
 /**
  * Resolves the acting user from the session registry — PRD §9 (Data scoping).
@@ -30,12 +31,24 @@ export class UnauthenticatedError extends Error {
   /** Why, for server logs. Never serialised: the client is told only "401". */
   readonly reason: SessionDenialReason | AccessDenialReason | "platform-tenant";
 
+  /**
+   * The organisation's status, set ONLY when `reason` is "tenant" — Stage 3.
+   *
+   * It exists so the dashboard shell can send a member of a suspended clinic to
+   * a screen that says so, instead of to a login page their still-valid cookie
+   * would immediately bounce them off. No API route reads it: a 401 body says
+   * nothing either way.
+   */
+  readonly tenantStatus: TenantStatus | null;
+
   constructor(
     reason: SessionDenialReason | AccessDenialReason | "platform-tenant" = null,
+    tenantStatus: TenantStatus | null = null,
   ) {
     super("Not signed in");
     this.name = "UnauthenticatedError";
     this.reason = reason;
+    this.tenantStatus = tenantStatus;
   }
 }
 
@@ -121,7 +134,10 @@ export function toTenantActor(
   });
 
   if (!access.allowed) {
-    throw new UnauthenticatedError(access.reason);
+    throw new UnauthenticatedError(
+      access.reason,
+      access.reason === "tenant" ? context.tenant.status : null,
+    );
   }
 
   return {

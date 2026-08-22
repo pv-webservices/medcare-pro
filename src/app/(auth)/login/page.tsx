@@ -17,10 +17,28 @@ const UNREACHABLE_MESSAGE =
 
 const EMAIL_NOT_VERIFIED_CODE = "EmailNotVerified";
 
+/**
+ * Stage 3 item 4 — the applicant's organisation exists and their password is
+ * right, but the application has not been approved. Auth.js surfaces these as
+ * `result.code`; see ClinicStateError in src/lib/auth.ts for what each one is
+ * allowed to disclose and why.
+ */
+const CLINIC_STATE_CODES: Record<string, string> = {
+  ClinicPending: "pending",
+  ClinicRejected: "rejected",
+  ClinicSuspended: "suspended",
+};
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const justVerified = searchParams.get("verified") === "1";
+  /**
+   * Set by the dashboard shell when it refuses a session that still carries a
+   * valid token — revoked, expired, or the account itself was suspended. See
+   * signedOutDestination in src/app/(dashboard)/layout.tsx.
+   */
+  const sessionEnded = searchParams.get("ended") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,8 +61,19 @@ function LoginContent() {
       });
 
       if (!result || result.error) {
+        const clinicState = result?.code
+          ? CLINIC_STATE_CODES[result.code]
+          : undefined;
+
         if (result?.code === EMAIL_NOT_VERIFIED_CODE) {
           setIsUnverified(true);
+        } else if (clinicState) {
+          // No session was created, so this page is where the applicant is
+          // told. The destination carries the state only — never the address,
+          // which would put it in a shareable URL and the browser history.
+          setPassword("");
+          router.push(`/pending-approval?status=${clinicState}`);
+          return;
         } else {
           setError(INVALID_CREDENTIALS_MESSAGE);
         }
@@ -87,6 +116,11 @@ function LoginContent() {
             </div>
 
             <form onSubmit={handleSubmit} noValidate={false} className="space-y-6">
+              {sessionEnded && !error && (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  Your session has ended. Sign in again to continue.
+                </p>
+              )}
               {justVerified && !error && !isUnverified && (
                 <p className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
                   Your email is verified. Log in to continue.

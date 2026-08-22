@@ -86,6 +86,8 @@ async function makeClinicTenant(label: string) {
     data: {
       businessName: TEST_TENANT_NAME,
       email: `${TEST_TENANT_NAME}-${label}-${Date.now()}@example.test`,
+      // Stage 3 made tenants.slug NOT NULL. Mirrors the email's uniqueness.
+      slug: `${TEST_TENANT_NAME}-${label}-${Date.now()}`,
       emailVerifiedAt: new Date(),
       status: "ACTIVE",
     },

@@ -1,45 +1,24 @@
-import { notFound, redirect } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
-import { requirePlatformOwner } from "@/lib/platform/auth";
+import Link from "next/link";
+import { ShieldCheck, ArrowRight } from "lucide-react";
+import { requireOwnerPage } from "@/lib/platform/ownerPage";
 import { getPlatformOverview } from "@/lib/platform/overview";
-import { PlatformAuthorizationError } from "@/lib/platform/context";
 
 /**
- * Platform Owner dashboard — Stage 2.
+ * Platform Owner dashboard — Stage 2, extended in Stage 3.
  *
- * The gate is here, server-side, and it is the only thing standing between a
- * signed-in clinic user and this page. There is no client-side check to
- * complement it, deliberately: hiding a link is not access control.
- *
- * A signed-in non-Owner gets 404, not 403. 403 would confirm that the platform
- * surface exists and that they simply lack the role — an answer worth nothing
- * to a legitimate user and worth a great deal to someone probing. Only the
- * "no session at all" case redirects to the login screen, and that leaks
- * nothing: /owner/login renders for anyone who asks for it.
- *
- * Read-only. The approval queue lands in Stage 3.
+ * The gate is server-side and is the only thing standing between a signed-in
+ * clinic user and this page. There is no client-side check to complement it,
+ * deliberately: hiding a link is not access control.
  */
 export default async function OwnerDashboardPage() {
-  let owner;
-  try {
-    owner = await requirePlatformOwner();
-  } catch (error: unknown) {
-    if (error instanceof PlatformAuthorizationError) {
-      if (error.reason === "no-session") {
-        redirect("/owner/login");
-      }
-      notFound();
-    }
-    throw error;
-  }
-
+  const owner = await requireOwnerPage();
   const overview = await getPlatformOverview(owner);
 
   const cards = [
-    { label: "Awaiting approval", value: overview.tenants.PENDING },
-    { label: "Active", value: overview.tenants.ACTIVE },
-    { label: "Suspended", value: overview.tenants.SUSPENDED },
-    { label: "Rejected", value: overview.tenants.REJECTED },
+    { label: "Awaiting approval", value: overview.tenants.PENDING, status: "PENDING" },
+    { label: "Active", value: overview.tenants.ACTIVE, status: "ACTIVE" },
+    { label: "Suspended", value: overview.tenants.SUSPENDED, status: "SUSPENDED" },
+    { label: "Rejected", value: overview.tenants.REJECTED, status: "REJECTED" },
   ];
 
   return (
@@ -59,16 +38,24 @@ export default async function OwnerDashboardPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <Link
+            key={card.label}
+            href={`/owner/applications?status=${card.status}`}
+            className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+          >
             <div className="text-2xl font-semibold tabular-nums">{card.value}</div>
             <div className="mt-1 text-xs text-slate-400">{card.label}</div>
-          </div>
+          </Link>
         ))}
       </div>
 
-      <p className="mt-8 text-sm text-slate-400">
-        Clinic registration approvals arrive in Stage 3.
-      </p>
+      <Link
+        href="/owner/applications?status=PENDING"
+        className="mt-8 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-white"
+      >
+        Review clinic applications
+        <ArrowRight className="h-4 w-4" />
+      </Link>
     </div>
   );
 }

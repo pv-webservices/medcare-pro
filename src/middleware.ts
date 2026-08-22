@@ -78,11 +78,22 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(LOGIN_PATH, nextUrl));
   }
 
-  // A signed-in user has no use for the signup/login screens.
+  // A signed-in user has no use for the signup/login screens — UNLESS the
+  // dashboard has just refused their session and sent them here (Stage 3).
+  //
+  // "Signed in" here means only "a decodable JWT is present". The token can be
+  // intact while the session row behind it is revoked, or the account is
+  // suspended; in that case bouncing them back to /dashboard, which is what
+  // refused them, is an infinite loop. `ended=1` is set by the dashboard shell
+  // to break it.
+  //
+  // The flag is trivially forgeable and that is fine: the worst a forged one
+  // can do is show a signed-in user the login form, which grants nothing.
   const isPublicAuthPath = PUBLIC_AUTH_PATHS.some(
     (path) => nextUrl.pathname === path,
   );
-  if (isSignedIn && isPublicAuthPath) {
+  const isSessionEnded = nextUrl.searchParams.get("ended") === "1";
+  if (isSignedIn && isPublicAuthPath && !isSessionEnded) {
     return NextResponse.redirect(new URL(DEFAULT_SIGNED_IN_PATH, nextUrl));
   }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { PermissionError, ScopeError } from "@/lib/rbac";
 import { UnauthenticatedError } from "@/lib/session";
+import { PlatformAuthorizationError } from "@/lib/platform/context";
 import type { ApiResponse } from "@/lib/utils";
 
 /**
@@ -67,6 +68,17 @@ export function toErrorResponse(
 ): NextResponse<ApiResponse<never>> {
   if (error instanceof UnauthenticatedError) {
     return jsonError("You are not signed in.", 401);
+  }
+
+  // Stage 3, the first Owner API routes. Mirrors what /owner/dashboard does:
+  // no session at all is a 401, but a signed-in caller who is not an Owner gets
+  // 404 — never 403, which would confirm the platform surface exists and that
+  // they merely lack the role.
+  if (error instanceof PlatformAuthorizationError) {
+    if (error.reason === "no-session") {
+      return jsonError("You are not signed in.", 401);
+    }
+    return jsonError("Not found.", 404);
   }
 
   if (error instanceof PermissionError) {

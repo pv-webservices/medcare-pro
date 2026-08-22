@@ -32,17 +32,45 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
+/** Maps a refused session onto a screen that will actually render for it. */
+function signedOutDestination(error: UnauthenticatedError): string {
+  if (error.reason === "platform-tenant") {
+    return "/owner/dashboard";
+  }
+  if (error.reason === "tenant") {
+    if (error.tenantStatus === "SUSPENDED") {
+      return "/pending-approval?status=suspended";
+    }
+    if (error.tenantStatus === "REJECTED") {
+      return "/pending-approval?status=rejected";
+    }
+    return "/pending-approval?status=pending";
+  }
+  return "/login?ended=1";
+}
+
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
   let actor;
   try {
     actor = await requireActor();
   } catch (error: unknown) {
     if (error instanceof UnauthenticatedError) {
-      // A Platform Owner belongs to the reserved platform tenant, which
-      // requireActor() refuses to scope to (Stage 2). Sending them to /login
-      // would loop: the middleware bounces a signed-in user off /login and
-      // straight back here. They go to their own surface instead.
-      redirect(error.reason === "platform-tenant" ? "/owner/dashboard" : "/login");
+      // WHERE A REFUSED SESSION GOES, and why it is not always /login.
+      //
+      // The cookie may still be a perfectly valid, unexpired JWT — what failed
+      // is the database check behind it. The middleware only sees the token, so
+      // it bounces a "signed in" user off /login and straight back here: plain
+      // `redirect("/login")` is an infinite loop for exactly these cases.
+      //
+      //   platform-tenant  an Owner, who has their own surface (Stage 2)
+      //   tenant           their organisation is pending, suspended or rejected
+      //                    — /pending-approval explains which, and the
+      //                    middleware does not bounce anyone off it
+      //   anything else    the session itself is gone, revoked or expired, or
+      //                    the refusal is personal. `ended=1` tells the
+      //                    middleware to let the login screen render even
+      //                    though a token is present.
+      redirect(signedOutDestination(error));
     }
     throw error;
   }

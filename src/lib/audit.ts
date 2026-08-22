@@ -31,6 +31,20 @@ export const AUDIT_ACTIONS = {
   OWNER_ALREADY_PRESENT: "OWNER_ALREADY_PRESENT",
   SESSION_CREATED: "SESSION_CREATED",
   SESSION_REVOKED: "SESSION_REVOKED",
+
+  // --- Stage 3: clinic registration and the Owner's decision on it ---------
+  /** An applicant submitted a registration. Actor is the applicant. */
+  CLINIC_REGISTERED: "CLINIC_REGISTERED",
+  /** The organisation's address was verified from the emailed link. */
+  CLINIC_EMAIL_VERIFIED: "CLINIC_EMAIL_VERIFIED",
+  CLINIC_APPROVED: "CLINIC_APPROVED",
+  CLINIC_REJECTED: "CLINIC_REJECTED",
+  CLINIC_SUSPENDED: "CLINIC_SUSPENDED",
+  CLINIC_REACTIVATED: "CLINIC_REACTIVATED",
+  /** The first user was given their account-wide role at approval. */
+  CLINIC_ADMIN_ASSIGNED: "CLINIC_ADMIN_ASSIGNED",
+  /** The Owner set the tenant's plan and/or its feature overrides. */
+  TENANT_ENTITLEMENTS_SET: "TENANT_ENTITLEMENTS_SET",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

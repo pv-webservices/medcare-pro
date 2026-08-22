@@ -1,5 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { PrismaClientOrTransaction } from "@/lib/defaultRoles";
+import {
+  purposeMatches,
+  VERIFICATION_PURPOSES,
+  type VerificationPurpose,
+} from "@/lib/verificationPurpose";
 
 /**
  * Email-verification token handling — FR-1.2 / FR-1.5.
@@ -13,8 +18,15 @@ import type { PrismaClientOrTransaction } from "@/lib/defaultRoles";
  * for passwords): the input is already 256 bits of entropy, so there is nothing
  * to brute-force or rainbow-table.
  *
- * `VerificationToken.identifier` holds the Tenant's email. It is unique on
- * Tenant, so a consumed token resolves to exactly one tenant.
+ * `VerificationToken.identifier` holds the email being verified.
+ *
+ * STAGE 3 — PURPOSE. At signup the organisation's address and the applicant's
+ * address are the same string, so `identifier` alone no longer identifies what a
+ * token is for. Every token now carries a purpose, and consumption REQUIRES the
+ * caller to state which one it expects: a token minted to verify the
+ * organisation cannot be redeemed to verify an individual, or the reverse. A
+ * mismatch is reported as `invalid` rather than as its own status — the holder
+ * of a wrong-purpose token learns nothing beyond "this link does not work here".
  */
 
 const TOKEN_BYTES = 32;
@@ -32,6 +44,7 @@ export interface IssuedToken {
   /** SHA-256 of the raw token — what actually goes in the database. */
   tokenHash: string;
   expires: Date;
+  purpose: VerificationPurpose;
 }
 
 export function hashToken(token: string): string {
@@ -45,6 +58,7 @@ export function hashToken(token: string): string {
 export async function issueVerificationToken(
   client: PrismaClientOrTransaction,
   email: string,
+  purpose: VerificationPurpose = VERIFICATION_PURPOSES.TENANT_EMAIL,
   now: Date = new Date(),
 ): Promise<IssuedToken> {
   const token = randomBytes(TOKEN_BYTES).toString("hex");
@@ -52,35 +66,47 @@ export async function issueVerificationToken(
   const expires = new Date(now.getTime() + TOKEN_TTL_MS);
 
   await client.verificationToken.create({
-    data: { identifier: email, token: tokenHash, expires },
+    data: { identifier: email, token: tokenHash, expires, purpose },
   });
 
-  return { token, tokenHash, expires };
+  return { token, tokenHash, expires, purpose };
 }
 
-/** Drops every outstanding token for an address, so a resend invalidates the old link. */
+/**
+ * Drops outstanding tokens for an address, so a resend invalidates the old link.
+ *
+ * Scoped to one purpose when given one. Clearing every purpose would mean a
+ * resent organisation link silently killed the applicant's own pending
+ * verification, which is a different flow with a different token.
+ */
 export async function clearVerificationTokens(
   client: PrismaClientOrTransaction,
   email: string,
+  purpose?: VerificationPurpose,
 ): Promise<void> {
-  await client.verificationToken.deleteMany({ where: { identifier: email } });
+  await client.verificationToken.deleteMany({
+    where: { identifier: email, ...(purpose ? { purpose } : {}) },
+  });
 }
 
 export type ConsumeResult =
-  | { status: "valid"; email: string }
+  | { status: "valid"; email: string; purpose: VerificationPurpose }
   | { status: "invalid" }
   | { status: "expired" };
 
 /**
- * Validates and consumes a raw token.
+ * Validates and consumes a raw token against an expected purpose.
  *
  * An expired token is deleted as it is rejected, so a stale link cannot be
- * retried. The caller marks the tenant verified — this function deliberately
- * does not, so that both happen in one transaction at the call site.
+ * retried. A token whose purpose does not match is deliberately NOT deleted:
+ * it is a valid token for some other flow, and destroying it here would let one
+ * flow break another. The caller marks the row verified — this function
+ * deliberately does not, so that both happen in one transaction at the call site.
  */
 export async function consumeVerificationToken(
   client: PrismaClientOrTransaction,
   token: string,
+  expectedPurpose: VerificationPurpose,
   now: Date = new Date(),
 ): Promise<ConsumeResult> {
   const tokenHash = hashToken(token);
@@ -93,13 +119,17 @@ export async function consumeVerificationToken(
     return { status: "invalid" };
   }
 
+  if (!purposeMatches(record.purpose, expectedPurpose)) {
+    return { status: "invalid" };
+  }
+
   if (record.expires.getTime() <= now.getTime()) {
     await client.verificationToken.delete({ where: { token: tokenHash } });
     return { status: "expired" };
   }
 
   await client.verificationToken.delete({ where: { token: tokenHash } });
-  return { status: "valid", email: record.identifier };
+  return { status: "valid", email: record.identifier, purpose: expectedPurpose };
 }
 
 /**

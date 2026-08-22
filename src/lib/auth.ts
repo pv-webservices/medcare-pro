@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
 import { createAppSession } from "@/lib/appSession";
 import { evaluateAccessStatus } from "@/lib/accessStatus";
+import { readClientIp, readUserAgent } from "@/lib/requestMeta";
+import type { TenantStatus } from "@prisma/client";
 
 /**
  * Auth.js (NextAuth) configuration — PRD §6.1 (FR-1.1 … FR-1.5).
@@ -49,19 +51,45 @@ export class EmailNotVerifiedError extends CredentialsSignin {
 }
 
 /**
- * Best-effort client IP for the session record.
+ * Stage 3 item 4 — the applicant has to be told their application is under
+ * review, rather than being shown "invalid email or password" for an account
+ * that is perfectly valid and simply not approved yet.
  *
- * Self-hosted behind a proxy, so `x-forwarded-for` is the only source there is;
- * its first entry is the original client. It is client-controllable and is
- * therefore recorded for the "your devices" list and incident review ONLY —
- * nothing authorizes on it.
+ * WHAT THIS DISCLOSES, AND WHY IT IS ACCEPTABLE. Like EmailNotVerifiedError,
+ * this is only ever reached AFTER the password has verified, so the caller has
+ * already proven they hold the credential. It reports the state of their own
+ * ORGANISATION and nothing about any individual: a user the Owner suspended
+ * personally, or one a Tenant Admin removed, still gets the same generic `null`
+ * as a wrong password. Confirming "your clinic is not approved yet" to the
+ * person who registered it tells them what they already know they are waiting
+ * for; confirming "you personally were suspended" is a different disclosure and
+ * is deliberately not made here.
  */
-function readClientIp(request: Request | undefined): string | null {
-  const forwarded = request?.headers?.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? null;
+export class ClinicStateError extends CredentialsSignin {
+  constructor(code: "ClinicPending" | "ClinicRejected" | "ClinicSuspended") {
+    super();
+    this.code = code;
   }
-  return request?.headers?.get("x-real-ip") ?? null;
+}
+
+/**
+ * Null for a state that gets the generic refusal instead of an explanation.
+ * ARCHIVED is one: it is terminal and there is nothing for the applicant to
+ * wait for or respond to.
+ */
+function clinicStateCode(
+  status: TenantStatus,
+): "ClinicPending" | "ClinicRejected" | "ClinicSuspended" | null {
+  switch (status) {
+    case "PENDING":
+      return "ClinicPending";
+    case "REJECTED":
+      return "ClinicRejected";
+    case "SUSPENDED":
+      return "ClinicSuspended";
+    default:
+      return null;
+  }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -98,6 +126,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: true,
             passwordHash: true,
             tenantId: true,
+            emailVerifiedAt: true,
             accountStatus: true,
             membershipStatus: true,
             tenant: {
@@ -125,6 +154,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           throw new EmailNotVerifiedError();
         }
 
+        // Stage 3 — and this person's OWN address. Stage 1 split the two
+        // because an invited team member verifies only their own, and the
+        // Stage 1 backfill filled this column for every pre-existing user from
+        // their tenant, so no existing login is affected.
+        if (!user.emailVerifiedAt) {
+          throw new EmailNotVerifiedError();
+        }
+
         // Stage 2 — the core authorization rule, applied at the door as well as
         // on every request. Without it a suspended user would sign in
         // successfully and then be bounced by requireActor() on the very next
@@ -140,6 +177,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           membershipStatus: user.membershipStatus,
         });
         if (!access.allowed) {
+          // Stage 3 item 4 — an organisation-level refusal is explained; a
+          // user-level one is not. See the note on ClinicStateError.
+          if (!user.tenant.isPlatform && access.reason === "tenant") {
+            const code = clinicStateCode(user.tenant.status);
+            if (code) {
+              throw new ClinicStateError(code);
+            }
+          }
           return null;
         }
 
@@ -151,7 +196,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           userId: user.id,
           tenantId: user.tenantId,
           ip: readClientIp(request),
-          userAgent: request?.headers?.get("user-agent") ?? null,
+          userAgent: readUserAgent(request),
           now,
         });
 

@@ -59,7 +59,7 @@ export interface SendVerificationEmailParams {
  * template unfiltered — without escaping, a business name containing markup
  * would be injected into the email we send.
  */
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -132,6 +132,24 @@ async function deliver(params: {
   if (error) {
     throw new EmailDeliveryError(error.message);
   }
+}
+
+/**
+ * The transport, for templates that live elsewhere — Stage 3's registration
+ * decision mail is in src/lib/registrationEmails.ts.
+ *
+ * This file stays the only place that knows about Resend, the API key, the from
+ * address, and the fact that a failure arrives in the resolved value rather than
+ * as a throw. A caller gets one guarantee: it returns, or it throws
+ * EmailDeliveryError. Nothing in between.
+ */
+export async function sendTransactionalEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<void> {
+  await deliver(params);
 }
 
 /**

@@ -4,13 +4,26 @@ import { Suspense, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, Eye, EyeOff, Globe, Calendar, Users, IndianRupee, Plus, Building2 } from "lucide-react";
+import { Mail, Eye, EyeOff, Globe, Calendar, Users, IndianRupee, Plus, Building2, User as UserIcon, MapPin, Phone } from "lucide-react";
+import { MIN_PASSWORD_LENGTH } from "@/lib/signupInput";
 
-// Signup screen — PRD §6.1 (FR-1.1, FR-1.2).
-// Creates one Tenant + one owner User, then sends a verification link.
+// Clinic registration — PRD §6.1 (FR-1.1, FR-1.2), widened by Stage 3.
+//
+// Creates one Tenant plus one applicant User as PENDING, then sends a
+// verification link. Approval by the Platform Owner is a separate step, so
+// finishing this form does NOT grant access — see /pending-approval.
+//
+// The field list and its rules live in src/lib/signupInput.ts, which the route
+// validates against too. The constants below are imported from there rather
+// than restated, so the two cannot drift.
 
-/** Kept in step with MIN_PASSWORD_LENGTH in src/app/api/auth/signup/route.ts. */
-const MIN_PASSWORD_LENGTH = 12;
+const FIELD_CLASS =
+  "block w-full rounded-xl border border-slate-200 py-3.5 px-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600";
+
+const FIELD_CLASS_ICON =
+  "block w-full rounded-xl border border-slate-200 py-3.5 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600";
+
+const LABEL_CLASS = "block text-sm font-medium text-slate-700 mb-2";
 
 const UNREACHABLE_MESSAGE =
   "Could not reach the server. Check your connection and try again.";
@@ -19,8 +32,14 @@ const FALLBACK_ERROR_MESSAGE = "Could not create the account. Try again.";
 
 function SignupContent() {
   const router = useRouter();
-  const [businessName, setBusinessName] = useState("");
+  const [name, setName] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [email, setEmail] = useState("");
+  const [city, setCity] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [businessEmail, setBusinessEmail] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   
@@ -45,7 +64,17 @@ function SignupContent() {
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessName, email, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          clinicName,
+          city,
+          phone,
+          address,
+          businessEmail,
+          password,
+          acceptTerms,
+        }),
       });
 
       const body: { success?: boolean; error?: string } = await response
@@ -110,25 +139,47 @@ function SignupContent() {
               )}
 
               <div>
-                <label htmlFor="businessName" className="block text-sm font-medium text-slate-700 mb-2">
-                  Business or clinic name
+                <label htmlFor="name" className={LABEL_CLASS}>
+                  Your name
+                </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <UserIcon className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                  </div>
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    autoFocus
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    aria-describedby={error ? "signup-error" : undefined}
+                    placeholder="Dr Amelia Rao"
+                    className={FIELD_CLASS_ICON}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="clinicName" className={LABEL_CLASS}>
+                  Clinic name
                 </label>
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                     <Building2 className="h-5 w-5 text-violet-600" aria-hidden="true" />
                   </div>
                   <input
-                    id="businessName"
-                    name="businessName"
+                    id="clinicName"
+                    name="clinicName"
                     type="text"
                     autoComplete="organization"
-                    autoFocus
                     required
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                    aria-describedby={error ? "signup-error" : undefined}
+                    value={clinicName}
+                    onChange={(e) => setClinicName(e.target.value)}
                     placeholder="Dental Care Clinic"
-                    className="block w-full rounded-xl border border-slate-200 py-3.5 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
+                    className={FIELD_CLASS_ICON}
                   />
                 </div>
               </div>
@@ -154,6 +205,88 @@ function SignupContent() {
                     className="block w-full rounded-xl border border-slate-200 py-3.5 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="city" className={LABEL_CLASS}>
+                    City
+                  </label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                      <MapPin className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                    </div>
+                    <input
+                      id="city"
+                      name="city"
+                      type="text"
+                      autoComplete="address-level2"
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Pune"
+                      className={FIELD_CLASS_ICON}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="phone" className={LABEL_CLASS}>
+                    Phone
+                  </label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                      <Phone className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                    </div>
+                    <input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      autoComplete="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className={FIELD_CLASS_ICON}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="address" className={LABEL_CLASS}>
+                  Address <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <textarea
+                  id="address"
+                  name="address"
+                  rows={2}
+                  autoComplete="street-address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Shop 4, MG Road"
+                  className={FIELD_CLASS}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="businessEmail" className={LABEL_CLASS}>
+                  Business contact email{" "}
+                  <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <input
+                  id="businessEmail"
+                  name="businessEmail"
+                  type="email"
+                  value={businessEmail}
+                  onChange={(e) => setBusinessEmail(e.target.value)}
+                  placeholder="accounts@dentalcare.com"
+                  className={FIELD_CLASS}
+                />
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Used for billing and notices. You still sign in with the email
+                  above.
+                </p>
               </div>
 
               <div>
@@ -213,6 +346,27 @@ function SignupContent() {
                   </button>
                 </div>
               </div>
+
+              <label className="flex items-start gap-3 text-sm text-slate-600">
+                <input
+                  id="acceptTerms"
+                  name="acceptTerms"
+                  type="checkbox"
+                  required
+                  checked={acceptTerms}
+                  onChange={(e) => setAcceptTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-600"
+                />
+                {/*
+                  No links yet: this repo has no /terms or /privacy route, and
+                  pointing a required consent at a 404 is worse than plain text.
+                  Wire both up when the documents exist — the timestamp stored in
+                  tenants.terms_accepted_at is what dates the acceptance.
+                */}
+                <span>
+                  I accept the terms of service and privacy policy.
+                </span>
+              </label>
 
               <button
                 type="submit"

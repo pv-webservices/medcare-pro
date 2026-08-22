@@ -52,13 +52,12 @@ model Tenant {
   /// an invitation link (/invite/<slug>/<token>) and nothing else — the slug is
   /// NEVER an authorisation input. See src/lib/tenantSlug.ts.
   ///
-  /// NULLable in Stage 1 and no further. The backfill generates one for every
-  /// existing tenant and the constrain migration adds the UNIQUE index, but the
-  /// column stays nullable because making it required would change the type of
-  /// prisma.tenant.create() and force an edit to api/auth/signup — which is out
-  /// of scope for Stage 1. Stage 3 rewrites signup to generate a slug, and
-  /// tightens this to NOT NULL at the same time.
-  slug       String?
+  /// NOT NULL since Stage 3 (migration 20260822120000_stage3_slug_required).
+  /// The Stage 1 backfill generated one for every existing tenant and the
+  /// constrain migration added the UNIQUE index; the column stayed nullable
+  /// only until signup allocated one itself, which it now does inside the same
+  /// transaction that creates the tenant.
+  slug       String
   /// Owner-controlled approval lifecycle. A tenant is unusable until ACTIVE.
   /// Only src/lib/platform/* may write this — see the note on
   /// User.accountStatus about the two statuses never being merged.

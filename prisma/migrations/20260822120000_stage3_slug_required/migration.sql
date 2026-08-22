@@ -1,0 +1,23 @@
+-- Stage 3 (M3) — tenants.slug becomes NOT NULL.
+--
+-- Deferred from the Stage 1 constrain migration, which said so in as many
+-- words: the column stayed nullable because requiring it would have changed the
+-- type of prisma.tenant.create() and forced an edit to api/auth/signup, which
+-- was out of scope for Stage 1.
+--
+-- Stage 3 makes that edit. Signup now allocates a unique slug inside the same
+-- transaction that creates the tenant, and ensurePlatformTenant() has always
+-- supplied one, so no code path can produce a NULL any more. The Stage 1
+-- backfill filled every pre-existing row.
+--
+-- SAFETY. This migration does NOT convert NULLs to anything. If a row still
+-- holds NULL, MySQL in its default strict mode refuses the ALTER and the
+-- migration fails loudly and atomically, which is the correct outcome: a silent
+-- conversion to '' would collide on the tenants_slug_key UNIQUE index the
+-- moment a second such row appeared. Check before applying:
+--
+--   SELECT COUNT(*) FROM tenants WHERE slug IS NULL;   -- must be 0
+--
+-- The UNIQUE index created in the constrain migration is unaffected: dropping
+-- NULLability does not rebuild it.
+ALTER TABLE `tenants` MODIFY COLUMN `slug` VARCHAR(191) NOT NULL;

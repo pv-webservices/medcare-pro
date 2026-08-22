@@ -69,6 +69,8 @@ async function makeTenant(name: string) {
     data: {
       businessName: name,
       email: `${name}-${Date.now()}@example.test`,
+      // Stage 3 made tenants.slug NOT NULL. Mirrors the email's uniqueness.
+      slug: `${name}-${Date.now()}`,
       emailVerifiedAt: new Date(),
     },
     select: { id: true },
