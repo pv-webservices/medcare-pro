@@ -296,6 +296,25 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
       },
     ],
   },
+  // -------------------------------------------------------------------------
+  // Stage 11 addition — the audit trail's first reader.
+  //
+  // Enforced from the day it was added, so it never carried a `pending` mark.
+  // Existing organisations get it through scripts/backfill-stage11.mts, which
+  // tops up only Admin roles nobody has edited — the same rule the Stage 1
+  // backfill keeps.
+  // -------------------------------------------------------------------------
+  {
+    module: "Activity log",
+    permissions: [
+      {
+        key: "audit:read",
+        label: "View activity log",
+        description:
+          "See who did what in this organisation and when — team changes, role and feature changes, and the decisions MEDCARE PRO took about the account.",
+      },
+    ],
+  },
   {
     module: "Marketing",
     permissions: [
@@ -388,15 +407,26 @@ export const HISTORICAL_ALL_PERMISSIONS: readonly string[] = [
   "role:manage",
 ];
 
+/** Everything Stage 11 added to the catalogue. */
+export const STAGE_11_PERMISSIONS: readonly string[] = ["audit:read"];
+
 /**
- * Everything added to the catalogue by Stage 1 — the difference between
- * HISTORICAL_ALL_PERMISSIONS and ALL_PERMISSIONS.
+ * Everything added to the catalogue by Stage 1.
  *
  * Derived rather than hand-listed so the two can never drift: adding a key to a
- * group above puts it here automatically.
+ * Stage 1 group above puts it here automatically.
+ *
+ * A LATER STAGE'S KEYS MUST BE SUBTRACTED, which is what the second filter is
+ * for. Without it `audit:read` would land in this list the moment Stage 11 added
+ * it, and scripts/backfill-stage1.mts — which appends exactly this list to
+ * untouched pre-Stage-1 Admin roles — would silently start doing Stage 11's job
+ * under Stage 1's name. Every future stage that adds a key must be subtracted
+ * here too; the unit tests check that the lists stay disjoint and complete.
  */
 export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
-  (permission) => !HISTORICAL_ALL_PERMISSIONS.includes(permission),
+  (permission) =>
+    !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
+    !STAGE_11_PERMISSIONS.includes(permission),
 );
 
 /**
@@ -413,5 +443,41 @@ export function isUntouchedHistoricalAdminSet(
   return (
     held.size === HISTORICAL_ALL_PERMISSIONS.length &&
     HISTORICAL_ALL_PERMISSIONS.every((permission) => held.has(permission))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stage 11 — one new key, and the same top-up rule Stage 1 established.
+// ---------------------------------------------------------------------------
+
+/**
+ * The catalogue exactly as it stood BEFORE Stage 11.
+ *
+ * Derived rather than frozen as a literal, unlike HISTORICAL_ALL_PERMISSIONS.
+ * That snapshot had to be frozen because the keys it names were added to the
+ * live catalogue in the same change; this one is simply "everything except what
+ * Stage 11 added", which stays correct on its own as long as STAGE_11_PERMISSIONS
+ * is accurate — and a unit test checks that it is.
+ */
+export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
+  (permission) => !STAGE_11_PERMISSIONS.includes(permission),
+);
+
+/**
+ * True when `permissions` is exactly the pre-Stage-11 catalogue — i.e. a seeded
+ * Admin role nobody has customised since the Stage 1 backfill.
+ *
+ * A role that does NOT match is left byte-for-byte alone. That includes an
+ * Admin still holding only the pre-Stage-1 twenty keys: it needs the Stage 1
+ * backfill first, and topping it up with `audit:read` alone would leave it in a
+ * state no seed ever produces.
+ */
+export function isUntouchedPreStage11AdminSet(
+  permissions: readonly string[],
+): boolean {
+  const held = new Set(permissions);
+  return (
+    held.size === PRE_STAGE_11_PERMISSIONS.length &&
+    PRE_STAGE_11_PERMISSIONS.every((permission) => held.has(permission))
   );
 }

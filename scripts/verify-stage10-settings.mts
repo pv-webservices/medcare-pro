@@ -318,11 +318,21 @@ async function main(): Promise<void> {
   console.log("\nThe seeded roles");
   // -------------------------------------------------------------------------
   const owner = await surfaceFor(t.ownerActor);
+  const readOnlySections = SETTINGS_SECTIONS.filter(
+    (section) => section.managePermissions.length === 0,
+  ).length;
   check(
-    "the account owner reaches every section and may change every one",
-    owner.sections.length === SETTINGS_SECTIONS.length &&
-      owner.manageable.length === SETTINGS_SECTIONS.length,
-    owner,
+    "the account owner reaches every section",
+    owner.sections.length === SETTINGS_SECTIONS.length,
+    owner.sections,
+  );
+  check(
+    "and may change every one except those nothing can change",
+    // Stage 11 added the activity log, which is append-only: not even the
+    // wildcard makes it editable, and an audit trail an owner can rewrite is
+    // not an audit trail.
+    owner.manageable.length === SETTINGS_SECTIONS.length - readOnlySections,
+    owner.manageable,
   );
 
   const admin = await surfaceFor(t.adminActor);

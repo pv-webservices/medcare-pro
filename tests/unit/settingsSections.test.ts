@@ -40,11 +40,21 @@ describe("SETTINGS_SECTIONS", () => {
     }
   });
 
-  it("gives every section at least one way in and one way to change it", () => {
+  it("gives every section at least one way in", () => {
     for (const section of SETTINGS_SECTIONS) {
       expect(section.viewPermissions.length).toBeGreaterThan(0);
-      expect(section.managePermissions.length).toBeGreaterThan(0);
     }
+  });
+
+  it("leaves manage permissions empty only where nothing CAN be changed", () => {
+    // Stage 11 added the activity log, which is append-only — no permission
+    // makes it editable, so it correctly reads "View only" for everyone. Every
+    // other section must offer a way to change it, or its landing-page label is
+    // wrong.
+    const readOnly = SETTINGS_SECTIONS.filter(
+      (section) => section.managePermissions.length === 0,
+    ).map((section) => section.href);
+    expect(readOnly).toEqual(["/settings/audit"]);
   });
 
   it("never opens a section on a permission the screen behind it would refuse", () => {
@@ -86,11 +96,16 @@ describe("SETTINGS_SECTIONS", () => {
 });
 
 describe("who reaches what", () => {
-  it("shows an account owner everything, editable", () => {
+  it("shows an account owner everything, and lets them change all but the log", () => {
     const visible = visibleSettingsSections(OWNER);
     expect(visible).toHaveLength(SETTINGS_SECTIONS.length);
+
     for (const section of visible) {
-      expect(canManageSection(section, OWNER)).toBe(true);
+      // The activity log is append-only. Not even the wildcard makes it
+      // editable, which is the point: an audit trail an owner can rewrite is
+      // not an audit trail. Everything else must be theirs to change.
+      const expected = section.href !== "/settings/audit";
+      expect(canManageSection(section, OWNER)).toBe(expected);
     }
   });
 

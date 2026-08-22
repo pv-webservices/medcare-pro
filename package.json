@@ -16,6 +16,8 @@
     "prisma:seed": "prisma db seed",
     "stage1:backfill": "tsx scripts/backfill-stage1.mts",
     "stage1:verify": "tsx scripts/verify-stage1-schema.mts",
+    "stage11:backfill": "tsx scripts/backfill-stage11.mts",
+    "verify:stage11": "tsx scripts/verify-stage11-audit.mts",
     "create-owner": "tsx scripts/create-owner.mts",
     "verify:registrations": "tsx scripts/verify-registrations.mts",
     "verify:reports": "tsx scripts/verify-reports.mts",

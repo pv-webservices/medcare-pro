@@ -33,7 +33,13 @@ export interface SettingsSection {
   description: string;
   /** ANY of these opens the section, read-only. */
   viewPermissions: readonly string[];
-  /** ANY of these makes its controls live. Always a superset in spirit, never enforced as one. */
+  /**
+   * ANY of these makes its controls live.
+   *
+   * EMPTY IS MEANINGFUL, not an oversight: the activity log is append-only, so
+   * no permission can make it editable and the landing page correctly shows it
+   * as "View only" to everybody, the account owner included.
+   */
   managePermissions: readonly string[];
 }
 
@@ -53,6 +59,19 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       "Which of the organisation's features each role may use. What the organisation is entitled to is set by MEDCARE PRO.",
     viewPermissions: ["feature:view"],
     managePermissions: ["feature:manage"],
+  },
+  {
+    href: "/settings/audit",
+    title: "Activity log",
+    description:
+      "Who did what in this organisation and when — team changes, role and feature changes, and the decisions MEDCARE PRO took about the account.",
+    // Read-only by nature: the trail is append-only, so `audit:read` is both the
+    // view and the "manage" permission. There is nothing to change here, and
+    // listing a manage permission nothing enforces would be the hollow grant
+    // lib/permissions.ts warns about — so the landing page will show this card
+    // as "View only" for everyone, which is the truth.
+    viewPermissions: ["audit:read"],
+    managePermissions: [],
   },
   {
     href: "/settings/branding",

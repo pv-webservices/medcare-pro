@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck, ArrowRight, Layers, ToggleLeft } from "lucide-react";
+import { ShieldCheck, ArrowRight, Layers, ScrollText, ToggleLeft } from "lucide-react";
 import { requireOwnerPage } from "@/lib/platform/ownerPage";
 import { getPlatformOverview } from "@/lib/platform/overview";
 
@@ -64,7 +64,7 @@ export default async function OwnerDashboardPage() {
         own page, because reaching it should require having looked at the clinic
         you are about to change.
       */}
-      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+      <div className="mt-8 grid gap-3 sm:grid-cols-3">
         <Link
           href="/owner/features"
           className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
@@ -88,6 +88,24 @@ export default async function OwnerDashboardPage() {
           </div>
           <p className="mt-1 text-xs text-slate-400">
             What each plan includes, and who follows it. Layer 2.
+          </p>
+        </Link>
+
+        {/*
+          Stage 11. The trail every other screen has been writing to since
+          Stage 2, finally readable. Cross-tenant by design — an organisation's
+          own admins see their slice of it under Settings.
+        */}
+        <Link
+          href="/owner/audit"
+          className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+            <ScrollText className="h-4 w-4" />
+            Activity log
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Every decision taken on the platform. Append-only, exportable.
           </p>
         </Link>
       </div>
