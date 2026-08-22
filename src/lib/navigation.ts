@@ -15,16 +15,25 @@
  * — it is the courtesy layer on top of the enforcement, never a substitute.
  *
  * The permission named here is the one that makes the page *useful*, which is
- * not always the one that gates every control on it. Branding, for example,
- * needs `clinic:edit` rather than `clinic:read`: a user who can only look at a
- * clinic has nothing to do on that screen.
+ * not always the one that gates every control on it. The Settings tab names
+ * several, because the screens behind it answer to different ones.
  */
+
+import { SETTINGS_VIEW_PERMISSIONS } from "@/lib/settingsSections";
 
 export interface NavLink {
   href: string;
   label: string;
-  /** null = always shown. Otherwise the permission needed, held in any scope. */
-  permission: string | null;
+  /**
+   * null = always shown. A string = the permission needed, held in any scope.
+   * A LIST = any one of them is enough.
+   *
+   * The list form exists for the Settings tab, which fronts several screens
+   * answering to different permissions — see src/lib/settingsSections.ts. A
+   * single string there would have meant either hiding the tab from someone who
+   * can reach one of its screens, or showing it to someone who can reach none.
+   */
+  permission: string | readonly string[] | null;
   /**
    * The feature key that gates the module — Stage 8. null = never gated.
    *
@@ -32,7 +41,7 @@ export interface NavLink {
    * permission AND their organisation and role have the module. The pages
    * behind them re-check both, as ever.
    *
-   * The settings tabs are deliberately null. If a feature switch could hide the
+   * The Settings tab is deliberately null. If a feature switch could hide the
    * Roles or Features screens, an organisation could switch away the only
    * controls that would put it back — see UNGATED_MODULES in lib/features.ts.
    */
@@ -50,9 +59,30 @@ export const NAV_LINKS: readonly NavLink[] = [
   { href: "/notifications", label: "Notifications", permission: "notification:read", feature: "notifications" },
   { href: "/messages", label: "Messages", permission: "message:send", feature: "whatsapp" },
   { href: "/team", label: "Team", permission: "team:view", feature: "team" },
-  { href: "/settings/roles", label: "Roles", permission: "role:read", feature: null },
-  { href: "/settings/features", label: "Features", permission: "feature:view", feature: null },
+  // Stage 10. One tab for the whole section rather than one per screen: three
+  // of ten sidebar entries belonging to settings crowded out the modules staff
+  // use all day, and Branding had no entry at all — it was reachable only by
+  // typing its URL, which made FR-8.3 and FR-8.4 built but undiscoverable.
+  {
+    href: "/settings",
+    label: "Settings",
+    permission: SETTINGS_VIEW_PERMISSIONS,
+    feature: null,
+  },
 ] as const;
+
+/** null passes, a string must be held, a list needs any one of them. */
+function holdsNavPermission(
+  permission: NavLink["permission"],
+  holds: (permission: string) => boolean,
+): boolean {
+  if (permission === null) {
+    return true;
+  }
+  return typeof permission === "string"
+    ? holds(permission)
+    : permission.some(holds);
+}
 
 /**
  * Takes predicates rather than resolved sets so this module stays free of
@@ -67,8 +97,7 @@ export function visibleNavLinks(
   hasFeature: (feature: string) => boolean = () => true,
 ): NavLink[] {
   return NAV_LINKS.filter(
-    (link) =>
-      (link.permission === null || holds(link.permission)) &&
+    (link) => holdsNavPermission(link.permission, holds) &&
       (link.feature === null || hasFeature(link.feature)),
   );
 }

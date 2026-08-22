@@ -84,12 +84,11 @@ describe("the navigation's feature keys", () => {
     }
   });
 
-  it("leaves both settings tabs ungated", () => {
+  it("leaves the settings tab ungated", () => {
     // Same guard, seen from the navigation: hiding the tab would be as
-    // effective a lockout as refusing the page.
-    for (const href of ["/settings/roles", "/settings/features"]) {
-      expect(NAV_LINKS.find((link) => link.href === href)?.feature).toBeNull();
-    }
+    // effective a lockout as refusing the page. Stage 10 collapsed the two
+    // settings tabs into one, so there is a single entry to check.
+    expect(NAV_LINKS.find((link) => link.href === "/settings")?.feature).toBeNull();
   });
 
   it("leaves the dashboard reachable whatever the plan says", () => {
@@ -102,11 +101,7 @@ describe("the navigation's feature keys", () => {
     const ungated = NAV_LINKS.filter((link) => link.feature === null).map(
       (link) => link.href,
     );
-    expect(ungated.sort()).toEqual([
-      "/dashboard",
-      "/settings/features",
-      "/settings/roles",
-    ]);
+    expect(ungated.sort()).toEqual(["/dashboard", "/settings"]);
   });
 });
 

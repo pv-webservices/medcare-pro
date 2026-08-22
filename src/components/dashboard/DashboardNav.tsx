@@ -43,8 +43,12 @@ function getIconForHref(href: string, isActive: boolean) {
     case "/reports": return <FileText className={className} />;
     case "/notifications": return <Bell className={className} />;
     case "/messages": return <MessageSquare className={className} />;
-    case "/roles": return <ShieldCheck className={className} />;
-    case "/branding": return <Settings className={className} />;
+    // Stage 10 collapsed the settings screens behind one tab. The two cases
+    // that used to sit here named "/roles" and "/branding" and matched nothing
+    // — the hrefs have always been "/settings/...", so both tabs silently drew
+    // the default icon.
+    case "/team": return <ShieldCheck className={className} />;
+    case "/settings": return <Settings className={className} />;
     default: return <FileText className={className} />;
   }
 }

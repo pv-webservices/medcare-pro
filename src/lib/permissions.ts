@@ -213,21 +213,27 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         description:
           "Create roles, change their permissions, and assign them to users.",
       },
+      // Stage 10 gave these two their first call sites. The descriptions name
+      // branding specifically rather than "settings" in the abstract, because
+      // branding is the only setting the PRD defines (§6.8, FR-8.3 and FR-8.4)
+      // and a description promising more than that would be the same false
+      // promise the `pending` mark exists to prevent.
+      //
+      // Neither key REPLACED anything. Branding has answered to clinic:read /
+      // clinic:edit since it was built and still does — see the ANY-folded lists
+      // in src/lib/settingsSections.ts — so no role lost a screen the day these
+      // started being enforced.
       {
         key: "settings:view",
         label: "View settings",
-        description: "See this organisation's settings.",
-        pending: "stage",
-        pendingNote:
-          "Clinic settings arrive in Stage 10. Branding is gated by clinic:edit today.",
+        description:
+          "Open Settings and see the clinic's branding — its logo and theme colour — without changing it.",
       },
       {
         key: "settings:manage",
         label: "Manage settings",
-        description: "Change this organisation's operational settings.",
-        pending: "stage",
-        pendingNote:
-          "Clinic settings arrive in Stage 10. Branding is gated by clinic:edit today.",
+        description:
+          "Change the clinic's logo and theme colour. “Edit clinics” also opens this, since branding lives on the clinic record.",
       },
     ],
   },

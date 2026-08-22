@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import FeatureMatrix from "@/components/settings/FeatureMatrix";
 import PageHeader from "@/components/ui/PageHeader";
 import { getFeatureOverview, type FeatureOverview } from "@/lib/features";
@@ -43,6 +45,13 @@ export default async function FeatureSettingsPage() {
   if (!overview) {
     return (
       <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <Link
+        href="/settings"
+        className="inline-flex items-center gap-1.5 text-label font-medium text-slate-500 transition hover:text-primary"
+      >
+        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+        Settings
+      </Link>
         <PageHeader title="Features" />
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
           Your role cannot view feature access. Ask the account owner if you need
@@ -56,6 +65,13 @@ export default async function FeatureSettingsPage() {
 
   return (
     <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <Link
+        href="/settings"
+        className="inline-flex items-center gap-1.5 text-label font-medium text-slate-500 transition hover:text-primary"
+      >
+        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+        Settings
+      </Link>
       <PageHeader
         title="Features"
         meta={

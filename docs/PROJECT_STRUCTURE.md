@@ -38,7 +38,9 @@ medcare-pro/
 │   │   │   ├── notifications/page.tsx    # (6.7)
 │   │   │   ├── messages/page.tsx         # WhatsApp send (6.9)
 │   │   │   └── settings/
+│   │   │       ├── page.tsx              # section landing page (Stage 10)
 │   │   │       ├── roles/page.tsx        # role creation/assignment (6.8)
+│   │   │       ├── features/page.tsx     # per-role feature access (Stage 8)
 │   │   │       └── branding/page.tsx     # theme + logo (6.8)
 │   │   │
 │   │   ├── api/

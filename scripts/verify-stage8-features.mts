@@ -644,7 +644,10 @@ async function main(): Promise<void> {
   check("the doctors tab is gone", !hrefs.includes("/doctors"), hrefs);
   check("the reports tab is gone with the organisation's entitlement", !hrefs.includes("/reports"));
   check("the registrations tab remains", hrefs.includes("/registration"));
-  check("both settings tabs remain", hrefs.includes("/settings/roles") && hrefs.includes("/settings/features"));
+  // Stage 10 collapsed the two settings tabs into one. What this check is for
+  // is unchanged: the settings entry must survive a feature switch, or an
+  // organisation could hide the only screen that would switch it back.
+  check("the settings tab remains", hrefs.includes("/settings"), hrefs);
   check("the dashboard always remains", hrefs.includes("/dashboard"));
 
   console.log("\nThe page gate and the API gate agree");

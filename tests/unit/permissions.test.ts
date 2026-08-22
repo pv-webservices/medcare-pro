@@ -19,6 +19,10 @@ import {
  *   - `reports:export` — lib/reports.ts requires it, alongside `report:read`,
  *     before building a downloadable report (Stage 7).
  *
+ *   - the two `settings:*` keys — the Settings landing page and the branding
+ *     screen check them, alongside the clinic permissions that already opened
+ *     branding (Stage 10).
+ *
  * `reports:view` is deliberately NOT here. It is still inert, and its note in
  * the catalogue says so.
  */
@@ -30,6 +34,8 @@ const ENFORCED_SINCE_STAGE_1 = [
   "reports:export",
   "feature:view",
   "feature:manage",
+  "settings:view",
+  "settings:manage",
 ] as const;
 
 describe("the catalogue", () => {

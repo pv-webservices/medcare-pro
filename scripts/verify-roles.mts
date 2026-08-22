@@ -21,6 +21,7 @@ import {
   permissionsHeldAnywhere,
 } from "@/lib/rbac";
 import { NAV_LINKS, visibleNavLinks } from "@/lib/navigation";
+import { canManageSection, visibleSettingsSections } from "@/lib/settingsSections";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultRoles, OWNER_ROLE_NAME } from "@/lib/defaultRoles";
 import { ALL_PERMISSIONS, isKnownPermission, WILDCARD } from "@/lib/permissions";
@@ -498,19 +499,39 @@ async function main(): Promise<void> {
   const staffTabs = await navLabelsFor(t.staffActor);
   check(
     "Staff see only what their role reaches",
-    staffTabs.join(",") === "Dashboard,Registrations,Doctors,Clinics",
+    // Stage 10 added Settings to this list, and it is earned rather than a
+    // widening: Staff holds `clinic:read`, which has opened the branding screen
+    // since branding was built. What changed is that the screen is now findable
+    // instead of reachable only by typing its URL. The two checks below pin
+    // that it stays READ-ONLY for them.
+    staffTabs.join(",") === "Dashboard,Registrations,Doctors,Clinics,Settings",
     staffTabs,
   );
   check(
-    "Staff are not offered Reports, Notifications, Roles or Branding",
-    ["Reports", "Notifications", "Roles", "Branding"].every(
-      (label) => !staffTabs.includes(label),
-    ),
+    "Staff are not offered Reports or Notifications",
+    ["Reports", "Notifications"].every((label) => !staffTabs.includes(label)),
     staffTabs,
   );
+
+  const staffHeld = await permissionsHeldAnywhere(t.staffActor);
+  const staffHolds = (permission: string) => holdsAnywhere(staffHeld, permission);
+  const staffSections = visibleSettingsSections(staffHolds);
+  check(
+    "and inside Settings they reach branding only — not roles, not features",
+    staffSections.map((section) => section.href).join(",") === "/settings/branding",
+    staffSections.map((section) => section.href),
+  );
+  check(
+    "which they cannot change, so the new tab grants them nothing",
+    staffSections.every((section) => !canManageSection(section, staffHolds)),
+  );
+
   check(
     "a clinic-scoped grant still shows the tab (the check is scope-blind)",
-    (await navLabelsFor(t.scopedManagerActor)).includes("Roles"),
+    // Was "Roles" before Stage 10, which is now a screen inside Settings rather
+    // than a tab of its own. The role under test holds `role:read`, so it earns
+    // the tab the same way it earned the old one.
+    (await navLabelsFor(t.scopedManagerActor)).includes("Settings"),
     await navLabelsFor(t.scopedManagerActor),
   );
   check(

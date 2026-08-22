@@ -29,6 +29,7 @@
     "verify:stage7": "tsx scripts/verify-stage7-reports.mts",
     "verify:stage8": "tsx scripts/verify-stage8-features.mts",
     "verify:stage9": "tsx scripts/verify-stage9-entitlements.mts",
+    "verify:stage10": "tsx scripts/verify-stage10-settings.mts",
     "verify:whatsapp": "tsx scripts/verify-whatsapp.mts",
     "whatsapp:doctor": "tsx scripts/whatsapp-doctor.mts"
   },
