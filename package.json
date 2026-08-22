@@ -35,7 +35,8 @@
     "verify:whatsapp": "tsx scripts/verify-whatsapp.mts",
     "whatsapp:doctor": "tsx scripts/whatsapp-doctor.mts",
     "ap1:backfill": "tsx scripts/backfill-ap1-appointments.mts",
-    "verify:ap1-appointments-schema": "tsx scripts/verify-ap1-appointments-schema.mts"
+    "verify:ap1-appointments-schema": "tsx scripts/verify-ap1-appointments-schema.mts",
+    "verify:ap2-appointment-slots": "tsx scripts/verify-ap2-appointment-slots.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
