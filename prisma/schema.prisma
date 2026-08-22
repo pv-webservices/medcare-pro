@@ -942,7 +942,10 @@ model Feature {
   /// can reach past it.
   globalEnabled      Boolean   @default(true) @map("global_enabled")
   /// Who last flipped the switch and why. Stage 9 requires a reason for a
-  /// manual change; the full history lives in AuditLog, not here.
+  /// manual change in BOTH directions (see evaluateGlobalSwitch) and stamps all
+  /// three columns in the same transaction as the flip. This is the LAST change
+  /// only — the full history lives in AuditLog, under FEATURE_GLOBAL_ENABLED /
+  /// FEATURE_GLOBAL_DISABLED, and is never updated or deleted.
   globalChangedById  String?   @map("global_changed_by_id")
   globalChangedAt    DateTime? @map("global_changed_at")
   globalChangeReason String?   @map("global_change_reason") @db.Text

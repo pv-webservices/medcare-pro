@@ -22,8 +22,10 @@ import { requireActor } from "@/lib/session";
 // clears the row and returns the role to inheriting the organisation.
 //
 // Layers 1 and 2 — the platform kill switch and per-tenant overrides — are not
-// writable from anywhere in this route. They belong to the Platform Owner and
-// arrive in Stage 9.
+// writable from anywhere in this route. They belong to the Platform Owner, who
+// sets them on the /owner surface (Stage 9, src/lib/platform/entitlements.ts).
+// A tenant reaching them from here would be the escalation the AND exists to
+// prevent.
 
 export async function GET() {
   try {

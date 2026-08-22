@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck, ArrowRight } from "lucide-react";
+import { ShieldCheck, ArrowRight, Layers, ToggleLeft } from "lucide-react";
 import { requireOwnerPage } from "@/lib/platform/ownerPage";
 import { getPlatformOverview } from "@/lib/platform/overview";
 
@@ -56,6 +56,41 @@ export default async function OwnerDashboardPage() {
         Review clinic applications
         <ArrowRight className="h-4 w-4" />
       </Link>
+
+      {/*
+        Stage 9. The two entitlement layers that belong to the platform rather
+        than to any one organisation. Layer 2b — a single organisation's
+        overrides — is deliberately NOT here: it hangs off that organisation's
+        own page, because reaching it should require having looked at the clinic
+        you are about to change.
+      */}
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/owner/features"
+          className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+            <ToggleLeft className="h-4 w-4" />
+            Platform features
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Switch a feature off for every organisation at once. Layer 1.
+          </p>
+        </Link>
+
+        <Link
+          href="/owner/plans"
+          className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+            <Layers className="h-4 w-4" />
+            Plans
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            What each plan includes, and who follows it. Layer 2.
+          </p>
+        </Link>
+      </div>
     </div>
   );
 }

@@ -96,6 +96,27 @@ export const AUDIT_ACTIONS = {
   ROLE_FEATURE_DISABLED: "ROLE_FEATURE_DISABLED",
   /** The explicit row was removed, so the role inherits the tenant again. */
   ROLE_FEATURE_RESET: "ROLE_FEATURE_RESET",
+
+  // --- Stage 9: the Platform Owner's entitlement layers (1 and 2a) ---------
+  //
+  // The counterpart to the three ROLE_FEATURE_* actions above, and kept
+  // separate from them for the same reason those are kept separate from
+  // TENANT_ENTITLEMENTS_SET: a reader must be able to tell "the platform
+  // switched the module off for everyone" from "this organisation lost it" from
+  // "an admin took it away from one role". Three causes, three people to ask,
+  // three action names.
+  //
+  // Layer 1. `targetId` is the Feature id; the key and the number of
+  // organisations entitled at the moment of the flip travel in `afterValue`,
+  // because after a kill switch that count is no longer recoverable.
+  FEATURE_GLOBAL_ENABLED: "FEATURE_GLOBAL_ENABLED",
+  FEATURE_GLOBAL_DISABLED: "FEATURE_GLOBAL_DISABLED",
+  /** Layer 2a. `targetId` is the Plan id. */
+  PLAN_FEATURE_ADDED: "PLAN_FEATURE_ADDED",
+  PLAN_FEATURE_REMOVED: "PLAN_FEATURE_REMOVED",
+  // Layer 2b has no new action: a standalone per-tenant override writes
+  // TENANT_ENTITLEMENTS_SET, exactly as the Stage 3 approval screen does, so
+  // one organisation's entitlement history reads as one sequence.
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

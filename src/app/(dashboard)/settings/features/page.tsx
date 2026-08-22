@@ -17,8 +17,8 @@ import { requireActor, UnauthenticatedError } from "@/lib/session";
 // @/lib/features. The same reasoning keeps /settings/roles ungated.
 //
 // Layers 1 and 2 are read-only here. What the organisation is entitled to is
-// the Platform Owner's decision (Stage 9); what each role does with that
-// entitlement is this screen's.
+// the Platform Owner's decision, made on /owner/features and /owner/plans
+// (Stage 9); what each role does with that entitlement is this screen's.
 
 export default async function FeatureSettingsPage() {
   let actor;

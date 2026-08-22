@@ -81,8 +81,9 @@ export function evaluatePlatformAccess(
   }
 
   // No hierarchy is implied: SUPPORT_ADMIN is not a lesser SUPER_ADMIN, it is a
-  // different role. Stage 9 may add read-only support routes that require it
-  // explicitly; until then nothing but an exact match passes.
+  // different role. Stage 9 added the entitlement screens and gave every one of
+  // them to SUPER_ADMIN alone; read-only support routes are still unbuilt, and
+  // until they exist nothing but an exact match passes.
   if (input.platformRole !== input.required) {
     return { allowed: false, reason: "insufficient-platform-role" };
   }

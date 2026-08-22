@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal } from "lucide-react";
 import { requireOwnerPage } from "@/lib/platform/ownerPage";
 import { getClinicApplication } from "@/lib/platform/applications";
 import DecisionPanel from "@/components/owner/DecisionPanel";
@@ -125,6 +125,20 @@ export default async function OwnerApplicationDetailPage({ params }: PageProps) 
         currentPlanKey={application.planKey}
         features={application.features}
       />
+
+      {/*
+        Stage 9. The decision panel sets entitlements only as part of an
+        approval, so before Stage 9 an already-approved organisation could not be
+        changed at all without SQL. This link goes to the standalone screen,
+        which takes no decision and sends no mail.
+      */}
+      <Link
+        href={`/owner/applications/${application.id}/entitlements`}
+        className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-xs font-medium text-slate-300 transition hover:border-slate-600"
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        Plan and entitlements
+      </Link>
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold text-slate-200">Decision history</h2>
