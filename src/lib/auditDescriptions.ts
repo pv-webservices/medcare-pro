@@ -39,6 +39,7 @@ export type AuditCategory =
   | "team"
   | "roles"
   | "entitlements"
+  | "appointments"
   | "platform";
 
 export interface AuditDescription {
@@ -284,6 +285,44 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "platform",
     category: "platform",
   },
+
+  // --- Appointments --------------------------------------------------------
+  //
+  // Every one of these is "tenant": a clinic's own people booking and pricing
+  // their own services. Nothing here is a platform decision, and nothing here
+  // names a patient — see the note in lib/audit.ts on what these rows carry.
+  [AUDIT_ACTIONS.APPOINTMENT_CREATED]: {
+    label: "Appointment booked",
+    detail: "Somebody booked a patient into a doctor's slot.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_TYPE_CREATED]: {
+    label: "Appointment type added",
+    detail: "A new bookable service was added, with its length and price.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_TYPE_UPDATED]: {
+    label: "Appointment type changed",
+    detail:
+      "A bookable service was renamed, re-timed, re-priced, or moved between clinics. Appointments already booked keep the price they were quoted.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_TYPE_ACTIVATED]: {
+    label: "Appointment type reopened",
+    detail: "A retired service can be booked again.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_TYPE_DEACTIVATED]: {
+    label: "Appointment type retired",
+    detail:
+      "A service can no longer be booked. Appointments already booked with it are untouched, and it is kept rather than deleted so their history stays readable.",
+    side: "tenant",
+    category: "appointments",
+  },
 };
 
 /**
@@ -314,6 +353,7 @@ export const AUDIT_CATEGORIES: readonly {
   { key: "team", label: "Team" },
   { key: "roles", label: "Roles" },
   { key: "entitlements", label: "Features and plan" },
+  { key: "appointments", label: "Appointments" },
   { key: "platform", label: "Platform" },
 ];
 

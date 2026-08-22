@@ -117,6 +117,28 @@ export const AUDIT_ACTIONS = {
   // Layer 2b has no new action: a standalone per-tenant override writes
   // TENANT_ENTITLEMENTS_SET, exactly as the Stage 3 approval screen does, so
   // one organisation's entitlement history reads as one sequence.
+
+  // --- AP-3: booking, and the price list it books against ------------------
+  //
+  // `targetId` carries the Appointment id or the AppointmentType id, and
+  // `targetType` says which. NEVER the patient: `afterValue` records that a
+  // slot was taken, by whom and at what price, not who it was taken for. The
+  // patient's name and number live on the appointment row, which is read under
+  // `appointment:read`; this table is append-only and is read during support
+  // work, so it carries the scheduling fact and nothing clinical.
+  APPOINTMENT_CREATED: "APPOINTMENT_CREATED",
+
+  // Retiring a type is kept distinct from editing one, because "why can nobody
+  // book a follow-up any more?" and "who changed the price?" are different
+  // questions with different answers, and folding both into one action would
+  // hide the one that stops bookings.
+  APPOINTMENT_TYPE_CREATED: "APPOINTMENT_TYPE_CREATED",
+  APPOINTMENT_TYPE_UPDATED: "APPOINTMENT_TYPE_UPDATED",
+  APPOINTMENT_TYPE_ACTIVATED: "APPOINTMENT_TYPE_ACTIVATED",
+  APPOINTMENT_TYPE_DEACTIVATED: "APPOINTMENT_TYPE_DEACTIVATED",
+  // AP-4 owns rescheduled/cancelled/no-show/checked-in, and AP-5 owns
+  // converted. Listing them here before their call sites exist would put
+  // actions in the filter control that no row will ever carry.
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

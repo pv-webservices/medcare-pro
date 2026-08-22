@@ -318,12 +318,15 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   // -------------------------------------------------------------------------
   // AP-1 addition — appointments.
   //
-  // All eight are `pending`: AP-1 lands the catalogue and the schema, and the
-  // call sites arrive in AP-3 (book), AP-4 (reschedule/cancel/check in),
-  // AP-5 (convert) and AP-6/AP-7 (manage types). Per this file's own rule, a
-  // string here that no call site checks grants NOTHING — the marks come off
-  // one at a time as each stage builds its gate, and a unit test holds them to
-  // that.
+  // AP-1 landed the catalogue and the schema with all eight marked `pending`,
+  // and the marks come off one at a time as each stage builds its gate. Per
+  // this file's own rule, a string here that no call site checks grants
+  // NOTHING, and saying otherwise on the roles screen is a false promise of
+  // protection — so a unit test holds each key to its actual state.
+  //
+  // LIVE:    appointment:read (AP-2), appointment:create (AP-3),
+  //          appointment:type:manage (AP-3).
+  // PENDING: update / reschedule / cancel / checkin (AP-4), convert (AP-5).
   //
   // Listing them now rather than per stage means ONE permission backfill over
   // live tenants instead of four. scripts/backfill-ap1-appointments.mts tops up
@@ -342,16 +345,16 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         label: "View appointments",
         description:
           "See the appointment board and each booking's details, within the clinics this person can reach.",
-        pending: "stage",
-        pendingNote: "AP-3 builds the first call site that checks this.",
+        // LIVE since AP-2. Checked by getAppointmentSlots and listAppointments
+        // in lib/appointments.ts, and by listAppointmentTypes — the booking
+        // form has to be able to read the price list it books against.
       },
       {
         key: "appointment:create",
         label: "Book appointments",
         description:
           "Book a patient into a doctor's free slot. Booking does not create a patient record — converting does.",
-        pending: "stage",
-        pendingNote: "AP-3 builds the booking endpoint.",
+        // LIVE since AP-3. Checked by createAppointment.
       },
       {
         key: "appointment:update",
@@ -397,8 +400,11 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         label: "Manage appointment types",
         description:
           "Create, rename, re-price, activate and deactivate the bookable services and their durations. Separate from booking: the front desk books appointments, it does not set the price list.",
-        pending: "stage",
-        pendingNote: "AP-6/AP-7 build the appointment types screen.",
+        // LIVE since AP-3. Checked by createAppointmentType and
+        // updateAppointmentType, and by listAppointmentTypes for the
+        // includeInactive widening. Brought forward from AP-6/AP-7: nothing can
+        // be booked until at least one type exists, so the API had to arrive
+        // with booking rather than with the screen that drives it.
       },
     ],
   },

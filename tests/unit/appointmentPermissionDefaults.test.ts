@@ -23,6 +23,23 @@ import {
   type RoleKey,
 } from "@/lib/defaultRoles";
 
+/**
+ * The appointment keys a call site actually checks today.
+ *
+ *   appointment:read         — AP-2's getAppointmentSlots, and AP-3's
+ *                              listAppointments and listAppointmentTypes.
+ *   appointment:create       — AP-3's createAppointment.
+ *   appointment:type:manage  — AP-3's create/updateAppointmentType.
+ *
+ * AP-4 adds update/reschedule/cancel/checkin and AP-5 adds convert; each stage
+ * appends its key here as it builds the gate.
+ */
+const ENFORCED_APPOINTMENT_PERMISSIONS: readonly string[] = [
+  "appointment:read",
+  "appointment:create",
+  "appointment:type:manage",
+];
+
 const permissionsFor = (key: RoleKey): readonly string[] => {
   const role = DEFAULT_ROLES.find((entry) => entry.key === key);
   if (!role) throw new Error(`No seeded role keyed ${key}`);
@@ -66,14 +83,50 @@ describe("the AP-1 permission keys", () => {
     }
   });
 
-  it("marks every key pending, because nothing checks them yet", () => {
-    // This file's own rule: a string nothing checks grants nothing, and saying
-    // otherwise on the roles screen is a false promise of protection.
+  it("marks a key pending until the stage that enforces it has landed", () => {
+    // This file's own rule, in both directions: a string nothing checks grants
+    // nothing, and saying otherwise on the roles screen is a false promise of
+    // protection — but a key that HAS gained a call site must lose the mark, or
+    // the same screen starts understating what a role can do.
+    //
+    // The list below is therefore the record of which appointment keys are
+    // actually enforced, and it grows as AP-4 and AP-5 build their gates.
     for (const permission of STAGE_AP1_PERMISSIONS) {
       const definition = findPermission(permission);
+
+      if (ENFORCED_APPOINTMENT_PERMISSIONS.includes(permission)) {
+        continue;
+      }
+
       expect(definition?.pending).toBe("stage");
       expect(definition?.pendingNote).toBeTruthy();
     }
+  });
+
+  it("has dropped the mark from every key that is now enforced", () => {
+    for (const permission of ENFORCED_APPOINTMENT_PERMISSIONS) {
+      expect(STAGE_AP1_PERMISSIONS).toContain(permission);
+      const definition = findPermission(permission);
+      expect(definition?.pending).toBeUndefined();
+      expect(definition?.pendingNote).toBeUndefined();
+    }
+  });
+
+  it("still has AP-4 and AP-5 waiting", () => {
+    // Stated as behaviour rather than left implicit, so that enforcing one of
+    // these without clearing its mark — or clearing a mark without building the
+    // gate — fails here.
+    expect(
+      STAGE_AP1_PERMISSIONS.filter(
+        (permission) => !ENFORCED_APPOINTMENT_PERMISSIONS.includes(permission),
+      ),
+    ).toEqual([
+      "appointment:update",
+      "appointment:reschedule",
+      "appointment:cancel",
+      "appointment:checkin",
+      "appointment:convert",
+    ]);
   });
 });
 
