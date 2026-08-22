@@ -6,6 +6,7 @@ import {
   notificationFilterSchema,
 } from "@/lib/notifications";
 import { requireActor } from "@/lib/session";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Notifications — PRD §6.7 (FR-7.1, FR-7.2). PATCH marks read/unread.
 //
@@ -21,6 +22,7 @@ import { requireActor } from "@/lib/session";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.notifications);
     const params = new URL(request.url).searchParams;
 
     const filters = notificationFilterSchema.parse({
@@ -38,6 +40,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.notifications);
     const input = markNotificationsSchema.parse(await readJsonBody(request));
 
     // The result reports how many rows actually changed. An id the caller

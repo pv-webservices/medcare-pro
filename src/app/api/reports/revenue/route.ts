@@ -11,6 +11,7 @@ import {
   reportFilterSchema,
 } from "@/lib/reports";
 import { requireActor } from "@/lib/session";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Revenue report — PRD §6.6 (FR-6.1 … FR-6.4). Aggregates registrations by
 // visit_date over daily/weekly/monthly/yearly windows, broken down by clinic
@@ -32,6 +33,7 @@ import { requireActor } from "@/lib/session";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.reports);
     const params = new URL(request.url).searchParams;
 
     const filters = reportFilterSchema.parse({

@@ -61,6 +61,6 @@ Both items in `STAGE1_NOTES.md` remain binding and neither is done:
 
 - **Before Stage 4** — `login_codes.code_hash` must not hold a plain unsalted
   SHA-256 digest. See the acceptance criteria there. **This is the next stage.**
-- **Before Stage 8** — the role-level feature default must key off
-  `Feature.tier`. `role_feature_access` is still empty, so the change is still
-  free.
+- ~~**Before Stage 8** — the role-level feature default must key off
+  `Feature.tier`.~~ **Done in Stage 8**, while `role_feature_access` was still
+  empty. See the resolution note in `STAGE1_NOTES.md`.

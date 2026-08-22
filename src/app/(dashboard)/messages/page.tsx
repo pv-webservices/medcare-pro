@@ -20,6 +20,8 @@ import {
   listTemplatesForActor,
   type TemplateRecord,
 } from "@/lib/whatsappTemplates";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // WhatsApp — PRD §6.9 (FR-9.1, FR-9.2).
 //
@@ -41,6 +43,11 @@ export default async function MessagesPage() {
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.whatsapp);
+  if (locked) {
+    return <ModuleLocked title="Messages" reason={locked} />;
   }
 
   let templates: TemplateRecord[] | null = null;

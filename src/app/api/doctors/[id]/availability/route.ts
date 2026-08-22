@@ -11,6 +11,7 @@ import {
   getDoctorForActor,
   removeAvailability,
 } from "@/lib/doctors";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Doctor availability — PRD §6.4 (FR-4.3): specific dates with time ranges.
 //
@@ -24,6 +25,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const { id } = await context.params;
     const doctor = await getDoctorForActor(actor, id);
     return jsonOk(doctor.availability);
@@ -35,6 +37,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const { id } = await context.params;
     const input = availabilitySchema.parse(await readJsonBody(request));
     return jsonOk(await addAvailability(actor, id, input), 201);
@@ -46,6 +49,7 @@ export async function POST(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const { id } = await context.params;
 
     // Which window to drop. Scoped to this doctor inside removeAvailability, so

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { FeatureError } from "@/lib/featureResolution";
 import { PermissionError, ScopeError } from "@/lib/rbac";
 import { UnauthenticatedError } from "@/lib/session";
 import { PlatformAuthorizationError } from "@/lib/platform/context";
@@ -84,6 +85,15 @@ export function toErrorResponse(
 
   if (error instanceof PermissionError) {
     return jsonError("You do not have permission to do that.", 403);
+  }
+
+  // Stage 8. Also a 403 — the caller genuinely may not do this — but with its
+  // own message, because "you do not have permission" would send someone to
+  // their admin when the answer is that their organisation's plan, or a
+  // platform-wide switch, is what stopped them. The message names the layer at
+  // the granularity that tells them who to ask, and no finer.
+  if (error instanceof FeatureError) {
+    return jsonError(error.message, 403);
   }
 
   if (error instanceof ScopeError) {

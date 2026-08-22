@@ -5,6 +5,7 @@ import {
   createDoctorSchema,
   listDoctorsForActor,
 } from "@/lib/doctors";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Doctors — PRD §6.4 (FR-4.1, FR-4.2).
 //
@@ -20,6 +21,7 @@ import {
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const clinicId = new URL(request.url).searchParams.get("clinicId");
     return jsonOk(await listDoctorsForActor(actor, { clinicId }));
   } catch (error: unknown) {
@@ -30,6 +32,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const input = createDoctorSchema.parse(await readJsonBody(request));
     return jsonOk(await createDoctor(actor, input), 201);
   } catch (error: unknown) {

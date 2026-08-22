@@ -13,6 +13,7 @@ import {
   parseRegistrationFilters,
 } from "@/lib/registrations";
 import { requireActor } from "@/lib/session";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Registrations — PRD §6.3 (FR-3.1 … FR-3.4).
 //
@@ -30,6 +31,7 @@ import { requireActor } from "@/lib/session";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.registrations);
     const params = new URL(request.url).searchParams;
     const filters = parseRegistrationFilters(Object.fromEntries(params));
 
@@ -56,6 +58,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.registrations);
     const input = createRegistrationSchema.parse(await readJsonBody(request));
     return jsonOk(await createRegistration(actor, input), 201);
   } catch (error: unknown) {

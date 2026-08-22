@@ -6,6 +6,7 @@ import SignOutButton from "@/components/dashboard/SignOutButton";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { ToastProvider } from "@/components/ui";
 import { listClinicsForActor } from "@/lib/clinics";
+import { resolveModulesForActor } from "@/lib/features";
 import { visibleNavLinks } from "@/lib/navigation";
 import { countUnreadForActor } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -79,10 +80,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   // `countUnreadForActor` returns 0 rather than throwing for a Staff user, so
   // the shell renders the same for everyone — only the badge differs.
   const selectedClinicId = await resolveSelectedClinicId(actor);
-  const [clinics, unreadNotifications, held, currentUser, roleName] = await Promise.all([
+  const [clinics, unreadNotifications, held, modules, currentUser, roleName] = await Promise.all([
     listClinicsForActor(actor),
     countUnreadForActor(actor),
     permissionsHeldAnywhere(actor),
+    resolveModulesForActor(actor),
     prisma.user.findFirst({
       where: { id: actor.userId, tenantId: actor.tenantId },
       select: { name: true },
@@ -93,9 +95,16 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   const userName = currentUser?.name ?? "Admin User";
 
   // Tabs the user's roles cannot reach are dropped here rather than rendered
-  // and refused. The pages behind them still enforce their own permissions —
-  // see the note in src/lib/navigation.ts.
-  const links = visibleNavLinks((permission) => holdsAnywhere(held, permission));
+  // and refused, and Stage 8 adds the same courtesy for a module the
+  // organisation or the role does not have. The pages behind them still enforce
+  // both checks — see the note in src/lib/navigation.ts.
+  const links = visibleNavLinks(
+    (permission) => holdsAnywhere(held, permission),
+    // A key missing from the map means the catalogue row is missing, which
+    // lib/features.ts already treats as a denial and logs. Hiding the tab keeps
+    // the shell consistent with the page behind it.
+    (feature) => modules.get(feature)?.allowed === true,
+  );
 
   // No extra query: the switcher's own list already carries every clinic's
   // branding. "All clinics" leaves themeColor undefined, which resolveAccent

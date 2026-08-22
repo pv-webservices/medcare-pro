@@ -7,6 +7,8 @@ import { listDoctorsForActor } from "@/lib/doctors";
 import { can } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Doctors — PRD §6.4 (FR-4.1, FR-4.2).
 //
@@ -23,6 +25,11 @@ export default async function DoctorsListPage() {
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.doctors);
+  if (locked) {
+    return <ModuleLocked title="Doctors" reason={locked} />;
   }
 
   const selectedClinicId = await resolveSelectedClinicId(actor);

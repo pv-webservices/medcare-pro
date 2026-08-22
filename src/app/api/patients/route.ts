@@ -1,6 +1,7 @@
 import { BadRequestError, jsonOk, toErrorResponse } from "@/lib/apiHandler";
 import { findPatientsForActor } from "@/lib/registrations";
 import { requireActor } from "@/lib/session";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Patient lookup — PRD §6.3 (FR-3.1), the return-visit path.
 //
@@ -20,6 +21,7 @@ import { requireActor } from "@/lib/session";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.registrations);
     const params = new URL(request.url).searchParams;
 
     const clinicId = params.get("clinicId")?.trim();

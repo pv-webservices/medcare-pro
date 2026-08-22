@@ -11,6 +11,8 @@ import {
 import { PermissionError } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Notifications — PRD §6.7 (FR-7.1, FR-7.2). Owner/Admin only.
 //
@@ -37,6 +39,11 @@ export default async function NotificationsPage({
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.notifications);
+  if (locked) {
+    return <ModuleLocked title="Notifications" reason={locked} />;
   }
 
   const params = await searchParams;

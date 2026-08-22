@@ -236,7 +236,8 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   //
   // Every key below was `pending` when Stage 1 catalogued it, because nothing
   // checked it yet: the modules that enforce them arrive in Stages 6-9. Team
-  // (Stage 6) and reports:export (Stage 7) are built and no longer marked. Per
+  // (Stage 6), reports:export (Stage 7) and the two feature keys (Stage 8) are
+  // built and no longer marked. Per
   // this file's own rule, a string listed
   // here that no call site checks grants NOTHING — it is listed now so the roles
   // editor and the seeded Admin role carry it from the start, rather than
@@ -280,16 +281,12 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         label: "View feature access",
         description:
           "See which features this organisation is entitled to, and which are locked.",
-        pending: "stage",
-        pendingNote: "Feature entitlements arrive in Stage 8.",
       },
       {
         key: "feature:manage",
         label: "Manage feature access",
         description:
-          "Choose which of the organisation's entitled features each role may use. Cannot grant a feature the organisation does not hold, and cannot override a platform-wide switch.",
-        pending: "stage",
-        pendingNote: "Feature entitlements arrive in Stage 8.",
+          "Choose which of the organisation's entitled features each role may use. Cannot grant a feature the organisation does not hold, cannot override a platform-wide switch, and cannot take a feature away from the account owner.",
       },
     ],
   },

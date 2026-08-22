@@ -5,6 +5,7 @@ import {
   updateClinic,
   updateClinicSchema,
 } from "@/lib/clinics";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Clinic detail — PRD §6.2 (FR-2.1).
 //
@@ -22,6 +23,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.clinics);
     const { id } = await context.params;
     return jsonOk(await getClinicForActor(actor, id));
   } catch (error: unknown) {
@@ -32,6 +34,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.clinics);
     const { id } = await context.params;
     const input = updateClinicSchema.parse(await readJsonBody(request));
     return jsonOk(await updateClinic(actor, id, input));

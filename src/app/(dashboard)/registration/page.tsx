@@ -16,6 +16,8 @@ import {
 } from "@/lib/registrations";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Registration list — PRD §6.3 (FR-3.2 … FR-3.4): search, filter, export.
 //
@@ -59,6 +61,11 @@ export default async function RegistrationListPage({
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.registrations);
+  if (locked) {
+    return <ModuleLocked title="Registrations" reason={locked} />;
   }
 
   const params = await searchParams;

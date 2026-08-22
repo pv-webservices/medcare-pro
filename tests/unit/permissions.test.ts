@@ -28,6 +28,8 @@ const ENFORCED_SINCE_STAGE_1 = [
   "team:approve",
   "team:manage",
   "reports:export",
+  "feature:view",
+  "feature:manage",
 ] as const;
 
 describe("the catalogue", () => {

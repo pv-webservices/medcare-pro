@@ -20,6 +20,8 @@ import {
 } from "@/lib/reports";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Revenue report — PRD §6.6 (FR-6.1 … FR-6.4).
 //
@@ -49,6 +51,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.reports);
+  if (locked) {
+    return <ModuleLocked title="Revenue reports" reason={locked} />;
   }
 
   const params = await searchParams;

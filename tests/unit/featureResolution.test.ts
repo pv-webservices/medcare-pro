@@ -3,6 +3,7 @@ import {
   canAccessFeature,
   isTenantEntitled,
   resolveFeatureAccess,
+  resolveModuleAccess,
   type FeatureResolutionInput,
 } from "@/lib/featureResolution";
 
@@ -12,6 +13,8 @@ const OPEN: FeatureResolutionInput = {
   planEnabled: true,
   tenantOverride: null,
   roleAccess: null,
+  tier: "CORE",
+  roleHoldsWildcard: false,
   hasActionPermission: true,
 };
 
@@ -53,6 +56,7 @@ describe("resolveFeatureAccess", () => {
   it("reports the outermost failing layer when several fail at once", () => {
     expect(
       resolveFeatureAccess({
+        ...OPEN,
         globalEnabled: false,
         planEnabled: false,
         tenantOverride: false,
@@ -63,6 +67,7 @@ describe("resolveFeatureAccess", () => {
 
     expect(
       resolveFeatureAccess({
+        ...OPEN,
         globalEnabled: true,
         planEnabled: false,
         tenantOverride: null,
@@ -135,5 +140,141 @@ describe("an absent RoleFeatureAccess row inherits the tenant entitlement", () =
   it("distinguishes absent (null) from explicitly denied (false)", () => {
     expect(canAccessFeature({ ...OPEN, roleAccess: null })).toBe(true);
     expect(canAccessFeature({ ...OPEN, roleAccess: false })).toBe(false);
+  });
+});
+
+describe("what an absent layer-3 row means depends on the tier", () => {
+  // The rule STAGE1_NOTES.md recorded as binding on Stage 8, implemented here.
+  // Getting it backwards in either direction is a real incident: allow-by-
+  // default hands a newly sold premium feature to every role at once, and
+  // deny-by-default locks every existing role out of the modules they use daily.
+  it("lets silence allow a CORE module, so nothing existing breaks", () => {
+    expect(
+      canAccessFeature({ ...OPEN, tier: "CORE", roleAccess: null }),
+    ).toBe(true);
+  });
+
+  it("lets silence deny every other tier, so a new module stays invisible", () => {
+    for (const tier of ["PREMIUM", "BETA", "INTERNAL"] as const) {
+      expect(resolveFeatureAccess({ ...OPEN, tier, roleAccess: null })).toEqual({
+        allowed: false,
+        reason: "role",
+      });
+    }
+  });
+
+  it("still lets an explicit grant open a non-CORE module", () => {
+    // Which is the point: the Tenant Admin decides who gets it, one role at a
+    // time, rather than nobody ever getting it.
+    expect(
+      canAccessFeature({ ...OPEN, tier: "PREMIUM", roleAccess: true }),
+    ).toBe(true);
+  });
+
+  it("still lets an explicit denial close a CORE module", () => {
+    expect(
+      canAccessFeature({ ...OPEN, tier: "CORE", roleAccess: false }),
+    ).toBe(false);
+  });
+
+  it("does not let the tier reach past the organisation's entitlement", () => {
+    // An explicit grant on a premium feature the tenant never bought is still a
+    // denial, and still reported as the entitlement layer, not the role layer.
+    expect(
+      resolveFeatureAccess({
+        ...OPEN,
+        tier: "PREMIUM",
+        roleAccess: true,
+        planEnabled: false,
+      }),
+    ).toEqual({ allowed: false, reason: "entitlement" });
+  });
+});
+
+describe("a wildcard role is immune to layer 3", () => {
+  // Lockout guard: a tenant-side switch must never be able to take the settings
+  // screen away from the account's own root, because nothing in the app could
+  // then give it back.
+  it("ignores an explicit denial written against the owner's role", () => {
+    expect(
+      canAccessFeature({ ...OPEN, roleAccess: false, roleHoldsWildcard: true }),
+    ).toBe(true);
+  });
+
+  it("ignores the non-CORE deny-by-default too", () => {
+    expect(
+      canAccessFeature({
+        ...OPEN,
+        tier: "PREMIUM",
+        roleAccess: null,
+        roleHoldsWildcard: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("is immunity from the tenant's own layer, not from the platform's", () => {
+    // The whole point of the ordering: an account owner is as subject to a kill
+    // switch and a cancelled plan as anybody else in their organisation.
+    expect(
+      resolveFeatureAccess({
+        ...OPEN,
+        roleHoldsWildcard: true,
+        globalEnabled: false,
+      }),
+    ).toEqual({ allowed: false, reason: "global" });
+
+    expect(
+      resolveFeatureAccess({
+        ...OPEN,
+        roleHoldsWildcard: true,
+        planEnabled: false,
+      }),
+    ).toEqual({ allowed: false, reason: "entitlement" });
+  });
+
+  it("does not substitute for the action permission either", () => {
+    // Immunity is layer 3 only. The wildcard already satisfies layer 4 through
+    // lib/rbac.ts; nothing here should short-circuit that check.
+    expect(
+      canAccessFeature({
+        ...OPEN,
+        roleHoldsWildcard: true,
+        hasActionPermission: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("resolveModuleAccess", () => {
+  it("answers layers 1-3 and stops, ignoring the action permission", () => {
+    // The module gate and the permission check are asked separately, by
+    // different call sites, and must not collapse into one another.
+    const withoutPermission: FeatureResolutionInput = {
+      ...OPEN,
+      hasActionPermission: false,
+    };
+    expect(resolveModuleAccess(withoutPermission)).toEqual({
+      allowed: true,
+      reason: null,
+    });
+  });
+
+  it("agrees with the four-layer resolver whenever the permission is held", () => {
+    const cases: Partial<FeatureResolutionInput>[] = [
+      {},
+      { globalEnabled: false },
+      { planEnabled: false },
+      { tenantOverride: false },
+      { tenantOverride: true, planEnabled: null },
+      { roleAccess: false },
+      { tier: "PREMIUM" },
+      { tier: "PREMIUM", roleAccess: true },
+      { roleHoldsWildcard: true, roleAccess: false },
+    ];
+
+    for (const override of cases) {
+      const input = { ...OPEN, ...override };
+      expect(resolveModuleAccess(input)).toEqual(resolveFeatureAccess(input));
+    }
   });
 });

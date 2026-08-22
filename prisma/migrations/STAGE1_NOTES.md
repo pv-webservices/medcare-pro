@@ -132,6 +132,15 @@ stage named.
 
 ### Before Stage 8 — role-level feature default depends on tier
 
+> **DONE (Stage 8).** Implemented exactly as specified below: `tier` is now a
+> field on `FeatureResolutionInput`, and `resolveModuleAccess` denies when
+> `roleAccess === null` and the tier is not `CORE`. `role_feature_access` was
+> still empty when the change landed, so no rows were reinterpreted. Covered by
+> `tests/unit/featureResolution.test.ts` and by `npm run verify:stage8`, which
+> proves a newly entitled PREMIUM feature reaches no role until a Tenant Admin
+> names one.
+
+
 Stage 1 shipped a single rule: an absent `RoleFeatureAccess` row inherits the
 tenant entitlement. That is right for the features that already exist, and
 wrong for anything sold later. A tenant buying a premium feature must not have

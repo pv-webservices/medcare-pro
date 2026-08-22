@@ -5,6 +5,8 @@ import { todayDateOnly } from "@/lib/dates";
 import { getDoctorForActor } from "@/lib/doctors";
 import { can, ScopeError } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Doctor profile, availability and leave — PRD §6.4 (FR-4.2 … FR-4.4).
 
@@ -24,6 +26,11 @@ export default async function DoctorDetailPage({ params }: DoctorDetailPageProps
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.doctors);
+  if (locked) {
+    return <ModuleLocked title="Doctor" reason={locked} />;
   }
 
   let doctor;

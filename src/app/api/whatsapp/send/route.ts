@@ -1,6 +1,7 @@
 import { jsonOk, readJsonBody, toErrorResponse } from "@/lib/apiHandler";
 import { requireActor } from "@/lib/session";
 import { sendMessageSchema, sendToPatients } from "@/lib/whatsappMessages";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // WhatsApp send — PRD §6.9 (FR-9.1, FR-9.2).
 //
@@ -21,6 +22,7 @@ import { sendMessageSchema, sendToPatients } from "@/lib/whatsappMessages";
 export async function POST(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.whatsapp);
     const input = sendMessageSchema.parse(await readJsonBody(request));
 
     // Answers 200 even when some recipients failed: a partial send is a real

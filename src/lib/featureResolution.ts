@@ -1,3 +1,5 @@
+import type { FeatureTier } from "@prisma/client";
+
 /**
  * Feature entitlement resolution — the pure core of Stage 8.
  *
@@ -20,15 +22,17 @@
  * entitlement says whether the organisation has the module that action lives in.
  * Conflating them would mean cancelling a plan silently rewrote everyone's role.
  *
- * Pure: no Prisma, no session, no imports. The caller loads the four rows and
- * passes their resolved values in, so this file is trivially unit-testable and
- * has exactly one copy of the precedence rule.
+ * Pure: no Prisma, no session, no runtime imports. The caller loads the four
+ * rows and passes their resolved values in, so this file is trivially
+ * unit-testable and has exactly one copy of the precedence rule.
  *
- * NOT WIRED UP IN STAGE 1. Nothing calls this yet; Stage 8 adds the loaders and
- * the call sites in APIs and server actions — never in the UI alone.
+ * WIRED UP IN STAGE 8. The loaders and the fold across a user's several roles
+ * live in src/lib/features.ts; the call sites are in the API routes and the
+ * page loads, never in the UI alone.
  */
 
-export interface FeatureResolutionInput {
+/** Layers 1-3: does this ORGANISATION and ROLE have the module at all? */
+export interface ModuleAccessInput {
   /** Layer 1 — Feature.globalEnabled. */
   globalEnabled: boolean;
   /**
@@ -49,12 +53,46 @@ export interface FeatureResolutionInput {
    * Layer 3 — RoleFeatureAccess. `null` means no row exists for this role and
    * feature.
    *
-   * ABSENCE INHERITS THE TENANT ENTITLEMENT. It means "the Tenant Admin has
-   * expressed no opinion", not "denied". Deny-by-default would require a row for
-   * every (role x feature) pair and would silently lock every role out of any
-   * feature added afterwards — a trap that only shows up in production.
+   * WHAT ABSENCE MEANS DEPENDS ON THE TIER, and that rule was decided during
+   * Stage 1 local validation (prisma/migrations/STAGE1_NOTES.md) as binding on
+   * this stage. See `tier` below.
    */
   roleAccess: boolean | null;
+  /**
+   * The feature's tier, which decides what an ABSENT layer-3 row means:
+   *
+   *   CORE                      — absence ALLOWS. Every role keeps working
+   *                               exactly as it did before entitlements were
+   *                               enforced, with no backfill and no
+   *                               (role x feature) row explosion.
+   *   PREMIUM, BETA, INTERNAL   — absence DENIES. A tenant who buys a premium
+   *                               feature must not have it appear for every
+   *                               role at once; the Tenant Admin decides who
+   *                               gets it, by writing a row.
+   *
+   * Absence still means "the Tenant Admin has expressed no opinion" in both
+   * cases. What differs is the safe reading of silence: for a module the
+   * organisation has always had, silence means carry on; for one it just
+   * acquired, silence means nobody asked for it yet.
+   */
+  tier: FeatureTier;
+  /**
+   * Whether the role being resolved holds the `*` wildcard.
+   *
+   * LAYER 3 CANNOT TOUCH AN OWNER. A tenant-side switch that could take the
+   * Features screen away from the account's own root would be a lockout with no
+   * in-app remedy, the same hazard lib/roles.ts guards when it refuses any edit
+   * leaving nobody holding `*` account-wide.
+   *
+   * This is immunity from layer 3 ONLY. Layers 1 and 2 belong to the Platform
+   * Owner, and an account owner is as subject to a kill switch or a cancelled
+   * plan as anybody else.
+   */
+  roleHoldsWildcard: boolean;
+}
+
+/** Every layer, including the action permission the call site checked. */
+export interface FeatureResolutionInput extends ModuleAccessInput {
   /** Layer 4 — the outcome of the existing lib/rbac.ts permission check. */
   hasActionPermission: boolean;
 }
@@ -88,9 +126,15 @@ export function isTenantEntitled(
   return input.planEnabled === true;
 }
 
-export function resolveFeatureAccess(
-  input: FeatureResolutionInput,
-): FeatureResolution {
+/**
+ * Layers 1-3 — has this organisation got the module, and is this role allowed
+ * to use it?
+ *
+ * This is the gate the API routes and page loads call, because "may you open
+ * the reports module" and "may you read a report" are different questions with
+ * different answers and different people to ask about them.
+ */
+export function resolveModuleAccess(input: ModuleAccessInput): FeatureResolution {
   if (!input.globalEnabled) {
     return { allowed: false, reason: "global" };
   }
@@ -99,9 +143,31 @@ export function resolveFeatureAccess(
     return { allowed: false, reason: "entitlement" };
   }
 
-  // Absence inherits; only an explicit `false` denies.
+  // Checked after the platform's own two layers, never before: immunity from a
+  // tenant-side switch is not immunity from a kill switch or a cancelled plan.
+  if (input.roleHoldsWildcard) {
+    return { allowed: true, reason: null };
+  }
+
   if (input.roleAccess === false) {
     return { allowed: false, reason: "role" };
+  }
+
+  // Silence reads as consent only for the modules the organisation has always
+  // had. See the note on `tier`.
+  if (input.roleAccess === null && input.tier !== "CORE") {
+    return { allowed: false, reason: "role" };
+  }
+
+  return { allowed: true, reason: null };
+}
+
+export function resolveFeatureAccess(
+  input: FeatureResolutionInput,
+): FeatureResolution {
+  const moduleVerdict = resolveModuleAccess(input);
+  if (!moduleVerdict.allowed) {
+    return moduleVerdict;
   }
 
   if (!input.hasActionPermission) {
@@ -113,4 +179,40 @@ export function resolveFeatureAccess(
 
 export function canAccessFeature(input: FeatureResolutionInput): boolean {
   return resolveFeatureAccess(input).allowed;
+}
+
+export type ModuleDenialReason = Exclude<FeatureDenialReason, null | "permission">;
+
+/**
+ * Thrown when a module is not available to this organisation or this role.
+ *
+ * Distinct from PermissionError on purpose: a 403 saying "you do not have
+ * permission" sends someone to their admin to have a role changed, which will
+ * not help if the organisation's plan is the problem. The message names the
+ * layer at exactly the granularity that tells them who to ask.
+ */
+export class FeatureError extends Error {
+  readonly featureKey: string;
+  readonly reason: ModuleDenialReason;
+
+  constructor(featureKey: string, reason: ModuleDenialReason) {
+    super(describeFeatureDenial(reason));
+    this.name = "FeatureError";
+    this.featureKey = featureKey;
+    this.reason = reason;
+  }
+}
+
+export const FEATURE_DENIAL_MESSAGES: Readonly<Record<ModuleDenialReason, string>> = {
+  // Layer 1. Says nothing about which tenants are affected or why the switch is
+  // down; "nothing you can change" is the part that stops a support call.
+  global: "This feature is temporarily unavailable across MEDCARE PRO. Nothing on your side needs changing.",
+  // Layer 2. The organisation's problem, not the person's.
+  entitlement: "Your plan does not include this feature. Contact MEDCARE PRO to add it.",
+  // Layer 3. Fixable in-app, by someone they can walk over to.
+  role: "This feature is switched off for your role. Ask an admin in your organisation to turn it on under Settings → Features.",
+};
+
+export function describeFeatureDenial(reason: ModuleDenialReason): string {
+  return FEATURE_DENIAL_MESSAGES[reason];
 }

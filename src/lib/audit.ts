@@ -84,6 +84,18 @@ export const AUDIT_ACTIONS = {
   TEAM_MEMBER_SUSPENDED: "TEAM_MEMBER_SUSPENDED",
   TEAM_MEMBER_REACTIVATED: "TEAM_MEMBER_REACTIVATED",
   TEAM_MEMBER_REMOVED: "TEAM_MEMBER_REMOVED",
+
+  // --- Stage 8: the Tenant Admin's per-role feature switches (layer 3) -----
+  //
+  // `targetId` carries the Role id; the feature key travels in `afterValue`.
+  // Layers 1 and 2 belong to the Platform Owner and are recorded under
+  // TENANT_ENTITLEMENTS_SET, not here — keeping the two apart is what lets a
+  // reader tell "the organisation lost the module" from "an admin took it away
+  // from one role".
+  ROLE_FEATURE_ENABLED: "ROLE_FEATURE_ENABLED",
+  ROLE_FEATURE_DISABLED: "ROLE_FEATURE_DISABLED",
+  /** The explicit row was removed, so the role inherits the tenant again. */
+  ROLE_FEATURE_RESET: "ROLE_FEATURE_RESET",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

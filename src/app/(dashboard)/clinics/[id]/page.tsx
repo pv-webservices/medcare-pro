@@ -4,6 +4,8 @@ import ClinicDetail from "@/components/clinics/ClinicDetail";
 import { getClinicForActor } from "@/lib/clinics";
 import { can, ScopeError } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Clinic detail and edit — PRD §6.2 (FR-2.1).
 
@@ -23,6 +25,11 @@ export default async function ClinicDetailPage({ params }: ClinicDetailPageProps
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.clinics);
+  if (locked) {
+    return <ModuleLocked title="Clinic" reason={locked} />;
   }
 
   let clinic;

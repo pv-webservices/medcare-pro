@@ -10,6 +10,8 @@ import {
   listPatientVisitsForActor,
 } from "@/lib/registrations";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Registration detail and edit — PRD §6.3 (FR-3.5, FR-3.6).
 //
@@ -35,6 +37,11 @@ export default async function RegistrationDetailPage({
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.registrations);
+  if (locked) {
+    return <ModuleLocked title="Registration" reason={locked} />;
   }
 
   let registration;

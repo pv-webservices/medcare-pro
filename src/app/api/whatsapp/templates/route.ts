@@ -9,6 +9,7 @@ import {
   updateTemplate,
   updateTemplateSchema,
 } from "@/lib/whatsappTemplates";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // WhatsApp message templates — PRD §6.9 (FR-9.1).
 //
@@ -24,6 +25,7 @@ import {
 export async function GET() {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.whatsapp);
     return jsonOk(await listTemplatesForActor(actor));
   } catch (error: unknown) {
     return toErrorResponse(error, "GET /api/whatsapp/templates");
@@ -33,6 +35,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.whatsapp);
     const input = createTemplateSchema.parse(await readJsonBody(request));
 
     return jsonOk(await createTemplate(actor, input), 201);
@@ -44,6 +47,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.whatsapp);
     const input = updateTemplateSchema.parse(await readJsonBody(request));
 
     return jsonOk(await updateTemplate(actor, input));
@@ -55,6 +59,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.whatsapp);
     const { templateId } = deleteTemplateSchema.parse(await readJsonBody(request));
 
     return jsonOk(await deleteTemplate(actor, templateId));

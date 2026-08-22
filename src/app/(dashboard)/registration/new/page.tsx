@@ -8,6 +8,8 @@ import { listDoctorsForActor } from "@/lib/doctors";
 import { accessibleClinicScope } from "@/lib/rbac";
 import { listDepartmentsForActor } from "@/lib/registrations";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // New registration — PRD §6.3 (FR-3.1).
 //
@@ -24,6 +26,11 @@ export default async function NewRegistrationPage() {
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.registrations);
+  if (locked) {
+    return <ModuleLocked title="Register patient" reason={locked} />;
   }
 
   // Only clinics this user may actually register into are offered. A read-only

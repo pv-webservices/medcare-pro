@@ -6,6 +6,7 @@ import {
   teamMutationSchema,
   updateTeamMembership,
 } from "@/lib/team";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Team — Stage 6. Who is in this organisation, and whether they may still use it.
 //
@@ -25,6 +26,7 @@ import {
 export async function GET() {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.team);
     return jsonOk(await getTeamOverview(actor));
   } catch (error: unknown) {
     return toErrorResponse(error, "GET /api/team");
@@ -34,6 +36,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.team);
     const input = teamMutationSchema.parse(await readJsonBody(request));
 
     return jsonOk(

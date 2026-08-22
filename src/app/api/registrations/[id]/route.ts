@@ -5,6 +5,7 @@ import {
   updateRegistrationSchema,
 } from "@/lib/registrations";
 import { requireActor } from "@/lib/session";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Registration detail — PRD §6.3 (FR-3.5, FR-3.6).
 //
@@ -25,6 +26,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.registrations);
     const { id } = await context.params;
     return jsonOk(await getRegistrationForActor(actor, id));
   } catch (error: unknown) {
@@ -35,6 +37,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.registrations);
     const { id } = await context.params;
     const input = updateRegistrationSchema.parse(await readJsonBody(request));
     return jsonOk(await updateRegistration(actor, id, input));

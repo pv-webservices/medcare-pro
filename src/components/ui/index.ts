@@ -12,6 +12,7 @@ export type { ButtonSize, ButtonVariant } from "@/components/ui/Button";
 export { default as Card } from "@/components/ui/Card";
 export { default as EmptyState } from "@/components/ui/EmptyState";
 export { default as Input, Textarea, FieldShell } from "@/components/ui/Input";
+export { default as ModuleLocked } from "@/components/ui/ModuleLocked";
 export { default as PageHeader, Count } from "@/components/ui/PageHeader";
 export { default as Panel } from "@/components/ui/Panel";
 export { default as Select } from "@/components/ui/Select";

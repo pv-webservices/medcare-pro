@@ -1,6 +1,7 @@
 import { jsonOk, toErrorResponse } from "@/lib/apiHandler";
 import { listEditHistoryForActor } from "@/lib/registrations";
 import { requireActor } from "@/lib/session";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Audit trail — PRD §6.3 (FR-3.6). Append-only and read-only: no write method
 // exists here by design (PRD §9 Audit integrity).
@@ -17,6 +18,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.registrations);
     const { id } = await context.params;
     return jsonOk(await listEditHistoryForActor(actor, id));
   } catch (error: unknown) {

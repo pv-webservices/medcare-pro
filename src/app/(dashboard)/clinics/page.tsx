@@ -6,6 +6,8 @@ import { listClinicsForActor } from "@/lib/clinics";
 import { can } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Clinic list — PRD §6.2 (FR-2.1, FR-2.2).
 
@@ -20,6 +22,11 @@ export default async function ClinicsListPage() {
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.clinics);
+  if (locked) {
+    return <ModuleLocked title="Clinics" reason={locked} />;
   }
 
   const [clinics, canCreate, selectedClinicId] = await Promise.all([

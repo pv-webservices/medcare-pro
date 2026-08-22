@@ -11,6 +11,7 @@ import {
   leaveSchema,
   removeLeave,
 } from "@/lib/doctors";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Doctor leave — PRD §6.4 (FR-4.4): a date range plus an optional reason,
 // marking the doctor unavailable for that period.
@@ -24,6 +25,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const { id } = await context.params;
     const doctor = await getDoctorForActor(actor, id);
     return jsonOk(doctor.leave);
@@ -35,6 +37,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const { id } = await context.params;
     const input = leaveSchema.parse(await readJsonBody(request));
     return jsonOk(await addLeave(actor, id, input), 201);
@@ -46,6 +49,7 @@ export async function POST(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.doctors);
     const { id } = await context.params;
 
     const entryId = new URL(request.url).searchParams.get("entryId");

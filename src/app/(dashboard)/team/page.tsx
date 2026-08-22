@@ -6,6 +6,8 @@ import PageHeader, { Count } from "@/components/ui/PageHeader";
 import { PermissionError } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import { getTeamOverview, type TeamOverview } from "@/lib/team";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Team — Stage 6. The people in this organisation, and the invitations out.
 //
@@ -26,6 +28,11 @@ export default async function TeamPage() {
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.team);
+  if (locked) {
+    return <ModuleLocked title="Team" reason={locked} />;
   }
 
   let overview: TeamOverview | null = null;

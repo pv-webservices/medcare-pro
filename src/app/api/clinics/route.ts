@@ -5,6 +5,7 @@ import {
   createClinicSchema,
   listClinicsForActor,
 } from "@/lib/clinics";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Clinics — PRD §6.2 (FR-2.1, FR-2.2).
 //
@@ -18,6 +19,7 @@ import {
 export async function GET() {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.clinics);
     return jsonOk(await listClinicsForActor(actor));
   } catch (error: unknown) {
     return toErrorResponse(error, "GET /api/clinics");
@@ -27,6 +29,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.clinics);
     const input = createClinicSchema.parse(await readJsonBody(request));
     return jsonOk(await createClinic(actor, input), 201);
   } catch (error: unknown) {

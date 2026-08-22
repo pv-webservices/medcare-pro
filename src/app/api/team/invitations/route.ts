@@ -7,6 +7,7 @@ import {
 } from "@/lib/invitations";
 import { readClientIp, readUserAgent } from "@/lib/requestMeta";
 import { requireActor } from "@/lib/session";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 // Invitations — Stage 6. Issue a link that turns into a login, or withdraw one.
 //
@@ -25,6 +26,7 @@ import { requireActor } from "@/lib/session";
 export async function POST(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.team);
     const input = createInvitationSchema.parse(await readJsonBody(request));
 
     const created = await createInvitation(actor, input, {
@@ -41,6 +43,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const actor = await requireActor();
+    await requireModule(actor, MODULE_FEATURES.team);
     const input = revokeInvitationSchema.parse(await readJsonBody(request));
 
     return jsonOk(

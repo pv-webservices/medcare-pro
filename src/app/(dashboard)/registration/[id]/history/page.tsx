@@ -9,6 +9,8 @@ import {
   type EditLogEntry,
 } from "@/lib/registrations";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
+import ModuleLocked from "@/components/ui/ModuleLocked";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 
 // Edit audit trail — PRD §6.3 (FR-3.6). Owner/Admin only.
 //
@@ -35,6 +37,11 @@ export default async function RegistrationHistoryPage({
       redirect("/login");
     }
     throw error;
+  }
+
+  const locked = await moduleLock(actor, MODULE_FEATURES.registrations);
+  if (locked) {
+    return <ModuleLocked title="Edit history" reason={locked} />;
   }
 
   let registration;
