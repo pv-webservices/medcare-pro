@@ -159,14 +159,16 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         pending: "covered-elsewhere",
         pendingNote:
           "report:read is the permission the reports page and API actually check. This key exists so the newer reports:* naming resolves, but granting it alone opens nothing.",
+        // Stage 7 deliberately left this inert while making reports:export
+        // live. Turning it into an alias for report:read would be a silent
+        // grant: every custom role that ticked it on the strength of the note
+        // above would gain revenue visibility nobody decided to give them.
       },
       {
         key: "reports:export",
         label: "Export reports",
-        description: "Download report data as CSV.",
-        pending: "stage",
-        pendingNote:
-          "Export is gated by report:read today; a separate export gate arrives in Stage 7.",
+        description:
+          "Download the revenue trend and breakdowns as CSV. Needs “View revenue reports” as well — this opens the download, not the figures.",
       },
     ],
   },
@@ -232,8 +234,10 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   // -------------------------------------------------------------------------
   // Stage 1 additions.
   //
-  // Every key below is `pending` because nothing checks it yet: the modules that
-  // enforce them arrive in Stages 6-9. Per this file's own rule, a string listed
+  // Every key below was `pending` when Stage 1 catalogued it, because nothing
+  // checked it yet: the modules that enforce them arrive in Stages 6-9. Team
+  // (Stage 6) and reports:export (Stage 7) are built and no longer marked. Per
+  // this file's own rule, a string listed
   // here that no call site checks grants NOTHING — it is listed now so the roles
   // editor and the seeded Admin role carry it from the start, rather than
   // needing a re-seed the day the call site lands.

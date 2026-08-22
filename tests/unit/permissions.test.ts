@@ -12,14 +12,22 @@ import {
 
 /**
  * Stage 1 catalogued a batch of keys ahead of the modules that would check
- * them. These are the ones a later stage has since wired up: lib/team.ts and
- * lib/invitations.ts check all four before writing anything.
+ * them. These are the ones a later stage has since wired up:
+ *
+ *   - the four `team:*` keys — lib/team.ts and lib/invitations.ts check all
+ *     four before writing anything (Stage 6);
+ *   - `reports:export` — lib/reports.ts requires it, alongside `report:read`,
+ *     before building a downloadable report (Stage 7).
+ *
+ * `reports:view` is deliberately NOT here. It is still inert, and its note in
+ * the catalogue says so.
  */
 const ENFORCED_SINCE_STAGE_1 = [
   "team:view",
   "team:invite",
   "team:approve",
   "team:manage",
+  "reports:export",
 ] as const;
 
 describe("the catalogue", () => {
@@ -113,6 +121,17 @@ describe("STAGE_1_PERMISSIONS", () => {
       expect(findPermission(key)?.pending).toBeUndefined();
       expect(findPermission(key)?.pendingNote).toBeUndefined();
     }
+  });
+
+  it("keeps reports:view inert, and says so", () => {
+    // Stage 7 made `reports:export` live and deliberately left this one alone.
+    // Turning it into an alias for `report:read` would grant revenue
+    // visibility to every custom role that had ticked it while the catalogue
+    // promised it opened nothing.
+    expect(findPermission("reports:view")?.pending).toBe("covered-elsewhere");
+    expect(findPermission("reports:view")?.pendingNote).toContain(
+      "granting it alone opens nothing",
+    );
   });
 
   it("does not overlap the historical set", () => {

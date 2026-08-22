@@ -1,14 +1,20 @@
 import { redirect } from "next/navigation";
 import BreakdownTable from "@/components/reports/BreakdownTable";
+import ExportCsvLink from "@/components/reports/ExportCsvLink";
 import GrowthChart from "@/components/reports/GrowthChart";
 import KpiTiles from "@/components/reports/KpiTiles";
 import PeriodSelector from "@/components/reports/PeriodSelector";
 import PageHeader from "@/components/ui/PageHeader";
-import { PermissionError } from "@/lib/rbac";
+import {
+  holdsAnywhere,
+  permissionsHeldAnywhere,
+  PermissionError,
+} from "@/lib/rbac";
 import { REPORT_PERIOD_LABELS } from "@/lib/reportPeriods";
 import {
   DEFAULT_PERIOD,
   getRevenueReport,
+  REPORT_EXPORT_PERMISSION,
   reportFilterSchema,
   type RevenueReport,
 } from "@/lib/reports";
@@ -24,6 +30,10 @@ import { requireActor, UnauthenticatedError } from "@/lib/session";
 // `report:read` is enforced in @/lib/reports, not by hiding this page: Staff do
 // not hold it, and reaching this URL directly gets them the same refusal the
 // API gives.
+//
+// The export controls (Stage 7) need `reports:export` as well, and are simply
+// absent without it — a download offered and then refused is worse than no
+// download offered. The API re-checks regardless.
 
 interface ReportsPageProps {
   // Next 16 hands search params to the page as a promise.
@@ -80,6 +90,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const scopeLabel = report.clinicName ?? "all clinics";
   const periodLabel = REPORT_PERIOD_LABELS[report.period].toLowerCase();
 
+  // One query for all three controls, resolved after the report so a role that
+  // cannot read reports never pays for it.
+  const canExport = holdsAnywhere(
+    await permissionsHeldAnywhere(actor),
+    REPORT_EXPORT_PERMISSION,
+  );
+
   return (
     <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
       <PageHeader
@@ -100,14 +117,29 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           <KpiTiles kpis={report.kpis} period={report.period} />
 
           <section aria-labelledby="growth-heading" className="pt-4">
-            <h2 id="growth-heading" className="mb-1 text-lg font-semibold text-slate-900">
-              Revenue trend
-            </h2>
-            <p className="mb-4 text-sm text-slate-500">
-              {/* Names the single series, which is why the chart has no legend. */}
-              Revenue per {periodLabel.replace(/ly$/, "")} period across{" "}
-              {scopeLabel}, ending with the current one.
-            </p>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2
+                  id="growth-heading"
+                  className="mb-1 text-lg font-semibold text-slate-900"
+                >
+                  Revenue trend
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {/* Names the single series, which is why the chart has no legend. */}
+                  Revenue per {periodLabel.replace(/ly$/, "")} period across{" "}
+                  {scopeLabel}, ending with the current one.
+                </p>
+              </div>
+              {canExport && (
+                <ExportCsvLink
+                  section="trend"
+                  period={report.period}
+                  clinicId={selectedClinicId}
+                  describes="the revenue trend"
+                />
+              )}
+            </div>
             <GrowthChart
               series={report.series}
               caption={`Revenue by ${periodLabel} period across ${scopeLabel}`}
@@ -120,12 +152,32 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               entityLabel="Clinic"
               rows={report.byClinic}
               emptyMessage="No revenue recorded in this period."
+              actions={
+                canExport && report.byClinic.length > 0 ? (
+                  <ExportCsvLink
+                    section="clinics"
+                    period={report.period}
+                    clinicId={selectedClinicId}
+                    describes="revenue by clinic"
+                  />
+                ) : null
+              }
             />
             <BreakdownTable
               title="By doctor"
               entityLabel="Doctor"
               rows={report.byDoctor}
               emptyMessage="No revenue recorded in this period."
+              actions={
+                canExport && report.byDoctor.length > 0 ? (
+                  <ExportCsvLink
+                    section="doctors"
+                    period={report.period}
+                    clinicId={selectedClinicId}
+                    describes="revenue by doctor"
+                  />
+                ) : null
+              }
             />
           </div>
         </>

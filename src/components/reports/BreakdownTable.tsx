@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { formatRupees } from "@/lib/money";
 import type { BreakdownRow } from "@/lib/reports";
 import Card from "@/components/ui/Card";
@@ -19,6 +20,11 @@ interface BreakdownTableProps {
   entityLabel: string;
   rows: readonly BreakdownRow[];
   emptyMessage: string;
+  /**
+   * Controls for this section, right-aligned beside the heading. Absent when
+   * the viewer's role has nothing to do here — see ExportCsvLink.
+   */
+  actions?: ReactNode;
 }
 
 export default function BreakdownTable({
@@ -26,15 +32,19 @@ export default function BreakdownTable({
   entityLabel,
   rows,
   emptyMessage,
+  actions,
 }: BreakdownTableProps) {
   return (
     <section aria-labelledby={`breakdown-${entityLabel.toLowerCase()}`} className="viz-root pt-4">
-      <h2
-        id={`breakdown-${entityLabel.toLowerCase()}`}
-        className="mb-4 text-lg font-bold text-slate-900"
-      >
-        {title}
-      </h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2
+          id={`breakdown-${entityLabel.toLowerCase()}`}
+          className="text-lg font-bold text-slate-900"
+        >
+          {title}
+        </h2>
+        {actions}
+      </div>
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">

@@ -8,6 +8,7 @@ import {
 } from "@/lib/rbac";
 import {
   bucketFullLabel,
+  bucketKey,
   bucketKeysIn,
   bucketLabel,
   currentRange,
@@ -42,6 +43,22 @@ export const reportFilterSchema = z.object({
 export type ReportFilters = z.infer<typeof reportFilterSchema>;
 
 export const DEFAULT_PERIOD: ReportPeriod = "monthly";
+
+/**
+ * The two gates on this module — Stage 7.
+ *
+ * `report:read` opens the report. `reports:export` opens the download, and is
+ * checked IN ADDITION to the view gate rather than instead of it: an export is
+ * the report in a file, so nobody should be able to obtain figures by
+ * downloading them that they are refused on screen.
+ *
+ * The catalogue also lists `reports:view`. It is deliberately NOT accepted
+ * here. Its entry in lib/permissions.ts tells anyone editing a role that
+ * granting it alone opens nothing, and quietly making that untrue would hand
+ * revenue figures to every custom role that had already ticked an inert box.
+ */
+export const REPORT_VIEW_PERMISSION = "report:read";
+export const REPORT_EXPORT_PERMISSION = "reports:export";
 
 export interface RevenueKpis {
   /** Exact decimal strings — never a float, which would drift on money. */
@@ -78,6 +95,12 @@ export interface BreakdownRow {
 export interface RevenueReport {
   period: ReportPeriod;
   rangeLabel: string;
+  /**
+   * First day of the reported window, `YYYY-MM-DD`. The label above is written
+   * for a person ("August 2026"); this is for anything that has to sort or name
+   * a file, which is why the export uses it rather than the download date.
+   */
+  rangeStartDate: string;
   kpis: RevenueKpis;
   series: RevenuePoint[];
   byClinic: BreakdownRow[];
@@ -158,22 +181,57 @@ interface ReportClinic {
 }
 
 /**
+ * The clinics the actor may exercise EVERY one of `permissions` in.
+ *
+ * Reports take a list rather than a single key because the export needs both
+ * gates at once, and the answer is the intersection — a user assigned
+ * `report:read` tenant-wide but `reports:export` only at the Riverside branch
+ * may download Riverside's figures and no others. Anything looser would let a
+ * clinic-scoped export grant fields the assignment never covered.
+ *
+ * Throws PermissionError (→ 403) for the first permission held nowhere, so the
+ * refusal names the gate that actually stopped them.
+ */
+async function reportableClinics(
+  actor: ActorContext,
+  permissions: readonly string[],
+): Promise<{ scope: "all" } | { scope: "clinics"; clinicIds: readonly string[] }> {
+  let narrowed: readonly string[] | null = null;
+
+  for (const permission of permissions) {
+    const access = await accessibleClinicScope(actor, permission);
+
+    if (access.scope === "none") {
+      throw new PermissionError(permission);
+    }
+
+    if (access.scope === "all") {
+      continue;
+    }
+
+    narrowed =
+      narrowed === null
+        ? access.clinicIds
+        : narrowed.filter((id) => access.clinicIds.includes(id));
+  }
+
+  return narrowed === null ? { scope: "all" } : { scope: "clinics", clinicIds: narrowed };
+}
+
+/**
  * The clinics this report covers.
  *
- * Throws PermissionError (→ 403) when the actor holds `report:read` nowhere —
+ * Throws PermissionError (→ 403) when the actor holds a required gate nowhere —
  * that is a refusal, not an empty report. A *selected* clinic outside their
  * reach is different: that is a filter that matches nothing, and returns an
  * empty list so the page renders zeros rather than an error.
  */
 async function resolveReportClinics(
   actor: ActorContext,
-  selectedClinicId?: string | null,
+  selectedClinicId: string | null | undefined,
+  permissions: readonly string[],
 ): Promise<ReportClinic[]> {
-  const access = await accessibleClinicScope(actor, "report:read");
-
-  if (access.scope === "none") {
-    throw new PermissionError("report:read");
-  }
+  const access = await reportableClinics(actor, permissions);
 
   const clinics = await prisma.clinic.findMany({
     where: {
@@ -372,9 +430,10 @@ export async function getRevenueReport(
   actor: ActorContext,
   filters: ReportFilters,
   now: Date = new Date(),
+  permissions: readonly string[] = [REPORT_VIEW_PERMISSION],
 ): Promise<RevenueReport> {
   const period = filters.period ?? DEFAULT_PERIOD;
-  const clinics = await resolveReportClinics(actor, filters.clinicId);
+  const clinics = await resolveReportClinics(actor, filters.clinicId, permissions);
   const clinicIds = clinics.map((clinic) => clinic.id);
 
   const range = currentRange(period, now);
@@ -385,6 +444,7 @@ export async function getRevenueReport(
     return {
       period,
       rangeLabel: rangeLabel(period, range),
+      rangeStartDate: bucketKey(range.start),
       kpis: EMPTY_KPIS,
       series: bucketKeysIn(period, seriesRange(period, now)).map((key) => ({
         bucket: key,
@@ -433,6 +493,7 @@ export async function getRevenueReport(
   return {
     period,
     rangeLabel: rangeLabel(period, range),
+    rangeStartDate: bucketKey(range.start),
     kpis: {
       totalRevenue,
       registrationCount: current._count._all,
@@ -447,4 +508,22 @@ export async function getRevenueReport(
     clinicName,
     hasClinics: true,
   };
+}
+
+/**
+ * The same report, for download — Stage 7.
+ *
+ * A thin wrapper on purpose: the export must never be able to show a figure the
+ * screen would not, so it runs the identical query path and differs only in
+ * demanding `reports:export` on top of the view gate.
+ */
+export async function getRevenueReportForExport(
+  actor: ActorContext,
+  filters: ReportFilters,
+  now: Date = new Date(),
+): Promise<RevenueReport> {
+  return getRevenueReport(actor, filters, now, [
+    REPORT_VIEW_PERMISSION,
+    REPORT_EXPORT_PERMISSION,
+  ]);
 }
