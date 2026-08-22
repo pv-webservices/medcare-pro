@@ -26,6 +26,26 @@ import type { TenantStatus } from "@prisma/client";
 const credentialsSchema = z.object({
   email: z.email(),
   password: z.string().min(1),
+  /**
+   * Stage 5 — "Remember me" on the login form, which until now was a checkbox
+   * that did nothing. It arrives as a string because the credentials body is
+   * form-encoded on the wire, and it is optional so that any caller that omits
+   * it keeps the previous 12-hour behaviour exactly.
+   *
+   * ONLY the truthy string opts in: anything else, including "TRUE", "1" and
+   * "yes", falls through to false. A parse that guessed here would hand out
+   * 30-day sessions on a typo, and the safe direction is unambiguous.
+   *
+   * This value has no part in deciding whether the password is right. It is
+   * read once, after the credential has already verified, and its whole effect
+   * is choosing which of the two constants in sessionPolicy.ts sets
+   * `app_sessions.expires_at`. Mirrors the equivalent transform on
+   * verifyLoginCodeSchema in lib/loginCode.ts.
+   */
+  rememberMe: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((value) => value === true || value === "true"),
 });
 
 /**
@@ -119,7 +139,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const { email, password } = parsed.data;
+        const { email, password, rememberMe } = parsed.data;
 
         const user = await prisma.user.findUnique({
           where: { email },
@@ -198,6 +218,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const sid = await createAppSession(prisma, {
           userId: user.id,
           tenantId: user.tenantId,
+          // Lengthens THIS session and nothing else — see the note on the
+          // schema field above.
+          rememberMe,
           ip: readClientIp(request),
           userAgent: readUserAgent(request),
           now,
