@@ -45,6 +45,22 @@ export const AUDIT_ACTIONS = {
   CLINIC_ADMIN_ASSIGNED: "CLINIC_ADMIN_ASSIGNED",
   /** The Owner set the tenant's plan and/or its feature overrides. */
   TENANT_ENTITLEMENTS_SET: "TENANT_ENTITLEMENTS_SET",
+
+  // --- Stage 4: six-digit login codes and session revocation ---------------
+  //
+  // Every one of these carries `{ method: "login-code", outcome: ... }` and the
+  // LoginCode row id in `targetId`. NEVER the code, its digest, or the pepper —
+  // assertSafeAuditMetadata below throws on a metadata key naming any of them,
+  // which is why the row id travels in a column instead.
+  /** A code was issued and handed to the mailer. Not written for a refused request. */
+  LOGIN_CODE_REQUESTED: "LOGIN_CODE_REQUESTED",
+  LOGIN_CODE_SUCCEEDED: "LOGIN_CODE_SUCCEEDED",
+  /** Wrong, expired, consumed, exhausted, or the account stopped being eligible. */
+  LOGIN_CODE_FAILED: "LOGIN_CODE_FAILED",
+  /** Throttling refused a request or a verification. Carries no subject. */
+  LOGIN_CODE_RATE_LIMITED: "LOGIN_CODE_RATE_LIMITED",
+  /** The user signed out of every device at once. */
+  SESSIONS_REVOKED_ALL: "SESSIONS_REVOKED_ALL",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

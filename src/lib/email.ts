@@ -191,3 +191,84 @@ export async function resendVerificationEmail(
     text,
   });
 }
+
+export interface SendLoginCodeEmailParams {
+  to: string;
+  /** The six digits. Held in memory for this call only — never stored or logged. */
+  code: string;
+  expiresInMinutes: number;
+}
+
+/**
+ * Stage 4 — the six-digit login code.
+ *
+ * NO CLICKABLE LINK, deliberately. A one-click "log me in" link is a different
+ * threat model from a code the user retypes: it turns every forwarded, cached or
+ * link-previewed message into a live credential, and mail scanners that fetch
+ * URLs would consume the login on the user's behalf. Requiring the digits to be
+ * typed back into a page the user already has open keeps possession of the inbox
+ * necessary but not sufficient.
+ *
+ * The code is NOT in the subject line either. Subjects show up in lock-screen
+ * notifications and sync to devices that the body does not always reach.
+ */
+function buildLoginCodeBody(
+  code: string,
+  expiresInMinutes: number,
+): { html: string; text: string } {
+  // The code is generated from a fixed digit alphabet, so it cannot carry
+  // markup. Escaped anyway: this template must stay safe if the generator is
+  // ever widened to alphanumerics.
+  const safeCode = escapeHtml(code);
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px">
+      <h1 style="font-size:20px;margin:0 0 16px">Your MEDCARE PRO login code</h1>
+      <p style="margin:0 0 16px">Enter this code to finish signing in:</p>
+      <p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:6px">
+        ${safeCode}
+      </p>
+      <p style="margin:0 0 16px;font-size:13px;color:#555">
+        It expires in ${expiresInMinutes} minutes and can be used once.
+      </p>
+      <p style="margin:0;font-size:13px;color:#555">
+        MEDCARE PRO staff will never ask you for this code. Do not share it with
+        anyone. If you did not try to sign in, ignore this email — nobody can use
+        the code without it.
+      </p>
+    </div>
+  `.trim();
+
+  const text = [
+    "Your MEDCARE PRO login code:",
+    "",
+    code,
+    "",
+    `It expires in ${expiresInMinutes} minutes and can be used once.`,
+    "",
+    "MEDCARE PRO staff will never ask you for this code. Do not share it with anyone.",
+    "If you did not try to sign in, ignore this email.",
+  ].join("\n");
+
+  return { html, text };
+}
+
+/**
+ * Sends the Stage 4 login code. Called by src/lib/loginCode.ts, which passes
+ * this function in as its mailer — so tests and the verification script can
+ * substitute a capture function and never send real mail.
+ *
+ * The rendered body is never logged: it contains the one secret in the flow.
+ */
+export async function sendLoginCodeEmail(
+  params: SendLoginCodeEmailParams,
+): Promise<void> {
+  const { html, text } = buildLoginCodeBody(params.code, params.expiresInMinutes);
+
+  await deliver({
+    to: params.to,
+    subject: "Your login code — MEDCARE PRO",
+    html,
+    text,
+  });
+}

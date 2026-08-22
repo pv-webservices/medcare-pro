@@ -7,6 +7,9 @@ import { authConfig } from "@/lib/auth.config";
 import { createAppSession } from "@/lib/appSession";
 import { evaluateAccessStatus } from "@/lib/accessStatus";
 import { readClientIp, readUserAgent } from "@/lib/requestMeta";
+import { sendLoginCodeEmail } from "@/lib/email";
+import { RateLimitError } from "@/lib/rateLimit";
+import { verifyLoginCode, verifyLoginCodeSchema } from "@/lib/loginCode";
 import type { TenantStatus } from "@prisma/client";
 
 /**
@@ -212,6 +215,73 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           tenantId: user.tenantId,
           sid,
         };
+      },
+    }),
+
+    /**
+     * Stage 4 — the six-digit login code, as a SECOND provider alongside the
+     * password one above, which is untouched.
+     *
+     * THIS IS THE ONE PLACE A LOGIN CODE IS CONSUMED. Both entry points reach
+     * it: the browser calls `signIn("login-code", ...)`, and
+     * POST /api/auth/login-code/verify calls the server-side `signIn` action,
+     * which builds an internal request against this same provider. Neither
+     * verifies anything itself, so a code cannot be spent twice by taking two
+     * different routes to the same login.
+     *
+     * `authorize` returns the identical shape as the password provider —
+     * { id, email, name, tenantId, sid } — so the jwt/session callbacks in
+     * auth.config.ts carry `sid` for this provider with no change at all. They
+     * key off the presence of `user`, not off which provider produced it.
+     */
+    Credentials({
+      id: "login-code",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        code: { label: "Login code", type: "text" },
+        rememberMe: { label: "Remember this device", type: "checkbox" },
+      },
+
+      /**
+       * Returns the user, or `null` for every failure without exception.
+       *
+       * Unlike the password provider, this one throws NO descriptive subclass of
+       * CredentialsSignin. EmailNotVerifiedError and ClinicStateError are safe
+       * up there because they are only reachable after a password has already
+       * verified, so the caller has proven they hold the credential. Here there
+       * is no such proof: a caller submitting a guessed code has proven nothing,
+       * so telling them "that account is suspended" rather than "wrong code"
+       * would hand an unauthenticated stranger the account's state. Every
+       * refusal is the same null.
+       */
+      async authorize(credentials, request) {
+        const parsed = verifyLoginCodeSchema.safeParse(credentials);
+        if (!parsed.success) {
+          return null;
+        }
+
+        try {
+          const verified = await verifyLoginCode(
+            { prisma, sendEmail: sendLoginCodeEmail },
+            {
+              ...parsed.data,
+              ip: readClientIp(request),
+              userAgent: readUserAgent(request),
+            },
+          );
+
+          return verified ?? null;
+        } catch (error: unknown) {
+          // Throttling reaches the user as the same generic refusal. Letting it
+          // propagate would surface a distinguishable Auth.js error, which is
+          // both a worse experience and a signal that the address is worth
+          // continuing to attack. The 429 belongs on the request endpoint, which
+          // is where a client can act on it.
+          if (error instanceof RateLimitError) {
+            return null;
+          }
+          throw error;
+        }
       },
     }),
   ],

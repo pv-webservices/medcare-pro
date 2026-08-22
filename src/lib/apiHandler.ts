@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { PermissionError, ScopeError } from "@/lib/rbac";
 import { UnauthenticatedError } from "@/lib/session";
 import { PlatformAuthorizationError } from "@/lib/platform/context";
+import { RateLimitError } from "@/lib/rateLimit";
 import type { ApiResponse } from "@/lib/utils";
 
 /**
@@ -93,6 +94,16 @@ export function toErrorResponse(
 
   if (error instanceof BadRequestError) {
     return jsonError(error.message, 400);
+  }
+
+  // Stage 4. The message is fixed and subject-free by construction (see
+  // RATE_LIMITED_MESSAGE), so a 429 tells a caller that THEY are throttled and
+  // nothing about whose account they were guessing at. `retryAfterMs` is
+  // deliberately not echoed: on the unauthenticated login-code endpoint a
+  // precise window varies with how far through its allowance one address is,
+  // which is the account-existence signal that endpoint exists to hide.
+  if (error instanceof RateLimitError) {
+    return jsonError(error.message, 429);
   }
 
   if (error instanceof ConflictError) {

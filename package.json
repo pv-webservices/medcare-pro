@@ -23,6 +23,7 @@
     "verify:roles": "tsx scripts/verify-roles.mts",
     "verify:owner": "tsx scripts/verify-owner-access.mts",
     "verify:stage3": "tsx scripts/verify-stage3-registration.mts",
+    "verify:stage4": "tsx scripts/verify-stage4-login-code.mts",
     "verify:whatsapp": "tsx scripts/verify-whatsapp.mts",
     "whatsapp:doctor": "tsx scripts/whatsapp-doctor.mts"
   },
