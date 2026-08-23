@@ -30,7 +30,26 @@ import {
  *     new table and a PRD change.
  */
 
-/** Format is `<record>.<action>`, matching the example types in the schema. */
+/**
+ * Format is `<record>.<action>`, matching the example types in the schema.
+ *
+ * WHICH APPOINTMENT EVENTS ARE HERE, AND WHICH ARE DELIBERATELY NOT — AP-8.
+ * The feed is what an Admin reviews, not a log of everything the desk does;
+ * `audit_logs` is the complete record. So:
+ *
+ *   booked, cancelled, missed, moved   ARE here. Each is a change to the day's
+ *                                      plan that somebody other than the person
+ *                                      who did it may need to know about.
+ *   checked in                         is NOT. It happens to every patient who
+ *                                      turns up, several times an hour, and
+ *                                      tells an Admin nothing — it would bury
+ *                                      the four events above.
+ *   converted                          is NOT, because it already raises
+ *                                      `registration.created` (see AP-5's
+ *                                      convertAppointmentToRegistration). One
+ *                                      event must not produce two feed items
+ *                                      saying the same thing.
+ */
 export const NOTIFICATION_TYPES = [
   "clinic.created",
   "clinic.updated",
@@ -38,6 +57,10 @@ export const NOTIFICATION_TYPES = [
   "doctor.updated",
   "registration.created",
   "registration.updated",
+  "appointment.created",
+  "appointment.cancelled",
+  "appointment.no_show",
+  "appointment.rescheduled",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -50,6 +73,12 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   "doctor.updated": "Doctor updated",
   "registration.created": "Registration added",
   "registration.updated": "Registration updated",
+  // AP-8. An Appointment is a slot booked in a doctor's day, not a
+  // Registration — the vocabulary rule in .claude/skills/admin-dashboard-ui.
+  "appointment.created": "Appointment booked",
+  "appointment.cancelled": "Appointment cancelled",
+  "appointment.no_show": "Appointment missed",
+  "appointment.rescheduled": "Appointment moved",
 };
 
 const DEFAULT_LIMIT = 50;
@@ -279,6 +308,121 @@ export async function notifyRegistrationUpdated(
 }
 
 // ---------------------------------------------------------------------------
+// Appointments — AP-8
+// ---------------------------------------------------------------------------
+
+/**
+ * What every appointment notification names.
+ *
+ * The patient's NAME and nothing else about them. No mobile number, no address,
+ * no age — the feed is a list of things that happened, read by Admins across a
+ * whole account, and the appointment itself already carries the contact details
+ * behind `appointment:read`. Same discipline as the registration messages above.
+ */
+export interface AppointmentEventInput {
+  appointmentId: string;
+  clinicId: string;
+  clinicName: string;
+  patientName: string;
+  doctorName: string;
+  /** "YYYY-MM-DD", already read back off the slot by the caller. */
+  slotDate: string;
+  /** "HH:mm", likewise. */
+  slotTime: string;
+}
+
+/**
+ * "2026-12-21 at 09:00".
+ *
+ * ISO rather than "21 Dec 2026" on purpose: this string is STORED in
+ * `notifications.message` and read back months later, so it must not depend on
+ * the server's locale at the moment it was written. Screens format their own
+ * dates; a stored sentence cannot be reformatted after the fact.
+ */
+function slotPhrase(appointment: AppointmentEventInput): string {
+  return `${appointment.slotDate} at ${appointment.slotTime}`;
+}
+
+export async function notifyAppointmentBooked(
+  actor: ActorContext,
+  appointment: AppointmentEventInput,
+): Promise<void> {
+  await recordNotification({
+    tenantId: actor.tenantId,
+    clinicId: appointment.clinicId,
+    type: "appointment.created",
+    message:
+      `${appointment.patientName} was booked with ${appointment.doctorName} at ` +
+      `${appointment.clinicName} on ${slotPhrase(appointment)} by ${await actorName(actor)}.`,
+    relatedRecordId: appointment.appointmentId,
+  });
+}
+
+/**
+ * The reason is included when the desk gave one — it is the whole reason the
+ * cancel endpoint accepts a note, and an Admin scanning the feed should not
+ * have to open the appointment to learn why it went.
+ */
+export async function notifyAppointmentCancelled(
+  actor: ActorContext,
+  appointment: AppointmentEventInput,
+  reason?: string | null,
+): Promise<void> {
+  const trimmed = reason?.trim();
+
+  await recordNotification({
+    tenantId: actor.tenantId,
+    clinicId: appointment.clinicId,
+    type: "appointment.cancelled",
+    message:
+      `${appointment.patientName}'s appointment with ${appointment.doctorName} at ` +
+      `${appointment.clinicName} on ${slotPhrase(appointment)} was cancelled by ` +
+      `${await actorName(actor)}.${trimmed ? ` Reason: ${trimmed}` : ""}`,
+    relatedRecordId: appointment.appointmentId,
+  });
+}
+
+export async function notifyAppointmentNoShow(
+  actor: ActorContext,
+  appointment: AppointmentEventInput,
+): Promise<void> {
+  await recordNotification({
+    tenantId: actor.tenantId,
+    clinicId: appointment.clinicId,
+    type: "appointment.no_show",
+    message:
+      `${appointment.patientName} did not attend their appointment with ` +
+      `${appointment.doctorName} at ${appointment.clinicName} on ` +
+      `${slotPhrase(appointment)}. Recorded by ${await actorName(actor)}.`,
+    relatedRecordId: appointment.appointmentId,
+  });
+}
+
+/**
+ * Names both slots, and points at the NEW appointment.
+ *
+ * A reschedule leaves the original row behind as RESCHEDULED and creates a
+ * replacement (AP-4). The useful link is the one the patient is now expected
+ * at, so `appointmentId` here is the replacement's.
+ */
+export async function notifyAppointmentRescheduled(
+  actor: ActorContext,
+  appointment: AppointmentEventInput,
+  previous: { slotDate: string; slotTime: string },
+): Promise<void> {
+  await recordNotification({
+    tenantId: actor.tenantId,
+    clinicId: appointment.clinicId,
+    type: "appointment.rescheduled",
+    message:
+      `${appointment.patientName}'s appointment at ${appointment.clinicName} was moved ` +
+      `from ${previous.slotDate} at ${previous.slotTime} to ${slotPhrase(appointment)} ` +
+      `with ${appointment.doctorName}, by ${await actorName(actor)}.`,
+    relatedRecordId: appointment.appointmentId,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
 
@@ -289,6 +433,9 @@ function hrefFor(type: string, relatedRecordId: string | null): string | null {
   if (type.startsWith("clinic.")) return `/clinics/${relatedRecordId}`;
   if (type.startsWith("doctor.")) return `/doctors/${relatedRecordId}`;
   if (type.startsWith("registration.")) return `/registration/${relatedRecordId}`;
+  // AP-8. Points at the appointment, which is still readable after it is
+  // cancelled or missed — nothing in this system deletes one.
+  if (type.startsWith("appointment.")) return `/appointments/${relatedRecordId}`;
   return null;
 }
 

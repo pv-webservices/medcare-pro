@@ -13,6 +13,7 @@ import {
   takeDoctorDayLocks,
   type DoctorDayLockKey,
 } from "@/lib/appointmentLocks";
+import { notifyAppointmentRescheduledById } from "@/lib/appointmentNotifications";
 import {
   activeSlotStartForStatus,
   appointmentIntervalProblem,
@@ -412,6 +413,14 @@ export async function rescheduleAppointment(
       });
 
       return { created, released };
+    });
+
+    // AP-8. After the commit. Keyed to the REPLACEMENT, because that is the
+    // slot the patient is now expected at and the one a reader following the
+    // feed item needs; the original's own slot is passed in as the "moved from"
+    // half. Swallows its own errors — a feed row must not fail a completed move.
+    await notifyAppointmentRescheduledById(actor, moved.created.id, {
+      slotStart: moved.released.slotStart,
     });
 
     return {

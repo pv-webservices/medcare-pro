@@ -21,6 +21,7 @@ import {
   assertCanSendSomewhere,
   getTemplateForActor,
   renderTemplate,
+  type TemplateRecord,
   type TemplateValues,
 } from "@/lib/whatsappTemplates";
 
@@ -212,6 +213,102 @@ async function isNotOnWhatsapp(to: string): Promise<boolean> {
   return check.checked && !check.exists;
 }
 
+/** One send's worth of who and what — everything `deliverTemplate` needs. */
+export interface DeliveryTarget {
+  /** The patient the row is filed against. Never null: the column is NOT NULL. */
+  patientId: string;
+  clinicId: string;
+  mobileNumber: string;
+  values: TemplateValues;
+}
+
+export interface DeliveryOutcome {
+  status: MessageStatus;
+  /** The gateway's reason when it refused, shown verbatim. */
+  failureReason: string | null;
+}
+
+/**
+ * Renders one approved template, sends it, and records the attempt — AP-8.
+ *
+ * EXTRACTED FROM `sendToPatients`, NOT COPIED OUT OF IT. This is the whole body
+ * of that function's per-recipient loop, unchanged: the same number
+ * normalisation, the same not-on-WhatsApp pre-check, the same media/text
+ * branch, the same swallowed row write. `sendToPatients` now calls it in a
+ * loop and the appointment reminder calls it once, so there is exactly one
+ * definition of what sending a template means — and a compliance rule added
+ * here cannot be true of one path and not the other.
+ *
+ * CALLERS OWN AUTHORISATION. This function checks nothing: by the time it runs,
+ * the caller has already proven the actor may send and that the clinic is
+ * theirs. Kept unexported-looking on purpose in its own right — it is exported
+ * only so lib/appointmentReminders.ts can reach it.
+ */
+export async function deliverTemplate(
+  template: TemplateRecord,
+  target: DeliveryTarget,
+): Promise<DeliveryOutcome> {
+  const message = renderTemplate(template.body, target.values);
+  const to = toDigits(target.mobileNumber);
+
+  let outcome: SendResult;
+  if (to.length < 10) {
+    // Short-circuited rather than sent: the gateway would reject it anyway,
+    // and this reason is far more useful than its generic one.
+    outcome = {
+      ok: false,
+      providerMessageId: null,
+      message: `${target.mobileNumber} is not a valid WhatsApp number.`,
+    };
+  } else if (await isNotOnWhatsapp(to)) {
+    // Checked before sending, not after failing. Repeatedly messaging numbers
+    // with no WhatsApp account is one of the patterns that gets a sending
+    // number flagged — and "not on WhatsApp" tells the front desk what to fix.
+    outcome = {
+      ok: false,
+      providerMessageId: null,
+      message: `${target.mobileNumber} is not on WhatsApp.`,
+    };
+  } else if (template.mediaType && template.mediaUrl) {
+    outcome = await sendMedia({
+      to,
+      message,
+      footer: template.footer ?? undefined,
+      mediaType: template.mediaType,
+      mediaUrl: template.mediaUrl,
+    });
+  } else {
+    outcome = await sendText({
+      to,
+      message,
+      footer: template.footer ?? undefined,
+    });
+  }
+
+  const status: MessageStatus = outcome.ok ? "sent" : "failed";
+
+  try {
+    await prisma.whatsappMessage.create({
+      data: {
+        clinicId: target.clinicId,
+        patientId: target.patientId,
+        // Denormalised copy — see the schema note. History must survive the
+        // template being renamed or deleted.
+        templateName: template.name,
+        status,
+        providerMessageId: outcome.providerMessageId,
+        failureReason: outcome.ok ? null : outcome.message,
+      },
+    });
+  } catch (error: unknown) {
+    // The message may genuinely have gone out; losing the log row must not
+    // turn that into an error on screen or stop the remaining recipients.
+    console.error("Could not record WhatsApp message", error);
+  }
+
+  return { status, failureReason: outcome.ok ? null : outcome.message };
+}
+
 /**
  * FR-9.1 — renders one approved template per recipient and sends it.
  *
@@ -248,70 +345,19 @@ export async function sendToPatients(
     // from the client, and a patient's clinic is what decides the permission.
     await assertClinicInTenant(actor.tenantId, recipient.clinicId);
 
-    const message = renderTemplate(template.body, recipient.values);
-    const to = toDigits(recipient.mobileNumber);
-
-    let outcome: SendResult;
-    if (to.length < 10) {
-      // Short-circuited rather than sent: the gateway would reject it anyway,
-      // and this reason is far more useful than its generic one.
-      outcome = {
-        ok: false,
-        providerMessageId: null,
-        message: `${recipient.mobileNumber} is not a valid WhatsApp number.`,
-      };
-    } else if (await isNotOnWhatsapp(to)) {
-      // Checked before sending, not after failing. Repeatedly messaging numbers
-      // with no WhatsApp account is one of the patterns that gets a sending
-      // number flagged — and "not on WhatsApp" tells the front desk what to fix.
-      outcome = {
-        ok: false,
-        providerMessageId: null,
-        message: `${recipient.mobileNumber} is not on WhatsApp.`,
-      };
-    } else if (template.mediaType && template.mediaUrl) {
-      outcome = await sendMedia({
-        to,
-        message,
-        footer: template.footer ?? undefined,
-        mediaType: template.mediaType,
-        mediaUrl: template.mediaUrl,
-      });
-    } else {
-      outcome = await sendText({
-        to,
-        message,
-        footer: template.footer ?? undefined,
-      });
-    }
-
-    const status: MessageStatus = outcome.ok ? "sent" : "failed";
-
-    try {
-      await prisma.whatsappMessage.create({
-        data: {
-          clinicId: recipient.clinicId,
-          patientId: recipient.id,
-          // Denormalised copy — see the schema note. History must survive the
-          // template being renamed or deleted.
-          templateName: template.name,
-          status,
-          providerMessageId: outcome.providerMessageId,
-          failureReason: outcome.ok ? null : outcome.message,
-        },
-      });
-    } catch (error: unknown) {
-      // The message may genuinely have gone out; losing the log row must not
-      // turn that into an error on screen or stop the remaining recipients.
-      console.error("Could not record WhatsApp message", error);
-    }
+    const outcome = await deliverTemplate(template, {
+      patientId: recipient.id,
+      clinicId: recipient.clinicId,
+      mobileNumber: recipient.mobileNumber,
+      values: recipient.values,
+    });
 
     results.push({
       patientId: recipient.id,
       patientName: recipient.name,
       patientCode: recipient.patientCode,
-      status,
-      failureReason: outcome.ok ? null : outcome.message,
+      status: outcome.status,
+      failureReason: outcome.failureReason,
     });
 
     if (index < recipients.length - 1) {

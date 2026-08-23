@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import AppointmentActions from "@/components/appointments/AppointmentActions";
 import RescheduleForm from "@/components/appointments/RescheduleForm";
+import SendReminderPanel from "@/components/appointments/SendReminderPanel";
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_TONES,
@@ -16,11 +17,19 @@ import PageHeader from "@/components/ui/PageHeader";
 import Panel from "@/components/ui/Panel";
 import StatusPill from "@/components/ui/StatusPill";
 import { getAppointmentDetailForActor } from "@/lib/appointmentDetail";
-import { isTerminalAppointmentStatus } from "@/lib/appointmentRules";
+import {
+  reminderRefusal,
+  reminderTemplateValues,
+} from "@/lib/appointmentReminderRules";
+import {
+  isAppointmentStatus,
+  isTerminalAppointmentStatus,
+} from "@/lib/appointmentRules";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 import { formatRupees } from "@/lib/money";
 import { can, ScopeError } from "@/lib/rbac";
+import { listTemplatesForActor } from "@/lib/whatsappTemplates";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
 // One appointment — AP-6.
@@ -93,16 +102,46 @@ export default async function AppointmentDetailPage({
   }
 
   const clinicId = appointment.clinicId;
-  const [canCheckIn, canConvert, canCancel, canReschedule, canReadRegistration] =
-    await Promise.all([
-      can(actor, "appointment:checkin", clinicId),
-      can(actor, "appointment:convert", clinicId),
-      can(actor, "appointment:cancel", clinicId),
-      can(actor, "appointment:reschedule", clinicId),
-      can(actor, "registration:read", clinicId),
-    ]);
+  const [
+    canCheckIn,
+    canConvert,
+    canCancel,
+    canReschedule,
+    canReadRegistration,
+    canSendMessage,
+  ] = await Promise.all([
+    can(actor, "appointment:checkin", clinicId),
+    can(actor, "appointment:convert", clinicId),
+    can(actor, "appointment:cancel", clinicId),
+    can(actor, "appointment:reschedule", clinicId),
+    can(actor, "registration:read", clinicId),
+    // AP-8. Messaging a patient answers to `message:send`, not to any
+    // appointment permission — booking all day does not confer texting.
+    can(actor, "message:send", clinicId),
+  ]);
 
   const isFinished = isTerminalAppointmentStatus(appointment.status);
+
+  // AP-8. The reminder panel appears only for someone who may send and only
+  // while the appointment is still ahead of the patient; inside it, the refusal
+  // explains a booking that cannot be reminded (no patient record yet, or they
+  // have already arrived). Templates are loaded only when they will be shown —
+  // `listTemplatesForActor` refuses anyone who cannot send anywhere.
+  const showReminder = canSendMessage && !isFinished;
+  const reminderTemplates = showReminder ? await listTemplatesForActor(actor) : [];
+  const reminderValues = reminderTemplateValues({
+    patientName: appointment.name,
+    patientCode: appointment.patientCode,
+    clinicName: appointment.clinicName,
+    doctorName: appointment.doctorName,
+    department: appointment.doctorDepartment,
+    serviceName: appointment.appointmentTypeName,
+    slotDate: appointment.date,
+    slotTime: appointment.startTime,
+  });
+  const reminderRefusalText = isAppointmentStatus(appointment.status)
+    ? reminderRefusal(appointment.status, appointment.patientCode !== null)
+    : "This appointment is in a state this version does not recognise.";
   // Only the doctors at this appointment's own clinic: a move may change the
   // doctor, but never the clinic — that would move the revenue with it.
   const doctors = await listDoctorsForActor(actor, { clinicId });
@@ -198,6 +237,25 @@ export default async function AppointmentDetailPage({
             canConvert={canConvert}
             canCancel={canCancel}
             size="md"
+          />
+        </Panel>
+      )}
+
+      {showReminder && (
+        <Panel
+          title="Remind the patient"
+          description="Send one of the account's approved messages about this appointment over WhatsApp."
+        >
+          <SendReminderPanel
+            appointmentId={appointment.id}
+            templates={reminderTemplates.map(({ id, name, body, footer }) => ({
+              id,
+              name,
+              body,
+              footer,
+            }))}
+            values={reminderValues}
+            refusal={reminderRefusalText}
           />
         </Panel>
       )}

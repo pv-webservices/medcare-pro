@@ -10,7 +10,21 @@
  * Same split, and same reason, as src/lib/registrationAudit.ts.
  */
 
-/** Filled from the patient and their latest visit at send time. */
+/**
+ * Filled at send time — from the patient and their latest VISIT, or, for an
+ * appointment reminder, from the APPOINTMENT itself.
+ *
+ * THE TWO GROUPS DESCRIBE DIFFERENT THINGS AND MUST NOT BE CONFUSED — AP-8.
+ * `visitDate` is the date of a registration that has already happened;
+ * `appointmentDate` is a slot still ahead of the patient. Writing "your
+ * appointment is on {visitDate}" would send somebody the date of their LAST
+ * visit, which is why the appointment group exists rather than the reminder
+ * borrowing the visit group's tokens.
+ *
+ * A token from the wrong group is not an error — it renders as MISSING_VALUE,
+ * the same as any known placeholder with nothing behind it. The template editor
+ * lists both groups with labels saying which is which.
+ */
 export const TEMPLATE_PLACEHOLDERS = [
   "patientName",
   "patientCode",
@@ -20,6 +34,10 @@ export const TEMPLATE_PLACEHOLDERS = [
   "visitDate",
   "visitTime",
   "amount",
+  // AP-8 — the appointment group. Filled only by an appointment reminder.
+  "appointmentDate",
+  "appointmentTime",
+  "serviceName",
 ] as const;
 
 export type TemplatePlaceholder = (typeof TEMPLATE_PLACEHOLDERS)[number];
@@ -30,9 +48,12 @@ export const PLACEHOLDER_LABELS: Record<TemplatePlaceholder, string> = {
   clinicName: "Clinic name",
   doctorName: "Doctor name",
   department: "Department",
-  visitDate: "Visit date",
-  visitTime: "Visit time",
+  visitDate: "Visit date (last visit)",
+  visitTime: "Visit time (last visit)",
   amount: "Amount",
+  appointmentDate: "Appointment date (reminders only)",
+  appointmentTime: "Appointment time (reminders only)",
+  serviceName: "Service (reminders only)",
 };
 
 /** Stands in for a known placeholder with nothing behind it. */

@@ -15,6 +15,10 @@ import {
   isAppointmentStatus,
   type AppointmentStatus,
 } from "@/lib/appointmentRules";
+import {
+  notifyAppointmentCancelledById,
+  notifyAppointmentNoShowById,
+} from "@/lib/appointmentNotifications";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import { formatClockTime, formatDateOnly } from "@/lib/dates";
@@ -449,6 +453,17 @@ async function applyStatusChange(
 
     return row;
   });
+
+  // AP-8. After the commit, never inside it, and only for the outcomes an Admin
+  // reviews. CHECKED_IN is deliberately absent: it happens to every patient who
+  // turns up and would bury the two events below — see NOTIFICATION_TYPES in
+  // lib/notifications.ts. Both calls swallow their own errors, so a feed row
+  // can never turn a completed status change into an error on screen.
+  if (spec.to === "CANCELLED") {
+    await notifyAppointmentCancelledById(actor, appointmentId, spec.reason);
+  } else if (spec.to === "NO_SHOW") {
+    await notifyAppointmentNoShowById(actor, appointmentId);
+  }
 
   return toAppointmentStateView(updated);
 }

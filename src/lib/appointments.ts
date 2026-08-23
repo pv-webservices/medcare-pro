@@ -11,6 +11,7 @@ import {
   isUniqueConstraintError,
   SLOT_TAKEN_MESSAGE,
 } from "@/lib/appointmentLocks";
+import { notifyAppointmentBookedById } from "@/lib/appointmentNotifications";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import {
@@ -669,6 +670,11 @@ export async function createAppointment(
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
       },
     );
+
+    // AP-8. AFTER the commit and never inside it: a feed row is a convenience,
+    // and it must not be able to roll back a booking that succeeded. The call
+    // swallows its own errors — see lib/appointmentNotifications.ts.
+    await notifyAppointmentBookedById(actor, created.id);
 
     return {
       id: created.id,
