@@ -147,14 +147,27 @@ export default async function AppointmentBoardPage({
           </>
         }
         actions={
-          canCreate && (
+          <>
+            {/* AP-7. Shown to everyone who can reach the board, not only to
+                whoever may edit the price list: the desk quotes these prices,
+                and the screen is read-only for a role without
+                `appointment:type:manage`. It is also the only way in — there is
+                deliberately no sidebar entry of its own. */}
             <Link
-              href="/appointments/new"
-              className={buttonClasses("commit", "md")}
+              href="/appointments/types"
+              className={buttonClasses("secondary", "md")}
             >
-              Book Appointment
+              Services
             </Link>
-          )
+            {canCreate && (
+              <Link
+                href="/appointments/new"
+                className={buttonClasses("commit", "md")}
+              >
+                Book Appointment
+              </Link>
+            )}
+          </>
         }
       />
 

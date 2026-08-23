@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import BookingForm from "@/components/appointments/BookingForm";
+import { buttonClasses } from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import ModuleLocked from "@/components/ui/ModuleLocked";
 import PageHeader from "@/components/ui/PageHeader";
@@ -46,10 +48,13 @@ export default async function BookAppointmentPage() {
     redirect("/appointments");
   }
 
-  const [clinics, doctors, services] = await Promise.all([
+  const [clinics, doctors, services, canManageServices] = await Promise.all([
     listClinicsForActor(actor),
     listDoctorsForActor(actor, {}),
     listAppointmentTypes(actor, {}),
+    // AP-7. Only to decide whether the dead end below offers a way out of
+    // itself; the services screen re-checks this per row regardless.
+    can(actor, "appointment:type:manage", selectedClinicId ?? undefined),
   ]);
 
   // Only live services can be booked onto. A retired one still exists so the
@@ -68,7 +73,21 @@ export default async function BookAppointmentPage() {
       {bookable.length === 0 ? (
         <EmptyState
           title="No bookable services yet"
-          guidance="An admin needs to add at least one service — its length and its price — before anything can be booked."
+          guidance={
+            canManageServices
+              ? "Add at least one service — its length and its price — before anything can be booked."
+              : "An admin needs to add at least one service — its length and its price — before anything can be booked."
+          }
+          action={
+            canManageServices ? (
+              <Link
+                href="/appointments/types"
+                className={buttonClasses("commit", "md")}
+              >
+                Add a Service
+              </Link>
+            ) : undefined
+          }
         />
       ) : doctors.length === 0 ? (
         <EmptyState

@@ -39,7 +39,8 @@
     "verify:ap2-appointment-slots": "tsx scripts/verify-ap2-appointment-slots.mts",
     "verify:ap3-appointment-booking": "tsx scripts/verify-ap3-appointment-booking.mts",
     "verify:ap4-appointment-lifecycle": "tsx scripts/verify-ap4-appointment-lifecycle.mts",
-    "verify:ap5-appointment-conversion": "tsx scripts/verify-ap5-appointment-conversion.mts"
+    "verify:ap5-appointment-conversion": "tsx scripts/verify-ap5-appointment-conversion.mts",
+    "verify:ap7-appointment-types": "tsx scripts/verify-ap7-appointment-types.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
