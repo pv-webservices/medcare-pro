@@ -37,7 +37,8 @@
     "ap1:backfill": "tsx scripts/backfill-ap1-appointments.mts",
     "verify:ap1-appointments-schema": "tsx scripts/verify-ap1-appointments-schema.mts",
     "verify:ap2-appointment-slots": "tsx scripts/verify-ap2-appointment-slots.mts",
-    "verify:ap3-appointment-booking": "tsx scripts/verify-ap3-appointment-booking.mts"
+    "verify:ap3-appointment-booking": "tsx scripts/verify-ap3-appointment-booking.mts",
+    "verify:ap4-appointment-lifecycle": "tsx scripts/verify-ap4-appointment-lifecycle.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

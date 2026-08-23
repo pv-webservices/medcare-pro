@@ -7,6 +7,10 @@ import {
   type AppointmentFilters,
   type CreateAppointmentInput,
 } from "@/lib/appointmentInput";
+import {
+  isUniqueConstraintError,
+  SLOT_TAKEN_MESSAGE,
+} from "@/lib/appointmentLocks";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import {
@@ -41,10 +45,12 @@ import {
 /**
  * Appointment data access — AP-2, READ SIDE ONLY.
  *
- * There is no booking, rescheduling, cancellation, check-in or conversion in
- * this file yet. AP-3 onwards add them, under the DoctorScheduleLock protocol
- * recorded in prisma/schema.prisma and proved by
- * scripts/verify-ap1-appointments-schema.mts.
+ * This file books and lists. It does NOT move, retire or convert: AP-4's
+ * lifecycle lives in lib/appointmentLifecycle.ts and lib/appointmentReschedule.ts,
+ * and AP-5's conversion will live in its own module too. All of them run the
+ * same DoctorScheduleLock protocol, which AP-4 extracted into
+ * lib/appointmentLocks.ts so the five paths share one implementation of it
+ * rather than five copies.
  *
  * The division of labour, and the reason for it: lib/appointmentSlots.ts owns
  * every rule about what a slot is and whether it is free, and is pure. This
@@ -315,28 +321,12 @@ function blankToNull(value: string | undefined | null): string | null {
     : value.trim();
 }
 
-/** Prisma's code for a unique-constraint violation. */
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
-  );
-}
-
-/**
- * The one message a losing booking ever sees.
- *
- * It names no competing appointment, no patient, no colleague and no constraint.
- * A front desk that can probe "is 09:30 taken, and by whom?" through error text
- * has a patient-privacy leak dressed as a validation message.
- */
-const SLOT_TAKEN = "This time slot was just booked. Please select another slot.";
-
 /**
  * Books a patient into a doctor's free slot — AP-3.
  *
- * There is no reschedule, cancel, check-in, no-show or conversion here; those
- * are AP-4 and AP-5, and each needs lock behaviour this function does not
- * implement.
+ * There is no reschedule, cancel, check-in or no-show here — AP-4 put those in
+ * lib/appointmentLifecycle.ts and lib/appointmentReschedule.ts — and no
+ * conversion, which is AP-5.
  *
  * THE SHAPE OF THIS FUNCTION IS THE SAFETY ARGUMENT. Everything that can be
  * validated without a lock is validated before the transaction opens, so the
@@ -599,7 +589,7 @@ export async function createAppointment(
         );
 
         if (clash.length > 0) {
-          throw new ConflictError(SLOT_TAKEN);
+          throw new ConflictError(SLOT_TAKEN_MESSAGE);
         }
 
         // 18. Only now insert.
@@ -702,7 +692,7 @@ export async function createAppointment(
     // overlap: the caller learns the slot is gone, never the constraint name nor
     // that a row already exists.
     if (isUniqueConstraintError(error)) {
-      throw new ConflictError(SLOT_TAKEN);
+      throw new ConflictError(SLOT_TAKEN_MESSAGE);
     }
     throw error;
   }

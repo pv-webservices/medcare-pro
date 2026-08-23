@@ -5,6 +5,7 @@ import {
   MAX_DURATION_MINUTES,
   MIN_DURATION_MINUTES,
   OCCUPYING_STATUSES,
+  canTransitionAppointment,
   isAppointmentStatus,
   isValidAppointmentAmount,
   isValidAppointmentDuration,
@@ -300,3 +301,128 @@ export function resolveListStatuses(
 
   return filters.includeHistory ? APPOINTMENT_STATUSES : ACTIVE_LIST_STATUSES;
 }
+
+// ---------------------------------------------------------------------------
+// Lifecycle input — AP-4
+// ---------------------------------------------------------------------------
+
+/**
+ * `cancellation_reason` is a TEXT column, so the database imposes no useful
+ * bound. Five hundred characters is a front-desk note ("patient rang, unwell"),
+ * not a case history — the appointment trail is not a clinical record and must
+ * not become one.
+ */
+export const MAX_CANCELLATION_REASON = 500;
+
+const reasonSchema = z
+  .string()
+  .trim()
+  .max(MAX_CANCELLATION_REASON, "That reason is too long.")
+  .optional();
+
+/**
+ * Cancelling and marking a no-show take the same body.
+ *
+ * Neither accepts a status: which one happened is decided by WHICH ENDPOINT was
+ * called, not by a field a client can set. A single `{ status }` body would let
+ * one permission check stand in front of two different outcomes, and the whole
+ * point of the split is that they are different outcomes.
+ */
+export const cancelAppointmentSchema = z.object({
+  reason: reasonSchema,
+});
+
+export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
+
+/**
+ * What a reschedule accepts, and — as with booking — what is absent is the
+ * point.
+ *
+ * No `clinicId`: a move to another site is a different booking, not a move.
+ * No `appointmentTypeId`: changing the service changes the duration and the
+ * price, which is a re-book. No `amount`: the patient keeps the price they were
+ * quoted. No patient fields at all, so this endpoint can never be used as an
+ * unaudited back door into someone's details — correcting those is
+ * `appointment:update`, which is a separate permission and a separate stage.
+ *
+ * `doctorId` IS accepted, because the commonest real reason to move an
+ * appointment is that the original doctor has gone on leave. It is re-derived
+ * against the appointment's own clinic before it is used.
+ */
+export const rescheduleAppointmentSchema = z.object({
+  doctorId: z.string().trim().min(1).optional(),
+  slotStart: slotInstantSchema,
+  slotEnd: slotInstantSchema,
+  reason: reasonSchema,
+});
+
+export type RescheduleAppointmentInput = z.infer<
+  typeof rescheduleAppointmentSchema
+>;
+
+/**
+ * Why a transition was refused, phrased for the person at the desk.
+ *
+ * PURE, and separate from the transition table itself: lib/appointmentRules.ts
+ * answers whether a move is allowed and this answers how to say no, so adding a
+ * message can never accidentally change what is permitted. `canTransitionAppointment`
+ * remains the only authority on the first question — this function calls it
+ * rather than restating it.
+ *
+ * The message names the CURRENT state and nothing else. It does not say who
+ * cancelled it or when; the appointment itself carries that, under
+ * `appointment:read`.
+ */
+export function appointmentTransitionRefusal(
+  from: AppointmentStatus,
+  to: AppointmentStatus,
+): string | null {
+  if (canTransitionAppointment(from, to)) {
+    return null;
+  }
+
+  if (from === to) {
+    return ALREADY_IN_STATE[from];
+  }
+
+  return `${TERMINAL_PHRASE[from] ?? `This appointment is ${STATE_PHRASE[from]}`}, so it cannot be ${TARGET_PHRASE[to]}.`;
+}
+
+/** Re-doing something already done is a conflict, not a silent success. */
+const ALREADY_IN_STATE: Readonly<Record<AppointmentStatus, string>> = {
+  SCHEDULED: "This appointment is already booked.",
+  CONFIRMED: "This appointment is already confirmed.",
+  CHECKED_IN: "This patient is already checked in.",
+  CONVERTED: "This appointment has already been converted to a registration.",
+  CANCELLED: "This appointment is already cancelled.",
+  NO_SHOW: "This appointment is already marked as a no-show.",
+  RESCHEDULED: "This appointment has already been moved to another slot.",
+};
+
+const STATE_PHRASE: Readonly<Record<AppointmentStatus, string>> = {
+  SCHEDULED: "booked",
+  CONFIRMED: "confirmed",
+  CHECKED_IN: "checked in",
+  CONVERTED: "already converted to a registration",
+  CANCELLED: "cancelled",
+  NO_SHOW: "marked as a no-show",
+  RESCHEDULED: "already been moved to another slot",
+};
+
+/** The four states an appointment ends in. Nothing moves out of them. */
+const TERMINAL_PHRASE: Readonly<Partial<Record<AppointmentStatus, string>>> = {
+  CONVERTED: "This appointment has already been converted to a registration",
+  CANCELLED: "This appointment is cancelled",
+  NO_SHOW: "This appointment is marked as a no-show",
+  RESCHEDULED: "This appointment has already been moved to another slot",
+};
+
+const TARGET_PHRASE: Readonly<Record<AppointmentStatus, string>> = {
+  SCHEDULED: "reopened",
+  CONFIRMED: "confirmed",
+  CHECKED_IN: "checked in",
+  CONVERTED: "converted to a registration",
+  CANCELLED: "cancelled",
+  NO_SHOW: "marked as a no-show",
+  RESCHEDULED: "moved to another slot",
+};

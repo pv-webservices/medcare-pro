@@ -325,8 +325,9 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   // protection — so a unit test holds each key to its actual state.
   //
   // LIVE:    appointment:read (AP-2), appointment:create (AP-3),
-  //          appointment:type:manage (AP-3).
-  // PENDING: update / reschedule / cancel / checkin (AP-4), convert (AP-5).
+  //          appointment:type:manage (AP-3), appointment:reschedule,
+  //          appointment:cancel, appointment:checkin (AP-4).
+  // PENDING: appointment:update (no endpoint yet), appointment:convert (AP-5).
   //
   // Listing them now rather than per stage means ONE permission backfill over
   // live tenants instead of four. scripts/backfill-ap1-appointments.mts tops up
@@ -362,30 +363,43 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         description:
           "Correct a booking's patient details or amount without moving it to a different slot.",
         pending: "stage",
-        pendingNote: "AP-4 builds the edit endpoint.",
+        // STILL PENDING AFTER AP-4. That stage built the lifecycle —
+        // reschedule, cancel, no-show, check-in — and deliberately did not
+        // build a detail edit: changing a booked patient's name or amount is a
+        // different operation from moving their slot, and lib/appointments.ts
+        // has no path that accepts patient fields on an existing appointment.
+        // Nothing checks this key, so per this file's own rule it grants
+        // nothing and must keep saying so.
+        pendingNote: "No edit endpoint exists yet.",
       },
       {
         key: "appointment:reschedule",
         label: "Reschedule appointments",
         description:
           "Move a booking to a different slot. The original is kept and marked rescheduled, never deleted.",
-        pending: "stage",
-        pendingNote: "AP-4 builds the reschedule endpoint.",
+        // LIVE since AP-4. Checked by rescheduleAppointment in
+        // lib/appointmentReschedule.ts, which also re-derives the target doctor
+        // against this permission's own clinic scope.
       },
       {
         key: "appointment:cancel",
         label: "Cancel appointments",
         description:
           "Cancel a booking or mark it a no-show, freeing the slot. The record is kept either way.",
-        pending: "stage",
-        pendingNote: "AP-4 builds the cancel endpoint.",
+        // LIVE since AP-4. ONE key for both outcomes, as the description has
+        // always said: cancelling and marking a no-show are the same authority
+        // — deciding a booked slot will not be used — and the audit trail is
+        // what tells the two apart. Checked by cancelAppointment and
+        // markAppointmentNoShow in lib/appointmentLifecycle.ts.
       },
       {
         key: "appointment:checkin",
         label: "Check patients in",
         description: "Mark a patient as arrived for their appointment.",
-        pending: "stage",
-        pendingNote: "AP-4 builds the check-in endpoint.",
+        // LIVE since AP-4. Checked by checkInAppointment in
+        // lib/appointmentLifecycle.ts. Separate from cancelling because
+        // arriving is the front desk's routine work while calling a slot off is
+        // a decision, and AP-5 will convert only from CHECKED_IN.
       },
       {
         key: "appointment:convert",

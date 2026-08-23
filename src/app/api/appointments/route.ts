@@ -21,10 +21,14 @@ import { requireActor } from "@/lib/session";
 // naming a clinic or doctor they cannot reach returns nothing rather than
 // widening the result.
 //
-// There is no PATCH, PUT or DELETE here. Editing, rescheduling, cancelling,
-// checking in and marking a no-show are AP-4; conversion to a registration is
-// AP-5. Each needs lock behaviour this stage does not implement, and an
-// appointment is never deleted — its status changes and the row remains.
+// There is no PATCH, PUT or DELETE here. AP-4 added the lifecycle as four
+// sibling routes under [id] — /reschedule, /cancel, /no-show and /check-in —
+// one per operation because each answers to a different permission. Conversion
+// to a registration is AP-5, and correcting a booking's patient details still
+// has no endpoint at all.
+//
+// Nothing deletes an appointment anywhere: its status changes and the row
+// remains, which is what any later utilisation figure depends on.
 
 export async function GET(request: Request) {
   try {

@@ -297,6 +297,34 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "appointments",
   },
+  [AUDIT_ACTIONS.APPOINTMENT_RESCHEDULED]: {
+    label: "Appointment moved",
+    detail:
+      "A booking was moved to a different slot, and possibly a different doctor. The original is kept and marked rescheduled rather than deleted, so the whole history of a move stays readable.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_CANCELLED]: {
+    label: "Appointment cancelled",
+    detail:
+      "A booking was cancelled and its slot released. The record is kept, with who cancelled it and any reason they gave.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_NO_SHOW]: {
+    label: "Patient did not attend",
+    detail:
+      "A booking was marked as a no-show, which frees the slot. Distinct from a cancellation: nobody decided to call it off, the patient simply did not arrive.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_CHECKED_IN]: {
+    label: "Patient checked in",
+    detail:
+      "A patient was marked as arrived. The slot stays occupied — somebody in the waiting room has not released the doctor's time.",
+    side: "tenant",
+    category: "appointments",
+  },
   [AUDIT_ACTIONS.APPOINTMENT_TYPE_CREATED]: {
     label: "Appointment type added",
     detail: "A new bookable service was added, with its length and price.",

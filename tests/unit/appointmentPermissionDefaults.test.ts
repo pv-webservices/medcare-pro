@@ -30,14 +30,25 @@ import {
  *                              listAppointments and listAppointmentTypes.
  *   appointment:create       — AP-3's createAppointment.
  *   appointment:type:manage  — AP-3's create/updateAppointmentType.
+ *   appointment:reschedule   — AP-4's rescheduleAppointment.
+ *   appointment:cancel       — AP-4's cancelAppointment AND
+ *                              markAppointmentNoShow. One key, two outcomes:
+ *                              the same authority decides a booked slot will
+ *                              not be used, and the audit trail is what tells
+ *                              a cancellation from a no-show.
+ *   appointment:checkin      — AP-4's checkInAppointment.
  *
- * AP-4 adds update/reschedule/cancel/checkin and AP-5 adds convert; each stage
- * appends its key here as it builds the gate.
+ * Still waiting: appointment:update, which AP-4 did NOT build — moving a slot
+ * and correcting a patient's details are different operations — and
+ * appointment:convert, which is AP-5's.
  */
 const ENFORCED_APPOINTMENT_PERMISSIONS: readonly string[] = [
   "appointment:read",
   "appointment:create",
   "appointment:type:manage",
+  "appointment:reschedule",
+  "appointment:cancel",
+  "appointment:checkin",
 ];
 
 const permissionsFor = (key: RoleKey): readonly string[] => {
@@ -112,7 +123,7 @@ describe("the AP-1 permission keys", () => {
     }
   });
 
-  it("still has AP-4 and AP-5 waiting", () => {
+  it("still has the un-built endpoints waiting", () => {
     // Stated as behaviour rather than left implicit, so that enforcing one of
     // these without clearing its mark — or clearing a mark without building the
     // gate — fails here.
@@ -120,13 +131,7 @@ describe("the AP-1 permission keys", () => {
       STAGE_AP1_PERMISSIONS.filter(
         (permission) => !ENFORCED_APPOINTMENT_PERMISSIONS.includes(permission),
       ),
-    ).toEqual([
-      "appointment:update",
-      "appointment:reschedule",
-      "appointment:cancel",
-      "appointment:checkin",
-      "appointment:convert",
-    ]);
+    ).toEqual(["appointment:update", "appointment:convert"]);
   });
 });
 

@@ -48,6 +48,32 @@ export async function readJsonBody(request: Request): Promise<unknown> {
   }
 }
 
+/**
+ * Reads a JSON body that a caller is allowed to omit entirely.
+ *
+ * `readJsonBody` treats an empty body as malformed, which is right for a
+ * create or an update — a POST with nothing in it is a mistake. It is wrong for
+ * an action endpoint whose only field is optional: cancelling an appointment
+ * without giving a reason is ordinary, and `POST /cancel` with no body at all
+ * should mean the same as `{}` rather than 400.
+ *
+ * A body that is present but malformed is still a 400. The only thing treated
+ * as "nothing was sent" is nothing.
+ */
+export async function readOptionalJsonBody(request: Request): Promise<unknown> {
+  const raw = (await request.text()).trim();
+
+  if (raw === "") {
+    return {};
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new BadRequestError("Malformed request body.");
+  }
+}
+
 export function jsonOk<T>(data: T, status = 200): NextResponse<ApiResponse<T>> {
   return NextResponse.json({ success: true, data }, { status });
 }

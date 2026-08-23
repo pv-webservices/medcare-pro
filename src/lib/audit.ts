@@ -136,9 +136,38 @@ export const AUDIT_ACTIONS = {
   APPOINTMENT_TYPE_UPDATED: "APPOINTMENT_TYPE_UPDATED",
   APPOINTMENT_TYPE_ACTIVATED: "APPOINTMENT_TYPE_ACTIVATED",
   APPOINTMENT_TYPE_DEACTIVATED: "APPOINTMENT_TYPE_DEACTIVATED",
-  // AP-4 owns rescheduled/cancelled/no-show/checked-in, and AP-5 owns
-  // converted. Listing them here before their call sites exist would put
-  // actions in the filter control that no row will ever carry.
+  // --- AP-4: the lifecycle -----------------------------------------------
+  //
+  // Same rule as the booking action above: `targetId` carries the Appointment
+  // id and the metadata carries the SCHEDULING fact — which doctor, which day,
+  // which times, which status either side of the change. Never the patient's
+  // name, number or id. A reason typed at the desk travels in the `reason`
+  // column, which is where this trail has always kept operator free text.
+  //
+  // Four separate actions rather than one APPOINTMENT_STATUS_CHANGED, because
+  // "who cancelled my 09:30?", "how many people did not turn up last week?" and
+  // "when did that patient arrive?" are three different questions, and folding
+  // them into one action would make every one of them a metadata search.
+
+  /**
+   * The appointment was moved. `targetId` is the ORIGINAL row — the one that was
+   * acted on — and `afterValue.newAppointmentId` leads forward to the row that
+   * replaced it. The reverse direction needs no audit row: the new appointment
+   * carries `rescheduled_from_id`, which the schema designed as the
+   * authoritative link.
+   */
+  APPOINTMENT_RESCHEDULED: "APPOINTMENT_RESCHEDULED",
+  APPOINTMENT_CANCELLED: "APPOINTMENT_CANCELLED",
+  /**
+   * Kept distinct from a cancellation on purpose. Both free the slot, but one is
+   * a decision somebody made and the other is a patient who did not arrive, and
+   * a clinic counting either would get the wrong number from a merged action.
+   */
+  APPOINTMENT_NO_SHOW: "APPOINTMENT_NO_SHOW",
+  APPOINTMENT_CHECKED_IN: "APPOINTMENT_CHECKED_IN",
+
+  // AP-5 owns converted. Listing it here before its call site exists would put
+  // an action in the filter control that no row will ever carry.
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
