@@ -332,6 +332,20 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "appointments",
   },
+  [AUDIT_ACTIONS.APPOINTMENT_CONFIRMED]: {
+    label: "Appointment confirmed",
+    detail:
+      "The patient acknowledged the booking, usually after a reminder or a call. The slot was already held and stays held — nothing about the doctor's day changed.",
+    side: "tenant",
+    category: "appointments",
+  },
+  [AUDIT_ACTIONS.APPOINTMENT_UPDATED]: {
+    label: "Appointment details corrected",
+    detail:
+      "A booking's own details were corrected — the patient's name, contact details or the amount quoted. The slot, doctor and service were not touched; moving a booking is a reschedule.",
+    side: "tenant",
+    category: "appointments",
+  },
   [AUDIT_ACTIONS.APPOINTMENT_TYPE_CREATED]: {
     label: "Appointment type added",
     detail: "A new bookable service was added, with its length and price.",

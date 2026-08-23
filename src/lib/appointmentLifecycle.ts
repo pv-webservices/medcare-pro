@@ -47,11 +47,17 @@ import { requirePermission, ScopeError, type ActorContext } from "@/lib/rbac";
  *      `active_slot_start`, so the unique index and the overlap query cannot
  *      disagree about what busy means.
  *
- * WHAT IS NOT HERE. There is no edit endpoint: correcting a booking's patient
- * details is `appointment:update`, a permission this stage deliberately leaves
- * pending. There is no conversion — that is AP-5 and `appointment:convert`. And
- * there is no confirm: SCHEDULED to CONFIRMED is a patient-side acknowledgement
- * that belongs with the messaging work, not with the front desk's controls.
+ * WHAT IS NOT HERE. There is no conversion — that is AP-5 and
+ * `appointment:convert` — and no detail edit: correcting a booking's patient
+ * details is `appointment:update`, which lives in lib/appointmentEdit.ts
+ * because it changes no status and so needs no doctor-day lock.
+ *
+ * AP-9 ADDED THE FOURTH TRANSITION. `confirmAppointment` below is the one
+ * status change AP-4 deferred, on the grounds that a patient-side
+ * acknowledgement belonged with the messaging work. AP-8 shipped the reminder
+ * that prompts it and the acknowledgement still arrives by phone, so it is
+ * recorded here with the rest of the desk's controls — through the same
+ * `applyStatusChange` path, carrying nothing but a different spec.
  */
 
 // ---------------------------------------------------------------------------
@@ -326,6 +332,42 @@ export async function checkInAppointment(
     // who did it — these exist so the board can show "arrived 09:51" without a
     // second query.
     writesCheckInColumns: true,
+  });
+}
+
+/**
+ * Records that the patient has acknowledged the booking — AP-9.
+ *
+ * UNDER `appointment:update`, not a key of its own. Confirming is the desk
+ * writing down something a patient said, and the roles that may correct a
+ * booking are exactly the roles that should be able to record that — Admin and
+ * Receptionist hold it, Doctor (read-only) and Staff do not. A ninth
+ * appointment permission would mean a new stage list, a backfill for every
+ * existing role and two widened catalogue tests, all for one button, and would
+ * leave every organisation that already granted the eight with a control
+ * nobody could use until an admin noticed.
+ *
+ * NOTHING ABOUT THE DOCTOR'S DAY CHANGES. CONFIRMED occupies the slot exactly
+ * as SCHEDULED did, so `activeSlotStartForStatus` returns the same value it
+ * already held and the write is a no-op as far as occupancy is concerned. The
+ * doctor-day lock is still taken, because this goes through the shared path and
+ * a confirm racing a cancellation of the same row is a real collision that the
+ * row lock inside it settles.
+ *
+ * ONLY FROM SCHEDULED. AP-1's transition table allows nothing else into
+ * CONFIRMED — an arrived patient is past confirming, and a cancelled one has
+ * nothing to confirm. `appointmentTransitionRefusal` says which, in words.
+ */
+export async function confirmAppointment(
+  actor: ActorContext,
+  appointmentId: string,
+): Promise<AppointmentStateView> {
+  return applyStatusChange(actor, appointmentId, {
+    to: "CONFIRMED",
+    permission: "appointment:update",
+    auditAction: AUDIT_ACTIONS.APPOINTMENT_CONFIRMED,
+    reason: null,
+    writesCancellationColumns: false,
   });
 }
 

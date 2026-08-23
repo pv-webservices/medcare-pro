@@ -327,8 +327,9 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   // LIVE:    appointment:read (AP-2), appointment:create (AP-3),
   //          appointment:type:manage (AP-3), appointment:reschedule,
   //          appointment:cancel, appointment:checkin (AP-4),
-  //          appointment:convert (AP-5).
-  // PENDING: appointment:update (no endpoint yet).
+  //          appointment:convert (AP-5), appointment:update (AP-9).
+  // PENDING: none. AP-9 took the last mark off, so every appointment key in
+  //          this catalogue now has a call site that checks it.
   //
   // Listing them now rather than per stage means ONE permission backfill over
   // live tenants instead of four. scripts/backfill-ap1-appointments.mts tops up
@@ -362,16 +363,19 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "appointment:update",
         label: "Edit appointments",
         description:
-          "Correct a booking's patient details or amount without moving it to a different slot.",
-        pending: "stage",
-        // STILL PENDING AFTER AP-4. That stage built the lifecycle —
-        // reschedule, cancel, no-show, check-in — and deliberately did not
-        // build a detail edit: changing a booked patient's name or amount is a
-        // different operation from moving their slot, and lib/appointments.ts
-        // has no path that accepts patient fields on an existing appointment.
-        // Nothing checks this key, so per this file's own rule it grants
-        // nothing and must keep saying so.
-        pendingNote: "No edit endpoint exists yet.",
+          "Correct a booking's patient details or amount without moving it to a different slot, and record that the patient has confirmed.",
+        // LIVE since AP-9. Checked by updateAppointment in
+        // lib/appointmentEdit.ts and by confirmAppointment in
+        // lib/appointmentLifecycle.ts.
+        //
+        // TWO CALL SITES, ONE AUTHORITY, and that is a decision worth finding
+        // here rather than in a diff. Confirming is the desk writing down that
+        // the patient said they are coming; the roles that may correct a
+        // booking are exactly the roles that should be able to record that. A
+        // ninth appointment key would have meant a new stage permission list, a
+        // backfill for every existing role and two widened catalogue tests, and
+        // would have left every organisation that already granted the eight
+        // with a button nobody could press until an admin noticed.
       },
       {
         key: "appointment:reschedule",

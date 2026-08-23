@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarX2, CheckCircle2, LogIn, UserPlus } from "lucide-react";
+import { CalendarX2, CheckCheck, CheckCircle2, LogIn, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button, { type ButtonSize } from "@/components/ui/Button";
@@ -19,9 +19,14 @@ import type { AppointmentStatus } from "@/lib/appointmentRules";
  * WHICH BUTTONS APPEAR IS DERIVED FROM THE STATUS, and it mirrors AP-1's
  * transition table rather than restating it in prose:
  *
- *   Booked / Confirmed  →  Check In, Cancel, Did Not Attend
+ *   Booked              →  Confirm, Check In, Cancel, Did Not Attend
+ *   Confirmed           →  Check In, Cancel, Did Not Attend
  *   Arrived             →  Register Patient, Cancel, Did Not Attend
  *   anything terminal   →  nothing. The row is finished.
+ *
+ * Confirm appears on a booked appointment ONLY, because SCHEDULED is the one
+ * state AP-1's transition table lets into CONFIRMED — a patient who has already
+ * arrived is past confirming, and the button would only ever refuse.
  *
  * HIDING A BUTTON IS NOT ACCESS CONTROL. Every route behind these calls runs
  * its own feature, scope and permission checks and refuses a caller who posts
@@ -40,14 +45,20 @@ interface AppointmentActionsProps {
   canCheckIn: boolean;
   canConvert: boolean;
   canCancel: boolean;
+  /** AP-9. Confirming answers to `appointment:update`, not to a key of its own. */
+  canConfirm: boolean;
   size?: ButtonSize;
   className?: string;
 }
 
 /** Which endpoint each control posts to, and what the desk should read after. */
-type Action = "check-in" | "convert" | "cancel" | "no-show";
+type Action = "confirm" | "check-in" | "convert" | "cancel" | "no-show";
 
 const SUCCESS: Record<Action, { title: string; detail?: string }> = {
+  confirm: {
+    title: "Appointment confirmed.",
+    detail: "The slot was already held and stays held.",
+  },
   "check-in": { title: "Patient marked as arrived." },
   convert: {
     title: "Patient registered.",
@@ -66,6 +77,7 @@ export default function AppointmentActions({
   canCheckIn,
   canConvert,
   canCancel,
+  canConfirm,
   size = "sm",
   className,
 }: AppointmentActionsProps) {
@@ -74,7 +86,8 @@ export default function AppointmentActions({
   const [busy, setBusy] = useState<Action | null>(null);
 
   const isArrived = status === "CHECKED_IN";
-  const isWaiting = status === "SCHEDULED" || status === "CONFIRMED";
+  const isBooked = status === "SCHEDULED";
+  const isWaiting = isBooked || status === "CONFIRMED";
   const isLive = isArrived || isWaiting;
 
   async function run(action: Action) {
@@ -121,6 +134,20 @@ export default function AppointmentActions({
   return (
     <div className={className}>
       <div className="flex flex-wrap items-center gap-2">
+        {isBooked && canConfirm && (
+          <Button
+            size={size}
+            variant="secondary"
+            isBusy={busy === "confirm"}
+            busyLabel="Confirming…"
+            disabled={busy !== null}
+            onClick={() => run("confirm")}
+          >
+            <CheckCheck aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+            Confirm
+          </Button>
+        )}
+
         {isWaiting && canCheckIn && (
           <Button
             size={size}

@@ -107,16 +107,27 @@ export default async function AppointmentBoardPage({
     } as Filters;
   }
 
-  const [result, clinics, doctors, canCreate, canCheckIn, canConvert, canCancel] =
-    await Promise.all([
-      listAppointments(actor, filters),
-      listClinicsForActor(actor),
-      listDoctorsForActor(actor, { clinicId: selectedClinicId }),
-      can(actor, "appointment:create", selectedClinicId ?? undefined),
-      can(actor, "appointment:checkin", selectedClinicId ?? undefined),
-      can(actor, "appointment:convert", selectedClinicId ?? undefined),
-      can(actor, "appointment:cancel", selectedClinicId ?? undefined),
-    ]);
+  const [
+    result,
+    clinics,
+    doctors,
+    canCreate,
+    canCheckIn,
+    canConvert,
+    canCancel,
+    canConfirm,
+  ] = await Promise.all([
+    listAppointments(actor, filters),
+    listClinicsForActor(actor),
+    listDoctorsForActor(actor, { clinicId: selectedClinicId }),
+    can(actor, "appointment:create", selectedClinicId ?? undefined),
+    can(actor, "appointment:checkin", selectedClinicId ?? undefined),
+    can(actor, "appointment:convert", selectedClinicId ?? undefined),
+    can(actor, "appointment:cancel", selectedClinicId ?? undefined),
+    // AP-9. The same key that governs correcting a booking, because confirming
+    // is the desk writing down something the patient said about theirs.
+    can(actor, "appointment:update", selectedClinicId ?? undefined),
+  ]);
 
   const selectedClinic = selectedClinicId
     ? clinics.find((clinic) => clinic.id === selectedClinicId)
@@ -187,7 +198,7 @@ export default async function AppointmentBoardPage({
         showClinic={!selectedClinic}
         showDate={appliedDate === ""}
         isFiltered={isFiltered}
-        permissions={{ canCheckIn, canConvert, canCancel, canCreate }}
+        permissions={{ canCheckIn, canConvert, canCancel, canConfirm, canCreate }}
       />
 
       {lastPage > 1 && (

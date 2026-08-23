@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import AppointmentActions from "@/components/appointments/AppointmentActions";
+import EditBookingForm from "@/components/appointments/EditBookingForm";
 import RescheduleForm from "@/components/appointments/RescheduleForm";
 import SendReminderPanel from "@/components/appointments/SendReminderPanel";
 import {
@@ -17,6 +18,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Panel from "@/components/ui/Panel";
 import StatusPill from "@/components/ui/StatusPill";
 import { getAppointmentDetailForActor } from "@/lib/appointmentDetail";
+import { editRefusal } from "@/lib/appointmentEditRules";
 import {
   reminderRefusal,
   reminderTemplateValues,
@@ -109,6 +111,7 @@ export default async function AppointmentDetailPage({
     canReschedule,
     canReadRegistration,
     canSendMessage,
+    canUpdate,
   ] = await Promise.all([
     can(actor, "appointment:checkin", clinicId),
     can(actor, "appointment:convert", clinicId),
@@ -118,6 +121,9 @@ export default async function AppointmentDetailPage({
     // AP-8. Messaging a patient answers to `message:send`, not to any
     // appointment permission — booking all day does not confer texting.
     can(actor, "message:send", clinicId),
+    // AP-9. Correcting the booking's details, and recording that the patient
+    // confirmed — one key covers both.
+    can(actor, "appointment:update", clinicId),
   ]);
 
   const isFinished = isTerminalAppointmentStatus(appointment.status);
@@ -142,6 +148,13 @@ export default async function AppointmentDetailPage({
   const reminderRefusalText = isAppointmentStatus(appointment.status)
     ? reminderRefusal(appointment.status, appointment.patientCode !== null)
     : "This appointment is in a state this version does not recognise.";
+  // AP-9. The correction form appears only for someone who may edit AND only
+  // while the booking is in a state a correction still means something in.
+  // `editRefusal` is the same pure rule the endpoint enforces, so the form is
+  // absent for exactly the appointments the server would refuse — most
+  // importantly a converted one, whose details now belong to the registration.
+  const canEditBooking = canUpdate && editRefusal(appointment.status) === null;
+
   // Only the doctors at this appointment's own clinic: a move may change the
   // doctor, but never the clinic — that would move the revenue with it.
   const doctors = await listDoctorsForActor(actor, { clinicId });
@@ -225,7 +238,7 @@ export default async function AppointmentDetailPage({
         </Card>
       )}
 
-      {!isFinished && (canCheckIn || canConvert || canCancel) && (
+      {!isFinished && (canCheckIn || canConvert || canCancel || canUpdate) && (
         <Panel
           title="What happens next"
           description="Move this appointment on as the patient arrives, or close it out."
@@ -236,6 +249,7 @@ export default async function AppointmentDetailPage({
             canCheckIn={canCheckIn}
             canConvert={canConvert}
             canCancel={canCancel}
+            canConfirm={canUpdate}
             size="md"
           />
         </Panel>
@@ -371,6 +385,26 @@ export default async function AppointmentDetailPage({
           <Fact label="Address">{appointment.address ?? <NotSet />}</Fact>
         </div>
       </Panel>
+
+      {canEditBooking && (
+        <Panel
+          title="Correct these details"
+          description="Fix what was written down when the booking was taken. Moving it to another slot is separate."
+        >
+          <EditBookingForm
+            appointmentId={appointment.id}
+            initial={{
+              name: appointment.name,
+              mobileNumber: appointment.mobileNumber,
+              age: appointment.age === null ? "" : String(appointment.age),
+              gender: appointment.gender ?? "",
+              city: appointment.city ?? "",
+              address: appointment.address ?? "",
+              amount: appointment.amount,
+            }}
+          />
+        </Panel>
+      )}
 
       {!isFinished && canReschedule && doctors.length > 0 && (
         <RescheduleForm

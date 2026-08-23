@@ -187,6 +187,39 @@ export const AUDIT_ACTIONS = {
    * happened consumed the doctor's time.
    */
   APPOINTMENT_CONVERTED: "APPOINTMENT_CONVERTED",
+
+  // --- AP-9: correcting a booking, and confirming one ----------------------
+
+  /**
+   * The patient acknowledged the booking. A fifth status action rather than a
+   * flag on another, for the reason the four above are separate: "how many of
+   * next week's bookings have we actually confirmed?" is a question a clinic
+   * asks, and folding it into a generic status action would make it a metadata
+   * search.
+   *
+   * Occupancy does not change — CONFIRMED occupies the slot exactly as
+   * SCHEDULED did — so this row records an acknowledgement, not a movement.
+   */
+  APPOINTMENT_CONFIRMED: "APPOINTMENT_CONFIRMED",
+
+  /**
+   * A booking's own details were corrected — never its slot, doctor, service or
+   * status, each of which has its own action above.
+   *
+   * WHAT THE METADATA MAY CARRY, and this is the AP-3 rule holding rather than
+   * a new one: `afterValue.changedFields` names the COLUMNS that changed and
+   * never their values, so the trail records that a mobile number was
+   * corrected and not what it was corrected to. The single exception is
+   * `amount`, carried on both sides, because a price is a commercial fact this
+   * table already records at booking and "who changed the price, and to what?"
+   * cannot be answered without the two numbers.
+   *
+   * This is a weaker trail than a registration edit gets: `registration_edit_log`
+   * keeps per-field before/after values, and nothing equivalent exists for an
+   * appointment. That is a deliberate limit of AP-9, not an oversight — adding
+   * one is a new table.
+   */
+  APPOINTMENT_UPDATED: "APPOINTMENT_UPDATED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

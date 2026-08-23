@@ -54,6 +54,7 @@ const ENFORCED_APPOINTMENT_PERMISSIONS: readonly string[] = [
   "appointment:cancel",
   "appointment:checkin",
   "appointment:convert",
+  "appointment:update",
 ];
 
 const permissionsFor = (key: RoleKey): readonly string[] => {
@@ -128,15 +129,17 @@ describe("the AP-1 permission keys", () => {
     }
   });
 
-  it("still has the un-built endpoints waiting", () => {
-    // Stated as behaviour rather than left implicit, so that enforcing one of
-    // these without clearing its mark — or clearing a mark without building the
-    // gate — fails here.
+  it("has no un-built endpoints left", () => {
+    // AP-9 took the last mark off: `appointment:update` is now checked by
+    // updateAppointment and confirmAppointment. Stated as behaviour rather than
+    // left implicit, so that a NEW key added to the catalogue without a gate —
+    // or a mark cleared without one — fails here rather than quietly promising
+    // a role protection it does not have.
     expect(
       STAGE_AP1_PERMISSIONS.filter(
         (permission) => !ENFORCED_APPOINTMENT_PERMISSIONS.includes(permission),
       ),
-    ).toEqual(["appointment:update"]);
+    ).toEqual([]);
   });
 });
 

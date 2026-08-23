@@ -35,6 +35,8 @@ interface AppointmentPermissions {
   canCheckIn: boolean;
   canConvert: boolean;
   canCancel: boolean;
+  /** AP-9. `appointment:update`, which also governs correcting a booking. */
+  canConfirm: boolean;
   canCreate: boolean;
 }
 
@@ -167,6 +169,7 @@ export default function AppointmentsTable({
                       canCheckIn={permissions.canCheckIn}
                       canConvert={permissions.canConvert}
                       canCancel={permissions.canCancel}
+                      canConfirm={permissions.canConfirm}
                     />
                     <Link
                       href={`/appointments/${appointment.id}`}
@@ -241,6 +244,7 @@ export default function AppointmentsTable({
                 canCheckIn={permissions.canCheckIn}
                 canConvert={permissions.canConvert}
                 canCancel={permissions.canCancel}
+                canConfirm={permissions.canConfirm}
                 className="mt-3"
               />
             </Card>

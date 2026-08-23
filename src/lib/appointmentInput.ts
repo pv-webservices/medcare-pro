@@ -360,6 +360,54 @@ export type RescheduleAppointmentInput = z.infer<
   typeof rescheduleAppointmentSchema
 >;
 
+// ---------------------------------------------------------------------------
+// Edit input — AP-9
+// ---------------------------------------------------------------------------
+
+/**
+ * What a correction accepts, and — as with booking and rescheduling — what is
+ * absent is the point.
+ *
+ * There is no `slotStart`, `slotEnd`, `doctorId`, `appointmentTypeId`,
+ * `clinicId`, `patientId` or `status` here. Zod strips unknown keys, so a
+ * client that sends one is not refused, it is IGNORED and the stored value
+ * stands. Each omission is a rule from AP-1 rather than an oversight: the
+ * times are never updated after insert (rule 2), a different doctor or service
+ * is a reschedule or a re-book, a different clinic is a different booking
+ * altogether, re-pointing the patient link would move the money with it at
+ * conversion, and the status is decided by which endpoint was called — never
+ * by a field.
+ *
+ * EVERY FIELD IS OPTIONAL and absent means unchanged, so this is a genuine
+ * PATCH. What blank and null mean is decided in exactly one place,
+ * `applyAppointmentEdit` in lib/appointmentEditRules.ts, and the shape of this
+ * schema's output is checked against that module's `AppointmentEditPatch` by
+ * tsc at the call site.
+ *
+ * A body that changes nothing is refused by the domain layer, not here: `{}`
+ * and "typed the same name back again" are the same non-event, and only a diff
+ * against the stored row can see the second one.
+ */
+export const updateAppointmentSchema = z.object({
+  name: z.string().trim().min(1, "Enter the patient's name.").max(255).optional(),
+  mobileNumber: mobileSchema.optional(),
+  /** Explicit null clears it; absent leaves it. Blank is the client's job. */
+  age: z.coerce.number().int().min(0).max(150).nullish(),
+  gender: z.string().trim().max(50).optional(),
+  address: z.string().trim().max(1000).optional(),
+  city: z.string().trim().max(255).optional(),
+  /**
+   * The one commercial field a correction may touch, and the reason
+   * `appointment:update` is a separate permission from `appointment:create`.
+   * Bounded for range AND scale by the same rule the price list uses, because
+   * this number is copied onto the Registration at conversion and becomes
+   * revenue.
+   */
+  amount: typeAmountSchema.optional(),
+});
+
+export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>;
+
 /**
  * Why a transition was refused, phrased for the person at the desk.
  *
