@@ -326,8 +326,9 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   //
   // LIVE:    appointment:read (AP-2), appointment:create (AP-3),
   //          appointment:type:manage (AP-3), appointment:reschedule,
-  //          appointment:cancel, appointment:checkin (AP-4).
-  // PENDING: appointment:update (no endpoint yet), appointment:convert (AP-5).
+  //          appointment:cancel, appointment:checkin (AP-4),
+  //          appointment:convert (AP-5).
+  // PENDING: appointment:update (no endpoint yet).
   //
   // Listing them now rather than per stage means ONE permission backfill over
   // live tenants instead of four. scripts/backfill-ap1-appointments.mts tops up
@@ -406,8 +407,16 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         label: "Convert appointments",
         description:
           "Turn an arrived appointment into a registration, creating the patient record and code if this is their first visit.",
-        pending: "stage",
-        pendingNote: "AP-5 builds the conversion endpoint.",
+        // LIVE since AP-5. Checked by convertAppointmentToRegistration in
+        // lib/appointmentConversion.ts, and it is the ONLY key that path
+        // checks: the catalogue entry above already says conversion creates the
+        // patient record, so also demanding `registration:create` would let a
+        // role hold this key and still be refused by a second one it was never
+        // told about. Every seeded role that holds convert holds both anyway.
+        //
+        // Only a CHECKED_IN appointment converts — arriving is what makes a
+        // visit real — and CONVERTED is terminal, so this permission cannot
+        // be used twice on the same booking.
       },
       {
         key: "appointment:type:manage",

@@ -325,6 +325,13 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "appointments",
   },
+  [AUDIT_ACTIONS.APPOINTMENT_CONVERTED]: {
+    label: "Appointment converted to a registration",
+    detail:
+      "An arrived patient's appointment became a visit on the register, creating their patient record and Patient ID if this was their first time. The slot stays occupied — the time was genuinely used.",
+    side: "tenant",
+    category: "appointments",
+  },
   [AUDIT_ACTIONS.APPOINTMENT_TYPE_CREATED]: {
     label: "Appointment type added",
     detail: "A new bookable service was added, with its length and price.",

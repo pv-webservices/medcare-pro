@@ -37,10 +37,14 @@ import {
  *                              not be used, and the audit trail is what tells
  *                              a cancellation from a no-show.
  *   appointment:checkin      — AP-4's checkInAppointment.
+ *   appointment:convert      — AP-5's convertAppointmentToRegistration. The
+ *                              only key that path checks: conversion creates
+ *                              the Registration and the patient record, and
+ *                              the catalogue entry says so, so it does not
+ *                              also demand `registration:create`.
  *
- * Still waiting: appointment:update, which AP-4 did NOT build — moving a slot
- * and correcting a patient's details are different operations — and
- * appointment:convert, which is AP-5's.
+ * Still waiting: appointment:update alone, which AP-4 did NOT build — moving a
+ * slot and correcting a patient's details are different operations.
  */
 const ENFORCED_APPOINTMENT_PERMISSIONS: readonly string[] = [
   "appointment:read",
@@ -49,6 +53,7 @@ const ENFORCED_APPOINTMENT_PERMISSIONS: readonly string[] = [
   "appointment:reschedule",
   "appointment:cancel",
   "appointment:checkin",
+  "appointment:convert",
 ];
 
 const permissionsFor = (key: RoleKey): readonly string[] => {
@@ -131,7 +136,7 @@ describe("the AP-1 permission keys", () => {
       STAGE_AP1_PERMISSIONS.filter(
         (permission) => !ENFORCED_APPOINTMENT_PERMISSIONS.includes(permission),
       ),
-    ).toEqual(["appointment:update", "appointment:convert"]);
+    ).toEqual(["appointment:update"]);
   });
 });
 

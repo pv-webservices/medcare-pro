@@ -84,7 +84,7 @@ const EXPORT_ROW_LIMIT = 5000;
  * `patients(tenant_id, patient_code)` is what actually guarantees uniqueness;
  * this is how many times we re-pick a candidate before giving up.
  */
-const MAX_PATIENT_CODE_ATTEMPTS = 5;
+export const MAX_PATIENT_CODE_ATTEMPTS = 5;
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -861,19 +861,7 @@ export async function createRegistration(
   // new case, and only the person at the desk knows that.
   const visitType: VisitType = input.visitType ?? (patient ? "FOLLOW_UP" : "NEW");
 
-  const created: RegistrationSnapshot = {
-    patientName: input.name,
-    age: input.age ?? null,
-    gender: blankToNull(input.gender),
-    mobileNumber: input.mobileNumber,
-    address: blankToNull(input.address),
-    city: blankToNull(input.city),
-    doctor: doctor?.name ?? null,
-    department: input.department,
-    amount: toAmountString(input.amount),
-    visitType: VISIT_TYPE_LABELS[visitType],
-    visitAt: visitAtLabel(input.visitDate, input.visitTime),
-  };
+  const created = buildCreationSnapshot(input, doctor?.name ?? null, visitType);
 
   const registrationId = await insertRegistration(actor, input, {
     existingPatientId: patient?.id ?? null,
@@ -900,13 +888,51 @@ export async function createRegistration(
   return record;
 }
 
-interface InsertOptions {
+/**
+ * The first `registration_edit_log` entry's "after" side.
+ *
+ * Exported because AP-5's conversion writes the same log row from the same
+ * shape, and two builders would let the trail describe a converted visit
+ * differently from a walk-in booked at the desk a minute later.
+ */
+export function buildCreationSnapshot(
+  input: CreateRegistrationInput,
+  doctorName: string | null,
+  visitType: VisitType,
+): RegistrationSnapshot {
+  return {
+    patientName: input.name,
+    age: input.age ?? null,
+    gender: blankToNull(input.gender),
+    mobileNumber: input.mobileNumber,
+    address: blankToNull(input.address),
+    city: blankToNull(input.city),
+    doctor: doctorName,
+    department: input.department,
+    amount: toAmountString(input.amount),
+    visitType: VISIT_TYPE_LABELS[visitType],
+    visitAt: visitAtLabel(input.visitDate, input.visitTime),
+  };
+}
+
+export interface InsertOptions {
   /** null = mint a new patient and a new Patient ID. */
   existingPatientId: string | null;
   doctorId: string | null;
   visitType: VisitType;
   roleAtTime: string;
   snapshot: RegistrationSnapshot;
+  /**
+   * The appointment this visit was converted from — AP-5, and nothing else.
+   *
+   * Written in the SAME statement that creates the registration, never in a
+   * follow-up update. `registrations.appointment_id` is UNIQUE, and that index
+   * is the database-level guard against converting one appointment twice; a
+   * two-step link would hand a competing transaction the window the index
+   * exists to close. A direct registration leaves this null, as every
+   * registration created before appointments existed does.
+   */
+  appointmentId?: string | null;
 }
 
 /** The demographic fields, shared by the create-new and reuse paths. */
@@ -939,6 +965,7 @@ async function writeVisit(
       visitDate: parseDateTime(input.visitDate, input.visitTime),
       visitType: options.visitType,
       createdBy: actor.userId,
+      appointmentId: options.appointmentId ?? null,
     },
     select: { id: true },
   });
@@ -963,45 +990,100 @@ async function writeVisit(
  * registrations can pick the same one. The database index is the thing that
  * guarantees uniqueness. A return visit mints no code, so it needs no retry.
  */
+export interface InsertedRegistration {
+  registrationId: string;
+  patientId: string;
+  /** `PT-YYYY-####`. Freshly minted on the new-patient path, existing on the other. */
+  patientCode: string;
+}
+
+/**
+ * The patient, the registration and the first log row — inside a transaction
+ * THE CALLER OWNS.
+ *
+ * Extracted from `insertRegistration` below in AP-5 so conversion can put this
+ * work in the same transaction as the appointment's status change and its audit
+ * row, which `insertRegistration`'s own `prisma.$transaction` made impossible.
+ * The body is unchanged; only who opens the transaction moved.
+ *
+ * TWO THINGS THE CALLER INHERITS by taking ownership:
+ *
+ *   1. THE PATIENT-CODE RETRY. `generatePatientCode` only picks the next
+ *      candidate; two concurrent registrations can pick the same one and the
+ *      database index is what actually guarantees uniqueness. This function
+ *      lets that P2002 escape, because a retry means a NEW transaction and this
+ *      one is not its to restart. `insertRegistration` below still owns the
+ *      loop for the direct path, and AP-5 owns an equivalent one.
+ *   2. TELLING THE TWO UNIQUE INDEXES APART. A caller that also writes
+ *      `appointmentId` can trip `registrations_appointment_id_key` instead, and
+ *      that one must NOT be retried — it means the appointment is already
+ *      converted. See lib/appointmentConversion.ts.
+ */
+export async function insertRegistrationWithin(
+  tx: Prisma.TransactionClient,
+  actor: ActorContext,
+  input: CreateRegistrationInput,
+  options: InsertOptions,
+): Promise<InsertedRegistration> {
+  const existingPatientId = options.existingPatientId;
+
+  if (existingPatientId) {
+    // Re-saved rather than left alone: the front desk confirms these details
+    // at every visit, and a corrected number should stick.
+    const patient = await tx.patient.update({
+      where: { id: existingPatientId },
+      data: patientFieldsFrom(input),
+      select: { id: true, patientCode: true },
+    });
+
+    return {
+      registrationId: await writeVisit(tx, actor, input, options, patient.id),
+      patientId: patient.id,
+      patientCode: patient.patientCode,
+    };
+  }
+
+  const patientCode = await generatePatientCode(tx, actor.tenantId);
+
+  const patient = await tx.patient.create({
+    data: {
+      // Denormalised from the clinic so the tenant-wide uniqueness of
+      // patient_code is enforceable by the database.
+      tenantId: actor.tenantId,
+      clinicId: input.clinicId,
+      patientCode,
+      ...patientFieldsFrom(input),
+    },
+    select: { id: true },
+  });
+
+  return {
+    registrationId: await writeVisit(tx, actor, input, options, patient.id),
+    patientId: patient.id,
+    patientCode,
+  };
+}
+
 async function insertRegistration(
   actor: ActorContext,
   input: CreateRegistrationInput,
   options: InsertOptions,
 ): Promise<string> {
-  const existingPatientId = options.existingPatientId;
+  if (options.existingPatientId) {
+    const inserted = await prisma.$transaction((tx) =>
+      insertRegistrationWithin(tx, actor, input, options),
+    );
 
-  if (existingPatientId) {
-    return prisma.$transaction(async (tx) => {
-      // Re-saved rather than left alone: the front desk confirms these details
-      // at every visit, and a corrected number should stick.
-      await tx.patient.update({
-        where: { id: existingPatientId },
-        data: patientFieldsFrom(input),
-      });
-
-      return writeVisit(tx, actor, input, options, existingPatientId);
-    });
+    return inserted.registrationId;
   }
 
   for (let attempt = 1; attempt <= MAX_PATIENT_CODE_ATTEMPTS; attempt += 1) {
     try {
-      return await prisma.$transaction(async (tx) => {
-        const patientCode = await generatePatientCode(tx, actor.tenantId);
+      const inserted = await prisma.$transaction((tx) =>
+        insertRegistrationWithin(tx, actor, input, options),
+      );
 
-        const patient = await tx.patient.create({
-          data: {
-            // Denormalised from the clinic so the tenant-wide uniqueness of
-            // patient_code is enforceable by the database.
-            tenantId: actor.tenantId,
-            clinicId: input.clinicId,
-            patientCode,
-            ...patientFieldsFrom(input),
-          },
-          select: { id: true },
-        });
-
-        return writeVisit(tx, actor, input, options, patient.id);
-      });
+      return inserted.registrationId;
     } catch (error: unknown) {
       if (isUniqueConstraintError(error) && attempt < MAX_PATIENT_CODE_ATTEMPTS) {
         continue;

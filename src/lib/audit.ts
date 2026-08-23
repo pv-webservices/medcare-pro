@@ -166,8 +166,27 @@ export const AUDIT_ACTIONS = {
   APPOINTMENT_NO_SHOW: "APPOINTMENT_NO_SHOW",
   APPOINTMENT_CHECKED_IN: "APPOINTMENT_CHECKED_IN",
 
-  // AP-5 owns converted. Listing it here before its call site exists would put
-  // an action in the filter control that no row will ever carry.
+  // --- AP-5: conversion ---------------------------------------------------
+  /**
+   * An arrived patient's appointment became a real Registration.
+   *
+   * `targetId` is the Appointment, so the trail reads from the side that was
+   * acted on, and `afterValue.registrationId` leads forward to the visit that
+   * came out of it. The reverse direction needs no row: `registrations`
+   * carries `appointment_id`, which the schema designed as the authoritative —
+   * and UNIQUE — link.
+   *
+   * THE METADATA IS A SCHEDULING FACT PLUS ONE ID, exactly as AP-3's booking
+   * and AP-4's transitions are. Never the patient's name, number, address or
+   * id, and never the `PT-YYYY-####` code — quite apart from the rule, the
+   * word "code" is one `assertSafeAuditMetadata` throws on, which is the
+   * mechanism doing the remembering rather than the author.
+   *
+   * SLOT OCCUPANCY DOES NOT CHANGE HERE. CONVERTED is an occupying status, so
+   * `active_slot_start` keeps mirroring `slot_start` — a visit that demonstrably
+   * happened consumed the doctor's time.
+   */
+  APPOINTMENT_CONVERTED: "APPOINTMENT_CONVERTED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
