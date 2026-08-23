@@ -272,3 +272,88 @@ export async function sendLoginCodeEmail(
     text,
   });
 }
+
+export interface SendPasswordResetEmailParams {
+  to: string;
+  /** Absolute link to /reset-password carrying the raw token. */
+  resetUrl: string;
+  expiresInMinutes: number;
+}
+
+/**
+ * "Forgot password?" — the reset link.
+ *
+ * A CLICKABLE LINK IS CORRECT HERE, where it is not for a login code. The link
+ * does not sign anyone in: it opens a form that still demands a new password be
+ * chosen and typed twice. Possession of the inbox therefore authorises a
+ * password CHANGE, which the account holder sees evidence of, rather than
+ * silently handing over a live session the way a magic link would.
+ *
+ * The token is in the URL and nowhere else — not in the subject, which syncs to
+ * lock screens, and not in the body text separately from the link.
+ */
+function buildPasswordResetBody(
+  resetUrl: string,
+  expiresInMinutes: number,
+): { html: string; text: string } {
+  const safeUrl = escapeHtml(resetUrl);
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px">
+      <h1 style="font-size:20px;margin:0 0 16px">Reset your password</h1>
+      <p style="margin:0 0 16px">
+        Someone asked to reset the MEDCARE PRO password for this address. Choose
+        a new one here:
+      </p>
+      <p style="margin:0 0 24px">
+        <a href="${safeUrl}"
+           style="display:inline-block;background:#111;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none">
+          Choose a new password
+        </a>
+      </p>
+      <p style="margin:0 0 8px;font-size:13px;color:#555">
+        Or paste this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;font-size:13px;word-break:break-all">${safeUrl}</p>
+      <p style="margin:0;font-size:13px;color:#555">
+        The link expires in ${expiresInMinutes} minutes and works once. If you did
+        not ask for this, ignore this email — your password has not changed, and
+        nobody can use the link without opening it.
+      </p>
+    </div>
+  `.trim();
+
+  // Plain-text alternative uses the raw URL: escaping would corrupt it here.
+  const text = [
+    "Someone asked to reset the MEDCARE PRO password for this address.",
+    "",
+    "Choose a new password:",
+    resetUrl,
+    "",
+    `The link expires in ${expiresInMinutes} minutes and works once.`,
+    "If you did not ask for this, ignore this email — your password has not changed.",
+  ].join("\n");
+
+  return { html, text };
+}
+
+/**
+ * Sends the reset link. Injected into src/lib/passwordReset.ts as its mailer,
+ * on the same pattern as sendLoginCodeEmail — so tests and scripts substitute a
+ * capture function and never send real mail.
+ */
+export async function sendPasswordResetEmail(
+  params: SendPasswordResetEmailParams,
+): Promise<void> {
+  const { html, text } = buildPasswordResetBody(
+    params.resetUrl,
+    params.expiresInMinutes,
+  );
+
+  await deliver({
+    to: params.to,
+    subject: "Reset your password — MEDCARE PRO",
+    html,
+    text,
+  });
+}

@@ -93,6 +93,39 @@ export const GENERIC_LOGIN_CODE_MESSAGE =
   "If this account is eligible, a login code has been sent.";
 
 /**
+ * The one thing the request endpoint now says INSTEAD of the generic message.
+ *
+ * ---------------------------------------------------------------------------
+ * THIS BREAKS THE GUARANTEE THE PARAGRAPH ABOVE DESCRIBES, DELIBERATELY. The
+ * authority for the decision, and the full statement of what it costs, is the
+ * note on `AccountNotFoundError` in src/lib/auth.ts — it was taken once and
+ * applied to all three unauthenticated forms (password login, this one, and
+ * password reset) so that they agree with each other.
+ *
+ * ONLY EXISTENCE IS DISCLOSED. `unknown-account` is the sole ineligibility
+ * reason that reaches the caller. A registered address that is unverified,
+ * pending, suspended, rejected, or belongs to the platform tenant still gets
+ * GENERIC_LOGIN_CODE_MESSAGE, byte-identical to an eligible one — the account's
+ * STATE remains undisclosed, and `evaluateLoginCodeEligibility`'s other reasons
+ * must never be mapped onto their own message.
+ *
+ * The bound on harvesting is the rate limit this function applies BEFORE the
+ * user lookup: 20 addresses per fifteen minutes per source IP, 3 per address.
+ * ---------------------------------------------------------------------------
+ */
+export const UNKNOWN_ACCOUNT_LOGIN_CODE_MESSAGE =
+  "No account exists for that email address. Sign up to create one.";
+
+/**
+ * What the request endpoint learned, so it can pick a status code.
+ *
+ * `sent` covers every registered address — issued, cooling down, ineligible for
+ * any reason, and a failed delivery alike. The handler cannot tell those apart,
+ * which is the simplest possible guarantee that it cannot leak one.
+ */
+export type RequestLoginCodeOutcome = "sent" | "unknown-account";
+
+/**
  * Floor on how long a request takes, whatever branch it took.
  *
  * WHAT THIS DOES AND DOES NOT ACHIEVE, stated plainly. The eligible branch does
@@ -447,7 +480,7 @@ const USER_FOR_LOGIN_CODE_SELECT = {
 export async function requestLoginCode(
   deps: LoginCodeDeps,
   input: RequestLoginCodeInput,
-): Promise<{ message: string }> {
+): Promise<{ message: string; outcome: RequestLoginCodeOutcome }> {
   const startedAt = Date.now();
   const now = deps.now ?? new Date();
   const pepper = deps.pepper ?? resolveLoginCodePepper();
@@ -495,10 +528,22 @@ export async function requestLoginCode(
   if (!user || !eligibility.eligible) {
     burnEquivalentHashWork(pepper);
     // Deliberately NOT audited. An audit row per guessed address would turn the
-    // trail into the enumeration list the response refuses to be, and would let
-    // an attacker fill a table nobody may delete from.
+    // trail into the enumeration list the rate limit exists to cap, and would
+    // let an attacker fill a table nobody may delete from.
     await padToMinimumDuration(startedAt, padTiming);
-    return { message: GENERIC_LOGIN_CODE_MESSAGE };
+
+    // The timing padding is kept even on the disclosed branch. It no longer
+    // hides anything there — the response says it outright — but it is what
+    // keeps the OTHER ineligible reasons indistinguishable from an eligible
+    // send, which is still a property worth having.
+    if (!user) {
+      return {
+        message: UNKNOWN_ACCOUNT_LOGIN_CODE_MESSAGE,
+        outcome: "unknown-account",
+      };
+    }
+
+    return { message: GENERIC_LOGIN_CODE_MESSAGE, outcome: "sent" };
   }
 
   const code = generateLoginCode();
@@ -567,7 +612,7 @@ export async function requestLoginCode(
   // caller is told the same thing as a successful issue.
   if (!issued) {
     await padToMinimumDuration(startedAt, padTiming);
-    return { message: GENERIC_LOGIN_CODE_MESSAGE };
+    return { message: GENERIC_LOGIN_CODE_MESSAGE, outcome: "sent" };
   }
 
   try {
@@ -587,7 +632,7 @@ export async function requestLoginCode(
   }
 
   await padToMinimumDuration(startedAt, padTiming);
-  return { message: GENERIC_LOGIN_CODE_MESSAGE };
+  return { message: GENERIC_LOGIN_CODE_MESSAGE, outcome: "sent" };
 }
 
 /** What a successful verification hands back to the Auth.js provider. */

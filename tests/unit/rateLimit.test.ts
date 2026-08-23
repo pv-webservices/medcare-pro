@@ -88,12 +88,38 @@ describe("RATE_LIMIT_POLICIES", () => {
       "acceptInvitationByIp",
       "inviteByEmail",
       "inviteByTenant",
+      // Password login — caps how fast the "no such account" answer can be
+      // harvested. See discloseAccountExists in src/lib/auth.ts.
+      "loginDisclosureByIp",
+      // Password reset.
+      "passwordResetByEmail",
+      "passwordResetByIp",
       // Stage 4 — login codes.
       "requestByEmail",
       "requestByIp",
       "verifyByEmail",
       "verifyByIp",
     ]);
+  });
+
+  it("limits password resets to one address more tightly than one source IP", () => {
+    // Same shape as the login-code pair, and for the same reason: harm from
+    // repeated mail concentrates on one victim's inbox, while a sweep spreads
+    // across addresses from one source.
+    expect(RATE_LIMIT_POLICIES.passwordResetByEmail.maxCount).toBe(3);
+    expect(RATE_LIMIT_POLICIES.passwordResetByIp.maxCount).toBe(20);
+    expect(RATE_LIMIT_POLICIES.passwordResetByEmail.maxCount).toBeLessThan(
+      RATE_LIMIT_POLICIES.passwordResetByIp.maxCount,
+    );
+  });
+
+  it("caps account-existence disclosure below the login-code request limit", () => {
+    // The password form's disclosure gate must not be the loosest way to
+    // enumerate: whatever it allows, the login-code request endpoint — which
+    // discloses the same fact — must not be tighter by accident.
+    expect(RATE_LIMIT_POLICIES.loginDisclosureByIp.maxCount).toBeLessThanOrEqual(
+      RATE_LIMIT_POLICIES.requestByIp.maxCount,
+    );
   });
 
   it("matches the approved Stage 6 invitation policy", () => {

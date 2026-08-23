@@ -62,6 +62,20 @@ export const AUDIT_ACTIONS = {
   /** The user signed out of every device at once. */
   SESSIONS_REVOKED_ALL: "SESSIONS_REVOKED_ALL",
 
+  // --- "Forgot password?" --------------------------------------------------
+  //
+  // `targetId` carries the User id. NEVER the reset token or its hash — the
+  // guard below throws on a metadata key containing "token", which is the same
+  // rule that keeps invitation tokens out of this table.
+  /** A reset link was issued and handed to the mailer. */
+  PASSWORD_RESET_REQUESTED: "PASSWORD_RESET_REQUESTED",
+  /** A link was redeemed and the password actually changed. */
+  PASSWORD_RESET_COMPLETED: "PASSWORD_RESET_COMPLETED",
+  /** A redemption was refused — link invalid, expired, or account ineligible. */
+  PASSWORD_RESET_FAILED: "PASSWORD_RESET_FAILED",
+  /** Throttling refused a reset request. Carries no subject. */
+  PASSWORD_RESET_RATE_LIMITED: "PASSWORD_RESET_RATE_LIMITED",
+
   // --- Stage 6: invitations and the tenant-side membership lifecycle -------
   //
   // `targetId` carries the Invitation row id or the User id. NEVER the token or

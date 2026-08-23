@@ -7,6 +7,7 @@ import {
   RATE_LIMITED_MESSAGE,
   REQUEST_FAILED_MESSAGE,
   RESEND_COOLDOWN_MS,
+  UNKNOWN_ACCOUNT_MESSAGE,
   describeRequestOutcome,
   formatCooldown,
   isCodeComplete,
@@ -17,6 +18,7 @@ import {
   CODE_LENGTH as SERVER_CODE_LENGTH,
   GENERIC_LOGIN_CODE_MESSAGE,
   RESEND_COOLDOWN_MS as SERVER_RESEND_COOLDOWN_MS,
+  UNKNOWN_ACCOUNT_LOGIN_CODE_MESSAGE as SERVER_UNKNOWN_ACCOUNT_MESSAGE,
 } from "@/lib/loginCode";
 import { RATE_LIMITED_MESSAGE as SERVER_RATE_LIMITED_MESSAGE } from "@/lib/rateLimit";
 
@@ -44,6 +46,17 @@ describe("client constants track the server", () => {
 
   it("uses the server's throttling message", () => {
     expect(RATE_LIMITED_MESSAGE).toBe(SERVER_RATE_LIMITED_MESSAGE);
+  });
+
+  it("uses the server's unregistered-address message, word for word", () => {
+    expect(UNKNOWN_ACCOUNT_MESSAGE).toBe(SERVER_UNKNOWN_ACCOUNT_MESSAGE);
+  });
+
+  it("keeps the disclosed message distinct from the generic one", () => {
+    // If these two ever collapsed into the same string, the 404 branch would
+    // stop saying anything the 200 branch does not — and the change would be
+    // invisible in the UI rather than failing here.
+    expect(UNKNOWN_ACCOUNT_MESSAGE).not.toBe(CODE_SENT_MESSAGE);
   });
 });
 
@@ -171,13 +184,32 @@ describe("describeRequestOutcome", () => {
       kind: "sent",
       message: CODE_SENT_MESSAGE,
       advance: true,
+      offerSignup: false,
     });
   });
 
-  it("says the same thing on 200 whatever account it was for", () => {
-    // The endpoint answers identically for unknown, suspended and eligible
-    // addresses; deriving copy from the status alone is what preserves that.
+  it("says the same thing on 200 whatever REGISTERED account it was for", () => {
+    // A 200 now means only "this address exists". The endpoint still answers
+    // identically for a suspended, pending, unverified and eligible account, so
+    // deriving copy from the status alone preserves what remains undisclosed.
     expect(describeRequestOutcome(200).message).toBe(describeRequestOutcome(200).message);
+  });
+
+  it("reports an unregistered address on 404, and offers signup", () => {
+    // THE ONE DISCLOSED BRANCH — a deliberate product decision, explained on
+    // AccountNotFoundError in src/lib/auth.ts. It must not advance: there is no
+    // inbox for a code to arrive in.
+    const outcome = describeRequestOutcome(404);
+    expect(outcome.kind).toBe("unknown-account");
+    expect(outcome.message).toBe(UNKNOWN_ACCOUNT_MESSAGE);
+    expect(outcome.advance).toBe(false);
+    expect(outcome.offerSignup).toBe(true);
+  });
+
+  it("offers signup on that status and on no other", () => {
+    for (const status of [200, 201, 400, 401, 403, 429, 500, 502, 0]) {
+      expect(describeRequestOutcome(status).offerSignup).toBe(false);
+    }
   });
 
   it("reports throttling without advancing", () => {
@@ -193,7 +225,8 @@ describe("describeRequestOutcome", () => {
   });
 
   it("falls back to the generic failure for anything else", () => {
-    for (const status of [401, 403, 404, 500, 502, 0]) {
+    // 404 is deliberately absent: it is a meaningful status here now.
+    for (const status of [401, 403, 500, 502, 0]) {
       const outcome = describeRequestOutcome(status);
       expect(outcome.kind).toBe("failed");
       expect(outcome.message).toBe(REQUEST_FAILED_MESSAGE);
@@ -202,12 +235,19 @@ describe("describeRequestOutcome", () => {
   });
 
   it("advances on nothing but a 200", () => {
-    for (const status of [201, 204, 301, 400, 401, 429, 500]) {
+    for (const status of [201, 204, 301, 400, 401, 404, 429, 500]) {
       expect(describeRequestOutcome(status).advance).toBe(false);
     }
   });
 });
 
+/**
+ * The remaining copy still discloses nothing. UNKNOWN_ACCOUNT_MESSAGE is
+ * deliberately excluded from this list — it is the one string that DOES name an
+ * account fact, by product decision (see AccountNotFoundError in
+ * src/lib/auth.ts). Adding it here would fail, which is the point: the exclusion
+ * has to be a decision somebody made, not a message that drifted in.
+ */
 describe("user-facing copy discloses nothing", () => {
   const ALL_COPY = [
     CODE_SENT_MESSAGE,

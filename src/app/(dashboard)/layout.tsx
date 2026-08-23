@@ -50,6 +50,27 @@ function signedOutDestination(error: UnauthenticatedError): string {
   return "/login?ended=1";
 }
 
+/**
+ * Routes the refusal through the one place that can DELETE the dead cookie.
+ *
+ * THE BUG THIS FIXES. This component is a Server Component, so `redirect()` is
+ * all it can do — it cannot write a Set-Cookie header. The refused JWT therefore
+ * survived every refusal and kept telling src/middleware.ts, which can only
+ * decode the token, that the visitor was signed in. A user in that state who
+ * clicked "Sign up" on the login screen went /signup → /dashboard → refused →
+ * /login?ended=1, three redirects that read as the page simply not navigating.
+ *
+ * /api/auth/session-ended is a Route Handler, which CAN write cookies. It clears
+ * the debris and forwards to the same destination this function already chose,
+ * so the redirect target is unchanged — only the cookie state at the other end
+ * is. The destination is re-derived from an allowlist there rather than trusted,
+ * because that route is reachable by anyone.
+ */
+function signedOutRedirect(error: UnauthenticatedError): string {
+  const destination = signedOutDestination(error);
+  return `/api/auth/session-ended?to=${encodeURIComponent(destination)}`;
+}
+
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
   let actor;
   try {
@@ -71,7 +92,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       //                    the refusal is personal. `ended=1` tells the
       //                    middleware to let the login screen render even
       //                    though a token is present.
-      redirect(signedOutDestination(error));
+      redirect(signedOutRedirect(error));
     }
     throw error;
   }

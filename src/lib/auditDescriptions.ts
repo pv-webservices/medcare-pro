@@ -96,6 +96,36 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     category: "access",
   },
 
+  // --- Password reset ------------------------------------------------------
+  [AUDIT_ACTIONS.PASSWORD_RESET_REQUESTED]: {
+    label: "Password reset requested",
+    detail: "A reset link was emailed to this login's address.",
+    side: "tenant",
+    category: "access",
+    isSignInNoise: true,
+  },
+  [AUDIT_ACTIONS.PASSWORD_RESET_COMPLETED]: {
+    label: "Password changed",
+    detail:
+      "A reset link was used to set a new password. Every other session was ended.",
+    side: "tenant",
+    category: "access",
+  },
+  [AUDIT_ACTIONS.PASSWORD_RESET_FAILED]: {
+    label: "Password reset refused",
+    detail: "A reset link was submitted that was invalid, expired or already used.",
+    side: "system",
+    category: "access",
+    isSignInNoise: true,
+  },
+  [AUDIT_ACTIONS.PASSWORD_RESET_RATE_LIMITED]: {
+    label: "Password reset throttled",
+    detail: "Too many reset requests arrived; the rest were refused.",
+    side: "system",
+    category: "access",
+    isSignInNoise: true,
+  },
+
   // --- Registration and the Owner's decision on it -------------------------
   [AUDIT_ACTIONS.CLINIC_REGISTERED]: {
     label: "Organisation registered",

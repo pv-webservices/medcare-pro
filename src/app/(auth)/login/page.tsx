@@ -9,19 +9,9 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { signIn } from "next-auth/react";
-import {
-  Mail,
-  Eye,
-  EyeOff,
-  Globe,
-  Calendar,
-  Users,
-  IndianRupee,
-  Plus,
-  AlertCircle,
-} from "lucide-react";
+import { Mail, Eye, EyeOff, AlertCircle } from "lucide-react";
+import AuthShell from "@/components/auth/AuthShell";
 import LoginCodeForm from "@/components/auth/LoginCodeForm";
 import { getSessionEndedMessage } from "@/lib/sessionEndedMessage";
 
@@ -35,6 +25,16 @@ const UNREACHABLE_MESSAGE =
   "Could not reach the server. Check your connection and try again.";
 
 const EMAIL_NOT_VERIFIED_CODE = "EmailNotVerified";
+
+/**
+ * Thrown by src/lib/auth.ts when the address has no account at all — the one
+ * refusal that names an account fact. Read the note on `AccountNotFoundError`
+ * there before treating any other refusal the same way.
+ */
+const ACCOUNT_NOT_FOUND_CODE = "AccountNotFound";
+
+const ACCOUNT_NOT_FOUND_MESSAGE =
+  "No account exists for that email address. Sign up to create one.";
 
 /**
  * Stage 3 item 4 — the applicant's organisation exists and their password is
@@ -71,6 +71,12 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const justVerified = searchParams.get("verified") === "1";
   /**
+   * Set by ResetPasswordForm after a successful reset. Like `verified`, it is a
+   * forgeable flag that only ever chooses between two fixed sentences — it is
+   * never echoed and never treated as a fact about an account.
+   */
+  const justReset = searchParams.get("reset") === "1";
+  /**
    * Set by the dashboard shell when it refuses a session that still carries a
    * valid token — revoked, expired, or the account itself was suspended. See
    * signedOutDestination in src/app/(dashboard)/layout.tsx, and
@@ -85,6 +91,8 @@ function LoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUnverified, setIsUnverified] = useState(false);
+  /** True only for the "no such account" refusal, which has an action attached. */
+  const [isUnknownAccount, setIsUnknownAccount] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const tabRefs = useRef<Record<LoginMode, HTMLButtonElement | null>>({
@@ -102,6 +110,7 @@ function LoginContent() {
     setPassword("");
     setError(null);
     setIsUnverified(false);
+    setIsUnknownAccount(false);
   }
 
   /**
@@ -141,6 +150,7 @@ function LoginContent() {
 
     setError(null);
     setIsUnverified(false);
+    setIsUnknownAccount(false);
     setIsSubmitting(true);
 
     try {
@@ -161,6 +171,12 @@ function LoginContent() {
 
         if (result?.code === EMAIL_NOT_VERIFIED_CODE) {
           setIsUnverified(true);
+        } else if (result?.code === ACCOUNT_NOT_FOUND_CODE) {
+          // The address is not registered. Signing up is the actual next step,
+          // so the message carries a link to it rather than leaving the user to
+          // re-read a generic refusal.
+          setIsUnknownAccount(true);
+          setError(ACCOUNT_NOT_FOUND_MESSAGE);
         } else if (clinicState) {
           // No session was created, so this page is where the applicant is
           // told. The destination carries the state only — never the address,
@@ -186,21 +202,7 @@ function LoginContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 sm:p-8">
-      <div className="flex w-full max-w-[1200px] overflow-hidden rounded-[2rem] bg-white shadow-xl min-h-[720px]">
-        {/* Left side: Login Form */}
-        <div className="flex w-full flex-col p-8 lg:w-[55%] lg:p-12 xl:p-16">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-              <Plus className="h-6 w-6 stroke-[3]" />
-            </div>
-            <div>
-              <div className="font-bold text-slate-900 text-xl tracking-tight leading-none">Medicare Pro</div>
-              <div className="text-xs text-slate-500 font-medium mt-0.5">Smart Clinic Management</div>
-            </div>
-          </div>
-
-          <div className="mx-auto w-full max-w-sm flex-grow flex flex-col justify-center">
+    <AuthShell>
             <div className="mb-8">
               <h1 className="text-4xl font-bold tracking-tight text-slate-900">
                 Welcome Back
@@ -219,6 +221,15 @@ function LoginContent() {
                   className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
                 >
                   {sessionEndedMessage}
+                </p>
+              )}
+              {justReset && !error && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800"
+                >
+                  Your password has been changed. Sign in with it to continue.
                 </p>
               )}
               {justVerified && !error && !isUnverified && (
@@ -303,6 +314,18 @@ function LoginContent() {
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
                       <span className="font-semibold">Error:</span> {error}
+                      {isUnknownAccount && (
+                        <>
+                          {" "}
+                          <Link
+                            href={`/signup?email=${encodeURIComponent(email)}`}
+                            className="font-semibold underline hover:text-red-900"
+                          >
+                            Create an account
+                          </Link>
+                          .
+                        </>
+                      )}
                     </span>
                   </p>
                 )}
@@ -376,9 +399,23 @@ function LoginContent() {
                     </label>
                   </div>
                   <div className="text-sm">
-                    <a href="#" className="font-medium text-violet-600 hover:text-violet-700">
+                    {/*
+                      Was `<a href="#">`, which reloaded the page and went
+                      nowhere — there was no reset flow behind it at all. The
+                      address already typed here is carried over so it does not
+                      have to be typed again; /forgot-password treats it as a
+                      default field value and nothing more.
+                    */}
+                    <Link
+                      href={
+                        email
+                          ? `/forgot-password?email=${encodeURIComponent(email)}`
+                          : "/forgot-password"
+                      }
+                      className="font-medium text-violet-600 hover:text-violet-700"
+                    >
                       Forgot password?
-                    </a>
+                    </Link>
                   </div>
                 </div>
 
@@ -407,109 +444,7 @@ function LoginContent() {
                 Sign up
               </Link>
             </p>
-          </div>
-        </div>
-
-        {/* Right side: Image and Stats */}
-        <div className="relative hidden w-[45%] lg:block p-4 pl-0">
-          <div className="relative h-full w-full rounded-2xl overflow-hidden shadow-sm">
-            <Image
-              src="/clinic-bg-generic.jpg"
-              alt="Generic Clinic"
-              fill
-              className="object-cover"
-              priority
-            />
-            {/* Top Right EN button */}
-            <div className="absolute top-6 right-6">
-              <button className="flex items-center gap-2 rounded-xl bg-white/95 backdrop-blur-md px-4 py-2 text-sm font-medium text-slate-700 shadow-sm border border-white/20">
-                <Globe className="h-4 w-4" />
-                EN
-                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Top Left floating card */}
-            <div className="absolute top-16 left-8 rounded-2xl bg-white/95 backdrop-blur-md px-5 py-4 shadow-xl border border-white/30 flex items-center gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-light text-primary">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-xs font-medium text-slate-500 mb-0.5">Today&apos;s Appointments</div>
-                <div className="text-[15px] font-bold text-primary">8 Scheduled</div>
-              </div>
-              {/* Little purple dot */}
-              <div className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
-            </div>
-
-            {/* Bottom Left floating card */}
-            <div className="absolute bottom-16 left-8 rounded-3xl bg-white/95 backdrop-blur-md p-6 shadow-xl border border-white/30 w-64">
-              <h3 className="text-sm font-bold text-slate-900 mb-5">Today&apos;s Overview</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-slate-700">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-medium text-slate-500">Patients</div>
-                      <div className="font-bold text-sm text-slate-900 leading-tight">24</div>
-                    </div>
-                  </div>
-                  <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">+12%</div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-slate-700">
-                      <Calendar className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-medium text-slate-500">Appointments</div>
-                      <div className="font-bold text-sm text-slate-900 leading-tight">18</div>
-                    </div>
-                  </div>
-                  <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">+8%</div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-slate-700">
-                      <IndianRupee className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-medium text-slate-500">Revenue</div>
-                      <div className="font-bold text-sm text-slate-900 leading-tight">₹45,230</div>
-                    </div>
-                  </div>
-                  <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">+15%</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Right Quote card */}
-            <div className="absolute bottom-16 right-8 rounded-3xl bg-primary p-7 shadow-xl w-60 text-white border border-white/10">
-              {/* Avatars */}
-              <div className="flex -space-x-3 mb-6 relative -top-12 -mt-2">
-                <img src="https://ui-avatars.com/api/?name=J+D&background=e0e7ff&color=4f46e5&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
-                <img src="https://ui-avatars.com/api/?name=A+S&background=dcfce7&color=16a34a&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
-                <img src="https://ui-avatars.com/api/?name=M+R&background=fce7f3&color=db2777&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
-              </div>
-              <div className="text-5xl font-serif leading-none mb-2 text-white opacity-80">&ldquo;</div>
-              <p className="text-base font-medium leading-relaxed mb-6 -mt-2">
-                Delivering better care, every day.
-              </p>
-              <p className="text-xs font-medium text-violet-200">
-                Medicare Pro Team
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }
 

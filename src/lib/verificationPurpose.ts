@@ -20,6 +20,23 @@ export const VERIFICATION_PURPOSES = {
   TENANT_EMAIL: "TENANT_EMAIL",
   /** Verifies one individual's address — sets `User.emailVerifiedAt`. */
   USER_EMAIL: "USER_EMAIL",
+  /**
+   * Authorises ONE password change for the address in `identifier` — the
+   * "Forgot password?" flow in src/lib/passwordReset.ts.
+   *
+   * It is a third purpose on the same table rather than a table of its own
+   * precisely because the column is a String with a default: adding a value
+   * needs no schema change and no migration, and every rule this token has to
+   * obey — single use, hashed at rest, expiring — is already implemented once
+   * in src/lib/verification.ts.
+   *
+   * THE DISCRIMINATOR IS DOING REAL WORK HERE, more than for the two above. A
+   * signup mints a TENANT_EMAIL token for the same address a reset token is
+   * later minted for; without the purpose check, a verification link out of an
+   * old inbox would be redeemable as a password reset. `purposeMatches` refuses
+   * that in both directions.
+   */
+  PASSWORD_RESET: "PASSWORD_RESET",
 } as const;
 
 export type VerificationPurpose =
@@ -34,7 +51,8 @@ export function isVerificationPurpose(
 ): value is VerificationPurpose {
   return (
     value === VERIFICATION_PURPOSES.TENANT_EMAIL ||
-    value === VERIFICATION_PURPOSES.USER_EMAIL
+    value === VERIFICATION_PURPOSES.USER_EMAIL ||
+    value === VERIFICATION_PURPOSES.PASSWORD_RESET
   );
 }
 

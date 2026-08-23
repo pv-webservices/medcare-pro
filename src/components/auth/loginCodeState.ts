@@ -36,6 +36,10 @@ export const RATE_LIMITED_MESSAGE =
 
 export const INVALID_EMAIL_MESSAGE = "Enter a valid email address.";
 
+/** Mirrors UNKNOWN_ACCOUNT_LOGIN_CODE_MESSAGE in src/lib/loginCode.ts. */
+export const UNKNOWN_ACCOUNT_MESSAGE =
+  "No account exists for that email address. Sign up to create one.";
+
 export const REQUEST_FAILED_MESSAGE =
   "Could not reach the server. Check your connection and try again.";
 
@@ -99,13 +103,23 @@ export function formatCooldown(remainingMs: number): string {
   return `${seconds}s`;
 }
 
-export type RequestOutcomeKind = "sent" | "invalid-email" | "rate-limited" | "failed";
+export type RequestOutcomeKind =
+  | "sent"
+  | "unknown-account"
+  | "invalid-email"
+  | "rate-limited"
+  | "failed";
 
 export interface RequestOutcome {
   kind: RequestOutcomeKind;
   message: string;
   /** Whether to advance to the code step. Only a 200 has issued anything. */
   advance: boolean;
+  /**
+   * Whether the form should offer a link to /signup beside the message. True for
+   * exactly one status — 404 — where creating an account is the real next step.
+   */
+  offerSignup: boolean;
 }
 
 /**
@@ -117,20 +131,53 @@ export interface RequestOutcome {
  * currently returns only curated messages, but "currently" is not a property
  * worth depending on for enumeration safety.
  *
- * A 200 says nothing about the account. The endpoint answers identically for an
- * unknown address, a suspended one, and an eligible one, so advancing to the
- * code step is not a signal that anything was sent — which is exactly why the
- * step is reached for every address.
+ * A 200 STILL SAYS NOTHING BEYOND "this address is registered". The endpoint
+ * answers identically for a suspended account, an unverified one and an eligible
+ * one, so advancing to the code step is not a signal that a code was actually
+ * issued.
+ *
+ * A 404 IS the disclosed branch — the address has no account. That is the one
+ * account fact the request endpoint now reveals, by product decision; the
+ * reasoning lives on `AccountNotFoundError` in src/lib/auth.ts. It does not
+ * advance, because there is no inbox for a code to arrive in.
  */
 export function describeRequestOutcome(status: number): RequestOutcome {
   if (status === 200) {
-    return { kind: "sent", message: CODE_SENT_MESSAGE, advance: true };
+    return {
+      kind: "sent",
+      message: CODE_SENT_MESSAGE,
+      advance: true,
+      offerSignup: false,
+    };
+  }
+  if (status === 404) {
+    return {
+      kind: "unknown-account",
+      message: UNKNOWN_ACCOUNT_MESSAGE,
+      advance: false,
+      offerSignup: true,
+    };
   }
   if (status === 429) {
-    return { kind: "rate-limited", message: RATE_LIMITED_MESSAGE, advance: false };
+    return {
+      kind: "rate-limited",
+      message: RATE_LIMITED_MESSAGE,
+      advance: false,
+      offerSignup: false,
+    };
   }
   if (status === 400) {
-    return { kind: "invalid-email", message: INVALID_EMAIL_MESSAGE, advance: false };
+    return {
+      kind: "invalid-email",
+      message: INVALID_EMAIL_MESSAGE,
+      advance: false,
+      offerSignup: false,
+    };
   }
-  return { kind: "failed", message: REQUEST_FAILED_MESSAGE, advance: false };
+  return {
+    kind: "failed",
+    message: REQUEST_FAILED_MESSAGE,
+    advance: false,
+    offerSignup: false,
+  };
 }

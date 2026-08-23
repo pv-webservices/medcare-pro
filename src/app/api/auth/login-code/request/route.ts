@@ -17,13 +17,20 @@ import type { ApiResponse } from "@/lib/utils";
  * the other two unauthenticated auth routes (signup, verify-email) rather than
  * the requireActor()/apiHandler style used everywhere behind a session.
  *
- * ONE RESPONSE, ALWAYS. Unknown address, pending account, rejected account,
+ * ONE RESPONSE FOR EVERY REGISTERED ADDRESS. Pending account, rejected account,
  * suspended account, suspended organisation, unverified email, platform user,
  * account still inside its resend cooldown, and a perfectly eligible user all
  * produce byte-identical 200s. So does a failure to deliver the mail — see the
  * note in lib/loginCode.ts on why reporting that would itself be a disclosure.
  *
- * The two exceptions, both of which disclose nothing about any account:
+ * 404 IS THE ONE ACCOUNT FACT THIS ENDPOINT NOW DISCLOSES: the address is not
+ * registered. That is a deliberate product decision, not an oversight — the
+ * reasoning, and what it costs, is stated once on `AccountNotFoundError` in
+ * src/lib/auth.ts and referenced from UNKNOWN_ACCOUNT_LOGIN_CODE_MESSAGE. Do not
+ * widen it: the service reports `unknown-account` for a missing user and nothing
+ * else, and every other ineligibility stays inside the 200.
+ *
+ * The other two exceptions disclose nothing about any account:
  *   400  the body is not a valid email address at all — a client bug, not an
  *        account fact, and answering it generically would leave a broken form
  *        silently doing nothing.
@@ -52,9 +59,10 @@ export async function POST(
 
   try {
     // The service decides everything — eligibility, cooldown, issuing, mailing.
-    // This handler never learns which branch was taken, which is the simplest
-    // possible guarantee that it cannot leak one.
-    const { message } = await requestLoginCode(
+    // This handler learns exactly one bit back: whether the address exists. Every
+    // other branch collapses into `sent`, which is what keeps the rest of the
+    // account's state out of reach here.
+    const { message, outcome } = await requestLoginCode(
       { prisma, sendEmail: sendLoginCodeEmail },
       {
         email: parsed.data.email,
@@ -62,6 +70,13 @@ export async function POST(
         userAgent: readUserAgent(request),
       },
     );
+
+    if (outcome === "unknown-account") {
+      return NextResponse.json(
+        { success: false, error: message },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json({ success: true, data: null, message }, { status: 200 });
   } catch (error: unknown) {

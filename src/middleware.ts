@@ -43,9 +43,40 @@ const OWNER_LOGIN_PATH = "/owner/login";
 
 /**
  * Reachable without a session. `/signup` and `/verify-email` are part of the
- * FR-1.1/FR-1.2 flow, which by definition runs before one exists.
+ * FR-1.1/FR-1.2 flow, which by definition runs before one exists; the two
+ * password-reset screens are the same shape.
  */
-const PUBLIC_AUTH_PATHS = ["/login", "/signup", "/verify-email"] as const;
+const PUBLIC_AUTH_PATHS = [
+  "/login",
+  "/signup",
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
+] as const;
+
+/**
+ * Public auth paths that a "signed-in" visitor is NEVER bounced away from.
+ *
+ * THE BUG THIS FIXES, because it is not obvious from the code alone. "Signed in"
+ * on this line means only "a decodable JWT is present" — it can be intact while
+ * the `app_sessions` row behind it is revoked or expired. A user in that state
+ * who clicked "Sign up" on the login screen went: /signup → bounced to /dashboard
+ * → the shell refuses the dead session → back to /login?ended=1. Three redirects
+ * that look exactly like the page refusing to navigate, which is what it was
+ * reported as.
+ *
+ * The dashboard now clears that dead cookie at the source (see
+ * signedOutDestination in src/app/(dashboard)/layout.tsx), so the loop is gone
+ * from the other end too. This list is the second half of the rule, and it holds
+ * on its own merits: a stale cookie must never be what stands between a user and
+ * a way to recover their account. Bouncing someone off /login to /dashboard is a
+ * courtesy; bouncing them off /forgot-password is a lockout.
+ */
+const ALWAYS_REACHABLE_AUTH_PATHS = new Set<string>([
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+]);
 
 const LOGIN_PATH = "/login";
 const DEFAULT_SIGNED_IN_PATH = "/dashboard";
@@ -93,8 +124,9 @@ export default auth((req) => {
   const isPublicAuthPath = PUBLIC_AUTH_PATHS.some(
     (path) => nextUrl.pathname === path,
   );
+  const isAlwaysReachable = ALWAYS_REACHABLE_AUTH_PATHS.has(nextUrl.pathname);
   const isSessionEnded = nextUrl.searchParams.get("ended") === "1";
-  if (isSignedIn && isPublicAuthPath && !isSessionEnded) {
+  if (isSignedIn && isPublicAuthPath && !isAlwaysReachable && !isSessionEnded) {
     return NextResponse.redirect(new URL(DEFAULT_SIGNED_IN_PATH, nextUrl));
   }
 

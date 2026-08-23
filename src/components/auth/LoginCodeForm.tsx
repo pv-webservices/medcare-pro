@@ -8,6 +8,7 @@ import {
   type ClipboardEvent,
   type FormEvent,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { AlertCircle } from "lucide-react";
@@ -28,13 +29,17 @@ import {
  * them: ask for a code, then type it in. A front-desk user who has to navigate
  * between two screens loses the code to a page transition.
  *
- * THE SERVER DECIDES; THIS FORM ONLY ASKS. It shows the same acknowledgement
- * whatever the request endpoint says, because the endpoint deliberately answers
- * identically for an unknown address and an eligible one. Advancing to the code
- * step is therefore NOT a signal that the account exists — the step is reached
- * for every address, which is exactly what keeps the UI from re-leaking what the
- * API went to some trouble to conceal. Every string the user sees is a constant
- * in loginCodeState.ts, chosen by status code alone; no server text is echoed.
+ * THE SERVER DECIDES; THIS FORM ONLY ASKS. Every string the user sees is a
+ * constant in loginCodeState.ts, chosen by STATUS CODE alone; no server text is
+ * ever echoed.
+ *
+ * ONE ACCOUNT FACT IS NOW SHOWN, AND EXACTLY ONE. A 404 means the address has no
+ * account, and the form says so and offers /signup — a deliberate product
+ * decision, explained once on `AccountNotFoundError` in src/lib/auth.ts. Every
+ * other outcome still collapses into the same 200 and the same acknowledgement,
+ * so reaching the code step remains no evidence that a code was issued: a
+ * suspended, pending or unverified account gets there identically to an eligible
+ * one. Do not add a second branch that distinguishes those.
  *
  * ONE CONSUMPTION PATH. Verification goes through `signIn("login-code", ...)`,
  * which reaches the Auth.js provider in lib/auth.ts — the same provider
@@ -69,6 +74,13 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
   const [rememberMe, setRememberMe] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Whether the current error is "no such account", which is the only one with
+   * an action attached. Kept as its own flag rather than inferred by comparing
+   * `error` against a string, so the copy can change without silently detaching
+   * the link from it.
+   */
+  const [offerSignup, setOfferSignup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /** When the last code was asked for, for the visible half of the cooldown. */
@@ -108,6 +120,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
     async (address: string): Promise<void> => {
       setError(null);
       setNotice(null);
+      setOfferSignup(false);
       setIsSubmitting(true);
 
       try {
@@ -121,6 +134,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
 
         if (!outcome.advance) {
           setError(outcome.message);
+          setOfferSignup(outcome.offerSignup);
           return;
         }
 
@@ -209,6 +223,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
     setCode("");
     setError(null);
     setNotice(null);
+    setOfferSignup(false);
   }
 
   if (step === "email") {
@@ -228,6 +243,18 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
               <span className="font-semibold">Error:</span> {error}
+              {offerSignup && (
+                <>
+                  {" "}
+                  <Link
+                    href={`/signup?email=${encodeURIComponent(email)}`}
+                    className="font-semibold underline hover:text-red-900"
+                  >
+                    Create an account
+                  </Link>
+                  .
+                </>
+              )}
             </span>
           </p>
         )}

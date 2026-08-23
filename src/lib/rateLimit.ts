@@ -92,6 +92,46 @@ export const RATE_LIMIT_POLICIES = {
     blockMs: FIFTEEN_MINUTES_MS,
   },
 
+  // --- Password reset -------------------------------------------------------
+  //
+  // Mirrors the login-code request limits exactly, and for the same two
+  // reasons: harm concentrates on one victim's inbox (per-address), and an
+  // enumeration sweep walks many addresses from one source (per-IP). The reset
+  // request endpoint discloses whether an address is registered, so the per-IP
+  // number here is also the cap on how fast that disclosure can be harvested.
+  passwordResetByEmail: {
+    name: "password-reset:request:email",
+    windowMs: FIFTEEN_MINUTES_MS,
+    maxCount: 3,
+    blockMs: FIFTEEN_MINUTES_MS,
+  },
+  passwordResetByIp: {
+    name: "password-reset:request:ip",
+    windowMs: FIFTEEN_MINUTES_MS,
+    maxCount: 20,
+    blockMs: FIFTEEN_MINUTES_MS,
+  },
+
+  /**
+   * Caps how fast the "no account exists for this email" answer on the PASSWORD
+   * login form can be harvested.
+   *
+   * READ THE NOTE ON `discloseAccountExists` IN src/lib/auth.ts FIRST. This
+   * policy does not gate logging in — a refused verdict never blocks anyone, it
+   * only downgrades the unknown-email message back to the generic "invalid
+   * email or password". A real user is therefore never locked out by it, while a
+   * sweep gets 12 usable answers per quarter hour per source address.
+   *
+   * Only an unknown address consumes an allowance. Ordinary sign-ins, right or
+   * wrong, never touch this bucket.
+   */
+  loginDisclosureByIp: {
+    name: "login:disclose:ip",
+    windowMs: FIFTEEN_MINUTES_MS,
+    maxCount: 12,
+    blockMs: FIFTEEN_MINUTES_MS,
+  },
+
   // --- Stage 6: invitations -------------------------------------------------
   //
   // Sending an invitation is an AUTHENTICATED action, so these are not there to

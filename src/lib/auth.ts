@@ -8,7 +8,11 @@ import { createAppSession } from "@/lib/appSession";
 import { evaluateAccessStatus } from "@/lib/accessStatus";
 import { readClientIp, readUserAgent } from "@/lib/requestMeta";
 import { sendLoginCodeEmail } from "@/lib/email";
-import { RateLimitError } from "@/lib/rateLimit";
+import {
+  RATE_LIMIT_POLICIES,
+  RateLimitError,
+  createDatabaseRateLimiter,
+} from "@/lib/rateLimit";
 import { verifyLoginCode, verifyLoginCodeSchema } from "@/lib/loginCode";
 import type { TenantStatus } from "@prisma/client";
 
@@ -115,6 +119,74 @@ function clinicStateCode(
   }
 }
 
+/**
+ * The address is not registered at all — "create an account first".
+ *
+ * ---------------------------------------------------------------------------
+ * THIS DELIBERATELY BREAKS THE ENUMERATION GUARANTEE THE REST OF THIS FILE
+ * KEEPS. Read this before adding a fourth code, or before "fixing" any of the
+ * generic `null`s below to match it.
+ *
+ * Every other refusal in `authorize` is either generic, or reached only AFTER a
+ * password has verified — so the caller had already proven they hold the
+ * credential and learned nothing new. This one is different in kind: it is
+ * returned to a caller who has proven nothing, and it confirms whether an email
+ * address has a MEDCARE PRO account. Anyone can now walk a list of clinic
+ * addresses and sort them into "registered" and "not".
+ *
+ * WHY IT IS HERE ANYWAY. It was asked for, explicitly, as product behaviour: a
+ * front-desk user who mistypes their address or has not signed up yet was being
+ * told "invalid email or password" and had no way to tell which. The same
+ * decision was taken for the login-code form and the password-reset form, so all
+ * three now agree. Reversing it means removing this class, the 404 branch in
+ * api/auth/login-code/request, and the `unknown-account` branch in
+ * lib/passwordReset.ts — and nothing else.
+ *
+ * WHAT IS STILL NOT DISCLOSED, and must not become so. Only EXISTENCE. A
+ * registered address that is unverified, pending, suspended, rejected or has no
+ * password set still gets the generic refusal, because the account's STATE is a
+ * fact about a real person that an anonymous caller has no claim on.
+ *
+ * HOW IT IS BOUNDED. `discloseAccountExists` puts the answer behind a per-IP
+ * rate limit that never blocks a login — see the note there.
+ * ---------------------------------------------------------------------------
+ */
+export class AccountNotFoundError extends CredentialsSignin {
+  code = "AccountNotFound";
+}
+
+/**
+ * May THIS caller be told that an address is unregistered?
+ *
+ * The gate does not decide whether the login proceeds — it only decides which
+ * of two messages a failed one gets. That asymmetry is the whole design:
+ *
+ *   - A real user is NEVER locked out by it. They type an address that exists,
+ *     so they never reach this call at all; and even if they did, a refused
+ *     verdict degrades the message, it does not refuse the sign-in.
+ *   - A sweep is capped at `loginDisclosureByIp.maxCount` useful answers per
+ *     window per source address. Past that the endpoint goes back to being the
+ *     indistinguishable one it was before.
+ *
+ * Only an unknown address consumes an allowance, so ordinary sign-ins — right
+ * password or wrong — never touch the bucket.
+ *
+ * FAILS CLOSED. If the limiter itself errors, the answer is "no": a database
+ * problem must not turn into an uncapped enumeration oracle.
+ */
+async function discloseAccountExists(ip: string | null): Promise<boolean> {
+  try {
+    const verdict = await createDatabaseRateLimiter(prisma).checkAndIncrement({
+      policy: RATE_LIMIT_POLICIES.loginDisclosureByIp,
+      subject: ip ?? "unknown",
+    });
+    return verdict.allowed;
+  } catch (error: unknown) {
+    console.error("Login disclosure rate-limit check failed", error);
+    return false;
+  }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
@@ -158,10 +230,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         });
 
-        // Unknown email, or a user row with no password set. Burn the same
-        // amount of time a real comparison would take before failing.
+        // Burn the same amount of time a real comparison would take before
+        // failing. Kept even on the disclosed branch below: it costs one bcrypt
+        // and still flattens the *other* refusals against each other.
         if (!user?.passwordHash) {
           await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+
+          // No such account — the one disclosed refusal. See AccountNotFoundError.
+          // A user row that merely has no password (an invitation that was never
+          // accepted) is NOT this case and keeps the generic refusal: that would
+          // be disclosing the account's state, not its existence.
+          if (!user && (await discloseAccountExists(readClientIp(request)))) {
+            throw new AccountNotFoundError();
+          }
+
           return null;
         }
 
