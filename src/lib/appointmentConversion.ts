@@ -258,6 +258,13 @@ export async function convertAppointmentToRegistration(
           where: { id: appointmentId },
           data: {
             status: "CONVERTED",
+            // Back-linked so `patient.appointments` includes the appointment
+            // that created that patient, and so the board stops reading a
+            // converted arrival as "not a patient here yet". Already equal to
+            // this value on the return-visit path; the write matters on the
+            // first-visit one, where booking left it NULL because no Patient
+            // row existed yet.
+            patientId: inserted.patientId,
             // Unchanged in value — CONVERTED occupies, so this is still
             // slot_start. Written anyway because the schema's rule is that
             // every write touching `status` writes this column in the same

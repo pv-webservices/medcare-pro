@@ -718,22 +718,18 @@ async function checkNewPatient(f: Fixture, types: TypeIds): Promise<string> {
     (await prisma.patient.count({ where: { tenantId: f.tenant.id } })) ===
       patientsBefore + 1,
   );
-  // NOT BACK-LINKED, and this is a deliberate reading of the AP-5 spec rather
-  // than an oversight. That spec enumerates what the conversion transaction
-  // writes — the registration, the status, the audit row — and setting
-  // `appointments.patient_id` is not among them. So the link runs one way:
-  // appointment -> registration -> patient. Asserted rather than left silent,
-  // because the consequence is real and belongs in front of whoever picks up
-  // AP-6: `patient.appointments` will not list the appointment that created
-  // that patient, and the board still reads this arrival as "not a patient
-  // here yet". Flagged as an AP-6 carry-forward.
+  // Back-linked in AP-6. Booking left patient_id NULL because no Patient row
+  // existed yet; conversion is the moment one does, and without this write
+  // `patient.appointments` would never list the appointment that created that
+  // patient, and the board would go on reading a converted arrival as
+  // "not a patient here yet".
   check(
-    "the appointment is NOT back-linked to the patient it created (AP-5 spec)",
-    after.patientId === null,
+    "the appointment is back-linked to the patient it created",
+    after.patientId === registration.patientId,
     { appointment: after.patientId, registration: registration.patientId },
   );
   check(
-    "  ...but the patient is still reachable through the registration",
+    "  ...and the patient is reachable from both sides",
     registration.patientId === registration.patient.id,
     registration.patientId,
   );

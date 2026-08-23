@@ -78,7 +78,8 @@ Shadows: Use soft, modern shadows (`shadow-sm`, `shadow-pop`) to lift cards and 
 ## Ground rules
 
 - **Gorgeous but usable.** Every screen must look premium while allowing staff to find or record something fast.
-- **Use the PRD's vocabulary exactly.** The words are **Registration**, **Visit**, **Visit Type**, **Patient ID**, **Department**, **Clinic**, **Notification**, **Role**. Never soften these into "Booking" or "Appointment" (MEDCARE PRO logs registrations of visits). Never use legacy v1 vocabulary like "IVR".
+- **Use the PRD's vocabulary exactly.** The words are **Registration**, **Visit**, **Visit Type**, **Patient ID**, **Department**, **Clinic**, **Notification**, **Role**. Never soften a Registration into a "Booking". Never use legacy v1 vocabulary like "IVR".
+- **Appointment is a separate entity, not a synonym for Registration.** An **Appointment** is a slot booked in a doctor's day, before the patient arrives. A **Registration** is the visit it becomes when they do arrive and it is converted (AP-5). Use each word for its own thing and never one for the other: an appointment board never says "Registration", and a registration screen never says "Appointment". The schema, the `appointment:*` permissions, the API routes and the audit actions all use the same split, so the interface, the database and the audit trail read alike.
 - **Empty and error states.** Use the `EmptyState` primitive so the pattern stays identical and helpful.
 - **Active voice on every action.** A button says what happens: "Add Clinic," "Register Patient" — not "Submit".
 - **Dynamic Theming.** Always use the `--primary` family of CSS variables for branding interactive elements. Never hardcode brand colors.

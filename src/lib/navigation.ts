@@ -52,6 +52,11 @@ export const NAV_LINKS: readonly NavLink[] = [
   // The landing page after sign-in. Always reachable, so a user whose roles
   // grant nothing still lands somewhere rather than on an empty sidebar.
   { href: "/dashboard", label: "Dashboard", permission: null, feature: null },
+  // AP-6. Ahead of Registrations because that is the order the day runs in: a
+  // slot is booked, the patient arrives, and the arrival becomes a
+  // registration. An Appointment and a Registration are different records —
+  // see the vocabulary rule in .claude/skills/admin-dashboard-ui.
+  { href: "/appointments", label: "Appointments", permission: "appointment:read", feature: "appointments" },
   { href: "/registration", label: "Registrations", permission: "registration:read", feature: "registrations" },
   { href: "/doctors", label: "Doctors", permission: "doctor:read", feature: "doctors" },
   { href: "/clinics", label: "Clinics", permission: "clinic:read", feature: "clinics" },
