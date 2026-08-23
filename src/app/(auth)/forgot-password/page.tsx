@@ -35,7 +35,6 @@ function ForgotPasswordContent() {
   const [email, setEmail] = useState(() => searchParams.get("email") ?? "");
   const [outcome, setOutcome] = useState<ResetRequestOutcome | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting) {
@@ -110,7 +109,14 @@ function ForgotPasswordContent() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/*
+        `method="post"` for the same reason as every other credential form here:
+        a <form> with no `method` defaults to GET, so a submit landing before
+        hydration would put the fields in the URL and in history. This one
+        carries the address being reset. Longer note in
+        src/components/auth/ResetPasswordForm.tsx.
+      */}
+      <form method="post" onSubmit={handleSubmit} className="space-y-6">
         {outcome && (
           <p
             id="forgot-password-error"

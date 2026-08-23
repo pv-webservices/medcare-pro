@@ -56,6 +56,7 @@ export default function ResetPasswordForm({
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -127,7 +128,26 @@ export default function ResetPasswordForm({
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/*
+        `method="post"` IS LOAD-BEARING, and is not about where this form
+        submits — `handleSubmit` calls preventDefault and posts with fetch, so
+        the browser's own submission never runs once React is listening.
+
+        It is the guard for the instant BEFORE that. A <form> with no `method`
+        defaults to GET, so a submit that happens before hydration attaches the
+        handler — Enter in a text field, a double-tap, a slow bundle — sends the
+        fields as a QUERY STRING. That put the new password in the URL bar, in
+        browser history, and in any proxy or server log on the way. POST cannot
+        do that: the fields go in a body, and the worst a stray native submit can
+        now produce is a 405 from a page that exports no POST handler.
+
+        There is deliberately NO `action`, and the button is deliberately NOT
+        disabled until mounted. Gating the page's only action on a `useEffect`
+        is what made this form unusable: when the client bundle failed to
+        compile, `isMounted` stayed false, and the button was dead with nothing
+        on screen to say why.
+      */}
+      <form method="POST" action="#" onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <p
             id="reset-password-error"
@@ -182,10 +202,7 @@ export default function ResetPasswordForm({
             <input
               id="reset-password-confirm"
               name="confirmPassword"
-              // Deliberately NOT toggled by the eye above. The point of a
-              // confirmation field is that it is typed independently; revealing
-              // it turns the check into a copy-and-compare by eye.
-              type="password"
+              type={showConfirmation ? "text" : "password"}
               autoComplete="new-password"
               required
               minLength={minPasswordLength}
@@ -196,6 +213,21 @@ export default function ResetPasswordForm({
               placeholder="••••••••••••••••"
               className={FIELD_CLASS}
             />
+            <button
+              type="button"
+              onClick={() => setShowConfirmation(!showConfirmation)}
+              aria-label={
+                showConfirmation ? "Hide confirmed password" : "Show confirmed password"
+              }
+              aria-pressed={showConfirmation}
+              className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-600 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-600 rounded"
+            >
+              {showConfirmation ? (
+                <EyeOff className="h-5 w-5" />
+              ) : (
+                <Eye className="h-5 w-5" />
+              )}
+            </button>
           </div>
         </div>
 

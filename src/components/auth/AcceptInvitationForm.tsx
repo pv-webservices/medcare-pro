@@ -128,8 +128,13 @@ export default function AcceptInvitationForm({
     );
   }
 
+  // `method="post"` is the pre-hydration guard, not the submit path: handleSubmit
+  // preventDefaults and posts with fetch. Without it the form would default to
+  // GET, and a submit landing before React attaches its handler would put the
+  // chosen password in the URL and in history. See the longer note in
+  // ResetPasswordForm.tsx.
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form method="post" onSubmit={handleSubmit} className="space-y-5" noValidate>
       {error && (
         <p
           id="invite-error"

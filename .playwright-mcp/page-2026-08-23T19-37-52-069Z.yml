@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Platform access
+        - generic [ref=e12]: MEDCARE PRO administration
+      - generic [ref=e13]:
+        - alert [ref=e31]: Sign in failed. Check your details and try again.
+        - generic [ref=e14]:
+          - generic [ref=e15]: Email
+          - textbox "Email" [ref=e16]: brainqurious@gmail.com
+        - generic [ref=e17]:
+          - generic [ref=e18]: Password
+          - textbox "Password" [ref=e19]
+        - button "Sign in" [ref=e20]
+  - button "Open Next.js Dev Tools" [ref=e26] [cursor=pointer]
+  - alert [ref=e30]

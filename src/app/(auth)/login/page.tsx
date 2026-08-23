@@ -284,7 +284,16 @@ function LoginContent() {
               aria-labelledby="login-tab-password"
               hidden={mode !== "password"}
             >
-              <form onSubmit={handleSubmit} className="space-y-6">
+              {/*
+                `method="post"` guards the instant before hydration: a <form> with no
+                `method` defaults to GET, so a submit landing before React attaches its
+                handler would send the password as a QUERY STRING — into the URL bar,
+                into history, and into every proxy log on the way. POST puts it in a
+                body instead. handleSubmit still preventDefaults and posts with fetch;
+                this only bounds what a stray native submit can do. Longer note in
+                src/components/auth/ResetPasswordForm.tsx.
+              */}
+              <form method="post" onSubmit={handleSubmit} className="space-y-6">
                 {isUnverified && (
                   <p
                     role="alert"

@@ -1,0 +1,35 @@
+- main [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: Medicare Pro
+      - generic [ref=e11]: Smart Clinic Management
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - heading "Welcome Back" [level=1] [ref=e14]
+        - paragraph [ref=e15]: Sign in to your clinic dashboard
+      - tablist "Sign-in method" [ref=e16]:
+        - tab "Password" [selected] [ref=e17]
+        - tab "Login code" [ref=e18]
+      - tabpanel "Password" [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - generic [ref=e22]: Email
+            - textbox "Email" [ref=e24]:
+              - /placeholder: dr.amelia@dentalcare.com
+          - generic [ref=e25]:
+            - generic [ref=e26]: Password
+            - generic [ref=e27]:
+              - textbox "Password" [ref=e28]:
+                - /placeholder: ••••••••••••••••
+              - button "Show password" [ref=e29]
+          - generic [ref=e33]:
+            - generic [ref=e34]:
+              - checkbox "Remember me" [ref=e35]
+              - generic [ref=e36]: Remember me
+            - link "Forgot password?" [ref=e38] [cursor=pointer]:
+              - /url: /forgot-password
+          - button "Sign In" [ref=e39]
+      - paragraph [ref=e40]:
+        - text: Don't have an account?
+        - link "Sign up" [ref=e41] [cursor=pointer]:
+          - /url: /signup

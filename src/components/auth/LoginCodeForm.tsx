@@ -227,8 +227,13 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
   }
 
   if (step === "email") {
+    // `method="post"` for the same reason as every other credential form here: a
+    // <form> with no `method` defaults to GET, so a submit landing before
+    // hydration would put the fields in the URL and in history. This one carries
+    // the address a code is being asked for. Longer note in
+    // src/components/auth/ResetPasswordForm.tsx.
     return (
-      <form onSubmit={handleRequest} className="space-y-6">
+      <form method="post" onSubmit={handleRequest} className="space-y-6">
         <p role="status" aria-live="polite" className="sr-only">
           {notice ?? ""}
         </p>
@@ -290,8 +295,13 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
     );
   }
 
+  // `method="post"` matters MORE on this one than anywhere else in the app: the
+  // field below holds the six-digit login code, which is a live credential. A
+  // pre-hydration GET submit would put it in the URL bar and in browser history
+  // — exactly what lib/email.ts refuses to do by never mailing the code as a
+  // link. Longer note in src/components/auth/ResetPasswordForm.tsx.
   return (
-    <form onSubmit={handleVerify} className="space-y-6">
+    <form method="post" onSubmit={handleVerify} className="space-y-6">
       <p
         role="status"
         aria-live="polite"

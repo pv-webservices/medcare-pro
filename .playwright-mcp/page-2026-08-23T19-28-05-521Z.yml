@@ -1,0 +1,67 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e109]:
+      - generic [ref=e110]:
+        - generic [ref=e114]:
+          - generic [ref=e115]: Medicare Pro
+          - generic [ref=e116]: Smart Clinic Management
+        - generic [ref=e117]:
+          - generic [ref=e118]:
+            - heading "Welcome Back" [level=1] [ref=e119]
+            - paragraph [ref=e120]: Sign in to your clinic dashboard
+          - status [ref=e122]: Your password has been changed. Sign in with it to continue.
+          - tablist "Sign-in method" [ref=e123]:
+            - tab "Password" [selected] [ref=e124]
+            - tab "Login code" [ref=e125]
+          - tabpanel "Password" [ref=e126]:
+            - generic [ref=e127]:
+              - generic [ref=e128]:
+                - generic [ref=e129]: Email
+                - textbox "Email" [ref=e131]:
+                  - /placeholder: dr.amelia@dentalcare.com
+              - generic [ref=e132]:
+                - generic [ref=e133]: Password
+                - generic [ref=e134]:
+                  - textbox "Password" [ref=e135]:
+                    - /placeholder: ••••••••••••••••
+                  - button "Show password" [ref=e136]
+              - generic [ref=e140]:
+                - generic [ref=e141]:
+                  - checkbox "Remember me" [ref=e142]
+                  - generic [ref=e143]: Remember me
+                - link "Forgot password?" [ref=e145] [cursor=pointer]:
+                  - /url: /forgot-password
+              - button "Sign In" [ref=e146]
+          - paragraph [ref=e147]:
+            - text: Don't have an account?
+            - link "Sign up" [ref=e148] [cursor=pointer]:
+              - /url: /signup
+      - generic [ref=e150]:
+        - button "EN" [ref=e152]
+        - generic [ref=e162]:
+          - generic [ref=e163]: Today's Appointments
+          - generic [ref=e164]: 8 Scheduled
+        - generic [ref=e166]:
+          - heading "Today's Overview" [level=3] [ref=e167]
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - generic [ref=e177]:
+                - generic [ref=e178]: Patients
+                - generic [ref=e179]: "24"
+              - generic [ref=e180]: +12%
+            - generic [ref=e181]:
+              - generic [ref=e186]:
+                - generic [ref=e187]: Appointments
+                - generic [ref=e188]: "18"
+              - generic [ref=e189]: +8%
+            - generic [ref=e190]:
+              - generic [ref=e196]:
+                - generic [ref=e197]: Revenue
+                - generic [ref=e198]: ₹45,230
+              - generic [ref=e199]: +15%
+        - generic [ref=e200]:
+          - generic [ref=e202]: “
+          - paragraph [ref=e203]: Delivering better care, every day.
+          - paragraph [ref=e204]: Medicare Pro Team
+  - button "Open Next.js Dev Tools" [ref=e97] [cursor=pointer]
+  - alert [ref=e101]
