@@ -49,4 +49,8 @@ next-env.d.ts
 # graphify
 /graphify-out/
 
+# playwright mcp — snapshots, console logs and screenshots from browser-driven
+# debugging sessions. Regenerated on every run and never worth committing.
+/.playwright-mcp/
+
 

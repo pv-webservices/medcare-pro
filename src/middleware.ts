@@ -17,6 +17,12 @@ const { auth } = NextAuth(authConfig);
  */
 const PROTECTED_PREFIXES = [
   "/dashboard",
+  // AP-6. Was missing while every other folder in the group was listed, so an
+  // unauthenticated request for /appointments fell through to the page instead
+  // of being redirected here. The page's own requireActor() still refused it —
+  // this was a gap in the courtesy layer, not an access-control hole — but the
+  // refusal arrived as a server error rather than a redirect to /login.
+  "/appointments",
   "/registration",
   "/doctors",
   "/clinics",

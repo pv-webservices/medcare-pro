@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Bell, Plus, Search, Settings } from "lucide-react";
 import DashboardNav from "@/components/dashboard/DashboardNav";
+import MobileNav from "@/components/dashboard/MobileNav";
 import ClinicSwitcher from "@/components/dashboard/ClinicSwitcher";
 import SignOutButton from "@/components/dashboard/SignOutButton";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
@@ -213,6 +214,15 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/*
+          The sidebar beside this column is `hidden lg:flex`, so below that
+          breakpoint it is the ONLY navigation and it is not on screen. This is
+          the replacement for those widths — see the note in MobileNav.tsx for
+          what its absence did. It takes the same already-filtered `links`, so
+          the two surfaces cannot offer different tabs.
+        */}
+        <MobileNav links={links} unreadNotifications={unreadNotifications} />
+
         <header className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-7 md:py-6">
           <div className="min-w-0">
             <h2 className="truncate text-title font-extrabold text-ink">
