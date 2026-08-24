@@ -49,7 +49,8 @@ const RESEND_ACKNOWLEDGEMENT =
   "If that address needs verification, a new link is on its way.";
 
 function redirectTo(request: Request, path: string, params: Record<string, string>) {
-  const url = new URL(path, new URL(request.url).origin);
+  const base = process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "") || new URL(request.url).origin;
+  const url = new URL(path, base);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }

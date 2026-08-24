@@ -286,6 +286,7 @@ export default function DecisionPanel({
               id="reason"
               rows={2}
               value={reason}
+              placeholder={`Enter at least ${MIN_REASON_LENGTH} characters...`}
               onChange={(event) => setReason(event.target.value)}
               className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
             />
