@@ -26,19 +26,19 @@ export default async function OwnerFeaturesPage() {
     <div className="mx-auto max-w-4xl p-8">
       <Link
         href="/owner/dashboard"
-        className="mb-6 inline-flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200"
+        className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-ink"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Platform overview
       </Link>
 
       <h1 className="text-xl font-semibold">Platform features</h1>
-      <p className="mt-1 max-w-2xl text-xs text-slate-400">
+      <p className="mt-1 max-w-2xl text-xs text-muted">
         The first of four layers. A feature switched off here is off for every
         organisation on MEDCARE PRO, whatever their plan says and whatever their
-        own admin has set — no plan, override or role can reach past it.{" "}
-        <span className="tabular-nums text-slate-300">{live}</span> of{" "}
-        <span className="tabular-nums text-slate-300">{features.length}</span>{" "}
+        own admin has set — no plan, override or role can reach past it.{""}
+        <span className="tabular-nums text-muted">{live}</span> of{""}
+        <span className="tabular-nums text-muted">{features.length}</span>{""}
         live.
       </p>
 
@@ -49,7 +49,7 @@ export default async function OwnerFeaturesPage() {
         />
       </div>
 
-      <p className="mt-8 text-[11px] text-slate-500">
+      <p className="mt-8 text-[11px] text-faint">
         Adding a feature to this list is a code change, not a screen: a key
         nothing checks gates nothing. See src/lib/defaultFeatures.ts.
       </p>

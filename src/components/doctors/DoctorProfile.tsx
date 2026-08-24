@@ -24,10 +24,10 @@ interface DoctorProfileProps {
   today: string;
 }
 
-const FIELD_LABEL_CLASS = "text-sm font-semibold text-slate-500";
+const FIELD_LABEL_CLASS = "text-sm font-semibold text-muted";
 
 function NotSet() {
-  return <span className="text-slate-400">Not set</span>;
+  return <span className="text-faint">Not set</span>;
 }
 
 export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileProps) {
@@ -65,7 +65,7 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
                 <span>{doctor.department} · {doctor.clinicName}</span>
                 {doctor.isOnLeaveToday && (
                   <div>
-                    <span className="rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
+                    <span className="rounded-md bg-warn-bg px-2.5 py-1 text-xs font-semibold text-warn-ink">
                       On leave today
                     </span>
                   </div>
@@ -85,15 +85,15 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
             <dl className="grid gap-6 sm:grid-cols-3">
               <div>
                 <dt className={FIELD_LABEL_CLASS}>Phone</dt>
-                <dd className="mt-1 tabular-nums text-base text-slate-900">{doctor.phone ?? <NotSet />}</dd>
+                <dd className="mt-1 tabular-nums text-base text-ink">{doctor.phone ?? <NotSet />}</dd>
               </div>
               <div>
                 <dt className={FIELD_LABEL_CLASS}>Gender</dt>
-                <dd className="mt-1 text-base text-slate-900">{doctor.gender ?? <NotSet />}</dd>
+                <dd className="mt-1 text-base text-ink">{doctor.gender ?? <NotSet />}</dd>
               </div>
               <div>
                 <dt className={FIELD_LABEL_CLASS}>Age</dt>
-                <dd className="mt-1 tabular-nums text-base text-slate-900">
+                <dd className="mt-1 tabular-nums text-base text-ink">
                   {doctor.age === null ? <NotSet /> : doctor.age}
                 </dd>
               </div>

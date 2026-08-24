@@ -43,7 +43,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
       <Link
         href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-slate-500 transition hover:text-primary"
+        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
       >
         <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
         Settings
@@ -73,7 +73,7 @@ export default async function BrandingSettingsPage() {
     return (
       <Shell>
         <PageHeader title="Branding" />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot view branding. Ask the account owner if you need
           access.
         </div>
@@ -90,8 +90,8 @@ export default async function BrandingSettingsPage() {
     return (
       <Shell>
         <PageHeader title="Branding" />
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+          <p className="text-sm font-medium text-muted">
             {holds("clinic:read")
               ? "No clinics to brand yet. Add a clinic first — its logo and colour are set here."
               : "Your role does not reach any clinic, and branding is set per clinic. Ask the account owner if you need access."}
@@ -110,8 +110,8 @@ export default async function BrandingSettingsPage() {
     return (
       <Shell>
         <PageHeader title="Branding" />
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+          <p className="text-sm font-medium text-muted">
             Pick a clinic in the sidebar to set its logo and colour. Each clinic is
             branded separately.
           </p>
@@ -143,8 +143,8 @@ export default async function BrandingSettingsPage() {
         meta={
           <span>
             {clinic.name}
-            {clinics.length > 1 && " · switch clinics in the sidebar to brand another"}
-            {!canEdit && " · view only"}
+            {clinics.length > 1 && "· switch clinics in the sidebar to brand another"}
+            {!canEdit && "· view only"}
           </span>
         }
       />

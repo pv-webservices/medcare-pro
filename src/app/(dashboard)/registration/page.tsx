@@ -107,10 +107,10 @@ export default async function RegistrationListPage({
         title="Registrations"
         meta={
           <>
-            <Count>{result.total}</Count>{" "}
+            <Count>{result.total}</Count>{""}
             {result.total === 1 ? "registration" : "registrations"}
-            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
-            {isFiltered ? " matching your filters" : ""}
+            {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}
+            {isFiltered ? "matching your filters" : ""}
           </>
         }
         actions={
@@ -151,7 +151,7 @@ export default async function RegistrationListPage({
           className="mt-4 flex flex-wrap items-center justify-between gap-3"
         >
           <p className="text-label text-muted">
-            Showing <Count>{firstOnPage}</Count>–<Count>{lastOnPage}</Count> of{" "}
+            Showing <Count>{firstOnPage}</Count>–<Count>{lastOnPage}</Count> of{""}
             <Count>{result.total}</Count>
           </p>
 

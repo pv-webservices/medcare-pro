@@ -1,10 +1,18 @@
 /**
- * MEDCARE PRO design system — UI Stage 0.
+ * MEDCARE PRO design system — Neumorphism (Soft UI).
  *
  * Tokens live in src/app/globals.css; the rules for using them live in
  * .claude/skills/admin-dashboard-ui. Nothing outside this folder should
- * hand-roll a button, field, table, panel or pill.
+ * hand-roll a button, field, table, panel, pill or avatar.
+ *
+ * The one rule worth repeating here, because it is the one that gets broken:
+ * cards and the page are the SAME COLOUR. Depth comes from the shadow tokens
+ * (shadow-neu-raised / -inset / -pressed), never from a lighter fill or a
+ * border. A `bg-white` in a call site is a bug.
  */
+
+export { default as Avatar } from "@/components/ui/Avatar";
+export type { AvatarSize } from "@/components/ui/Avatar";
 
 export { default as Button, buttonClasses } from "@/components/ui/Button";
 export type { ButtonSize, ButtonVariant } from "@/components/ui/Button";

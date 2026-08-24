@@ -22,7 +22,7 @@ export default function AddDoctorPanel({ clinics }: AddDoctorPanelProps) {
   // nothing to add them to. Say so rather than opening a form that cannot save.
   if (clinics.length === 0) {
     return (
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+      <p className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
         Add a clinic before adding doctors — every doctor belongs to one.
       </p>
     );

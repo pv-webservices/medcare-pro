@@ -128,11 +128,11 @@ export default function AvailabilityManager({
     return (
       <li
         key={group.date}
-        className={`border-b border-slate-200 py-4 last:border-b-0 ${
+        className={`border-b border-line py-4 last:border-b-0 ${
           isPast ? "opacity-60" : ""
         }`}
       >
-        <p className="text-sm font-semibold text-slate-900">{formatDayLabel(group.date)}</p>
+        <p className="text-sm font-semibold text-ink">{formatDayLabel(group.date)}</p>
         <ul className="mt-2 flex flex-wrap items-center gap-2">
           {group.slots
             .slice()
@@ -140,9 +140,9 @@ export default function AvailabilityManager({
             .map((slot) => (
               <li
                 key={slot.id}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 py-1.5 pl-3 pr-1.5 bg-slate-50"
+                className="flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-1.5 bg-canvas-deep"
               >
-                <span className="text-sm tabular-nums text-slate-900 font-medium">
+                <span className="text-sm tabular-nums text-ink font-medium">
                   {slot.startTime}–{slot.endTime}
                 </span>
                 {canEdit && (
@@ -151,7 +151,7 @@ export default function AvailabilityManager({
                     onClick={() => handleRemove(slot.id)}
                     disabled={removingId === slot.id}
                     aria-label={`Remove ${slot.startTime} to ${slot.endTime} on ${formatDayLabel(group.date)}`}
-                    className="min-h-8 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50 transition-colors"
+                    className="min-h-8 rounded-md px-2 text-xs font-medium text-muted hover:bg-canvas-deep disabled:opacity-50 transition-colors"
                   >
                     {removingId === slot.id ? "…" : "Remove"}
                   </button>
@@ -165,21 +165,21 @@ export default function AvailabilityManager({
 
   return (
     <section aria-labelledby="availability-heading" className="space-y-4">
-      <h2 id="availability-heading" className="text-lg font-bold text-slate-900">
+      <h2 id="availability-heading" className="text-lg font-bold text-ink">
         Availability
       </h2>
 
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {error}
         </p>
       )}
 
       {canEdit && (
-        <Card isFlush={false} className="p-4 bg-slate-50 border-slate-200">
+        <Card isFlush={false} className="p-4 bg-canvas-deep border-line">
           <form
             onSubmit={handleAdd}
             className="grid gap-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
@@ -221,8 +221,8 @@ export default function AvailabilityManager({
       )}
 
       {entries.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+          <p className="text-sm font-medium text-muted">
             No availability set. Add the dates and hours this doctor is in.
           </p>
         </div>
@@ -231,8 +231,8 @@ export default function AvailabilityManager({
           <ul>{upcoming.map((group) => renderGroup(group, false))}</ul>
 
           {past.length > 0 && (
-            <details className="mt-4 border-t border-slate-200 pt-4 group">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors list-none flex items-center">
+            <details className="mt-4 border-t border-line pt-4 group">
+              <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
                 <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
                 Past dates ({past.length})
               </summary>

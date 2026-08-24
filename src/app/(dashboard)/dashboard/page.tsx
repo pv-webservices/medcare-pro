@@ -1,378 +1,344 @@
-import { 
-  Building2, 
-  Stethoscope, 
-  Users, 
-  Calendar, 
-  Bell, 
-  MessageSquare,
+import Link from "next/link";
+import {
+  ArrowDownRight,
   ArrowUpRight,
-  ChevronDown
+  CalendarDays,
+  Check,
+  IndianRupee,
+  ListChecks,
+  Users,
 } from "lucide-react";
-import Image from "next/image";
+import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
+import {
+  Avatar,
+  Card,
+  StatusPill,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+  Table,
+  cx,
+  type StatusTone,
+} from "@/components/ui";
 
-// Live dashboard — PRD §6.4 (FR-4.1 … FR-4.3). Stage 2. 
-// Uses static layout mirroring the reference design.
+/*
+ * Dashboard overview — PRD §6.4 (FR-4.1 … FR-4.3).
+ *
+ * STILL STATIC. Every figure below is placeholder data, exactly as it was
+ * before this redesign; wiring the panels to real queries is its own stage and
+ * is deliberately not smuggled in with a restyle. The shapes are what matter
+ * here — each panel takes the form the real data will arrive in, so the swap is
+ * a data change rather than a layout one.
+ *
+ * The page carries no heading of its own. The greeting lives in the shell's
+ * topbar (see the dashboard layout), so repeating it here would give the screen
+ * two competing first lines.
+ */
+
+interface Kpi {
+  label: string;
+  value: string;
+  delta: number;
+  icon: typeof Users;
+}
+
+const KPIS: readonly Kpi[] = [
+  { label: "Total patients", value: "1,843", delta: 12.5, icon: Users },
+  { label: "Appointments today", value: "18", delta: 8.2, icon: CalendarDays },
+  { label: "Monthly revenue", value: "₹4,52,300", delta: 15.4, icon: IndianRupee },
+  { label: "Pending tasks", value: "12", delta: -4.1, icon: ListChecks },
+];
+
+const PATIENT_TREND: readonly AreaPoint[] = [
+  { label: "Feb", value: 210 },
+  { label: "Mar", value: 285 },
+  { label: "Apr", value: 262 },
+  { label: "May", value: 340 },
+  { label: "Jun", value: 315 },
+  { label: "Jul", value: 402 },
+  { label: "Aug", value: 448 },
+];
+
+interface ScheduleRow {
+  time: string;
+  name: string;
+  visit: string;
+  status: string;
+  tone: StatusTone;
+}
+
+const SCHEDULE: readonly ScheduleRow[] = [
+  { time: "09:30", name: "Anita Rao", visit: "Follow-up", status: "Confirmed", tone: "accent" },
+  { time: "10:15", name: "Vikram Shah", visit: "New consult", status: "Confirmed", tone: "accent" },
+  { time: "11:00", name: "Priya Nair", visit: "Root canal", status: "Waiting", tone: "warn" },
+  { time: "12:30", name: "Rahul Menon", visit: "Cleaning", status: "Confirmed", tone: "accent" },
+  { time: "14:00", name: "Sneha Kulkarni", visit: "Follow-up", status: "Waiting", tone: "warn" },
+];
+
+interface ActivityRow {
+  name: string;
+  activity: string;
+  date: string;
+  status: string;
+  tone: StatusTone;
+}
+
+const ACTIVITY: readonly ActivityRow[] = [
+  { name: "Anita Rao", activity: "Registration created", date: "24 Aug 2026", status: "Paid", tone: "ok" },
+  { name: "Vikram Shah", activity: "Contact number edited", date: "24 Aug 2026", status: "Updated", tone: "neutral" },
+  { name: "Priya Nair", activity: "Visit completed", date: "23 Aug 2026", status: "Completed", tone: "ok" },
+  { name: "Rahul Menon", activity: "Appointment booked", date: "23 Aug 2026", status: "Confirmed", tone: "accent" },
+  { name: "Sneha Kulkarni", activity: "Payment pending", date: "22 Aug 2026", status: "Waiting", tone: "warn" },
+];
+
+interface Task {
+  title: string;
+  meta: string;
+  isDone: boolean;
+}
+
+const TASKS: readonly Task[] = [
+  { title: "Confirm tomorrow's appointments", meta: "Due by 5:00 PM", isDone: false },
+  { title: "File Priya Nair's lab report", meta: "Due by 6:00 PM", isDone: false },
+  { title: "Reconcile today's cash payments", meta: "Due by 8:00 PM", isDone: false },
+  { title: "Send Dr. Iyer the weekly roster", meta: "Completed 11:20 AM", isDone: true },
+];
+
+/** A card title with its muted subtitle — the section signature, repeated. */
+function PanelHeading({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="text-section font-bold text-ink">{title}</h3>
+        <p className="mt-1 text-label font-medium text-muted">{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
-  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
   return (
-    <div className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-            Welcome back, Admin! 👋
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Here's what's happening with your clinics today.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm border border-slate-100">
-          <Calendar className="h-4 w-4 text-slate-400" />
-          {today}
-        </div>
-      </div>
+    <div className="flex flex-col gap-6 pb-2">
+      {/* --- KPI row ------------------------------------------------------ */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        {KPIS.map((kpi) => {
+          const Icon = kpi.icon;
+          const isUp = kpi.delta >= 0;
+          const Arrow = isUp ? ArrowUpRight : ArrowDownRight;
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {/* Card 1 */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
-              <Building2 className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Clinics</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">24</h3>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-              <ArrowUpRight className="h-3 w-3" />
-              12%
-            </div>
-          </div>
-          <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-50">Active clinics</p>
-        </div>
+          return (
+            <Card key={kpi.label}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-label font-medium text-muted">{kpi.label}</p>
+                  <p className="tnum mt-2 text-metric font-extrabold text-ink">
+                    {kpi.value}
+                  </p>
+                </div>
 
-        {/* Card 2 */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
-              <Stethoscope className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Doctors</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">146</h3>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-              <ArrowUpRight className="h-3 w-3" />
-              8%
-            </div>
-          </div>
-          <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-50">Active doctors</p>
-        </div>
-
-        {/* Card 3 */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
-              <Users className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Patients</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">1,843</h3>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-              <ArrowUpRight className="h-3 w-3" />
-              15%
-            </div>
-          </div>
-          <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-50">Registered patients</p>
-        </div>
-
-        {/* Card 4 */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
-              <Calendar className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Appointments</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">532</h3>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-              <ArrowUpRight className="h-3 w-3" />
-              10%
-            </div>
-          </div>
-          <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-50">This month</p>
-        </div>
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left Column (2 spans) */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Chart Section */}
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-base font-bold text-slate-900">Appointments Overview</h3>
-              <div className="flex items-center gap-2 text-sm text-slate-500 cursor-pointer hover:text-slate-900 transition-colors">
-                This Month <ChevronDown className="h-4 w-4" />
-              </div>
-            </div>
-            
-            {/* Legend */}
-            <div className="flex items-center gap-6 mb-8 text-xs font-medium text-slate-500">
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-sm bg-primary"></div>
-                Completed
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-sm bg-primary/40"></div>
-                Pending
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-sm bg-slate-200"></div>
-                Cancelled
-              </div>
-            </div>
-
-            {/* Mock Chart Area */}
-            <div className="relative h-64 w-full flex items-end justify-between gap-2 px-2">
-              {/* Chart lines */}
-              <div className="absolute inset-0 flex flex-col justify-between border-b border-slate-100 pb-6 pointer-events-none">
-                <div className="border-t border-slate-100 w-full flex-1"></div>
-                <div className="border-t border-slate-100 w-full flex-1"></div>
-                <div className="border-t border-slate-100 w-full flex-1"></div>
-                <div className="border-t border-slate-100 w-full flex-1"></div>
-              </div>
-              
-              {/* Y-axis labels */}
-              <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[10px] font-medium text-slate-400">
-                <span>200</span>
-                <span>150</span>
-                <span>100</span>
-                <span>50</span>
-                <span>0</span>
+                {/*
+                  A sunken tile, not a raised one. The number is the object on
+                  this card; the icon is a category marker behind it, and giving
+                  it the same elevation as a button would promise a press.
+                */}
+                <span
+                  aria-hidden="true"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-canvas text-accent shadow-neu-inset"
+                >
+                  <Icon strokeWidth={2} className="h-5 w-5" />
+                </span>
               </div>
 
-              {/* Bars */}
-              <div className="ml-8 w-full flex items-end justify-around h-[calc(100%-24px)] z-10">
-                {/* Bar 1 */}
-                <div className="relative flex flex-col justify-end w-8 h-[60%] group">
-                  <div className="w-full bg-slate-200 rounded-t-sm h-[20%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary/40 h-[30%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 16</span>
-                </div>
-                {/* Bar 2 */}
-                <div className="relative flex flex-col justify-end w-8 h-[55%] group">
-                  <div className="w-full bg-slate-200 rounded-t-sm h-[25%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary/40 h-[25%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 17</span>
-                </div>
-                {/* Bar 3 */}
-                <div className="relative flex flex-col justify-end w-8 h-[80%] group">
-                  <div className="w-full bg-slate-200 rounded-t-sm h-[15%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary/40 h-[35%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 18</span>
-                </div>
-                {/* Bar 4 */}
-                <div className="relative flex flex-col justify-end w-8 h-[65%] group">
-                  <div className="w-full bg-slate-200 rounded-t-sm h-[20%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary/40 h-[40%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary rounded-b-sm h-[40%] transition-opacity group-hover:opacity-80"></div>
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 19</span>
-                </div>
-                {/* Bar 5 */}
-                <div className="relative flex flex-col justify-end w-8 h-[58%] group">
-                  <div className="w-full bg-slate-200 rounded-t-sm h-[10%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary/40 h-[40%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 20</span>
-                </div>
-                {/* Bar 6 */}
-                <div className="relative flex flex-col justify-end w-8 h-[62%] group">
-                  <div className="w-full bg-slate-200 rounded-t-sm h-[15%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary/40 h-[35%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary rounded-b-sm h-[50%] transition-opacity group-hover:opacity-80"></div>
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-500 whitespace-nowrap">May 21</span>
-                </div>
-                {/* Bar 7 */}
-                <div className="relative flex flex-col justify-end w-8 h-[85%] group">
-                  <div className="w-full bg-slate-200 rounded-t-sm h-[20%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary/40 h-[35%] transition-opacity group-hover:opacity-80"></div>
-                  <div className="w-full bg-primary rounded-b-sm h-[45%] transition-opacity group-hover:opacity-80"></div>
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-900 font-bold whitespace-nowrap">May 22</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Notifications List */}
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-base font-bold text-slate-900">Notifications</h3>
-              <div className="text-sm font-medium text-primary cursor-pointer hover:text-primary-hover transition-colors">
-                View all
-              </div>
-            </div>
-            
-            <div className="space-y-6">
-              {/* Notif 1 */}
-              <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-                  <Bell className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start mb-0.5">
-                    <p className="text-sm font-bold text-slate-900">New clinic registration</p>
-                    <span className="text-xs font-medium text-slate-400 whitespace-nowrap ml-2">10 min ago</span>
-                  </div>
-                  <p className="text-sm text-slate-500 truncate">City Smiles Clinic has been registered successfully.</p>
-                </div>
-              </div>
-              
-              {/* Notif 2 */}
-              <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary">
-                  <Users className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start mb-0.5">
-                    <p className="text-sm font-bold text-slate-900">Appointment updated</p>
-                    <span className="text-xs font-medium text-slate-400 whitespace-nowrap ml-2">1 hr ago</span>
-                  </div>
-                  <p className="text-sm text-slate-500 truncate">Appointment #APT-1452 has been rescheduled.</p>
-                </div>
-              </div>
-              
-              {/* Notif 3 */}
-              <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                  <MessageSquare className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start mb-0.5">
-                    <p className="text-sm font-bold text-slate-900">New message received</p>
-                    <span className="text-xs font-medium text-slate-400 whitespace-nowrap ml-2">2 hrs ago</span>
-                  </div>
-                  <p className="text-sm text-slate-500 truncate">You have a new message from Bright Dental Care.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-        </div>
-        
-        {/* Right Column (1 span) */}
-        <div className="space-y-8">
-          
-          {/* Recent Registrations */}
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-base font-bold text-slate-900">Recent Registrations</h3>
-              <div className="text-sm font-medium text-primary cursor-pointer hover:text-primary-hover transition-colors">
-                View all
-              </div>
-            </div>
-            
-            <div className="space-y-6">
-              {/* Reg 1 */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <img src="https://ui-avatars.com/api/?name=C+S&background=e0e7ff&color=4f46e5&size=128" alt="Clinic" className="h-10 w-10 rounded-full object-cover" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">City Smiles Clinic</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Registered on May 22, 2025</p>
-                  </div>
-                </div>
-                <div className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                  Active
-                </div>
-              </div>
-              
-              {/* Reg 2 */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <img src="https://ui-avatars.com/api/?name=B+D&background=dcfce7&color=16a34a&size=128" alt="Clinic" className="h-10 w-10 rounded-full object-cover" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">Bright Dental Care</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Registered on May 21, 2025</p>
-                  </div>
-                </div>
-                <div className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                  Active
-                </div>
-              </div>
-              
-              {/* Reg 3 */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <img src="https://ui-avatars.com/api/?name=H+T&background=fef3c7&color=d97706&size=128" alt="Clinic" className="h-10 w-10 rounded-full object-cover" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">Healthy Teeth Clinic</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Registered on May 21, 2025</p>
-                  </div>
-                </div>
-                <div className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                  Active
-                </div>
-              </div>
-              
-              {/* Reg 4 */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <img src="https://ui-avatars.com/api/?name=S+Z&background=fce7f3&color=db2777&size=128" alt="Clinic" className="h-10 w-10 rounded-full object-cover" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">Smile Zone</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Registered on May 20, 2025</p>
-                  </div>
-                </div>
-                <div className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                  Active
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Promo Card */}
-          <div className="rounded-3xl bg-primary-light p-8 shadow-sm border border-primary-light overflow-hidden relative">
-            <div className="relative z-10 w-[60%]">
-              <h3 className="text-xl font-bold text-slate-900 leading-tight mb-3">
-                Delivering better care, every day.
-              </h3>
-              <p className="text-sm text-slate-600 mb-6">
-                Manage your clinics, doctors and patients all in one place.
+              <p
+                className={cx(
+                  "mt-4 flex items-center gap-1 text-meta font-semibold",
+                  isUp ? "text-ok-ink" : "text-alert-ink",
+                )}
+              >
+                <Arrow aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5" />
+                <span className="tnum">{Math.abs(kpi.delta)}%</span>
+                <span className="font-medium text-muted">vs last month</span>
               </p>
-              <button className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary-hover transition-colors">
-                Explore Features
-              </button>
-            </div>
-            <div className="absolute -bottom-4 -right-12 h-[120%] w-[80%] pointer-events-none">
-              <Image 
-                src="/clinic-bg-generic.jpg" 
-                alt="Doctors"
-                fill
-                className="object-cover object-left opacity-30 mix-blend-multiply rounded-l-full"
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* --- Trend + today ------------------------------------------------ */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <PanelHeading
+            title="Patient overview"
+            subtitle="New and returning patients over time"
+            action={
+              <span className="rounded-full bg-canvas px-4 py-2 text-meta font-semibold text-muted shadow-neu-inset">
+                Last 7 months
+              </span>
+            }
+          />
+          <AreaChart
+            points={PATIENT_TREND}
+            caption="Patients seen per month over the last seven months."
+          />
+        </Card>
+
+        <Card>
+          <PanelHeading
+            title="Today's schedule"
+            subtitle="5 appointments remaining"
+            action={
+              <Link
+                href="/appointments"
+                className="rounded-2xl text-label font-semibold text-accent hover:text-accent-strong"
+              >
+                View all
+              </Link>
+            }
+          />
+
+          <ul className="flex flex-col gap-4">
+            {SCHEDULE.map((row) => (
+              <li key={row.time} className="flex items-center gap-3">
+                <span className="tnum w-12 shrink-0 text-label font-medium text-muted">
+                  {row.time}
+                </span>
+                <Avatar name={row.name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-body font-semibold text-ink">
+                    {row.name}
+                  </p>
+                  <p className="truncate text-meta font-medium text-muted">
+                    {row.visit}
+                  </p>
+                </div>
+                <StatusPill tone={row.tone} hasDot={false}>
+                  {row.status}
+                </StatusPill>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      {/* --- Activity + tasks --------------------------------------------- */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <Card isFlush>
+            <div className="p-6 pb-0">
+              <PanelHeading
+                title="Recent patient activity"
+                subtitle="Registrations, edits and payments across this clinic"
+                action={
+                  <Link
+                    href="/registration"
+                    className="rounded-2xl text-label font-semibold text-accent hover:text-accent-strong"
+                  >
+                    View all
+                  </Link>
+                }
               />
             </div>
-          </div>
 
+            {/*
+              The table primitive brings its own raised shell, which would be a
+              second card inside this one. `shadow-none` strips it; the Card is
+              the object here and the table is its contents.
+            */}
+            <Table
+              caption="Recent patient activity across this clinic"
+              className="rounded-none shadow-none"
+            >
+              <THead>
+                <TH>Patient</TH>
+                <TH>Activity</TH>
+                <TH>Date</TH>
+                <TH align="end">Status</TH>
+              </THead>
+              <TBody>
+                {ACTIVITY.map((row) => (
+                  <TR key={`${row.name}-${row.activity}`}>
+                    <TD>
+                      <span className="flex items-center gap-3">
+                        <Avatar name={row.name} size="sm" />
+                        <span className="font-semibold">{row.name}</span>
+                      </span>
+                    </TD>
+                    <TD className="text-muted">{row.activity}</TD>
+                    <TD className="tnum text-muted">{row.date}</TD>
+                    <TD align="end">
+                      <StatusPill tone={row.tone} hasDot={false}>
+                        {row.status}
+                      </StatusPill>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </Card>
         </div>
+
+        <Card>
+          <PanelHeading
+            title="Pending tasks"
+            subtitle="Yours and the front desk's, for today"
+            action={
+              <span className="text-label font-semibold text-accent">12 total</span>
+            }
+          />
+
+          <ul className="flex flex-col gap-4">
+            {TASKS.map((task) => (
+              <li key={task.title} className="flex items-start gap-3">
+                {/*
+                  A SPAN, NOT A CHECKBOX. There is no task store behind this
+                  panel yet, and an input that accepts a click and then forgets
+                  it is worse than a picture of one. The state is announced for
+                  screen readers rather than implied by the tick alone.
+                */}
+                <span
+                  className={cx(
+                    "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+                    task.isDone
+                      ? "bg-accent text-accent-ink"
+                      : "bg-canvas shadow-neu-inset",
+                  )}
+                >
+                  {task.isDone && (
+                    <Check aria-hidden="true" strokeWidth={3} className="h-3 w-3" />
+                  )}
+                  <span className="sr-only">
+                    {task.isDone ? "Completed:" : "Not started:"}
+                  </span>
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={cx(
+                      "text-body font-semibold",
+                      task.isDone ? "text-muted line-through" : "text-ink",
+                    )}
+                  >
+                    {task.title}
+                  </p>
+                  <p className="mt-0.5 text-meta font-medium text-muted">
+                    {task.meta}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </div>
     </div>
   );

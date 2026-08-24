@@ -18,12 +18,12 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/signupInput";
 // than restated, so the two cannot drift.
 
 const FIELD_CLASS =
-  "block w-full rounded-xl border border-slate-200 py-3.5 px-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600";
+  "block w-full rounded-2xl shadow-neu-inset py-3.5 px-4 text-sm text-ink placeholder:text-faint";
 
 const FIELD_CLASS_ICON =
-  "block w-full rounded-xl border border-slate-200 py-3.5 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600";
+  "block w-full rounded-2xl shadow-neu-inset py-3.5 pl-11 pr-4 text-sm text-ink placeholder:text-faint";
 
-const LABEL_CLASS = "block text-sm font-medium text-slate-700 mb-2";
+const LABEL_CLASS = "block text-sm font-medium text-ink mb-2";
 
 const UNREACHABLE_MESSAGE =
   "Could not reach the server. Check your connection and try again.";
@@ -103,26 +103,26 @@ function SignupContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 sm:p-8">
-      <div className="flex w-full max-w-[1200px] overflow-hidden rounded-[2rem] bg-white shadow-xl min-h-[720px]">
+    <div className="flex min-h-screen items-center justify-center bg-canvas-deep p-4 sm:p-8">
+      <div className="flex w-full max-w-[1200px] overflow-hidden rounded-[2rem] bg-canvas shadow-neu-float min-h-[720px]">
         {/* Left side: Signup Form */}
         <div className="flex w-full flex-col p-8 lg:w-[55%] lg:p-12 xl:p-16">
           <div className="flex items-center gap-3 mb-8">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
               <Plus className="h-6 w-6 stroke-[3]" />
             </div>
             <div>
-              <div className="font-bold text-slate-900 text-xl tracking-tight leading-none">Medicare Pro</div>
-              <div className="text-xs text-slate-500 font-medium mt-0.5">Smart Clinic Management</div>
+              <div className="font-bold text-ink text-xl tracking-tight leading-none">Medicare Pro</div>
+              <div className="text-xs text-muted font-medium mt-0.5">Smart Clinic Management</div>
             </div>
           </div>
 
           <div className="mx-auto w-full max-w-sm flex-grow flex flex-col justify-center">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-3xl font-bold tracking-tight text-ink">
                 Create Account
               </h1>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-muted">
                 Join MEDCARE PRO to manage your clinic
               </p>
             </div>
@@ -141,7 +141,7 @@ function SignupContent() {
                 <p
                   role="alert"
                   id="signup-error"
-                  className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                  className="rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
                 >
                   {error}
                 </p>
@@ -153,7 +153,7 @@ function SignupContent() {
                 </label>
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <UserIcon className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                    <UserIcon className="h-5 w-5 text-accent" aria-hidden="true" />
                   </div>
                   <input
                     id="name"
@@ -177,7 +177,7 @@ function SignupContent() {
                 </label>
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <Building2 className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                    <Building2 className="h-5 w-5 text-accent" aria-hidden="true" />
                   </div>
                   <input
                     id="clinicName"
@@ -194,12 +194,12 @@ function SignupContent() {
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-ink mb-2">
                   Email
                 </label>
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <Mail className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                    <Mail className="h-5 w-5 text-accent" aria-hidden="true" />
                   </div>
                   <input
                     id="email"
@@ -211,7 +211,7 @@ function SignupContent() {
                     onChange={(e) => setEmail(e.target.value)}
                     aria-describedby={error ? "signup-error" : undefined}
                     placeholder="dr.amelia@dentalcare.com"
-                    className="block w-full rounded-xl border border-slate-200 py-3.5 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
+                    className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-11 pr-4 text-sm text-ink placeholder:text-faint"
                   />
                 </div>
               </div>
@@ -223,7 +223,7 @@ function SignupContent() {
                   </label>
                   <div className="relative">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                      <MapPin className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                      <MapPin className="h-5 w-5 text-accent" aria-hidden="true" />
                     </div>
                     <input
                       id="city"
@@ -245,7 +245,7 @@ function SignupContent() {
                   </label>
                   <div className="relative">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                      <Phone className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                      <Phone className="h-5 w-5 text-accent" aria-hidden="true" />
                     </div>
                     <input
                       id="phone"
@@ -264,7 +264,7 @@ function SignupContent() {
 
               <div>
                 <label htmlFor="address" className={LABEL_CLASS}>
-                  Address <span className="font-normal text-slate-400">(optional)</span>
+                  Address <span className="font-normal text-faint">(optional)</span>
                 </label>
                 <textarea
                   id="address"
@@ -280,8 +280,8 @@ function SignupContent() {
 
               <div>
                 <label htmlFor="businessEmail" className={LABEL_CLASS}>
-                  Business contact email{" "}
-                  <span className="font-normal text-slate-400">(optional)</span>
+                  Business contact email{""}
+                  <span className="font-normal text-faint">(optional)</span>
                 </label>
                 <input
                   id="businessEmail"
@@ -292,14 +292,14 @@ function SignupContent() {
                   placeholder="accounts@dentalcare.com"
                   className={FIELD_CLASS}
                 />
-                <p className="mt-1.5 text-xs text-slate-500">
+                <p className="mt-1.5 text-xs text-muted">
                   Used for billing and notices. You still sign in with the email
                   above.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-ink mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -314,23 +314,23 @@ function SignupContent() {
                     onChange={(e) => setPassword(e.target.value)}
                     aria-describedby="password-hint"
                     placeholder="••••••••••••••••"
-                    className="block w-full rounded-xl border border-slate-200 py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-slate-900 placeholder:text-slate-400 placeholder:tracking-[0.2em] focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
+                    className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-ink placeholder:text-faint placeholder:tracking-[0.2em]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-600 hover:text-violet-700 focus:outline-none"
+                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                <p id="password-hint" className="mt-1.5 text-xs text-slate-500">
+                <p id="password-hint" className="mt-1.5 text-xs text-muted">
                   At least {MIN_PASSWORD_LENGTH} characters.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-ink mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -344,19 +344,19 @@ function SignupContent() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••••••••••"
-                    className="block w-full rounded-xl border border-slate-200 py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-slate-900 placeholder:text-slate-400 placeholder:tracking-[0.2em] focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
+                    className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-ink placeholder:text-faint placeholder:tracking-[0.2em]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-600 hover:text-violet-700 focus:outline-none"
+                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent"
                   >
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
 
-              <label className="flex items-start gap-3 text-sm text-slate-600">
+              <label className="flex items-start gap-3 text-sm text-muted">
                 <input
                   id="acceptTerms"
                   name="acceptTerms"
@@ -364,7 +364,7 @@ function SignupContent() {
                   required
                   checked={acceptTerms}
                   onChange={(e) => setAcceptTerms(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-600"
+                  className="mt-0.5 h-4 w-4 rounded border-line text-accent"
                 />
                 {/*
                   No links yet: this repo has no /terms or /privacy route, and
@@ -380,15 +380,15 @@ function SignupContent() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-4 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 transition-colors"
+                className="mt-4 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors"
               >
                 {isSubmitting ? "Creating Account..." : "Create Account"}
               </button>
             </form>
             
-            <p className="mt-8 text-center text-sm text-slate-500">
-              Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-violet-600 hover:text-violet-700">
+            <p className="mt-8 text-center text-sm text-muted">
+              Already have an account?{""}
+              <Link href="/login" className="font-semibold text-accent hover:text-accent">
                 Sign In
               </Link>
             </p>
@@ -397,7 +397,7 @@ function SignupContent() {
 
         {/* Right side: Image and Stats */}
         <div className="relative hidden w-[45%] lg:block p-4 pl-0">
-          <div className="relative h-full w-full rounded-2xl overflow-hidden shadow-sm">
+          <div className="relative h-full w-full rounded-2xl overflow-hidden shadow-neu-raised-sm">
             <Image
               src="/clinic-bg-generic.jpg"
               alt="Generic Clinic"
@@ -407,22 +407,22 @@ function SignupContent() {
             />
             {/* Top Right EN button */}
             <div className="absolute top-6 right-6">
-              <button className="flex items-center gap-2 rounded-xl bg-white/95 backdrop-blur-md px-4 py-2 text-sm font-medium text-slate-700 shadow-sm border border-white/20">
+              <button className="flex items-center gap-2 rounded-xl bg-canvas/95 backdrop-blur-md px-4 py-2 text-sm font-medium text-ink shadow-neu-raised-sm">
                 <Globe className="h-4 w-4" />
                 EN
-                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-4 w-4 text-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
             </div>
 
             {/* Top Left floating card */}
-            <div className="absolute top-16 left-8 rounded-2xl bg-white/95 backdrop-blur-md px-5 py-4 shadow-xl border border-white/30 flex items-center gap-4">
+            <div className="absolute top-16 left-8 rounded-2xl bg-canvas/95 backdrop-blur-md px-5 py-4 shadow-neu-float flex items-center gap-4">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-light text-primary">
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xs font-medium text-slate-500 mb-0.5">Today's Appointments</div>
+                <div className="text-xs font-medium text-muted mb-0.5">Today's Appointments</div>
                 <div className="text-[15px] font-bold text-primary">8 Scheduled</div>
               </div>
               {/* Little purple dot */}
@@ -430,63 +430,63 @@ function SignupContent() {
             </div>
 
             {/* Bottom Left floating card */}
-            <div className="absolute bottom-16 left-8 rounded-3xl bg-white/95 backdrop-blur-md p-6 shadow-xl border border-white/30 w-64">
-              <h3 className="text-sm font-bold text-slate-900 mb-5">Today's Overview</h3>
+            <div className="absolute bottom-16 left-8 rounded-3xl bg-canvas/95 backdrop-blur-md p-6 shadow-neu-float w-64">
+              <h3 className="text-sm font-bold text-ink mb-5">Today's Overview</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-ink">
                       <Users className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-[11px] font-medium text-slate-500">Patients</div>
-                      <div className="font-bold text-sm text-slate-900 leading-tight">24</div>
+                      <div className="text-[11px] font-medium text-muted">Patients</div>
+                      <div className="font-bold text-sm text-ink leading-tight">24</div>
                     </div>
                   </div>
-                  <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">+12%</div>
+                  <div className="text-xs font-bold text-ok-mark bg-ok-bg px-2 py-1 rounded-md">+12%</div>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-ink">
                       <Calendar className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-[11px] font-medium text-slate-500">Appointments</div>
-                      <div className="font-bold text-sm text-slate-900 leading-tight">18</div>
+                      <div className="text-[11px] font-medium text-muted">Appointments</div>
+                      <div className="font-bold text-sm text-ink leading-tight">18</div>
                     </div>
                   </div>
-                  <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">+8%</div>
+                  <div className="text-xs font-bold text-ok-mark bg-ok-bg px-2 py-1 rounded-md">+8%</div>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-slate-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-ink">
                       <IndianRupee className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-[11px] font-medium text-slate-500">Revenue</div>
-                      <div className="font-bold text-sm text-slate-900 leading-tight">₹45,230</div>
+                      <div className="text-[11px] font-medium text-muted">Revenue</div>
+                      <div className="font-bold text-sm text-ink leading-tight">₹45,230</div>
                     </div>
                   </div>
-                  <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">+15%</div>
+                  <div className="text-xs font-bold text-ok-mark bg-ok-bg px-2 py-1 rounded-md">+15%</div>
                 </div>
               </div>
             </div>
 
             {/* Bottom Right Quote card */}
-            <div className="absolute bottom-16 right-8 rounded-3xl bg-primary p-7 shadow-xl w-60 text-white border border-white/10">
+            <div className="absolute bottom-16 right-8 rounded-3xl bg-accent p-7 shadow-neu-float w-60 text-accent-ink">
               {/* Avatars */}
               <div className="flex -space-x-3 mb-6 relative -top-12 -mt-2">
-                <img src="https://ui-avatars.com/api/?name=J+D&background=e0e7ff&color=4f46e5&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
-                <img src="https://ui-avatars.com/api/?name=A+S&background=dcfce7&color=16a34a&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
-                <img src="https://ui-avatars.com/api/?name=M+R&background=fce7f3&color=db2777&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-white object-cover shadow-sm" />
+                <img src="https://ui-avatars.com/api/?name=J+D&background=e0e7ff&color=4f46e5&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-canvas object-cover shadow-neu-raised-sm" />
+                <img src="https://ui-avatars.com/api/?name=A+S&background=dcfce7&color=16a34a&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-canvas object-cover shadow-neu-raised-sm" />
+                <img src="https://ui-avatars.com/api/?name=M+R&background=fce7f3&color=db2777&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-canvas object-cover shadow-neu-raised-sm" />
               </div>
-              <div className="text-5xl font-serif leading-none mb-2 text-white opacity-80">&ldquo;</div>
+              <div className="text-5xl font-serif leading-none mb-2 text-accent-ink opacity-80">&ldquo;</div>
               <p className="text-base font-medium leading-relaxed mb-6 -mt-2">
                 Delivering better care, every day.
               </p>
-              <p className="text-xs font-medium text-violet-200">
+              <p className="text-xs font-medium text-accent-ink/80">
                 Medicare Pro Team
               </p>
             </div>

@@ -24,14 +24,14 @@ export default async function OwnerPlansPage() {
     <div className="mx-auto max-w-4xl p-8">
       <Link
         href="/owner/dashboard"
-        className="mb-6 inline-flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200"
+        className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-ink"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Platform overview
       </Link>
 
       <h1 className="text-xl font-semibold">Plans</h1>
-      <p className="mt-1 max-w-2xl text-xs text-slate-400">
+      <p className="mt-1 max-w-2xl text-xs text-muted">
         The second layer. A plan is the baseline every organisation on it
         follows, and a change here reaches them the moment it saves — except
         where an organisation carries an override of its own, which the plan does
@@ -43,7 +43,7 @@ export default async function OwnerPlansPage() {
         <PlanFeatureEditor plans={plans} />
       </div>
 
-      <p className="mt-8 text-[11px] text-slate-500">
+      <p className="mt-8 text-[11px] text-faint">
         Creating and retiring plans is not on this screen. A plan is a commercial
         object with tenants pointing at it under a Restrict foreign key, and
         deleting one out from under them would strip every feature they are

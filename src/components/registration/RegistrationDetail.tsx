@@ -39,7 +39,7 @@ interface RegistrationDetailProps {
 }
 
 function NotSet() {
-  return <span className="text-slate-400">Not set</span>;
+  return <span className="text-faint">Not set</span>;
 }
 
 function formatVisitDate(date: string): string {
@@ -117,13 +117,13 @@ export default function RegistrationDetail({
         title={registration.patientName}
         meta={
           <div className="flex flex-col gap-1.5 mt-2">
-            <span className="text-sm font-medium tabular-nums text-slate-500">
+            <span className="text-sm font-medium tabular-nums text-muted">
               {registration.patientCode}
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-slate-600">
+              <span className="text-sm text-muted">
                 {registration.department}
-                {registration.doctorName ? ` · ${registration.doctorName}` : ""} ·{" "}
+                {registration.doctorName ? ` · ${registration.doctorName}` : ""} ·{""}
                 {registration.clinicName}
               </span>
               <StatusPill
@@ -133,7 +133,7 @@ export default function RegistrationDetail({
                 {VISIT_TYPE_LABELS[registration.visitType]}
               </StatusPill>
               {visits.length > 1 && (
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-muted">
                   · {visits.length} visits on this record
                 </span>
               )}
@@ -162,44 +162,44 @@ export default function RegistrationDetail({
       <Card>
         <dl className="grid gap-6 sm:grid-cols-3">
           <div>
-            <dt className="text-sm font-semibold text-slate-500">Amount</dt>
-            <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+            <dt className="text-sm font-semibold text-muted">Amount</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-ink">
               {formatRupees(registration.amount)}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-slate-500">Visit date &amp; time</dt>
-            <dd className="mt-1 text-base tabular-nums text-slate-900">
+            <dt className="text-sm font-semibold text-muted">Visit date &amp; time</dt>
+            <dd className="mt-1 text-base tabular-nums text-ink">
               {formatVisitDate(registration.visitDate)} at {registration.visitTime}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-slate-500">Mobile number</dt>
-            <dd className="mt-1 text-base tabular-nums text-slate-900">{registration.mobileNumber}</dd>
+            <dt className="text-sm font-semibold text-muted">Mobile number</dt>
+            <dd className="mt-1 text-base tabular-nums text-ink">{registration.mobileNumber}</dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-slate-500">Age</dt>
-            <dd className="mt-1 text-base tabular-nums text-slate-900">
+            <dt className="text-sm font-semibold text-muted">Age</dt>
+            <dd className="mt-1 text-base tabular-nums text-ink">
               {registration.age === null ? <NotSet /> : registration.age}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-slate-500">Gender</dt>
-            <dd className="mt-1 text-base text-slate-900">{registration.gender ?? <NotSet />}</dd>
+            <dt className="text-sm font-semibold text-muted">Gender</dt>
+            <dd className="mt-1 text-base text-ink">{registration.gender ?? <NotSet />}</dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-slate-500">City</dt>
-            <dd className="mt-1 text-base text-slate-900">{registration.city ?? <NotSet />}</dd>
+            <dt className="text-sm font-semibold text-muted">City</dt>
+            <dd className="mt-1 text-base text-ink">{registration.city ?? <NotSet />}</dd>
           </div>
           <div className="sm:col-span-3">
-            <dt className="text-sm font-semibold text-slate-500">Address</dt>
-            <dd className="mt-1 text-base text-slate-900">{registration.address ?? <NotSet />}</dd>
+            <dt className="text-sm font-semibold text-muted">Address</dt>
+            <dd className="mt-1 text-base text-ink">{registration.address ?? <NotSet />}</dd>
           </div>
         </dl>
       </Card>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Registered by {registration.createdByName ?? registration.createdByEmail}
         </p>
       </div>

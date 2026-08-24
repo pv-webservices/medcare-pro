@@ -2,11 +2,16 @@ import type { ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
 
 /**
- * A titled container: a `Card` whose contents need announcing — an add form,
- * a filter block, a report section.
+ * A titled container: a `Card` whose contents need announcing — an add form, a
+ * filter block, a report section.
  *
- * The title is the one place besides the page heading where the display face
- * appears. Everything inside is body type.
+ * The header is separated by SPACE, not by a rule. A border drawn across a soft
+ * surface cuts it in half and the panel stops reading as one raised object, so
+ * the title block simply sits above the content with room around it.
+ *
+ * The title is 17px/700 against a 13px/500 muted subtitle. That pairing is the
+ * section-header signature used on every screen; keeping it in the primitive is
+ * what stops eleven modules from each inventing their own.
  */
 
 interface PanelProps {
@@ -34,24 +39,21 @@ export default function Panel({
   return (
     <section
       aria-label={title}
-      className={cx(
-        "rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden",
-        className,
-      )}
+      className={cx("rounded-3xl bg-canvas p-6 shadow-neu-raised", className)}
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-50 px-6 py-5">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <Heading className="text-base font-bold text-slate-900">
-            {title}
-          </Heading>
+          <Heading className="text-section font-bold text-ink">{title}</Heading>
           {description && (
-            <p className="mt-1 text-sm text-slate-500">{description}</p>
+            <p className="mt-1 text-label font-medium text-muted">{description}</p>
           )}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-3">{actions}</div>}
+        {actions && (
+          <div className="flex shrink-0 items-center gap-3">{actions}</div>
+        )}
       </div>
 
-      <div className="p-6">{children}</div>
+      {children}
     </section>
   );
 }

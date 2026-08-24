@@ -205,7 +205,7 @@ export default function AppointmentActions({
       </div>
 
       {isArrived && canConvert && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-muted">
           <CheckCircle2
             aria-hidden="true"
             strokeWidth={1.75}

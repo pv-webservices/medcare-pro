@@ -48,7 +48,7 @@ export default async function TeamPage() {
     return (
       <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
         <PageHeader title="Team" />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot view the team. Ask the account owner if you need
           access.
         </div>
@@ -74,13 +74,13 @@ export default async function TeamPage() {
             <Count>{activeCount}</Count> active
             {overview.members.length !== activeCount && (
               <>
-                {" of "}
+                {"of"}
                 <Count>{overview.members.length}</Count>
               </>
             )}
             {outstanding > 0 && (
               <>
-                {" · "}
+                {"·"}
                 <Count>{outstanding}</Count> invitation
                 {outstanding === 1 ? "" : "s"} outstanding
               </>

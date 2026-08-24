@@ -9,6 +9,17 @@ import { cx } from "@/components/ui/cx";
 /**
  * Text fields, with their label, hint and error attached.
  *
+ * A FIELD IS A WELL. Every control here is the same colour as the page and
+ * carries `shadow-neu-inset`, so it reads as a recess you put something into
+ * rather than an object sitting on top of one. That is the counterpart to the
+ * raised button, and the pair is what makes the surface legible: raised means
+ * press me, sunken means fill me.
+ *
+ * No borders. The inset shadow is the entire boundary, which means the FOCUS
+ * RING IS LOAD-BEARING — a recess with no outline gives a keyboard user nothing
+ * to locate. The global :focus-visible rule in globals.css draws it in the
+ * accent; nothing here may set `outline-none`.
+ *
  * The label/hint/error wiring lives in the primitive rather than at each call
  * site so `aria-describedby` and `aria-invalid` cannot be forgotten — inline
  * validation is a ground rule here, and a validation message the screen reader
@@ -19,17 +30,18 @@ import { cx } from "@/components/ui/cx";
  */
 
 const CONTROL_BASE =
-  "block w-full rounded-xl border bg-white text-sm text-slate-900 " +
-  "placeholder:text-slate-400 transition-colors disabled:opacity-55 focus:outline-none focus:ring-4";
+  "block w-full rounded-2xl border-0 bg-canvas text-input text-ink" +
+  "shadow-neu-inset placeholder:text-faint" +
+  "transition-shadow duration-200 disabled:opacity-55";
 
+/*
+ * An invalid field cannot signal with a border, because it has none. A ring
+ * composes with the inset shadow rather than replacing it, so the control stays
+ * a well and gains a red edge — and the message below still carries the reason,
+ * because a colour is not an explanation.
+ */
 export const controlClasses = (isInvalid: boolean, extra?: string) =>
-  cx(
-    CONTROL_BASE,
-    isInvalid
-      ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-      : "border-slate-200 focus:border-violet-500 hover:border-slate-300 focus:ring-violet-500/10",
-    extra,
-  );
+  cx(CONTROL_BASE, isInvalid && "ring-2 ring-alert-mark/60", extra);
 
 interface FieldShellProps {
   id: string;
@@ -54,7 +66,10 @@ export function FieldShell({
 }: FieldShellProps) {
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-slate-700">
+      <label
+        htmlFor={id}
+        className="mb-2 block text-label font-semibold text-ink"
+      >
         {label}
       </label>
 
@@ -68,11 +83,11 @@ export function FieldShell({
       )}
 
       {error ? (
-        <p id={`${id}-message`} className="mt-1.5 text-xs text-red-500">
+        <p id={`${id}-message`} className="mt-2 text-meta font-medium text-alert-ink">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-message`} className="mt-1.5 text-xs text-slate-500">
+        <p id={`${id}-message`} className="mt-2 text-meta font-medium text-muted">
           {hint}
         </p>
       ) : null}
@@ -117,7 +132,7 @@ export default function Input({
       aria-describedby={error || hint ? `${id}-message` : undefined}
       className={controlClasses(
         Boolean(error),
-        cx("min-h-11 pr-3", unit ? "pl-8" : "pl-3", className),
+        cx("min-h-11 pr-4", unit ? "pl-9" : "pl-4", className),
       )}
       {...rest}
     />
@@ -136,7 +151,7 @@ export default function Input({
         <div className="relative">
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-input text-muted"
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-input text-muted"
           >
             {unit}
           </span>
@@ -181,8 +196,8 @@ export function Textarea({
         rows={rows}
         aria-invalid={error ? true : undefined}
         aria-describedby={error || hint ? `${id}-message` : undefined}
-        className={controlClasses(Boolean(error), cx("px-3 py-2.5", className))}
-        {...rest}
+        className={controlClasses(Boolean(error), cx("px-4 py-3", className))}
+      {...rest}
       />
     </FieldShell>
   );
@@ -220,12 +235,15 @@ export function Select({
           id={id}
           aria-invalid={error ? true : undefined}
           aria-describedby={error || hint ? `${id}-message` : undefined}
-          className={controlClasses(Boolean(error), cx("px-3 h-11 appearance-none pr-10 cursor-pointer", className))}
+          className={controlClasses(
+            Boolean(error),
+            cx("h-11 cursor-pointer appearance-none pl-4 pr-11", className),
+          )}
           {...rest}
         >
           {children}
         </select>
-        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"

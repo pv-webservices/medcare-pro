@@ -29,10 +29,10 @@ interface GlobalFeatureSwitchesProps {
 }
 
 const TIER_STYLES: Record<string, string> = {
-  CORE: "border-slate-700 text-slate-400",
-  PREMIUM: "border-emerald-500/40 text-emerald-300",
-  BETA: "border-amber-500/40 text-amber-300",
-  INTERNAL: "border-rose-500/40 text-rose-300",
+  CORE: "border-line text-muted",
+  PREMIUM: "border-line text-ok-ink",
+  BETA: "border-line text-warn-ink",
+  INTERNAL: "border-line text-alert-ink",
 };
 
 const GENERIC_ERROR = "Could not change that switch. Try again.";
@@ -113,7 +113,7 @@ export default function GlobalFeatureSwitches({
       {error && (
         <p
           role="alert"
-          className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200"
+          className="rounded-lg bg-alert-bg p-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -121,7 +121,7 @@ export default function GlobalFeatureSwitches({
       {notice && (
         <p
           role="status"
-          className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200"
+          className="rounded-lg bg-ok-bg p-3 text-sm text-ok-ink"
         >
           {notice}
         </p>
@@ -136,15 +136,15 @@ export default function GlobalFeatureSwitches({
         return (
           <section
             key={feature.key}
-            className="rounded-xl border border-slate-800 bg-slate-900 p-5"
+            className="rounded-3xl bg-canvas p-5 shadow-neu-raised-sm"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-sm font-semibold text-slate-100">
+                  <h2 className="text-sm font-semibold text-ink">
                     {feature.name}
                   </h2>
-                  <code className="rounded bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-400">
+                  <code className="rounded bg-canvas px-1.5 py-0.5 text-[11px] text-muted">
                     {feature.key}
                   </code>
                   <span
@@ -157,8 +157,8 @@ export default function GlobalFeatureSwitches({
                   <span
                     className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
                       feature.globalEnabled
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                        : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                        ? "border-line bg-ok-bg text-ok-ink"
+                        : "border-line bg-alert-bg text-alert-ink"
                     }`}
                   >
                     {feature.globalEnabled ? "Live" : "Switched off"}
@@ -166,26 +166,26 @@ export default function GlobalFeatureSwitches({
                 </div>
 
                 {feature.description && (
-                  <p className="mt-1.5 text-xs text-slate-400">
+                  <p className="mt-1.5 text-xs text-muted">
                     {feature.description}
                   </p>
                 )}
 
-                <p className="mt-2 text-xs text-slate-400">
-                  <span className="tabular-nums text-slate-200">
+                <p className="mt-2 text-xs text-muted">
+                  <span className="tabular-nums text-ink">
                     {feature.entitledTenants}
-                  </span>{" "}
+                  </span>{""}
                   of {totalCustomerTenants} organisation
                   {totalCustomerTenants === 1 ? "" : "s"} entitled
                   {feature.plansIncluding.length > 0
-                    ? ` · in ${feature.plansIncluding.join(", ")}`
-                    : " · in no plan"}
+                    ? ` · in ${feature.plansIncluding.join(",")}`
+                    : "· in no plan"}
                   {feature.overridesGranted + feature.overridesRevoked > 0 &&
                     ` · ${feature.overridesGranted} granted and ${feature.overridesRevoked} revoked by override`}
                 </p>
 
                 {!feature.isEnforced && (
-                  <p className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-[11px] text-amber-200">
+                  <p className="mt-2 flex items-start gap-2 rounded-lg bg-warn-bg p-2.5 text-[11px] text-warn-ink">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     <span>
                       Nothing checks this key, so switching it changes nothing
@@ -195,7 +195,7 @@ export default function GlobalFeatureSwitches({
                 )}
 
                 {feature.lastChange.at && (
-                  <p className="mt-2 text-[11px] text-slate-500">
+                  <p className="mt-2 text-[11px] text-faint">
                     Last changed {feature.lastChange.at.toISOString().slice(0, 10)}
                     {feature.lastChange.byName
                       ? ` by ${feature.lastChange.byName}`
@@ -213,8 +213,8 @@ export default function GlobalFeatureSwitches({
                   onClick={() => open(feature.key)}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                     feature.globalEnabled
-                      ? "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
-                      : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                      ? "border-line bg-alert-bg text-alert-ink hover:bg-alert-bg"
+                      : "border-line bg-ok-bg text-ok-ink hover:bg-ok-bg"
                   }`}
                 >
                   {feature.globalEnabled ? (
@@ -233,15 +233,15 @@ export default function GlobalFeatureSwitches({
             </div>
 
             {isOpen && (
-              <div className="mt-4 rounded-lg border border-slate-700 bg-slate-950 p-4">
+              <div className="mt-4 rounded-2xl bg-canvas p-4 shadow-neu-raised-sm">
                 {switchingOff && (
-                  <p className="flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/5 p-3 text-xs text-rose-200">
+                  <p className="flex items-start gap-2 rounded-lg bg-alert-bg p-3 text-xs text-alert-ink">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>
-                      This removes {feature.name} from{" "}
+                      This removes {feature.name} from{""}
                       <span className="font-semibold tabular-nums">
                         {feature.entitledTenants}
-                      </span>{" "}
+                      </span>{""}
                       organisation{feature.entitledTenants === 1 ? "" : "s"} the
                       moment it saves. No plan, override or role can reach past
                       it, and nobody in those organisations can restore it
@@ -252,7 +252,7 @@ export default function GlobalFeatureSwitches({
 
                 <label
                   htmlFor={`reason-${feature.key}`}
-                  className="mt-4 block text-xs font-medium text-slate-300"
+                  className="mt-4 block text-xs font-medium text-muted"
                 >
                   Reason (required, at least {MIN_REASON_LENGTH} characters)
                 </label>
@@ -266,16 +266,16 @@ export default function GlobalFeatureSwitches({
                       ? "e.g. BSP outage — suspending outbound messaging until resolved"
                       : "e.g. BSP outage resolved, messaging restored"
                   }
-                  className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none"
+                  className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink placeholder:text-faint shadow-neu-inset"
                 />
 
                 {switchingOff && (
                   <>
                     <label
                       htmlFor={`confirm-${feature.key}`}
-                      className="mt-4 block text-xs font-medium text-slate-300"
+                      className="mt-4 block text-xs font-medium text-muted"
                     >
-                      Type <code className="text-slate-100">{feature.key}</code>{" "}
+                      Type <code className="text-ink">{feature.key}</code>{""}
                       to confirm
                     </label>
                     <input
@@ -284,7 +284,7 @@ export default function GlobalFeatureSwitches({
                       autoComplete="off"
                       value={confirmation}
                       onChange={(event) => setConfirmation(event.target.value)}
-                      className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-100 focus:border-slate-500 focus:outline-none"
+                      className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 font-mono text-sm text-ink shadow-neu-inset"
                     />
                   </>
                 )}
@@ -294,7 +294,7 @@ export default function GlobalFeatureSwitches({
                     type="button"
                     disabled={pending || !confirmed || !reasonLongEnough}
                     onClick={() => submit(feature)}
-                    className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                    className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-canvas-deep disabled:text-muted"
                   >
                     {pending
                       ? "Saving…"
@@ -306,7 +306,7 @@ export default function GlobalFeatureSwitches({
                     type="button"
                     onClick={close}
                     disabled={pending}
-                    className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-500 disabled:opacity-50"
+                    className="rounded-lg border border-line px-4 py-2 text-xs font-medium text-muted transition hover:border-line disabled:opacity-50"
                   >
                     Cancel
                   </button>

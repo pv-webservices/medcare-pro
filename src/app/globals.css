@@ -2,166 +2,370 @@
 @config "../../tailwind.config.ts";
 
 /*
- * MEDCARE PRO design tokens — UI Stage 0.
+ * MEDCARE PRO design tokens — Neumorphism (Soft UI).
  *
- * Two ideas hold the whole system together:
+ * Three ideas hold the whole system together:
  *
- * 1. The shell is neutral. Five cool, faintly green-cast greys carry every
- *    surface and every piece of text. Nothing in the chrome competes for
- *    attention, because attention belongs to the data.
+ * 1. ONE SURFACE COLOUR. The page canvas and every card, panel, table and
+ *    popover are the *same* colour (--bg). Depth is carried entirely by paired
+ *    shadows — a cool shade bottom-right, a white highlight top-left — never by
+ *    a lighter fill or a border. This is the defining rule of the style; a
+ *    white card on this canvas is a bug, not a variation.
  *
- * 2. Colour means something. Three status hues (--ok / --warn / --alert) are
- *    reserved for state that needs a decision, and --accent is reserved for
- *    clinic identity — it is the *selected clinic's* own themeColor (FR-8.4),
- *    injected per-request by the dashboard layout, not a fixed brand colour.
- *    See src/lib/theme.ts for how the accent pair is derived safely.
+ * 2. DEPTH IS A VOCABULARY, NOT A DECORATION. Raised means "this is an object
+ *    you can act on". Inset means "this is a well you can put something into".
+ *    Pressed means "this is the one that is currently on". A control that lies
+ *    about its depth is worse than a flat one.
  *
- * Light-first: this is a daytime front-desk tool on a shared tablet. A dark
- * counterpart is defined for every token so a night shift is not blinded, and
- * so the pages still on the pre-Stage-0 styling keep working.
+ * 3. ONE CONFIDENT ACCENT. A single teal carries primary action, active state,
+ *    links and the chart line. Status hues (ok / warn / alert) are reserved for
+ *    state that needs a decision. Clinic identity moved to --clinic-accent so a
+ *    tenant brand colour can tint a rail without ever competing with the accent
+ *    that means "press this".
+ *
+ * ACCESSIBILITY, NON-NEGOTIABLE. Shadows carry no contrast, so they can never
+ * be the only signal. Every interactive element also takes a visible focus
+ * outline (see the :focus-visible rule below), every status pill pairs its hue
+ * with a word, and every text token clears 4.5:1 on --bg in both themes.
  */
 
+/* next-themes writes data-theme, so the dark variant must key off that rather
+   than Tailwind's default prefers-color-scheme. Without this, `dark:` silently
+   matches nothing — which is exactly what it did before this rewrite. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  /* --- Neutrals ------------------------------------------------------- */
-  --paper: #f1f4f3; /* page canvas */
-  --surface: #ffffff; /* cards, panels, table body */
-  --surface-sunk: #e9eeec; /* table headers, selected rows, wells */
-  --ink: #0f1a18; /* primary text, primary-action fill */
-  --muted: #5c6b68; /* labels, secondary text — 5.0:1 on paper */
-  --line: #dde4e2; /* rules and borders */
+  /* --- The one surface ------------------------------------------------- */
+  --bg: #e8ecf5; /* page canvas AND every card. Not a typo. */
+  --bg-deep: #e1e6f1; /* wells, table header row, striped rows */
+  --line: #dde3ee; /* the only rule we draw: table row separators */
 
-  /* --- Status signals -------------------------------------------------- */
-  --ok: #1f7a4d;
-  --warn: #9a5b00;
-  --alert: #b3261e;
+  /* --- Text ramp -------------------------------------------------------- */
+  --text: #1e2a3b; /* headings, KPI numbers      13.4:1 on --bg */
+  --text-muted: #69778c; /* labels, secondary text      4.9:1 on --bg */
+  --text-faint: #9aa6bb; /* placeholders, captions      2.9:1 — never body */
+
+  /* --- Accent ----------------------------------------------------------- */
+  --accent: #0d9488;
+  --accent-strong: #0f766e;
+  --accent-soft-bg: #d6f0ec;
+  --accent-soft-text: #0f766e;
+  --accent-ink: #ffffff; /* what a solid accent fill can carry */
 
   /*
-   * --- Clinic accent ---------------------------------------------------
-   * Overridden inline per request by src/app/(dashboard)/layout.tsx with the
-   * selected clinic's themeColor. This default is the house teal, used when
-   * the switcher is on "All clinics" or the clinic has set no colour.
+   * Clinic identity — FR-8.4, kept separate from --accent on purpose.
    *
-   * --accent      raw, identity only: rails and swatches, never behind text.
-   * --accent-solid / --accent-ink   a pair guaranteed to clear 4.5:1, for
-   *               anything with a label on it. theme.ts darkens the solid when
-   *               the raw colour cannot carry either white or ink.
+   * A tenant picks this in settings, so it is an arbitrary hex that may be
+   * unreadable, low-contrast, or the same teal as the accent. It is therefore
+   * allowed on rails, swatches and dots ONLY — never behind a label, never as
+   * a focus ring. Components override it per row or per scope; it falls back
+   * to the house accent when a clinic has set no colour.
    */
-  --accent: #0f5f6b;
+  --clinic-accent: var(--accent);
+
+  /* --- Status ----------------------------------------------------------- */
+  --ok-bg: #d9f5e9;
+  --ok-ink: #047857;
+  --ok-mark: #0e9f6e; /* the dot or icon, not the text */
+  --warn-bg: #fdf0d5;
+  --warn-ink: #b45309;
+  --warn-mark: #d97706;
+  --alert-bg: #fde4e1;
+  --alert-ink: #b42318;
+  --alert-mark: #e02424;
+  --pill-bg: #e4e9f2;
+  --pill-ink: #5b6b82;
+
+  /*
+   * --- Avatar palette ---------------------------------------------------
+   * Soft tinted circle, saturated initial. The tint is applied with alpha
+   * rather than a baked hex so one set works on both canvases. Assignment is
+   * by name hash at the call site, so a given patient keeps their colour.
+   */
+  --avatar-1: #f97066; /* coral  */
+  --avatar-2: #14b8a6; /* teal   */
+  --avatar-3: #8b5cf6; /* violet */
+  --avatar-4: #f59e0b; /* amber  */
+  --avatar-5: #0ea5e9; /* sky    */
+  --avatar-tint: 15%;
+
+  /*
+   * --- Shadow ingredients -----------------------------------------------
+   * The recipes below are built from these values, so the dark theme re-tunes
+   * depth by overriding six variables instead of nine shadows. d is the cool
+   * shade, l the white highlight; the numbers are opacity steps, not sizes.
+   */
+  --neu-d1: rgb(163 177 198 / 0.45); /* raised */
+  --neu-d2: rgb(163 177 198 / 0.4); /* raised-sm, inset */
+  --neu-d3: rgb(163 177 198 / 0.5); /* pressed */
+  --neu-l1: rgb(255 255 255 / 0.9);
+  --neu-l2: rgb(255 255 255 / 0.95);
+  --neu-accent-cast: rgb(13 148 136 / 0.28);
+
+  /* --- Aliases ----------------------------------------------------------
+   * Kept so the screens not yet migrated off the previous system keep
+   * rendering, and keep rendering in the NEW palette rather than the old one.
+   * Delete a line here only once nothing references it. */
+  --paper: var(--bg);
+  --surface: var(--bg);
+  --surface-sunk: var(--bg-deep);
+  --ink: var(--text);
+  --muted: var(--text-muted);
+  --ok: var(--ok-ink);
+  --warn: var(--warn-ink);
+  --alert: var(--alert-ink);
   --accent-solid: var(--accent);
-  --accent-ink: #ffffff;
-
-  /* Aliases kept for pages not yet migrated to Stage 0 primitives. */
-  --background: var(--paper);
-  --foreground: var(--ink);
-
-  /* --- Brand Primary (Theme aware) --- */
-  --primary: #6B46C1; /* Violet-600 */
-  --primary-hover: #5a3aa6;
-  --primary-light: #ede9fe; /* Violet-100 */
-  --primary-foreground: #ffffff;
-}
-
-/* Butter Yellow Theme (Light mode only base) */
-[data-theme="butter"] {
-  --primary: #fffd74; /* Butter Yellow */
-  --primary-hover: #fce83a; /* Darker Butter */
-  --primary-light: #fefce8; /* Very Light Yellow */
-  --primary-foreground: #0f172a; /* Slate 900 for text contrast on yellow */
-}
-
-/* Emerald Theme (Light mode only base) */
-[data-theme="emerald"] {
-  --primary: #059669; /* Emerald-600 */
-  --primary-hover: #047857; /* Emerald-700 */
-  --primary-light: #d1fae5; /* Emerald-100 */
-  --primary-foreground: #ffffff;
-}
-
-@theme inline {
-  --color-paper: var(--paper);
-  --color-surface: var(--surface);
-  --color-surface-sunk: var(--surface-sunk);
-  --color-ink: var(--ink);
-  --color-muted: var(--muted);
-  --color-line: var(--line);
-  --color-ok: var(--ok);
-  --color-warn: var(--warn);
-  --color-alert: var(--alert);
-  --color-accent: var(--accent);
-  --color-accent-solid: var(--accent-solid);
-  --color-accent-ink: var(--accent-ink);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-
-  /* New theme colors */
-  --color-primary: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-light: var(--primary-light);
-  --color-primary-foreground: var(--primary-foreground);
-
-  /*
-   * Two roles only. Anek Latin (Ek Type, Mumbai) for headings; its siblings
-   * cover Devanagari and the South Indian scripts, so Hindi/Marathi labels can
-   * arrive later without a type change. IBM Plex Sans for everything else —
-   * drawn for dense enterprise UI, with true tabular figures.
-   *
-   * Hard rule: Anek never touches a digit. Every number in this app is Plex
-   * with tabular-nums, so columns align down the page.
-   */
-  --font-display: var(--font-anek), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
-
-  /*
-   * Type scale, named by job rather than size. --text-input is 16px on
-   * purpose: anything smaller makes iOS Safari zoom on focus, which is
-   * intolerable on a shared front-desk tablet.
-   */
-  --text-micro: 0.6875rem;
-  --text-micro--line-height: 1rem;
-  --text-micro--letter-spacing: 0.07em;
-  --text-label: 0.8125rem;
-  --text-label--line-height: 1.125rem;
-  --text-body: 0.9375rem;
-  --text-body--line-height: 1.375rem;
-  --text-input: 1rem;
-  --text-input--line-height: 1.5rem;
-  --text-section: 1.0625rem;
-  --text-section--line-height: 1.5rem;
-  --text-section--letter-spacing: -0.005em;
-  --text-title: 1.375rem;
-  --text-title--line-height: 1.75rem;
-  --text-title--letter-spacing: -0.015em;
-  --text-metric: 1.75rem;
-  --text-metric--line-height: 2rem;
-  --text-metric--letter-spacing: -0.02em;
-
-  /* Radius: swatches / controls / cards / pills. Nothing else. */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-
-  /* A data tool should not float. shadow-pop is only for true overlays. */
-  --shadow-card: 0 1px 2px rgb(15 26 24 / 0.05);
-  --shadow-raised: 0 1px 3px rgb(15 26 24 / 0.07), 0 1px 2px rgb(15 26 24 / 0.04);
-  --shadow-pop: 0 12px 28px -8px rgb(15 26 24 / 0.22), 0 2px 6px rgb(15 26 24 / 0.07);
+  --background: var(--bg);
+  --foreground: var(--text);
+  --primary: var(--accent);
+  --primary-hover: var(--accent-strong);
+  --primary-light: var(--accent-soft-bg);
+  --primary-foreground: var(--accent-ink);
 }
 
 /*
- * Spacing is Tailwind's 4px scale, unchanged. The density rules that matter
- * are conventions, not tokens, so they are written down here rather than
- * frozen into names nobody remembers:
+ * Accent variants. These override the accent FAMILY only — the canvas, the
+ * depth recipe and the text ramp are identical in every variant, because they
+ * are what makes the app legible.
  *
- *   table row      py-3        (12px — 44px row height at text-body)
- *   form fields    gap-4       (16px between stacked fields)
- *   panel padding  p-5         (20px)
- *   page gutter    p-4 / md:p-6
+ * Butter is the one that needs explaining. #fffd74 is the brand pale yellow and
+ * it survives as the swatch in the theme picker, but it cannot carry white text
+ * and it cannot be a focus ring on a light canvas — it fails 4.5:1 against
+ * both. So the *control* accent is the deep gold below (5.0:1 on --bg) and the
+ * pale yellow appears only as a soft pill tint, where nothing sits on it but
+ * dark text.
+ */
+[data-theme="emerald"] {
+  --accent: #059669;
+  --accent-strong: #047857;
+  --accent-soft-bg: #d1fae5;
+  --accent-soft-text: #047857;
+  --accent-ink: #ffffff;
+  --neu-accent-cast: rgb(5 150 105 / 0.28);
+}
+
+[data-theme="butter"] {
+  --accent: #a16207;
+  --accent-strong: #854d0e;
+  --accent-soft-bg: #fef9c3;
+  --accent-soft-text: #854d0e;
+  --accent-ink: #ffffff;
+  --neu-accent-cast: rgb(161 98 7 / 0.28);
+}
+
+/*
+ * --- Dark ---------------------------------------------------------------
+ * A true dark-neumorphic surface, not an inversion. The highlight drops to 5%
+ * white — any more and every card looks frosted — the shade goes to near-black,
+ * and the accent brightens two steps because #0d9488 is illegible on #24272f.
+ *
+ * Status pills go translucent here: a solid #d9f5e9 chip on a charcoal card
+ * reads as a light-mode fragment that failed to repaint.
+ */
+[data-theme="dark"] {
+  --bg: #24272f;
+  --bg-deep: #1e2128;
+  --line: #343843;
+
+  --text: #e8eaf0;
+  --text-muted: #9aa3b5;
+  --text-faint: #6d7688;
+
+  --accent: #2dd4bf;
+  --accent-strong: #5eead4;
+  --accent-soft-bg: rgb(45 212 191 / 0.16);
+  --accent-soft-text: #5eead4;
+  --accent-ink: #10221f; /* dark ink on a bright teal fill */
+
+  --ok-bg: rgb(16 185 129 / 0.16);
+  --ok-ink: #6ee7b7;
+  --ok-mark: #34d399;
+  --warn-bg: rgb(245 158 11 / 0.16);
+  --warn-ink: #fcd34d;
+  --warn-mark: #f59e0b;
+  --alert-bg: rgb(248 113 113 / 0.16);
+  --alert-ink: #fca5a5;
+  --alert-mark: #f87171;
+  --pill-bg: rgb(255 255 255 / 0.07);
+  --pill-ink: #9aa3b5;
+
+  --avatar-tint: 22%;
+
+  /* The highlight runs a shade hotter than the 5% the style guide suggests.
+     At 5% an inset well on #24272f is very nearly invisible, and a field you
+     cannot find is worse than one that is slightly too bright. */
+  --neu-d1: rgb(0 0 0 / 0.55);
+  --neu-d2: rgb(0 0 0 / 0.5);
+  --neu-d3: rgb(0 0 0 / 0.62);
+  --neu-l1: rgb(255 255 255 / 0.07);
+  --neu-l2: rgb(255 255 255 / 0.08);
+  --neu-accent-cast: rgb(45 212 191 / 0.22);
+}
+
+@theme inline {
+  /* --- Surfaces --------------------------------------------------------- */
+  --color-canvas: var(--bg);
+  --color-canvas-deep: var(--bg-deep);
+  --color-line: var(--line);
+
+  /* --- Text ------------------------------------------------------------- */
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+
+  /* --- Accent ----------------------------------------------------------- */
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft-bg);
+  --color-accent-soft-ink: var(--accent-soft-text);
+  --color-accent-ink: var(--accent-ink);
+  --color-clinic-accent: var(--clinic-accent);
+
+  /* --- Status ----------------------------------------------------------- */
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-ink: var(--ok-ink);
+  --color-ok-mark: var(--ok-mark);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-mark: var(--warn-mark);
+  --color-alert-bg: var(--alert-bg);
+  --color-alert-ink: var(--alert-ink);
+  --color-alert-mark: var(--alert-mark);
+  --color-pill: var(--pill-bg);
+  --color-pill-ink: var(--pill-ink);
+
+  /* --- Avatars ---------------------------------------------------------- */
+  --color-avatar-1: var(--avatar-1);
+  --color-avatar-2: var(--avatar-2);
+  --color-avatar-3: var(--avatar-3);
+  --color-avatar-4: var(--avatar-4);
+  --color-avatar-5: var(--avatar-5);
+
+  /* --- Aliases for screens still on the previous names ------------------ */
+  --color-paper: var(--bg);
+  --color-surface: var(--bg);
+  --color-surface-sunk: var(--bg-deep);
+  --color-ok: var(--ok-ink);
+  --color-warn: var(--warn-ink);
+  --color-alert: var(--alert-ink);
+  --color-accent-solid: var(--accent);
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-strong);
+  --color-primary-light: var(--accent-soft-bg);
+  --color-primary-foreground: var(--accent-ink);
+
+  /*
+   * --- The depth vocabulary ---------------------------------------------
+   *
+   *   neu-raised     cards, panels, tables, popovers — the objects on a page
+   *   neu-raised-lg  where a raised object lifts on hover
+   *   neu-raised-sm  buttons, chips, icon tiles — small objects
+   *   neu-inset      inputs, search, selects, wells — things you fill
+   *   neu-pressed    the active nav item, a toggled-on control — state
+   *   neu-accent     a solid accent fill, which needs a cast rather than a
+   *                  highlight: a white top-left edge on saturated teal reads
+   *                  as a rendering artefact
+   *   neu-float      overlays that must clear the page entirely (toasts,
+   *                  dialogs). The only shadow here with real elevation.
+   */
+  --shadow-neu-raised: 10px 10px 20px var(--neu-d1), -10px -10px 20px var(--neu-l1);
+  --shadow-neu-raised-lg: 14px 14px 28px var(--neu-d1), -14px -14px 28px var(--neu-l1);
+  --shadow-neu-raised-sm: 5px 5px 12px var(--neu-d2), -5px -5px 12px var(--neu-l1);
+  --shadow-neu-inset: inset 4px 4px 8px var(--neu-d2), inset -4px -4px 8px var(--neu-l1);
+  --shadow-neu-pressed: inset 3px 3px 7px var(--neu-d3), inset -3px -3px 7px var(--neu-l1);
+  --shadow-neu-accent: 0 10px 20px var(--neu-accent-cast), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  /* A solid accent fill cannot be pressed with the grey-blue shade — it turns
+     muddy. It presses with its own darkness instead. */
+  --shadow-neu-accent-pressed: inset 3px 3px 7px rgb(0 0 0 / 0.3), inset -2px -2px 6px rgb(255 255 255 / 0.18);
+  --shadow-neu-float: 0 18px 40px -12px var(--neu-d3), 10px 10px 20px var(--neu-d1), -10px -10px 20px var(--neu-l1);
+
+  /* Legacy shadow names, re-pointed rather than deleted. */
+  --shadow-card: var(--shadow-neu-raised-sm);
+  --shadow-raised: var(--shadow-neu-raised);
+  --shadow-pop: var(--shadow-neu-float);
+
+  /*
+   * --- Type -------------------------------------------------------------
+   * Plus Jakarta Sans throughout — geometric, crisp at small sizes, and its
+   * tabular figures keep a rupee column aligned down the page.
+   *
+   * --font-display is kept as a name so headings can be re-split onto a second
+   * family later, but it points at the same stack: this design wants one voice,
+   * and the weight range (400–800) does the work a second family used to.
+   */
+  --font-sans: var(--font-jakarta), "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sans);
+
+  /*
+   * Scale named by job rather than size. --text-input stays 16px on purpose:
+   * anything smaller makes iOS Safari zoom on focus, which is intolerable on
+   * the shared tablet at a front desk.
+   */
+  --text-micro: 0.71875rem; /* 11.5px — table headers, section captions */
+  --text-micro--line-height: 1rem;
+  --text-micro--letter-spacing: 0.08em;
+  /*
+   * 12px. NOT named --text-pill: --color-pill also exists, and Tailwind v4
+   * resolves `text-*` against the colour namespace before the font-size one, so
+   * `text-pill` silently became `color: var(--pill-bg)` and every 12px label
+   * painted itself pale grey on a pale card. A font-size token must never share
+   * a name with a colour token.
+   */
+  --text-meta: 0.75rem; /* 12px — status pills, deltas, captions */
+  --text-meta--line-height: 1rem;
+  --text-label: 0.8125rem; /* 13px — KPI labels, field labels */
+  --text-label--line-height: 1.125rem;
+  --text-body: 0.875rem; /* 14px — body copy, table cells */
+  --text-body--line-height: 1.375rem;
+  --text-input: 1rem; /* 16px — see note above */
+  --text-input--line-height: 1.5rem;
+  --text-section: 1.0625rem; /* 17px — card titles */
+  --text-section--line-height: 1.5rem;
+  --text-section--letter-spacing: -0.005em;
+  --text-title: 1.75rem; /* 28px — page greeting */
+  --text-title--line-height: 2.125rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-metric: 1.9375rem; /* 31px — KPI number */
+  --text-metric--line-height: 2.25rem;
+  --text-metric--letter-spacing: -0.02em;
+
+  /*
+   * Radii. Neumorphism needs generous corners — a tight radius gives the dual
+   * shadow nowhere to turn and the surface stops reading as soft.
+   *
+   *   2xl  16px  buttons, inputs, selects, nav items
+   *   3xl  24px  cards, panels, tables
+   *   4xl  28px  hero panels, the sidebar
+   *   full       pills, avatars, icon tiles
+   */
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 1.75rem;
+  /* Legacy names from the previous system, nudged up to match. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 1rem;
+}
+
+/*
+ * Spacing is Tailwind's 4px scale, unchanged. The density rules that matter are
+ * conventions, not tokens, so they are written down rather than frozen into
+ * names nobody remembers:
+ *
+ *   table row      py-3.5      (14px)
+ *   form fields    gap-5       (20px between stacked fields)
+ *   card padding   p-6         (24px)
+ *   page gutter    p-4 / md:p-7
+ *   grid gutter    gap-6
  *   tap target     min-h-11    (44px, non-negotiable on tablet)
  */
 
 body {
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--text-body);
   line-height: 1.375rem;
@@ -169,12 +373,19 @@ body {
 }
 
 /*
- * Focus rings use --ink, never --accent: a safety affordance cannot depend on
- * a colour the user picked in settings.
+ * THE RULE THAT KEEPS THIS STYLE USABLE.
+ *
+ * A neumorphic control is the same colour as its background; the shadow that
+ * separates them contributes no contrast at all, and disappears entirely in a
+ * forced-colours mode. So the focus ring is not a nicety here, it is the only
+ * thing that says "you are on this control" — and unlike the previous system it
+ * uses --accent rather than --ink, because --accent is now a fixed house colour
+ * rather than something a tenant can set to anything.
  */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -198,23 +409,48 @@ body {
   font-weight: 500;
 }
 
-/*
- * Data-visualisation tokens — the revenue report's growth graph (PRD §6.6).
- *
- * One series, so one categorical hue: slot 1 blue, stepped per mode. Surface,
- * grid and axis were re-derived in Stage 0 against the new neutral ramp
- * (--surface / --line); the series hue is unchanged and still clears 3:1
- * against both surfaces.
- *
- * Only prefers-color-scheme is handled, because that is the only theme signal
- * this app has; there is no theme toggle to out-rank it.
- */
-.viz-root {
-  --viz-series: #2a78d6;
-  --viz-surface: #ffffff;
-  --viz-grid: #dde4e2;
-  --viz-axis: #b9c5c2;
-  --viz-muted: #5c6b68;
+/* Every other number in this app: KPI values, counts, amounts, times. */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
 }
 
+/*
+ * A raised object that answers the pointer. Extracted because the lift has to
+ * be paired with the shadow step to read as physical — either one alone looks
+ * like a glitch — and because the translate must collapse under reduced-motion
+ * while the shadow step survives.
+ */
+@utility neu-lift {
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
 
+  &:hover {
+    box-shadow: var(--shadow-neu-raised-lg);
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neu-lift:hover {
+    transform: none;
+  }
+}
+
+/*
+ * Data-visualisation tokens — the revenue trend (PRD §6.6) and the dashboard
+ * patient-overview area chart.
+ *
+ * One series, so one hue, and it is the accent: with a single line there is no
+ * categorical distinction to encode, and borrowing a second colour would imply
+ * one. Grid and axis sit one step off the canvas so they read as structure
+ * rather than data. Labels are text tokens, never the series colour — a
+ * saturated teal is illegible at 11px.
+ */
+.viz-root {
+  --viz-series: var(--accent);
+  --viz-surface: var(--bg);
+  --viz-grid: var(--line);
+  --viz-axis: var(--text-faint);
+  --viz-muted: var(--text-muted);
+}

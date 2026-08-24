@@ -32,9 +32,9 @@ interface AcceptInvitationFormProps {
 const MIN_PASSWORD_LENGTH = 12;
 
 const FIELD_CLASS =
-  "block w-full rounded-xl border border-slate-200 py-3.5 px-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600 disabled:bg-slate-50 disabled:text-slate-500";
+  "block w-full rounded-2xl shadow-neu-inset py-3.5 px-4 text-sm text-ink placeholder:text-faint disabled:bg-canvas-deep disabled:text-muted";
 
-const LABEL_CLASS = "block text-sm font-medium text-slate-700 mb-2";
+const LABEL_CLASS = "block text-sm font-medium text-ink mb-2";
 
 export default function AcceptInvitationForm({
   token,
@@ -116,11 +116,11 @@ export default function AcceptInvitationForm({
       <p
         role="status"
         aria-live="polite"
-        className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+        className="flex items-start gap-2 rounded-xl bg-ok-bg p-4 text-sm text-ok-ink"
       >
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <span>
-          Your account is ready. Taking you to the sign-in page — use{" "}
+          Your account is ready. Taking you to the sign-in page — use{""}
           <span className="font-semibold">{email}</span> and the password you just
           chose.
         </span>
@@ -140,7 +140,7 @@ export default function AcceptInvitationForm({
           id="invite-error"
           role="alert"
           aria-live="assertive"
-          className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>
@@ -163,7 +163,7 @@ export default function AcceptInvitationForm({
           autoComplete="username"
           className={FIELD_CLASS}
         />
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-muted">
           The invitation was sent to this address, so only it can accept.
         </p>
       </div>
@@ -204,7 +204,7 @@ export default function AcceptInvitationForm({
           aria-describedby="invite-password-hint"
           className={FIELD_CLASS}
         />
-        <p id="invite-password-hint" className="mt-2 text-sm text-slate-500">
+        <p id="invite-password-hint" className="mt-2 text-sm text-muted">
           At least {MIN_PASSWORD_LENGTH} characters.
         </p>
       </div>
@@ -229,7 +229,7 @@ export default function AcceptInvitationForm({
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 transition-colors"
+        className="mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors"
       >
         {isSubmitting ? "Setting up..." : "Accept Invitation"}
       </button>

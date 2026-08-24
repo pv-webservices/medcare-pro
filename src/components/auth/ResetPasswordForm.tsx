@@ -30,12 +30,12 @@ import {
  */
 
 const FIELD_CLASS =
-  "block w-full rounded-xl border border-slate-200 py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-slate-900 placeholder:text-slate-400 placeholder:tracking-[0.2em] focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600";
+  "block w-full rounded-2xl shadow-neu-inset py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-ink placeholder:text-faint placeholder:tracking-[0.2em]";
 
-const LABEL_CLASS = "block text-sm font-medium text-slate-700 mb-2";
+const LABEL_CLASS = "block text-sm font-medium text-ink mb-2";
 
 const PRIMARY_BUTTON_CLASS =
-  "mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 transition-colors";
+  "mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors";
 
 const GENERIC_WEAK_PASSWORD_MESSAGE =
   "That password does not meet the requirements. Choose a longer one.";
@@ -119,10 +119,10 @@ export default function ResetPasswordForm({
   return (
     <>
       <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-4xl font-bold tracking-tight text-ink">
           Choose a new password
         </h1>
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-muted">
           At least {minPasswordLength} characters. Setting it signs you out
           everywhere else.
         </p>
@@ -153,7 +153,7 @@ export default function ResetPasswordForm({
             id="reset-password-error"
             role="alert"
             aria-live="assertive"
-            className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+            className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
@@ -187,7 +187,7 @@ export default function ResetPasswordForm({
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? "Hide password" : "Show password"}
               aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-600 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-600 rounded"
+              className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent rounded"
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -220,7 +220,7 @@ export default function ResetPasswordForm({
                 showConfirmation ? "Hide confirmed password" : "Show confirmed password"
               }
               aria-pressed={showConfirmation}
-              className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-600 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-600 rounded"
+              className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent rounded"
             >
               {showConfirmation ? (
                 <EyeOff className="h-5 w-5" />
@@ -236,9 +236,9 @@ export default function ResetPasswordForm({
         </button>
       </form>
 
-      <p className="mt-8 text-center text-sm text-slate-500">
-        Remembered it?{" "}
-        <Link href="/login" className="font-semibold text-violet-600 hover:text-violet-700">
+      <p className="mt-8 text-center text-sm text-muted">
+        Remembered it?{""}
+        <Link href="/login" className="font-semibold text-accent hover:text-accent">
           Back to sign in
         </Link>
       </p>

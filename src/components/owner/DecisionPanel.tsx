@@ -145,7 +145,7 @@ export default function DecisionPanel({
 
   if (status === "REJECTED" || status === "ARCHIVED") {
     return (
-      <p className="mt-8 rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">
+      <p className="mt-8 rounded-3xl bg-canvas p-5 text-sm text-muted shadow-neu-raised-sm">
         This application is closed. Re-admitting a rejected applicant is a fresh
         registration, not a status change.
       </p>
@@ -153,13 +153,13 @@ export default function DecisionPanel({
   }
 
   return (
-    <section className="mt-8 rounded-xl border border-slate-800 bg-slate-900 p-5">
-      <h2 className="text-sm font-semibold text-slate-200">Decision</h2>
+    <section className="mt-8 rounded-3xl bg-canvas p-5 shadow-neu-raised-sm">
+      <h2 className="text-sm font-semibold text-ink">Decision</h2>
 
       {error && (
         <p
           role="alert"
-          className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200"
+          className="mt-3 rounded-lg bg-alert-bg p-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -167,7 +167,7 @@ export default function DecisionPanel({
       {notice && (
         <p
           role="status"
-          className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200"
+          className="mt-3 rounded-lg bg-warn-bg p-3 text-sm text-warn-ink"
         >
           {notice}
         </p>
@@ -176,7 +176,7 @@ export default function DecisionPanel({
       {status === "PENDING" && (
         <>
           {!emailVerified && (
-            <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+            <p className="mt-3 rounded-lg bg-warn-bg p-3 text-xs text-warn-ink">
               This applicant has not verified their email address yet. Approving
               is still possible — they will be asked to verify before they can
               sign in.
@@ -186,7 +186,7 @@ export default function DecisionPanel({
           <div className="mt-4">
             <label
               htmlFor="planKey"
-              className="block text-xs font-medium text-slate-300"
+              className="block text-xs font-medium text-muted"
             >
               Plan
             </label>
@@ -194,23 +194,23 @@ export default function DecisionPanel({
               id="planKey"
               value={planKey}
               onChange={(event) => setPlanKey(event.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-slate-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
             >
               {selectablePlans.length === 0 && <option value="">No plans</option>}
               {selectablePlans.map((plan) => (
                 <option key={plan.key} value={plan.key}>
                   {plan.name}
-                  {plan.isActive ? "" : " (retired)"}
+                  {plan.isActive ? "" : "(retired)"}
                 </option>
               ))}
             </select>
           </div>
 
           <fieldset className="mt-5">
-            <legend className="text-xs font-medium text-slate-300">
+            <legend className="text-xs font-medium text-muted">
               Feature entitlements
             </legend>
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p className="mt-1 text-[11px] text-faint">
               Ticked follows the selected plan unless you change it. A change is
               stored as an override and needs a reason.
             </p>
@@ -223,7 +223,7 @@ export default function DecisionPanel({
                 return (
                   <label
                     key={feature.key}
-                    className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2"
+                    className="flex items-start gap-3 rounded-2xl bg-canvas px-3 py-2 shadow-neu-raised-sm"
                   >
                     <input
                       type="checkbox"
@@ -235,18 +235,18 @@ export default function DecisionPanel({
                           [feature.key]: event.target.checked,
                         }))
                       }
-                      className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900"
+                      className="mt-0.5 h-4 w-4 rounded-2xl bg-canvas shadow-neu-inset"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm text-slate-200">
+                      <span className="block text-sm text-ink">
                         {feature.name}
                         {feature.tier !== "CORE" && (
-                          <span className="ml-2 rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">
+                          <span className="ml-2 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted">
                             {feature.tier}
                           </span>
                         )}
                       </span>
-                      <span className="mt-0.5 block text-[11px] text-slate-500">
+                      <span className="mt-0.5 block text-[11px] text-faint">
                         {!feature.globalEnabled
                           ? "Disabled platform-wide — no plan can grant it."
                           : deviates
@@ -264,7 +264,7 @@ export default function DecisionPanel({
             <div className="mt-4">
               <label
                 htmlFor="entitlementReason"
-                className="block text-xs font-medium text-slate-300"
+                className="block text-xs font-medium text-muted"
               >
                 Why these features differ from the plan
               </label>
@@ -273,13 +273,13 @@ export default function DecisionPanel({
                 rows={2}
                 value={entitlementReason}
                 onChange={(event) => setEntitlementReason(event.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-slate-500 focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
               />
             </div>
           )}
 
           <div className="mt-5">
-            <label htmlFor="reason" className="block text-xs font-medium text-slate-300">
+            <label htmlFor="reason" className="block text-xs font-medium text-muted">
               Reason (required to reject)
             </label>
             <textarea
@@ -287,10 +287,10 @@ export default function DecisionPanel({
               rows={2}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-slate-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
             />
             {reasonTooShort && (
-              <p className="mt-1 text-[11px] text-amber-300">
+              <p className="mt-1 text-[11px] text-warn-ink">
                 At least {MIN_REASON_LENGTH} characters.
               </p>
             )}
@@ -306,7 +306,7 @@ export default function DecisionPanel({
                   entitlementReason.trim().length < MIN_REASON_LENGTH)
               }
               onClick={() => submit(CLINIC_DECISIONS.APPROVE)}
-              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:opacity-50"
             >
               {pending === CLINIC_DECISIONS.APPROVE ? "Approving…" : "Approve"}
             </button>
@@ -314,7 +314,7 @@ export default function DecisionPanel({
               type="button"
               disabled={pending !== null || reason.trim().length < MIN_REASON_LENGTH}
               onClick={() => submit(CLINIC_DECISIONS.REJECT)}
-              className="rounded-lg border border-rose-500/40 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/10 disabled:opacity-50"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-alert-ink transition hover:bg-alert-bg disabled:opacity-50"
             >
               {pending === CLINIC_DECISIONS.REJECT ? "Rejecting…" : "Reject"}
             </button>
@@ -324,13 +324,13 @@ export default function DecisionPanel({
 
       {status === "ACTIVE" && (
         <>
-          <p className="mt-3 text-xs text-slate-400">
+          <p className="mt-3 text-xs text-muted">
             Suspending removes access for everyone in this organisation on their
             next request, including sessions that are already open.
           </p>
           <label
             htmlFor="suspendReason"
-            className="mt-4 block text-xs font-medium text-slate-300"
+            className="mt-4 block text-xs font-medium text-muted"
           >
             Reason (required)
           </label>
@@ -339,7 +339,7 @@ export default function DecisionPanel({
             rows={2}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-slate-500 focus:outline-none"
+            className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
           />
           <button
             type="button"
@@ -354,14 +354,14 @@ export default function DecisionPanel({
 
       {status === "SUSPENDED" && (
         <>
-          <p className="mt-3 text-xs text-slate-400">
+          <p className="mt-3 text-xs text-muted">
             Reactivating restores access for everyone in this organisation.
           </p>
           <button
             type="button"
             disabled={pending !== null}
             onClick={() => submit(CLINIC_DECISIONS.REACTIVATE)}
-            className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+            className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:opacity-50"
           >
             {pending === CLINIC_DECISIONS.REACTIVATE
               ? "Reactivating…"

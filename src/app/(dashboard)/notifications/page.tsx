@@ -70,7 +70,7 @@ export default async function NotificationsPage({
     return (
       <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
         <PageHeader title="Notifications" />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot view notifications. Ask an admin or the account owner
           if you need access.
         </div>

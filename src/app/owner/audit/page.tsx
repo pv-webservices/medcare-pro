@@ -79,7 +79,7 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
     <div className="mx-auto max-w-7xl p-8">
       <Link
         href="/owner/dashboard"
-        className="mb-6 inline-flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200"
+        className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-ink"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Platform overview
@@ -88,8 +88,8 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Activity log</h1>
-          <p className="mt-1 text-xs text-slate-400">
-            <span className="tabular-nums text-slate-200">{result.total}</span>{" "}
+          <p className="mt-1 text-xs text-muted">
+            <span className="tabular-nums text-ink">{result.total}</span>{""}
             record{result.total === 1 ? "" : "s"} across every organisation.
             Append-only — nothing here can be edited or removed.
           </p>
@@ -97,7 +97,7 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
 
         <a
           href={`/api/owner/audit?${exportQuery.toString()}`}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-slate-500"
+          className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink transition hover:border-line"
         >
           <Download className="h-3.5 w-3.5" />
           Export CSV
@@ -106,20 +106,20 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
 
       <form method="get" className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
         <div className="relative lg:col-span-2">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
           <input
             type="search"
             name="search"
             defaultValue={result.filters.search}
             placeholder="Who — name or email"
-            className="w-full rounded-lg border border-slate-800 bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none"
+            className="w-full rounded-2xl bg-canvas py-2 pl-9 pr-3 text-sm text-ink placeholder:text-faint shadow-neu-inset"
           />
         </div>
 
         <select
           name="tenantId"
           defaultValue={result.filters.tenantId ?? ""}
-          className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-slate-600 focus:outline-none"
+          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
         >
           <option value="">Every organisation</option>
           {result.tenants.map((tenant) => (
@@ -132,7 +132,7 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
         <select
           name="category"
           defaultValue={result.filters.category ?? ""}
-          className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-slate-600 focus:outline-none"
+          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
         >
           <option value="">Every category</option>
           {result.categories.map((category) => (
@@ -147,32 +147,32 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
           name="from"
           defaultValue={result.filters.from ?? ""}
           aria-label="From date"
-          className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-slate-600 focus:outline-none"
+          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
         />
         <input
           type="date"
           name="to"
           defaultValue={result.filters.to ?? ""}
           aria-label="To date"
-          className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-slate-600 focus:outline-none"
+          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
         />
 
         <button
           type="submit"
-          className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:bg-white lg:col-span-1"
+          className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-ink transition hover:bg-accent-strong lg:col-span-1"
         >
           Apply filters
         </button>
       </form>
 
       {result.entries.length === 0 ? (
-        <p className="mt-8 rounded-xl border border-slate-800 bg-slate-900 p-6 text-center text-sm text-slate-400">
+        <p className="mt-8 rounded-3xl bg-canvas p-6 text-center text-sm text-muted shadow-neu-raised-sm">
           Nothing matches those filters.
         </p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
+        <div className="mt-6 overflow-x-auto rounded-xl border border-line">
           <table className="w-full min-w-[64rem] text-left text-xs">
-            <thead className="bg-slate-900 text-slate-400">
+            <thead className="bg-canvas text-muted">
               <tr>
                 <th className="px-3 py-2 font-medium">When (UTC)</th>
                 <th className="px-3 py-2 font-medium">Action</th>
@@ -184,52 +184,52 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
                 <th className="px-3 py-2 font-medium">IP</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 bg-slate-950">
+            <tbody className="divide-y divide-line bg-canvas">
               {result.entries.map((entry) => (
                 <tr key={entry.id} className="align-top">
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-400">
-                    {entry.createdAt.toISOString().slice(0, 19).replace("T", " ")}
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted">
+                    {entry.createdAt.toISOString().slice(0, 19).replace("T", "")}
                   </td>
                   <td className="px-3 py-2">
-                    <span className="text-slate-100">{entry.label}</span>
-                    <code className="mt-0.5 block text-[10px] text-slate-500">
+                    <span className="text-ink">{entry.label}</span>
+                    <code className="mt-0.5 block text-[10px] text-faint">
                       {entry.action}
                     </code>
                   </td>
-                  <td className="px-3 py-2 text-slate-300">
+                  <td className="px-3 py-2 text-muted">
                     {entry.tenantName ?? (
-                      <span className="text-slate-500">— platform —</span>
+                      <span className="text-faint">— platform —</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-slate-300">
+                  <td className="px-3 py-2 text-muted">
                     {entry.actorName ?? entry.actorEmail ?? (
-                      <span className="text-slate-500">System</span>
+                      <span className="text-faint">System</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-slate-400">
+                  <td className="px-3 py-2 text-muted">
                     {entry.targetType}
                     {entry.targetId && (
-                      <code className="mt-0.5 block text-[10px] text-slate-600">
+                      <code className="mt-0.5 block text-[10px] text-faint">
                         {entry.targetId}
                       </code>
                     )}
                   </td>
-                  <td className="max-w-[16rem] px-3 py-2 text-slate-400">
+                  <td className="max-w-[16rem] px-3 py-2 text-muted">
                     {entry.reason ?? ""}
                   </td>
                   <td className="max-w-[18rem] px-3 py-2">
                     {entry.beforeValue !== null && (
-                      <code className="block break-all text-[10px] text-rose-300/80">
+                      <code className="block break-all text-[10px] text-alert-ink/80">
                         {preview(entry.beforeValue)}
                       </code>
                     )}
                     {entry.afterValue !== null && (
-                      <code className="block break-all text-[10px] text-emerald-300/80">
+                      <code className="block break-all text-[10px] text-ok-ink/80">
                         {preview(entry.afterValue)}
                       </code>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-500">
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-faint">
                     {entry.ip ?? ""}
                   </td>
                 </tr>
@@ -240,16 +240,16 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
       )}
 
       {lastPage > 1 && (
-        <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+        <div className="mt-4 flex items-center justify-between text-xs text-muted">
           <span>
-            Page <span className="tabular-nums">{result.page}</span> of{" "}
+            Page <span className="tabular-nums">{result.page}</span> of{""}
             <span className="tabular-nums">{lastPage}</span>
           </span>
           <div className="flex gap-2">
             {result.page > 1 && (
               <Link
                 href={withPage(result.page - 1)}
-                className="rounded-lg border border-slate-800 px-3 py-1.5 hover:border-slate-600"
+                className="rounded-lg border border-line px-3 py-1.5 hover:border-line"
               >
                 Previous
               </Link>
@@ -257,7 +257,7 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
             {result.page < lastPage && (
               <Link
                 href={withPage(result.page + 1)}
-                className="rounded-lg border border-slate-800 px-3 py-1.5 hover:border-slate-600"
+                className="rounded-lg border border-line px-3 py-1.5 hover:border-line"
               >
                 Next
               </Link>

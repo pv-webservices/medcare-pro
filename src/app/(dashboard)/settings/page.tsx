@@ -47,7 +47,7 @@ export default async function SettingsPage() {
     return (
       <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
         <PageHeader title="Settings" />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role does not open any of the settings screens. Ask the account
           owner if you need access.
         </div>
@@ -75,20 +75,20 @@ export default async function SettingsPage() {
             <Link
               key={section.href}
               href={section.href}
-              className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-primary hover:shadow-pop"
+              className="group rounded-2xl bg-canvas p-5 shadow-neu-raised-sm transition hover:border-primary hover:shadow-pop"
             >
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-section font-display font-semibold text-slate-900">
+                <h2 className="text-section font-display font-semibold text-ink">
                   {section.title}
                 </h2>
                 <ArrowRight
                   aria-hidden="true"
                   strokeWidth={1.75}
-                  className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-primary"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-faint transition group-hover:text-primary"
                 />
               </div>
-              <p className="mt-2 text-label text-slate-500">{section.description}</p>
-              <p className="mt-3 text-micro font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mt-2 text-label text-muted">{section.description}</p>
+              <p className="mt-3 text-micro font-semibold uppercase tracking-wide text-faint">
                 {canManage ? "You can change this" : "View only"}
               </p>
             </Link>
@@ -97,15 +97,15 @@ export default async function SettingsPage() {
       </div>
 
       {hidden.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-          <h2 className="flex items-center gap-2 text-label font-semibold text-slate-600">
+        <div className="rounded-2xl bg-canvas-deep p-5">
+          <h2 className="flex items-center gap-2 text-label font-semibold text-muted">
             <Lock aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
             Not available to your role
           </h2>
           <ul className="mt-2 space-y-1">
             {hidden.map((section) => (
-              <li key={section.href} className="text-label text-slate-500">
-                <span className="font-medium text-slate-600">{section.title}</span>{" "}
+              <li key={section.href} className="text-label text-muted">
+                <span className="font-medium text-muted">{section.title}</span>{""}
                 — {section.description}
               </li>
             ))}

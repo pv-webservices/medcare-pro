@@ -41,7 +41,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
       <Link
         href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-slate-500 transition hover:text-primary"
+        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
       >
         <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
         Settings
@@ -82,7 +82,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
     return (
       <Shell>
         <PageHeader title="Activity log" />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot view the activity log. Ask the account owner if you
           need access.
         </div>
@@ -116,14 +116,14 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
           <Search
             aria-hidden="true"
             strokeWidth={1.75}
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
           />
           <input
             type="search"
             name="search"
             defaultValue={trail.search}
             placeholder="Search by who — name or email"
-            className="min-h-11 w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-3 text-input text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="min-h-11 w-full rounded-2xl bg-canvas py-2 pl-9 pr-3 text-input text-ink placeholder:text-faint shadow-neu-inset"
           />
         </div>
 
@@ -131,7 +131,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
           name="category"
           defaultValue={trail.category ?? ""}
           aria-label="Category"
-          className="min-h-11 rounded-md border border-slate-200 bg-white px-3 text-input text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="min-h-11 rounded-2xl bg-canvas px-3 text-input text-ink shadow-neu-inset"
         >
           <option value="">Decisions (default)</option>
           {trail.categories.map((category) => (
@@ -150,8 +150,8 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
       </form>
 
       {trail.entries.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
+        <div className="rounded-2xl bg-canvas px-6 py-10 text-center shadow-neu-raised-sm">
+          <p className="text-sm font-medium text-muted">
             {trail.search || trail.category
               ? "Nothing matches those filters."
               : "Nothing has been recorded yet. Team changes, role changes and account decisions will appear here."}
@@ -162,12 +162,12 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
           {trail.entries.map((entry) => (
             <li
               key={entry.id}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm"
+              className="rounded-xl bg-canvas px-5 py-4 shadow-neu-raised-sm"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-body font-semibold text-slate-900">
+                    <span className="text-body font-semibold text-ink">
                       {entry.label}
                     </span>
                     {entry.byPlatform ? (
@@ -194,9 +194,9 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
                       </StatusPill>
                     )}
                   </div>
-                  <p className="mt-1 text-label text-slate-500">{entry.detail}</p>
+                  <p className="mt-1 text-label text-muted">{entry.detail}</p>
                   {entry.reason && (
-                    <p className="mt-1.5 text-label text-slate-600">
+                    <p className="mt-1.5 text-label text-muted">
                       Reason: “{entry.reason}”
                     </p>
                   )}
@@ -204,9 +204,9 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
 
                 <time
                   dateTime={entry.createdAt.toISOString()}
-                  className="shrink-0 text-label tabular-nums text-slate-400"
+                  className="shrink-0 text-label tabular-nums text-faint"
                 >
-                  {entry.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                  {entry.createdAt.toISOString().slice(0, 16).replace("T", "")}
                 </time>
               </div>
             </li>
@@ -215,16 +215,16 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
       )}
 
       {lastPage > 1 && (
-        <div className="flex items-center justify-between text-label text-slate-500">
+        <div className="flex items-center justify-between text-label text-muted">
           <span>
-            Page <span className="tabular-nums">{trail.page}</span> of{" "}
+            Page <span className="tabular-nums">{trail.page}</span> of{""}
             <span className="tabular-nums">{lastPage}</span>
           </span>
           <div className="flex gap-2">
             {trail.page > 1 && (
               <Link
                 href={withPage(trail.page - 1)}
-                className="rounded-md border border-slate-200 px-4 py-2 font-medium transition hover:border-primary hover:text-primary"
+                className="rounded-md border border-line px-4 py-2 font-medium transition hover:border-primary hover:text-primary"
               >
                 Previous
               </Link>
@@ -232,7 +232,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
             {trail.page < lastPage && (
               <Link
                 href={withPage(trail.page + 1)}
-                className="rounded-md border border-slate-200 px-4 py-2 font-medium transition hover:border-primary hover:text-primary"
+                className="rounded-md border border-line px-4 py-2 font-medium transition hover:border-primary hover:text-primary"
               >
                 Next
               </Link>

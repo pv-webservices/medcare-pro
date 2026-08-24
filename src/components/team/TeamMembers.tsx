@@ -152,20 +152,20 @@ export default function TeamMembers({
           return (
             <TR key={member.id}>
               <TD>
-                <span className="block font-semibold text-slate-900">
+                <span className="block font-semibold text-ink">
                   {member.name?.trim() || "—"}
                   {member.isSelf && (
-                    <span className="ml-2 text-xs font-medium text-slate-400">
+                    <span className="ml-2 text-xs font-medium text-faint">
                       You
                     </span>
                   )}
                 </span>
-                <span className="block text-xs text-slate-500">{member.email}</span>
+                <span className="block text-xs text-muted">{member.email}</span>
               </TD>
 
               <TD>
                 {member.roles.length === 0 ? (
-                  <span className="text-slate-400">No role</span>
+                  <span className="text-faint">No role</span>
                 ) : (
                   <span className="flex flex-wrap gap-1.5">
                     {member.roles.map((role, index) => (
@@ -189,7 +189,7 @@ export default function TeamMembers({
                   </StatusPill>
                   {member.isBlockedByPlatform && (
                     <span
-                      className="inline-flex items-center gap-1 text-xs font-medium text-amber-700"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-warn-ink"
                       title="Access is on hold at the platform level. Contact support."
                     >
                       <ShieldAlert
@@ -263,7 +263,7 @@ export default function TeamMembers({
                   )}
 
                   {isLocked && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-faint">
                       Ask another admin
                     </span>
                   )}
@@ -275,8 +275,8 @@ export default function TeamMembers({
       </TBody>
     </Table>
 
-    <p className="px-1 text-xs text-slate-500">
-      Roles are changed on the{" "}
+    <p className="px-1 text-xs text-muted">
+      Roles are changed on the{""}
       <Link href="/settings/roles" className="font-medium text-primary underline">
         Roles screen
       </Link>

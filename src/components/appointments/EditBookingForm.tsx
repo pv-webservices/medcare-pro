@@ -153,7 +153,7 @@ export default function EditBookingForm({
         title: "Booking corrected.",
         detail:
           changed.length > 0
-            ? `Updated: ${changed.join(", ")}.`
+            ? `Updated: ${changed.join(",")}.`
             : "The booking is up to date.",
       });
       router.refresh();
@@ -285,7 +285,7 @@ export default function EditBookingForm({
             Discard Changes
           </Button>
         ) : (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             Nothing has been changed yet.
           </p>
         )}

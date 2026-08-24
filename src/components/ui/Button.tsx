@@ -4,30 +4,64 @@ import { cx } from "@/components/ui/cx";
 /**
  * The unified button for the application.
  *
- * `commit` is the variant that writes a record. Now uses the primary violet theme.
- * `buttonClasses` is exported so a `<Link>` that behaves like a button can wear
- * the same clothes without a second implementation.
+ * DEPTH CARRIES THE HIERARCHY, not colour weight. `commit` is a solid accent
+ * fill that casts a coloured shadow — it is the only thing on a screen that
+ * floats above the surface, so the eye finds the affirmative action without
+ * reading a word. `secondary` is the same colour as the page and merely raised,
+ * which is what "an object you may press" looks like here. `quiet` is flush
+ * with the surface until you point at it.
+ *
+ * Every variant presses IN on :active. That is the whole promise of the style:
+ * a control that looks physical has to behave physically, and a button that
+ * stays raised while held reads as broken.
+ *
+ * `commit` is the variant that writes a record. `buttonClasses` is exported so
+ * a `<Link>` that behaves like a button can wear the same clothes without a
+ * second implementation.
  */
 
 export type ButtonVariant = "commit" | "primary" | "secondary" | "quiet" | "danger";
 export type ButtonSize = "md" | "sm";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-medium " +
-  "transition-colors disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex items-center justify-center gap-2 rounded-2xl font-semibold" +
+  "transition-[box-shadow,background-color,color] duration-200" +
+  "disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none";
 
 /** 44px minimum — this is used on a shared tablet at a front desk. */
 const SIZES: Record<ButtonSize, string> = {
-  md: "min-h-11 px-5 text-sm",
-  sm: "min-h-9 px-3.5 text-xs",
+  md: "min-h-11 px-5 text-body",
+  sm: "min-h-9 px-4 text-meta",
 };
 
+/*
+ * `primary` is an alias of `commit` rather than a second look. The two were
+ * distinct in the old flat system (violet against near-black); with one accent
+ * there is nothing left to distinguish them, and inventing a difference would
+ * give two names to one meaning. Nothing in the app passes `primary` today.
+ */
+const AFFIRMATIVE =
+  "bg-accent text-accent-ink shadow-neu-accent hover:bg-accent-strong" +
+  "active:shadow-neu-accent-pressed";
+
 const VARIANTS: Record<ButtonVariant, string> = {
-  commit: "bg-primary text-primary-foreground hover:bg-primary-hover shadow-sm",
-  primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-sm",
-  secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm",
-  quiet: "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-  danger: "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100",
+  commit: AFFIRMATIVE,
+  primary: AFFIRMATIVE,
+  secondary:
+    "bg-canvas text-ink shadow-neu-raised-sm hover:shadow-neu-raised" +
+    "active:shadow-neu-pressed",
+  quiet:
+    "bg-transparent text-muted hover:text-ink hover:shadow-neu-raised-sm" +
+    "active:shadow-neu-pressed",
+  /*
+   * Destructive stays a raised surface rather than a red fill. A solid red
+   * button is the loudest object on the page, and on screens where Delete sits
+   * beside Save that is the wrong thing to draw the eye. The red lives in the
+   * label, where it is read at the moment of deciding.
+   */
+  danger:
+    "bg-canvas text-alert-ink shadow-neu-raised-sm hover:shadow-neu-raised" +
+    "hover:text-alert-mark active:shadow-neu-pressed",
 };
 
 export function buttonClasses(

@@ -26,13 +26,13 @@ const COPY: Record<
     icon: Clock,
     title: "Your registration is under review",
     body: "Thanks — we have your details. A member of the MEDCARE PRO team reviews every clinic before it goes live. You will get an email as soon as a decision is made, and you can sign in from that point.",
-    tone: "bg-amber-50 text-amber-600",
+    tone: "bg-warn-bg text-warn-ink",
   },
   rejected: {
     icon: ShieldX,
     title: "Your registration was not approved",
     body: "We were not able to approve this clinic. The reason was sent to the email address you registered with. If you think this was a mistake, reply to that email.",
-    tone: "bg-rose-50 text-rose-600",
+    tone: "bg-alert-bg text-alert-ink",
   },
   suspended: {
     icon: PauseCircle,
@@ -59,17 +59,17 @@ export default async function PendingApprovalPage({ searchParams }: PageProps) {
   const Icon = copy.icon;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 sm:p-8">
-      <div className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-xl sm:p-10">
+    <div className="flex min-h-screen items-center justify-center bg-canvas-deep p-4 sm:p-8">
+      <div className="w-full max-w-md rounded-[2rem] bg-canvas p-8 shadow-neu-float sm:p-10">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
             <Plus className="h-6 w-6 stroke-[3]" />
           </div>
           <div>
-            <div className="text-xl font-bold leading-none tracking-tight text-slate-900">
+            <div className="text-xl font-bold leading-none tracking-tight text-ink">
               Medicare Pro
             </div>
-            <div className="mt-0.5 text-xs font-medium text-slate-500">
+            <div className="mt-0.5 text-xs font-medium text-muted">
               Smart Clinic Management
             </div>
           </div>
@@ -81,22 +81,22 @@ export default async function PendingApprovalPage({ searchParams }: PageProps) {
           <Icon className="h-6 w-6" aria-hidden="true" />
         </div>
 
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">
           {copy.title}
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-slate-600">{copy.body}</p>
+        <p className="mt-3 text-sm leading-relaxed text-muted">{copy.body}</p>
 
         <div className="mt-8 flex flex-wrap gap-4 text-sm">
           <Link
             href="/login"
-            className="font-semibold text-violet-600 hover:text-violet-700"
+            className="font-semibold text-accent hover:text-accent"
           >
             Back to sign in
           </Link>
           {status === "rejected" && (
             <Link
               href="/signup"
-              className="font-semibold text-slate-500 hover:text-slate-700"
+              className="font-semibold text-muted hover:text-ink"
             >
               Register a different clinic
             </Link>

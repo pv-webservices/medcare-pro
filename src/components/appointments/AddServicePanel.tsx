@@ -31,7 +31,7 @@ export default function AddServicePanel({
   // this only bites someone who is scoped to clinics and has none.
   if (clinics.length === 0 && !canScopeTenantWide) {
     return (
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+      <p className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
         Add a clinic before adding services — every service is offered at one,
         or at all of them.
       </p>

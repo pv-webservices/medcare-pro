@@ -30,9 +30,9 @@ function OnLeaveBadge() {
 export default function DoctorsTable({ doctors, showClinic }: DoctorsTableProps) {
   if (doctors.length === 0) {
     return (
-      <div className="rounded-3xl border border-slate-100 bg-white px-6 py-12 text-center shadow-sm">
-        <p className="mb-1 text-lg font-bold text-slate-900">No doctors yet</p>
-        <p className="text-sm text-slate-500">
+      <div className="rounded-3xl bg-canvas px-6 py-12 text-center shadow-neu-raised-sm">
+        <p className="mb-1 text-lg font-bold text-ink">No doctors yet</p>
+        <p className="text-sm text-muted">
           Add a doctor to start setting their availability and registering
           patients to them.
         </p>
@@ -60,7 +60,7 @@ export default function DoctorsTable({ doctors, showClinic }: DoctorsTableProps)
                   <div className="flex flex-col gap-1.5 items-start">
                     <Link
                       href={`/doctors/${doctor.id}`}
-                      className="font-semibold text-slate-900 underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                      className="font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                     >
                       {doctor.name}
                     </Link>
@@ -70,7 +70,7 @@ export default function DoctorsTable({ doctors, showClinic }: DoctorsTableProps)
                 <TD>{doctor.department}</TD>
                 {showClinic && <TD>{doctor.clinicName}</TD>}
                 <TD isNumeric={Boolean(doctor.phone)}>
-                  {doctor.phone ?? <span className="text-slate-400">—</span>}
+                  {doctor.phone ?? <span className="text-faint">—</span>}
                 </TD>
                 <TD align="end" className="py-2">
                   <Link
@@ -93,16 +93,16 @@ export default function DoctorsTable({ doctors, showClinic }: DoctorsTableProps)
               <div className="flex flex-col gap-1.5 items-start">
                 <Link
                   href={`/doctors/${doctor.id}`}
-                  className="font-semibold text-slate-900 underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                  className="font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                 >
                   {doctor.name}
                 </Link>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted">
                   {doctor.department}
                   {showClinic ? ` · ${doctor.clinicName}` : ""}
                 </p>
                 {doctor.phone && (
-                  <p className="text-sm tabular-nums text-slate-700">{doctor.phone}</p>
+                  <p className="text-sm tabular-nums text-ink">{doctor.phone}</p>
                 )}
                 {doctor.isOnLeaveToday && (
                   <div className="mt-1">

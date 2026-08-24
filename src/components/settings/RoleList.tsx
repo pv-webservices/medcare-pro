@@ -44,7 +44,7 @@ function PermissionCheckboxes({
     <div className="grid gap-6 sm:grid-cols-2">
       {PERMISSION_GROUPS.map((group) => (
         <fieldset key={group.module} className="min-w-0">
-          <legend className="mb-2 text-sm font-bold text-slate-900">{group.module}</legend>
+          <legend className="mb-2 text-sm font-bold text-ink">{group.module}</legend>
           <ul className="grid gap-2">
             {group.permissions.map((permission) => {
               const id = `${idPrefix}-${permission.key}`;
@@ -55,7 +55,7 @@ function PermissionCheckboxes({
                   <label
                     htmlFor={id}
                     className={`flex items-start gap-3 rounded-md p-2 transition-colors ${
-                      isGrantable ? "hover:bg-slate-50 cursor-pointer" : "opacity-60 cursor-not-allowed"
+                      isGrantable ? "hover:bg-canvas-deep cursor-pointer" : "opacity-60 cursor-not-allowed"
                     }`}
                   >
                     <input
@@ -66,24 +66,24 @@ function PermissionCheckboxes({
                       onChange={(event) =>
                         onToggle(permission.key, event.target.checked)
                       }
-                      className="mt-1 size-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-600/20"
+                      className="mt-1 size-4 shrink-0 rounded border-line text-accent"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-slate-900">
+                      <span className="block text-sm font-semibold text-ink">
                         {permission.label}
                       </span>
-                      <span className="block text-xs text-slate-500">
+                      <span className="block text-xs text-muted">
                         {permission.description}
                       </span>
                       {permission.pendingNote && (
                         // Says so rather than implying protection that does not
                         // exist yet — ticking this box changes nothing today.
-                        <span className="mt-1 block text-xs text-amber-700 font-medium">
+                        <span className="mt-1 block text-xs text-warn-ink font-medium">
                           {permission.pendingNote}
                         </span>
                       )}
                       {!isGrantable && (
-                        <span className="mt-1 block text-xs text-slate-400">
+                        <span className="mt-1 block text-xs text-faint">
                           You do not hold this permission, so you cannot grant it.
                         </span>
                       )}
@@ -187,7 +187,7 @@ export default function RoleList({
   return (
     <section aria-labelledby="roles-heading">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-4">
-        <h2 id="roles-heading" className="text-lg font-bold text-slate-900">
+        <h2 id="roles-heading" className="text-lg font-bold text-ink">
           Roles
         </h2>
         {canManage && !isAdding && (
@@ -200,14 +200,14 @@ export default function RoleList({
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {error}
         </p>
       )}
 
       {isAdding && (
-        <Card className="mb-6 p-4 sm:p-6 bg-slate-50 border-slate-200">
+        <Card className="mb-6 p-4 sm:p-6 bg-canvas-deep border-line">
           <form onSubmit={handleCreate} className="grid gap-6">
             <div className="max-w-md">
               <Input
@@ -222,7 +222,7 @@ export default function RoleList({
               />
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="bg-canvas rounded-3xl p-5 shadow-neu-raised-sm">
               <PermissionCheckboxes
                 idPrefix="new-role"
                 selected={newPermissions}
@@ -266,13 +266,13 @@ export default function RoleList({
           return (
             <li
               key={role.id}
-              className={`rounded-xl border p-5 shadow-sm transition-colors ${
-                isEditing ? "border-violet-200 bg-violet-50/30" : "border-slate-200 bg-white"
+              className={`rounded-xl border p-5 shadow-neu-raised-sm transition-colors ${
+                isEditing ? "border-line bg-accent-soft/30" : "border-line bg-canvas"
               }`}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-                <p className="font-semibold text-slate-900">{role.name}</p>
-                <p className="text-sm font-medium text-slate-500">
+                <p className="font-semibold text-ink">{role.name}</p>
+                <p className="text-sm font-medium text-muted">
                   {role.assignmentCount === 1
                     ? "1 assignment"
                     : `${role.assignmentCount} assignments`}
@@ -280,12 +280,12 @@ export default function RoleList({
               </div>
 
               {role.isWildcard ? (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-muted">
                   Full access to everything. Permissions for this role are not
                   editable here — create a custom role instead.
                 </p>
               ) : (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-muted">
                   {role.permissions.length === 0
                     ? "No permissions — this role can sign in and do nothing else."
                     : `${role.permissions.length} permission${
@@ -295,7 +295,7 @@ export default function RoleList({
               )}
 
               {canManage && !role.isWildcard && !isEditing && (
-                <div className="mt-5 pt-4 border-t border-slate-100">
+                <div className="mt-5 pt-4 border-t border-line">
                   <Button
                     type="button"
                     variant="secondary"
@@ -309,8 +309,8 @@ export default function RoleList({
               )}
 
               {isEditing && editing && (
-                <div className="mt-6 pt-6 border-t border-slate-200/60">
-                  <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5 shadow-sm">
+                <div className="mt-6 pt-6 border-t border-line/60">
+                  <div className="bg-canvas rounded-xl p-5 mb-5 shadow-neu-raised-sm">
                     <PermissionCheckboxes
                       idPrefix={`role-${role.id}`}
                       selected={editing.permissions}

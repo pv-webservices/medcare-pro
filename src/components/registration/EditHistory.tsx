@@ -28,7 +28,7 @@ function formatTimestamp(iso: string): string {
 }
 
 function Blank() {
-  return <span className="text-slate-400">not set</span>;
+  return <span className="text-faint">not set</span>;
 }
 
 /**
@@ -47,9 +47,9 @@ function Value({ field, value }: { field: string; value: string | null }) {
 export default function EditHistory({ entries }: EditHistoryProps) {
   if (entries.length === 0) {
     return (
-      <div className="rounded-3xl border border-slate-100 bg-white px-6 py-12 text-center shadow-sm">
-        <p className="mb-1 text-lg font-bold text-slate-900">No history recorded</p>
-        <p className="text-sm text-slate-500">
+      <div className="rounded-3xl bg-canvas px-6 py-12 text-center shadow-neu-raised-sm">
+        <p className="mb-1 text-lg font-bold text-ink">No history recorded</p>
+        <p className="text-sm text-muted">
           This registration has not been edited since it was created.
         </p>
       </div>
@@ -62,37 +62,37 @@ export default function EditHistory({ entries }: EditHistoryProps) {
         <li key={entry.id}>
           <Card isFlush={false}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="font-semibold text-slate-900">
-                {entry.editedByName ?? entry.editedByEmail}{" "}
-                <span className="font-normal text-slate-500">
+              <p className="font-semibold text-ink">
+                {entry.editedByName ?? entry.editedByEmail}{""}
+                <span className="font-normal text-muted">
                   {/* The role held at the time, not the one they hold today. */}
                   as {entry.roleAtTime}
                 </span>
               </p>
-              <p className="text-sm tabular-nums text-slate-500">
+              <p className="text-sm tabular-nums text-muted">
                 {formatTimestamp(entry.timestamp)}
               </p>
             </div>
 
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-muted">
               {entry.isCreation ? "Registered the patient" : "Edited the registration"}
             </p>
 
             <ul className="mt-3 grid gap-1.5">
               {entry.changes.map((change) => (
-                <li key={change.field} className="text-sm text-slate-900">
-                  <span className="font-medium text-slate-700">{change.label}:</span>{" "}
+                <li key={change.field} className="text-sm text-ink">
+                  <span className="font-medium text-ink">{change.label}:</span>{""}
                   {entry.isCreation ? (
                     <span>
                       <Value field={change.field} value={change.to} />
                     </span>
                   ) : (
                     <>
-                      <span className="line-through decoration-slate-300 text-slate-500">
+                      <span className="line-through decoration-slate-300 text-muted">
                         <Value field={change.field} value={change.from} />
-                      </span>{" "}
-                      <span aria-hidden="true" className="text-slate-400 mx-1">→</span>{" "}
-                      <span className="font-medium text-slate-900">
+                      </span>{""}
+                      <span aria-hidden="true" className="text-faint mx-1">→</span>{""}
+                      <span className="font-medium text-ink">
                         <Value field={change.field} value={change.to} />
                       </span>
                     </>

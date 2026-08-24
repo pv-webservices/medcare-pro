@@ -368,7 +368,7 @@ export default function RegistrationForm({
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {formError}
         </p>
@@ -403,12 +403,12 @@ export default function RegistrationForm({
           (values.patientId ? (
             <Card
               isFlush
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-canvas-deep p-4 rounded-xl"
             >
-              <p className="text-sm text-slate-900">
-                Adding a visit to{" "}
-                <span className="font-semibold">{values.name}</span>{" "}
-                <span className="serial text-slate-500">({values.patientCode})</span>
+              <p className="text-sm text-ink">
+                Adding a visit to{""}
+                <span className="font-semibold">{values.name}</span>{""}
+                <span className="serial text-muted">({values.patientCode})</span>
                 . Their existing Patient ID is kept.
               </p>
               <Button
@@ -589,7 +589,7 @@ export default function RegistrationForm({
       </Panel>
 
       {!isEdit && values.patientId === "" && (
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-xs text-muted">
           A Patient ID is assigned automatically when you save.
         </p>
       )}

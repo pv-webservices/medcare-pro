@@ -49,31 +49,31 @@ export default async function ResetPasswordPage({
     return (
       <AuthShell>
         <div className="mb-8">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 text-red-700">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-alert-bg text-alert-ink">
             <AlertCircle className="h-6 w-6" aria-hidden="true" />
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-4xl font-bold tracking-tight text-ink">
             This link has expired
           </h1>
-          <p role="status" className="mt-3 text-sm text-slate-500">
+          <p role="status" className="mt-3 text-sm text-muted">
             {RESET_LINK_INVALID_MESSAGE}
           </p>
         </div>
 
-        <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+        <p className="rounded-xl bg-canvas-deep p-3 text-sm text-ink">
           Reset links work once and last 24 hours. Requesting a new one also
           cancels any older link still sitting in your inbox.
         </p>
 
         <Link
           href="/forgot-password"
-          className="mt-8 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
+          className="mt-8 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary transition-colors"
         >
           Request a new link
         </Link>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
-          <Link href="/login" className="font-semibold text-violet-600 hover:text-violet-700">
+        <p className="mt-6 text-center text-sm text-muted">
+          <Link href="/login" className="font-semibold text-accent hover:text-accent">
             Back to sign in
           </Link>
         </p>

@@ -43,7 +43,7 @@ function formatVisitDate(date: string): string {
 }
 
 function Dash() {
-  return <span className="text-slate-400">—</span>;
+  return <span className="text-faint">—</span>;
 }
 
 /**
@@ -60,7 +60,7 @@ function FollowUpPill() {
 }
 
 function PatientCode({ children }: { children: ReactNode }) {
-  return <span className="serial font-semibold text-slate-900">{children}</span>;
+  return <span className="serial font-semibold text-ink">{children}</span>;
 }
 
 export default function RegistrationsTable({
@@ -125,12 +125,12 @@ export default function RegistrationsTable({
 
                 <TD>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-ink">
                       {registration.patientName}
                     </span>
                     {registration.visitType === "FOLLOW_UP" && <FollowUpPill />}
                   </div>
-                  <p className="mt-0.5 text-xs tabular-nums text-slate-500">
+                  <p className="mt-0.5 text-xs tabular-nums text-muted">
                     {registration.mobileNumber}
                   </p>
                 </TD>
@@ -145,19 +145,19 @@ export default function RegistrationsTable({
                   <span className="tabular-nums">
                     {formatVisitDate(registration.visitDate)}
                   </span>
-                  <p className="mt-0.5 text-xs tabular-nums text-slate-500">
+                  <p className="mt-0.5 text-xs tabular-nums text-muted">
                     {registration.visitTime}
                   </p>
                 </TD>
 
-                <TD isNumeric className="font-bold text-slate-900">
+                <TD isNumeric className="font-bold text-ink">
                   {formatRupees(registration.amount)}
                 </TD>
 
                 <TD align="end" className="py-0 pl-0">
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-400 hover:text-slate-900 transition-colors"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md text-faint hover:text-ink transition-colors"
                   >
                     <span className="sr-only">
                       Open registration {registration.patientCode}
@@ -185,32 +185,32 @@ export default function RegistrationsTable({
                 <div className="min-w-0">
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="font-semibold text-slate-900 underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                    className="font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                   >
                     {registration.patientName}
                   </Link>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-0.5 text-xs text-muted">
                     <PatientCode>{registration.patientCode}</PatientCode>
                     <span className="tabular-nums">
-                      {" · "}
+                      {"·"}
                       {registration.mobileNumber}
                     </span>
                   </p>
                 </div>
-                <p className="shrink-0 font-bold tabular-nums text-slate-900">
+                <p className="shrink-0 font-bold tabular-nums text-ink">
                   {formatRupees(registration.amount)}
                 </p>
               </div>
 
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-muted">
                 {registration.department}
                 {registration.doctorName ? ` · ${registration.doctorName}` : ""}
                 {showClinic ? ` · ${registration.clinicName}` : ""}
               </p>
 
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <p className="text-xs tabular-nums text-slate-500">
-                  {formatVisitDate(registration.visitDate)}{" "}
+                <p className="text-xs tabular-nums text-muted">
+                  {formatVisitDate(registration.visitDate)}{""}
                   {registration.visitTime}
                 </p>
                 {registration.visitType === "FOLLOW_UP" && <FollowUpPill />}

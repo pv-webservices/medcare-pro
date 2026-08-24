@@ -139,7 +139,7 @@ export default function BrandingForm({
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -148,7 +148,7 @@ export default function BrandingForm({
       {saved && (
         <p
           role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+          className="rounded-xl bg-ok-bg px-4 py-3 text-sm font-medium text-ok-ink"
         >
           Branding saved for {clinicName}.
         </p>
@@ -157,7 +157,7 @@ export default function BrandingForm({
       <div className="grid gap-6">
         <div className="grid gap-4 max-w-2xl">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+            <label className="mb-1.5 block text-sm font-semibold text-ink">
               Logo
             </label>
 
@@ -173,7 +173,7 @@ export default function BrandingForm({
 
             {/* Preview of uploaded logo */}
             {hasUploadedLogo && (
-              <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-3 flex items-center gap-3 rounded-xl bg-canvas-deep p-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={logo}
@@ -181,8 +181,8 @@ export default function BrandingForm({
                   className="h-12 w-auto max-w-[120px] rounded object-contain"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">Logo uploaded</p>
-                  <p className="text-xs text-slate-500">Image loaded from your device</p>
+                  <p className="text-sm font-medium text-ink">Logo uploaded</p>
+                  <p className="text-xs text-muted">Image loaded from your device</p>
                 </div>
                 {canEdit && (
                   <button
@@ -192,7 +192,7 @@ export default function BrandingForm({
                       setSaved(false);
                       if (fileInputRef.current) fileInputRef.current.value = "";
                     }}
-                    className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+                    className="rounded-md px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-canvas-deep hover:text-ink transition-colors"
                   >
                     Remove
                   </button>
@@ -208,15 +208,15 @@ export default function BrandingForm({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-xl bg-canvas px-4 py-2.5 text-sm font-medium text-ink shadow-neu-raised-sm hover:bg-canvas-deep hover:border-line transition-colors"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 text-slate-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 text-muted">
                         <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
                         <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
                       </svg>
                       Upload from device
                     </button>
-                    <span className="self-center text-xs text-slate-400">or</span>
+                    <span className="self-center text-xs text-faint">or</span>
                   </div>
                 )}
                 <Input
@@ -256,7 +256,7 @@ export default function BrandingForm({
           </Button>
         </div>
       ) : (
-        <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+        <p className="mt-4 rounded-xl bg-canvas-deep px-4 py-3 text-sm text-muted">
           Your role cannot edit this clinic&apos;s branding. Ask an admin or the
           account owner if you need access.
         </p>

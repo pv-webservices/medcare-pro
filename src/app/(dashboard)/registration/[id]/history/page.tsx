@@ -76,7 +76,7 @@ export default async function RegistrationHistoryPage({
       />
 
       {entries === null ? (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot view edit history. Ask an admin or the account owner
           if you need to see who changed this registration.
         </div>

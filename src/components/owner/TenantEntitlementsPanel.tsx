@@ -138,9 +138,9 @@ export default function TenantEntitlementsPanel({
   }
 
   return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-      <h2 className="text-sm font-semibold text-slate-200">Plan and entitlements</h2>
-      <p className="mt-1 text-xs text-slate-500">
+    <section className="rounded-3xl bg-canvas p-5 shadow-neu-raised-sm">
+      <h2 className="text-sm font-semibold text-ink">Plan and entitlements</h2>
+      <p className="mt-1 text-xs text-faint">
         Layers 1 and 2 of four. What each role in the organisation may then use is
         the organisation admin&rsquo;s own setting, and nothing here changes it.
       </p>
@@ -148,7 +148,7 @@ export default function TenantEntitlementsPanel({
       {error && (
         <p
           role="alert"
-          className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200"
+          className="mt-3 rounded-lg bg-alert-bg p-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -156,32 +156,32 @@ export default function TenantEntitlementsPanel({
       {notice && (
         <p
           role="status"
-          className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200"
+          className="mt-3 rounded-lg bg-ok-bg p-3 text-sm text-ok-ink"
         >
           {notice}
         </p>
       )}
 
       <div className="mt-4">
-        <label htmlFor="tenantPlan" className="block text-xs font-medium text-slate-300">
+        <label htmlFor="tenantPlan" className="block text-xs font-medium text-muted">
           Plan
         </label>
         <select
           id="tenantPlan"
           value={planKey}
           onChange={(event) => setPlanKey(event.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-slate-500 focus:outline-none"
+          className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
         >
           {selectablePlans.length === 0 && <option value="">No plans</option>}
           {selectablePlans.map((plan) => (
             <option key={plan.key} value={plan.key}>
               {plan.name}
-              {plan.isActive ? "" : " (retired)"}
+              {plan.isActive ? "" : "(retired)"}
             </option>
           ))}
         </select>
         {planChanged && (
-          <p className="mt-1.5 text-[11px] text-amber-200">
+          <p className="mt-1.5 text-[11px] text-warn-ink">
             Changing the plan re-evaluates every feature you have not ticked
             yourself.
           </p>
@@ -189,8 +189,8 @@ export default function TenantEntitlementsPanel({
       </div>
 
       <fieldset className="mt-5">
-        <legend className="text-xs font-medium text-slate-300">Features</legend>
-        <p className="mt-1 text-[11px] text-slate-500">
+        <legend className="text-xs font-medium text-muted">Features</legend>
+        <p className="mt-1 text-[11px] text-faint">
           A tick that matches the plan clears any override, so the organisation
           keeps following the plan when it changes. A tick that differs is stored
           as an override and needs a reason.
@@ -205,7 +205,7 @@ export default function TenantEntitlementsPanel({
             return (
               <label
                 key={feature.key}
-                className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2"
+                className="flex items-start gap-3 rounded-2xl bg-canvas px-3 py-2 shadow-neu-raised-sm"
               >
                 <input
                   type="checkbox"
@@ -217,23 +217,23 @@ export default function TenantEntitlementsPanel({
                       [feature.key]: event.target.checked,
                     }))
                   }
-                  className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900"
+                  className="mt-0.5 h-4 w-4 rounded-2xl bg-canvas shadow-neu-inset"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-slate-200">
+                  <span className="block text-sm text-ink">
                     {feature.name}
                     {feature.tier !== "CORE" && (
-                      <span className="ml-2 rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">
+                      <span className="ml-2 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted">
                         {feature.tier}
                       </span>
                     )}
                     {!feature.isEnforced && (
-                      <span className="ml-2 text-[10px] text-slate-500">
+                      <span className="ml-2 text-[10px] text-faint">
                         not enforced
                       </span>
                     )}
                   </span>
-                  <span className="mt-0.5 block text-[11px] text-slate-500">
+                  <span className="mt-0.5 block text-[11px] text-faint">
                     {!feature.globalEnabled
                       ? "Switched off platform-wide — no plan or override can grant it."
                       : deviates
@@ -241,7 +241,7 @@ export default function TenantEntitlementsPanel({
                         : "Follows the plan"}
                   </span>
                   {feature.override !== null && feature.overrideReason && (
-                    <span className="mt-0.5 block text-[11px] text-slate-600">
+                    <span className="mt-0.5 block text-[11px] text-faint">
                       Current override: “{feature.overrideReason}”
                     </span>
                   )}
@@ -252,8 +252,8 @@ export default function TenantEntitlementsPanel({
         </div>
       </fieldset>
 
-      <label htmlFor="entitlementReason" className="mt-5 block text-xs font-medium text-slate-300">
-        Reason{" "}
+      <label htmlFor="entitlementReason" className="mt-5 block text-xs font-medium text-muted">
+        Reason{""}
         {needsReason
           ? `(required, at least ${MIN_REASON_LENGTH} characters)`
           : "(optional)"}
@@ -264,7 +264,7 @@ export default function TenantEntitlementsPanel({
         value={reason}
         onChange={(event) => setReason(event.target.value)}
         placeholder="e.g. Pilot customer — WhatsApp enabled ahead of their plan"
-        className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none"
+        className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink placeholder:text-faint shadow-neu-inset"
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -272,7 +272,7 @@ export default function TenantEntitlementsPanel({
           type="button"
           disabled={pending || !dirty || (needsReason && !reasonLongEnough)}
           onClick={submit}
-          className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+          className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-canvas-deep disabled:text-muted"
         >
           {pending ? "Saving…" : "Save entitlements"}
         </button>
@@ -284,7 +284,7 @@ export default function TenantEntitlementsPanel({
             setPlanKey(view.planKey ?? selectablePlans[0]?.key ?? "");
             setReason("");
           }}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-4 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-500 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line px-4 py-2 text-xs font-medium text-muted transition hover:border-line disabled:opacity-50"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Discard changes

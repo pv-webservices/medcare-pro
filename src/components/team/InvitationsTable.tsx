@@ -120,12 +120,12 @@ export default function InvitationsTable({
           {invitations.map((invitation) => (
             <TR key={invitation.id}>
               <TD>
-                <span className="font-medium text-slate-900">{invitation.email}</span>
+                <span className="font-medium text-ink">{invitation.email}</span>
               </TD>
               <TD>
                 {invitation.roleName}
                 {invitation.clinicName && (
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-muted">
                     {invitation.clinicName}
                   </span>
                 )}
@@ -148,7 +148,7 @@ export default function InvitationsTable({
                     Revoke
                   </Button>
                 ) : (
-                  <span className="text-xs text-slate-400">—</span>
+                  <span className="text-xs text-faint">—</span>
                 )}
               </TD>
             </TR>

@@ -104,7 +104,7 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
       {error && (
         <p
           role="alert"
-          className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200"
+          className="rounded-lg bg-alert-bg p-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -112,14 +112,14 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
       {notice && (
         <p
           role="status"
-          className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200"
+          className="rounded-lg bg-ok-bg p-3 text-sm text-ok-ink"
         >
           {notice}
         </p>
       )}
 
       {plans.length === 0 && (
-        <p className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">
+        <p className="rounded-3xl bg-canvas p-5 text-sm text-muted shadow-neu-raised-sm">
           No plans exist yet. Run the seed to create the standard plan.
         </p>
       )}
@@ -127,30 +127,30 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
       {plans.map((plan) => (
         <section
           key={plan.key}
-          className="rounded-xl border border-slate-800 bg-slate-900 p-5"
+          className="rounded-3xl bg-canvas p-5 shadow-neu-raised-sm"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-100">
+            <h2 className="text-sm font-semibold text-ink">
               {plan.name}
               {!plan.isActive && (
-                <span className="ml-2 rounded border border-slate-700 px-1.5 py-0.5 text-[10px] font-normal text-slate-400">
+                <span className="ml-2 rounded border border-line px-1.5 py-0.5 text-[10px] font-normal text-muted">
                   retired
                 </span>
               )}
             </h2>
-            <p className="text-xs text-slate-400">
-              <span className="tabular-nums text-slate-200">
+            <p className="text-xs text-muted">
+              <span className="tabular-nums text-ink">
                 {plan.tenantCount}
-              </span>{" "}
+              </span>{""}
               organisation{plan.tenantCount === 1 ? "" : "s"} on this plan
             </p>
           </div>
 
           {plan.description && (
-            <p className="mt-1 text-xs text-slate-500">{plan.description}</p>
+            <p className="mt-1 text-xs text-faint">{plan.description}</p>
           )}
 
-          <ul className="mt-4 divide-y divide-slate-800 border-t border-slate-800">
+          <ul className="mt-4 divide-y divide-line border-t border-line">
             {plan.features.map((feature) => {
               const isTarget =
                 change?.planKey === plan.key && change.featureKey === feature.key;
@@ -159,12 +159,12 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                 <li key={feature.key} className="py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <span className="text-sm text-slate-200">{feature.name}</span>
-                      <code className="ml-2 rounded bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-500">
+                      <span className="text-sm text-ink">{feature.name}</span>
+                      <code className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-[11px] text-faint">
                         {feature.key}
                       </code>
                       {!feature.globalEnabled && (
-                        <span className="ml-2 text-[11px] text-rose-300">
+                        <span className="ml-2 text-[11px] text-alert-ink">
                           off platform-wide
                         </span>
                       )}
@@ -174,8 +174,8 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                       <span
                         className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
                           feature.included
-                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                            : "border-slate-700 text-slate-400"
+                            ? "border-line bg-ok-bg text-ok-ink"
+                            : "border-line text-muted"
                         }`}
                       >
                         {feature.included ? "Included" : "Not included"}
@@ -192,7 +192,7 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                             tenantCount: plan.tenantCount,
                           })
                         }
-                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 disabled:opacity-50"
+                        className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-medium text-muted transition hover:border-line disabled:opacity-50"
                       >
                         {feature.included ? "Remove from plan" : "Add to plan"}
                       </button>
@@ -200,14 +200,14 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                   </div>
 
                   {isTarget && (
-                    <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950 p-4">
+                    <div className="mt-3 rounded-2xl bg-canvas p-4 shadow-neu-raised-sm">
                       {isRemoval ? (
-                        <p className="flex items-start gap-2 text-xs text-amber-200">
+                        <p className="flex items-start gap-2 text-xs text-warn-ink">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                           <span>
                             Removing {feature.name} takes it from every
                             organisation on {plan.name} that has no override of
-                            its own — up to{" "}
+                            its own — up to{""}
                             <span className="font-semibold tabular-nums">
                               {plan.tenantCount}
                             </span>
@@ -216,19 +216,19 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                           </span>
                         </p>
                       ) : (
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-muted">
                           Adding {feature.name} grants it to every organisation
                           on {plan.name} that has no override of its own.
                           {feature.tier !== "CORE" &&
-                            " Because this is not a CORE feature, each organisation's admin still has to switch it on per role."}
+                            "Because this is not a CORE feature, each organisation's admin still has to switch it on per role."}
                         </p>
                       )}
 
                       <label
                         htmlFor={`plan-reason-${plan.key}-${feature.key}`}
-                        className="mt-4 block text-xs font-medium text-slate-300"
+                        className="mt-4 block text-xs font-medium text-muted"
                       >
-                        Reason{" "}
+                        Reason{""}
                         {isRemoval
                           ? `(required, at least ${MIN_REASON_LENGTH} characters)`
                           : "(optional)"}
@@ -238,7 +238,7 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                         rows={2}
                         value={reason}
                         onChange={(event) => setReason(event.target.value)}
-                        className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-slate-500 focus:outline-none"
+                        className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
                       />
 
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -246,7 +246,7 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                           type="button"
                           disabled={pending || (isRemoval && !reasonLongEnough)}
                           onClick={submit}
-                          className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                          className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-canvas-deep disabled:text-muted"
                         >
                           {pending
                             ? "Saving…"
@@ -258,7 +258,7 @@ export default function PlanFeatureEditor({ plans }: PlanFeatureEditorProps) {
                           type="button"
                           disabled={pending}
                           onClick={() => setChange(null)}
-                          className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-500 disabled:opacity-50"
+                          className="rounded-lg border border-line px-4 py-2 text-xs font-medium text-muted transition hover:border-line disabled:opacity-50"
                         >
                           Cancel
                         </button>

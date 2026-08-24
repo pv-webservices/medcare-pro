@@ -28,7 +28,7 @@ import { requireActor, UnauthenticatedError } from "@/lib/session";
 // .claude/skills/admin-dashboard-ui.
 //
 // DEFAULTS TO TODAY. A front desk opening this screen is asking "who is coming
-// in today?", not "every slot ever booked". The date control clears to widen it.
+// in today?", not"every slot ever booked". The date control clears to widen it.
 //
 // Like the registration list, the clinic comes from the sidebar switcher
 // (FR-2.3) rather than a filter of its own, so the two can never disagree — and
@@ -147,14 +147,14 @@ export default async function AppointmentBoardPage({
         title="Appointments"
         meta={
           <>
-            <Count>{result.total}</Count>{" "}
+            <Count>{result.total}</Count>{""}
             {result.total === 1 ? "appointment" : "appointments"}
             {appliedDate
               ? appliedDate === today
-                ? " today"
+                ? "today"
                 : ` on ${formatAppointmentDate(appliedDate)}`
-              : " upcoming"}
-            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
+              : "upcoming"}
+            {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}
           </>
         }
         actions={
@@ -207,7 +207,7 @@ export default async function AppointmentBoardPage({
           className="mt-4 flex flex-wrap items-center justify-between gap-3"
         >
           <p className="text-label text-muted">
-            Showing <Count>{firstOnPage}</Count>–<Count>{lastOnPage}</Count> of{" "}
+            Showing <Count>{firstOnPage}</Count>–<Count>{lastOnPage}</Count> of{""}
             <Count>{result.total}</Count>
           </p>
 

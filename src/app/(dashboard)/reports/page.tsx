@@ -86,7 +86,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     return (
       <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
         <PageHeader title="Revenue report" />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot view revenue reports. Ask an admin or the account
           owner if you need access.
         </div>
@@ -113,8 +113,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       />
 
       {!report.hasClinics ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+          <p className="text-sm font-medium text-muted">
             No clinics to report on yet. Add a clinic and start registering
             patients — revenue appears here as visits are recorded.
           </p>
@@ -128,13 +128,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               <div className="min-w-0">
                 <h2
                   id="growth-heading"
-                  className="mb-1 text-lg font-semibold text-slate-900"
+                  className="mb-1 text-lg font-semibold text-ink"
                 >
                   Revenue trend
                 </h2>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted">
                   {/* Names the single series, which is why the chart has no legend. */}
-                  Revenue per {periodLabel.replace(/ly$/, "")} period across{" "}
+                  Revenue per {periodLabel.replace(/ly$/, "")} period across{""}
                   {scopeLabel}, ending with the current one.
                 </p>
               </div>

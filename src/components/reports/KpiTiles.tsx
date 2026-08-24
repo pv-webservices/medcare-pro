@@ -29,11 +29,11 @@ interface TileProps {
 function Tile({ label, value, hint, children }: TileProps) {
   return (
     <Card className="p-5">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
+      <p className="text-sm font-medium text-muted">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
       {children}
       {hint && (
-        <p className="mt-2 text-xs text-slate-400">{hint}</p>
+        <p className="mt-2 text-xs text-faint">{hint}</p>
       )}
     </Card>
   );
@@ -58,7 +58,7 @@ function RevenueDelta({
 
   if (changePercent === null) {
     return (
-      <p className="mt-2 text-xs font-medium text-slate-500">
+      <p className="mt-2 text-xs font-medium text-muted">
         {/* Growth from zero is not a percentage — say what happened instead. */}
         {Number(previousRevenue) === 0
           ? `No revenue ${against}`
@@ -75,13 +75,13 @@ function RevenueDelta({
       <span
         className={
           isUp
-            ? "text-emerald-600"
-            : "text-red-600"
+            ? "text-ok-ink"
+            : "text-alert-ink"
         }
       >
         {isUp ? "▲" : "▼"} {rounded}%
-      </span>{" "}
-      <span className="text-slate-400 ml-1">vs {against}</span>
+      </span>{""}
+      <span className="text-faint ml-1">vs {against}</span>
     </p>
   );
 }

@@ -35,8 +35,8 @@ export default function PeriodSelector({ selected }: PeriodSelectorProps) {
                 aria-current={isSelected ? "page" : undefined}
                 className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors ${
                   isSelected
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                    ? "bg-primary text-primary-foreground shadow-neu-raised-sm"
+                    : "bg-canvas text-ink hover:bg-canvas-deep"
                 }`}
               >
                 {REPORT_PERIOD_LABELS[period]}

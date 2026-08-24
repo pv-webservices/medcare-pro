@@ -103,7 +103,7 @@ export default function NotificationList({
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -125,9 +125,9 @@ export default function NotificationList({
       )}
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-          <p className="mb-1 font-semibold text-slate-900">Nothing to review</p>
-          <p className="text-sm text-slate-500">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+          <p className="mb-1 font-semibold text-ink">Nothing to review</p>
+          <p className="text-sm text-muted">
             Changes to patients, doctors and clinics appear here as staff make
             them.
           </p>
@@ -137,10 +137,10 @@ export default function NotificationList({
           {items.map((item) => (
             <li
               key={item.id}
-              className={`rounded-xl border p-5 shadow-sm transition-colors ${
+              className={`rounded-xl border p-5 shadow-neu-raised-sm transition-colors ${
                 item.read
-                  ? "border-slate-200 bg-white"
-                  : "border-amber-200 bg-amber-50"
+                  ? "border-line bg-canvas"
+                  : "border-line bg-warn-bg"
               }`}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
@@ -148,26 +148,26 @@ export default function NotificationList({
                   {!item.read && (
                     <span
                       aria-hidden="true"
-                      className="inline-block size-2 shrink-0 rounded-full bg-amber-500"
+                      className="inline-block size-2 shrink-0 rounded-full bg-warn-mark"
                     />
                   )}
-                  <span className={`text-xs font-bold uppercase tracking-wider ${item.read ? "text-slate-500" : "text-amber-700"}`}>
+                  <span className={`text-xs font-bold uppercase tracking-wider ${item.read ? "text-muted" : "text-warn-ink"}`}>
                     {item.typeLabel}
                   </span>
                   {!item.read && <span className="sr-only">Unread</span>}
                 </p>
-                <p className={`text-sm tabular-nums ${item.read ? "text-slate-400" : "text-amber-600"}`}>
+                <p className={`text-sm tabular-nums ${item.read ? "text-faint" : "text-warn-ink"}`}>
                   {formatTimestamp(item.createdAt)}
                 </p>
               </div>
 
-              <p className={`text-slate-900 ${item.read ? "font-normal" : "font-semibold"}`}>
+              <p className={`text-ink ${item.read ? "font-normal" : "font-semibold"}`}>
                 {item.message}
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-4">
                 {item.clinicName && (
-                  <span className={`text-sm font-medium ${item.read ? "text-slate-500" : "text-amber-700"}`}>
+                  <span className={`text-sm font-medium ${item.read ? "text-muted" : "text-warn-ink"}`}>
                     {item.clinicName}
                   </span>
                 )}
@@ -175,7 +175,7 @@ export default function NotificationList({
                 {item.href && (
                   <Link
                     href={item.href}
-                    className={`text-sm font-semibold hover:underline underline-offset-4 ${item.read ? "text-primary hover:text-primary-hover" : "text-amber-700 hover:text-amber-800"}`}
+                    className={`text-sm font-semibold hover:underline underline-offset-4 ${item.read ? "text-primary hover:text-primary-hover" : "text-warn-ink hover:text-warn-ink"}`}
                   >
                     Open Record
                   </Link>
@@ -188,8 +188,8 @@ export default function NotificationList({
                     disabled={pendingId === item.id}
                     className={`min-h-9 rounded-md px-3 text-sm font-medium transition-colors disabled:opacity-50 ml-auto ${
                       item.read 
-                        ? "text-slate-500 hover:bg-slate-100" 
-                        : "text-amber-700 hover:bg-amber-100"
+                        ? "text-muted hover:bg-canvas-deep" 
+                        : "text-warn-ink hover:bg-warn-bg"
                     }`}
                   >
                     {pendingId === item.id

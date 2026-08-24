@@ -44,16 +44,16 @@ export default async function OwnerTenantEntitlementsPage({ params }: PageProps)
     <div className="mx-auto max-w-3xl p-8">
       <Link
         href={`/owner/applications/${view.tenantId}`}
-        className="mb-6 inline-flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200"
+        className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-ink"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Back to {view.clinicName}
       </Link>
 
       <h1 className="text-xl font-semibold">{view.clinicName}</h1>
-      <p className="mt-1 text-xs text-slate-400">
-        {view.planName ? `On the ${view.planName} plan` : "No plan assigned"} ·{" "}
-        <span className="tabular-nums">{entitled}</span> of{" "}
+      <p className="mt-1 text-xs text-muted">
+        {view.planName ? `On the ${view.planName} plan` : "No plan assigned"} ·{""}
+        <span className="tabular-nums">{entitled}</span> of{""}
         <span className="tabular-nums">{view.features.length}</span> features
         available to them · {view.status.toLowerCase()}
       </p>
@@ -62,7 +62,7 @@ export default async function OwnerTenantEntitlementsPage({ params }: PageProps)
         <TenantEntitlementsPanel view={view} />
       </div>
 
-      <p className="mt-8 text-[11px] text-slate-500">
+      <p className="mt-8 text-[11px] text-faint">
         Revoking a feature leaves this organisation&rsquo;s per-role settings
         untouched. They stop mattering while the entitlement is gone and take
         effect again if it is restored, so a revoke followed by a restore does not

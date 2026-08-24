@@ -33,17 +33,17 @@ function readToken(params: Record<string, string | string[] | undefined>): strin
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 sm:p-8">
-      <div className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-xl sm:p-10">
+    <div className="flex min-h-screen items-center justify-center bg-canvas-deep p-4 sm:p-8">
+      <div className="w-full max-w-md rounded-[2rem] bg-canvas p-8 shadow-neu-float sm:p-10">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
             <Plus className="h-6 w-6 stroke-[3]" aria-hidden="true" />
           </div>
           <div>
-            <div className="text-xl font-bold leading-none tracking-tight text-slate-900">
+            <div className="text-xl font-bold leading-none tracking-tight text-ink">
               Medicare Pro
             </div>
-            <div className="mt-0.5 text-xs font-medium text-slate-500">
+            <div className="mt-0.5 text-xs font-medium text-muted">
               Smart Clinic Management
             </div>
           </div>
@@ -68,20 +68,20 @@ export default async function AcceptInvitationPage({ searchParams }: PageProps) 
   if (result.status === "refused") {
     return (
       <Shell>
-        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-alert-bg text-alert-ink">
           <ShieldX className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-xl font-bold tracking-tight text-ink">
           This invitation cannot be used
         </h1>
         {/*
           The message comes from a fixed set in lib/invitationPolicy.ts, never
           from the URL — nothing the visitor typed is echoed back into the page.
         */}
-        <p className="mt-3 text-sm text-slate-600">{result.message}</p>
+        <p className="mt-3 text-sm text-muted">{result.message}</p>
         <Link
           href="/login"
-          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800"
+          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-5 text-sm font-semibold text-accent-ink hover:bg-accent-strong"
         >
           Go to sign in
         </Link>
@@ -93,15 +93,15 @@ export default async function AcceptInvitationPage({ searchParams }: PageProps) 
 
   return (
     <Shell>
-      <h1 className="text-xl font-bold tracking-tight text-slate-900">
+      <h1 className="text-xl font-bold tracking-tight text-ink">
         Join {preview.businessName}
       </h1>
-      <p className="mt-2 text-sm text-slate-600">
+      <p className="mt-2 text-sm text-muted">
         {preview.invitedByName
           ? `${preview.invitedByName} invited you as `
-          : "You have been invited as "}
-        <span className="font-semibold text-slate-900">{preview.roleName}</span>
-        {preview.clinicName ? ` at ${preview.clinicName}` : " across the whole account"}
+          : "You have been invited as"}
+        <span className="font-semibold text-ink">{preview.roleName}</span>
+        {preview.clinicName ? ` at ${preview.clinicName}` : "across the whole account"}
         . Choose a password to finish setting up your login.
       </p>
 

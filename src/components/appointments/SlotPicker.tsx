@@ -19,7 +19,7 @@ import type { SlotOutcome } from "@/lib/appointmentSlots";
  *
  * WHY A DAY IS EMPTY IS SAID IN WORDS. AP-2 returns an outcome alongside the
  * slots for exactly this — "the doctor is on leave" and "nobody set up hours for
- * that day" send the front desk to two different places, and a bare "no slots"
+ * that day"send the front desk to two different places, and a bare"no slots"
  * sends them to neither.
  */
 
@@ -57,7 +57,7 @@ const OUTCOME_MESSAGE: Record<SlotOutcome, { title: string; guidance: string }> 
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-5 py-8 text-center">
+    <div className="rounded-2xl border border-dashed border-line bg-canvas-deep/60 px-5 py-8 text-center">
       {children}
     </div>
   );
@@ -73,7 +73,7 @@ export default function SlotPicker({
   if (error) {
     return (
       <Frame>
-        <p role="alert" className="text-sm font-semibold text-red-600">
+        <p role="alert" className="text-sm font-semibold text-alert-ink">
           {error}
         </p>
       </Frame>
@@ -86,9 +86,9 @@ export default function SlotPicker({
         <Loader2
           aria-hidden="true"
           strokeWidth={1.75}
-          className="mx-auto h-5 w-5 animate-spin text-slate-400"
+          className="mx-auto h-5 w-5 animate-spin text-faint"
         />
-        <p className="mt-2 text-sm text-slate-500">Checking what is free…</p>
+        <p className="mt-2 text-sm text-muted">Checking what is free…</p>
       </Frame>
     );
   }
@@ -96,7 +96,7 @@ export default function SlotPicker({
   if (!result) {
     return (
       <Frame>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Choose a doctor, a service and a date to see what is free.
         </p>
       </Frame>
@@ -117,10 +117,10 @@ export default function SlotPicker({
         <CalendarOff
           aria-hidden="true"
           strokeWidth={1.75}
-          className="mx-auto h-5 w-5 text-slate-400"
+          className="mx-auto h-5 w-5 text-faint"
         />
-        <p className="mt-2 font-semibold text-slate-900">{message.title}</p>
-        <p className="mt-1 text-sm text-slate-500">{message.guidance}</p>
+        <p className="mt-2 font-semibold text-ink">{message.title}</p>
+        <p className="mt-1 text-sm text-muted">{message.guidance}</p>
       </Frame>
     );
   }
@@ -129,10 +129,10 @@ export default function SlotPicker({
 
   return (
     <div>
-      <p className="mb-3 text-sm text-slate-500">
-        <span className="font-bold tabular-nums text-slate-900">{free}</span>{" "}
-        {free === 1 ? "slot" : "slots"} free of{" "}
-        <span className="tabular-nums">{result.slots.length}</span>, at{" "}
+      <p className="mb-3 text-sm text-muted">
+        <span className="font-bold tabular-nums text-ink">{free}</span>{""}
+        {free === 1 ? "slot" : "slots"} free of{""}
+        <span className="tabular-nums">{result.slots.length}</span>, at{""}
         <span className="tabular-nums">{result.durationMinutes}</span> minutes
         each.
       </p>
@@ -157,17 +157,17 @@ export default function SlotPicker({
               className={cx(
                 "min-h-11 rounded-xl border px-2 text-sm font-semibold tabular-nums transition-colors",
                 isTaken &&
-                  "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 line-through",
+                  "cursor-not-allowed border-line bg-canvas-deep text-faint line-through",
                 !isTaken &&
                   !isChosen &&
-                  "border-slate-200 bg-white text-slate-700 shadow-sm hover:border-primary hover:text-primary",
+                  "border-line bg-canvas text-ink shadow-neu-raised-sm hover:border-primary hover:text-primary",
                 isChosen &&
-                  "border-primary bg-primary text-primary-foreground shadow-sm",
+                  "border-primary bg-primary text-primary-foreground shadow-neu-raised-sm",
               )}
             >
               {slot.start}
               <span className="sr-only">
-                {isTaken ? " — already booked" : ""}
+                {isTaken ? "— already booked" : ""}
               </span>
             </button>
           );

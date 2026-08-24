@@ -376,7 +376,7 @@ export default function BookingForm({
       {formError && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-sm font-medium text-alert-ink"
         >
           {formError}
         </p>
@@ -447,12 +447,12 @@ export default function BookingForm({
         </div>
 
         {service && (
-          <p className="mt-4 rounded-xl bg-primary-light px-4 py-3 text-sm text-slate-700">
-            <span className="font-semibold">{service.name}</span> runs{" "}
+          <p className="mt-4 rounded-xl bg-primary-light px-4 py-3 text-sm text-ink">
+            <span className="font-semibold">{service.name}</span> runs{""}
             <span className="font-semibold tabular-nums">
               {service.durationMinutes}
-            </span>{" "}
-            minutes and is quoted at{" "}
+            </span>{""}
+            minutes and is quoted at{""}
             <span className="font-bold tabular-nums">
               {formatRupees(service.defaultAmount)}
             </span>
@@ -461,7 +461,7 @@ export default function BookingForm({
         )}
 
         <div className="mt-5">
-          <p className="mb-2 text-sm font-semibold text-slate-700">Slot</p>
+          <p className="mb-2 text-sm font-semibold text-ink">Slot</p>
           <SlotPicker
             result={slots}
             isLoading={isLoadingSlots}
@@ -470,7 +470,7 @@ export default function BookingForm({
             onSelect={handleSlot}
           />
           {errors.slotStart && (
-            <p role="alert" className="mt-2 text-sm font-medium text-red-600">
+            <p role="alert" className="mt-2 text-sm font-medium text-alert-ink">
               {errors.slotStart}
             </p>
           )}
@@ -493,7 +493,7 @@ export default function BookingForm({
         {values.patientId !== null && (
           <Card isFlush className="mb-5 border-primary/30 bg-primary-light p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-sm text-slate-700">
+              <p className="flex items-center gap-2 text-sm text-ink">
                 <UserRoundCheck
                   aria-hidden="true"
                   strokeWidth={1.75}

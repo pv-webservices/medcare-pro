@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { LogOut } from "lucide-react";
 
 /**
  * Ends the session and returns to the login screen.
@@ -45,9 +46,10 @@ export default function SignOutButton() {
       type="button"
       onClick={handleSignOut}
       disabled={isSigningOut}
-      className="min-h-11 rounded border border-black/20 px-3 text-sm font-medium disabled:opacity-60 dark:border-white/25"
+      className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-canvas text-body font-semibold text-muted shadow-neu-raised-sm transition-shadow duration-200 hover:text-ink hover:shadow-neu-raised active:shadow-neu-pressed disabled:opacity-60 disabled:shadow-none"
     >
-      {isSigningOut ? "Logging out…" : "Log Out"}
+      <LogOut aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+      {isSigningOut ? "Logging out…" : "Log out"}
     </button>
   );
 }

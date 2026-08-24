@@ -75,7 +75,7 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
 
   const linePath = points
     .map((point, index) => `${index === 0 ? "M" : "L"}${xFor(index)},${yFor(point.value)}`)
-    .join(" ");
+    .join("");
 
   const areaPath =
     points.length === 0
@@ -237,15 +237,15 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
         {active && activeIndex !== null && (
           <div
             role="status"
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-md"
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md bg-canvas px-3 py-2 text-xs shadow-neu-raised"
             style={{
               left: `${(Math.min(Math.max(xFor(activeIndex), 90), WIDTH - 90) / WIDTH) * 100}%`,
               top: `${(yFor(active.value) / HEIGHT) * 100}%`,
             }}
           >
-            <p className="font-semibold text-slate-900">{active.fullLabel}</p>
-            <p className="mt-1 font-medium tabular-nums text-slate-900">{formatRupees(active.revenue)}</p>
-            <p className="text-slate-500 mt-1">
+            <p className="font-semibold text-ink">{active.fullLabel}</p>
+            <p className="mt-1 font-medium tabular-nums text-ink">{formatRupees(active.revenue)}</p>
+            <p className="text-muted mt-1">
               {active.registrations === 1
                 ? "1 registration"
                 : `${active.registrations} registrations`}
@@ -256,22 +256,22 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
 
       {/* The table view twin — every plotted value, reachable without hover. */}
       <details className="mt-4 group">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors list-none flex items-center">
+        <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
           <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
           View as table
         </summary>
-        <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+        <div className="mt-3 overflow-x-auto rounded-xl shadow-neu-raised-sm">
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">{caption}</caption>
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/50">
-                <th scope="col" className="py-3 pl-4 pr-4 text-sm font-semibold text-slate-900">
+              <tr className="border-b border-line bg-canvas-deep/50">
+                <th scope="col" className="py-3 pl-4 pr-4 text-sm font-semibold text-ink">
                   Period
                 </th>
-                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-slate-900">
+                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-ink">
                   Registrations
                 </th>
-                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-slate-900">
+                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-ink">
                   Revenue
                 </th>
               </tr>
@@ -280,13 +280,13 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
               {points.map((point) => (
                 <tr
                   key={point.bucket}
-                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors"
+                  className="border-b border-line last:border-0 hover:bg-canvas-deep/50 transition-colors"
                 >
-                  <td className="py-3 pl-4 pr-4 text-sm font-medium text-slate-900">{point.fullLabel}</td>
-                  <td className="py-3 pr-4 text-right text-sm tabular-nums text-slate-600">
+                  <td className="py-3 pl-4 pr-4 text-sm font-medium text-ink">{point.fullLabel}</td>
+                  <td className="py-3 pr-4 text-right text-sm tabular-nums text-muted">
                     {point.registrations}
                   </td>
-                  <td className="py-3 pr-4 text-right text-sm font-medium tabular-nums text-slate-900">
+                  <td className="py-3 pr-4 text-right text-sm font-medium tabular-nums text-ink">
                     {formatRupees(point.revenue)}
                   </td>
                 </tr>

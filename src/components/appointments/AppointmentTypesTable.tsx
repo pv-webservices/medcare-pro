@@ -182,7 +182,7 @@ export default function AppointmentTypesTable({
                     clinic list uses, and a service row is not a clinic — a
                     tenant-wide one belongs to all of them. */}
                 <TD>
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-ink">
                     {service.name}
                   </span>
                 </TD>
@@ -222,20 +222,20 @@ export default function AppointmentTypesTable({
             <Card key={service.id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-900">{service.name}</p>
-                  <p className="mt-0.5 text-label text-slate-500">
+                  <p className="font-semibold text-ink">{service.name}</p>
+                  <p className="mt-0.5 text-label text-muted">
                     {scopeLabel(service.clinicName)}
                   </p>
                 </div>
                 <StatusPill tone={status.tone}>{status.label}</StatusPill>
               </div>
 
-              <p className="mt-3 text-sm text-slate-600">
-                <span className="tabular-nums font-semibold text-slate-900">
+              <p className="mt-3 text-sm text-muted">
+                <span className="tabular-nums font-semibold text-ink">
                   {formatDuration(service.durationMinutes)}
-                </span>{" "}
-                ·{" "}
-                <span className="tabular-nums font-semibold text-slate-900">
+                </span>{""}
+                ·{""}
+                <span className="tabular-nums font-semibold text-ink">
                   {formatRupees(service.defaultAmount)}
                 </span>
               </p>
@@ -280,7 +280,7 @@ function RowActions({
     // Said rather than left blank: a clinic-scoped admin looking at a shared
     // service should learn why there is no button, not wonder where it went.
     return (
-      <span className="text-label text-slate-400">
+      <span className="text-label text-faint">
         {service.clinicId === null
           ? "Shared — account admin only"
           : "View only"}

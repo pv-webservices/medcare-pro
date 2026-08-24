@@ -8,9 +8,21 @@ import { cx } from "@/components/ui/cx";
 
 /**
  * The one list pattern — clinics, doctors, registrations, notifications,
- * messages all use this shell, so staff learn to read a table once.
+ * messages and appointments all use this shell, so staff learn to read a table
+ * once.
  *
- * Two rules are baked in rather than left to call sites:
+ * The table is a single raised object with a sunken header strip. Rows are
+ * separated by a hairline rather than by alternating fills: on a surface this
+ * soft, zebra striping reads as two different materials.
+ *
+ * A NOTE ON THE HEADER COLOUR. The design language assigns column headers to
+ * --text-faint, which measures 2.9:1 on the canvas. Column headers are the text
+ * that tells a receptionist which number is the fee and which is the phone
+ * number, so they are read, not decorative, and they take --text-muted (4.9:1)
+ * instead. --text-faint is kept for genuinely non-load-bearing marks. Where the
+ * two rules collide, contrast wins.
+ *
+ * Two behaviours are baked in rather than left to call sites:
  *  - Numeric columns are right-aligned with tabular figures, so amounts and
  *    counts line up down the page.
  *  - The wrapper scrolls, not the page. A wide table on a tablet must never
@@ -34,11 +46,11 @@ export default function Table({ caption, className, children }: TableProps) {
   return (
     <div
       className={cx(
-        "overflow-x-auto rounded-3xl border border-slate-100 bg-white shadow-sm",
+        "overflow-x-auto rounded-3xl bg-canvas shadow-neu-raised",
         className,
       )}
     >
-      <table className="w-full border-collapse text-left text-sm">
+      <table className="w-full border-collapse text-left text-body">
         <caption className="sr-only">{caption}</caption>
         {children}
       </table>
@@ -48,8 +60,8 @@ export default function Table({ caption, className, children }: TableProps) {
 
 export function THead({ children }: { children: ReactNode }) {
   return (
-    <thead className="bg-slate-50/50">
-      <tr className="border-b border-slate-100">{children}</tr>
+    <thead className="bg-canvas-deep">
+      <tr>{children}</tr>
     </thead>
   );
 }
@@ -72,8 +84,8 @@ export function TR({ isCurrent = false, style, className, children }: TRProps) {
     <tr
       style={style}
       className={cx(
-        "border-b border-slate-100 last:border-b-0 transition-colors",
-        isCurrent ? "bg-slate-50" : "hover:bg-slate-50/80",
+        "border-b border-line transition-colors last:border-b-0",
+        isCurrent ? "bg-canvas-deep" : "hover:bg-canvas-deep/60",
         className,
       )}
     >
@@ -92,7 +104,7 @@ export function TH({ align = "start", className, children, ...rest }: THProps) {
     <th
       scope="col"
       className={cx(
-        "px-6 py-4 text-xs font-semibold text-slate-500",
+        "px-6 py-3.5 text-micro font-semibold uppercase text-muted",
         align === "end" ? "text-right" : "text-left",
         className,
       )}
@@ -110,6 +122,10 @@ interface TDProps extends Omit<TdHTMLAttributes<HTMLTableCellElement>, "align"> 
   /**
    * Draws the clinic rail down the left edge of the row. Only the first cell
    * should set it — see the accent rules in the admin-dashboard-ui skill.
+   *
+   * The rail is the ONE place a tenant colour appears in a table, which is why
+   * it reads --clinic-accent rather than --accent: an arbitrary brand hex is
+   * safe as a 4px bar and unsafe as anything with a label on it.
    */
   hasRail?: boolean;
   children: ReactNode;
@@ -128,10 +144,10 @@ export function TD({
   return (
     <td
       className={cx(
-        "px-6 py-4 align-middle text-sm text-slate-700",
+        "px-6 py-3.5 align-middle text-body font-medium text-ink",
         hasRail && "relative pl-6",
         resolved === "end" ? "text-right" : "text-left",
-        isNumeric && "tabular-nums font-medium text-slate-900",
+        isNumeric && "tnum font-semibold",
         className,
       )}
       {...rest}
@@ -139,7 +155,7 @@ export function TD({
       {hasRail && (
         <span
           aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-1 bg-[#6B46C1]"
+          className="absolute inset-y-0 left-0 w-1 rounded-r-full bg-clinic-accent"
         />
       )}
       {children}

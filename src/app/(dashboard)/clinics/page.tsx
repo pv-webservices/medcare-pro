@@ -49,10 +49,10 @@ export default async function ClinicsListPage() {
       <Count>{clinics.length}</Count> {clinics.length === 1 ? "clinic" : "clinics"}
       {clinics.length > 0 && (
         <>
-          {" · "}
+          {"·"}
           <Count>{doctorTotal}</Count> {doctorTotal === 1 ? "doctor" : "doctors"}
-          {" · "}
-          <Count>{patientTotal}</Count>{" "}
+          {"·"}
+          <Count>{patientTotal}</Count>{""}
           {patientTotal === 1 ? "patient" : "patients"}
         </>
       )}

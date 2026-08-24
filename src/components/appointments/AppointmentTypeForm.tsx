@@ -202,7 +202,7 @@ export default function AppointmentTypeForm({
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {formError}
         </p>

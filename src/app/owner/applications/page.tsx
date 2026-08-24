@@ -27,11 +27,11 @@ const TABS: readonly { label: string; status: TenantStatus }[] = [
 ];
 
 const STATUS_STYLES: Record<TenantStatus, string> = {
-  PENDING: "bg-amber-500/10 text-amber-300 border-amber-500/30",
-  ACTIVE: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  PENDING: "bg-warn-bg text-warn-ink border-line",
+  ACTIVE: "bg-ok-bg text-ok-ink border-line",
   SUSPENDED: "bg-orange-500/10 text-orange-300 border-orange-500/30",
-  REJECTED: "bg-rose-500/10 text-rose-300 border-rose-500/30",
-  ARCHIVED: "bg-slate-500/10 text-slate-300 border-slate-500/30",
+  REJECTED: "bg-alert-bg text-alert-ink border-line",
+  ARCHIVED: "bg-pill text-muted border-line",
 };
 
 function parseStatus(value: string | undefined): TenantStatus {
@@ -76,14 +76,14 @@ export default async function OwnerApplicationsPage({ searchParams }: PageProps)
     <div className="mx-auto max-w-5xl p-8">
       <Link
         href="/owner/dashboard"
-        className="mb-6 inline-flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200"
+        className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-ink"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Platform overview
       </Link>
 
       <h1 className="text-xl font-semibold">Clinic applications</h1>
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="mt-1 text-xs text-muted">
         {total} organisation{total === 1 ? "" : "s"} with this status
       </p>
 
@@ -94,12 +94,12 @@ export default async function OwnerApplicationsPage({ searchParams }: PageProps)
             href={`/owner/applications?status=${tab.status}`}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
               tab.status === status
-                ? "border-slate-500 bg-slate-800 text-slate-100"
-                : "border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700"
+                ? "border-line bg-canvas-deep text-ink"
+                : "border-line bg-canvas text-muted hover:border-line"
             }`}
           >
             {tab.label}
-            <span className="ml-2 tabular-nums text-slate-500">
+            <span className="ml-2 tabular-nums text-faint">
               {counts[tab.status]}
             </span>
           </Link>
@@ -109,25 +109,25 @@ export default async function OwnerApplicationsPage({ searchParams }: PageProps)
       <form method="get" className="mt-4 flex gap-2">
         <input type="hidden" name="status" value={status} />
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
           <input
             type="search"
             name="search"
             defaultValue={search}
             placeholder="Clinic name, email or city"
-            className="w-full rounded-lg border border-slate-800 bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none"
+            className="w-full rounded-2xl bg-canvas py-2 pl-9 pr-3 text-sm text-ink placeholder:text-faint shadow-neu-inset"
           />
         </div>
         <button
           type="submit"
-          className="rounded-lg border border-slate-700 bg-slate-800 px-4 text-sm font-medium text-slate-100 hover:bg-slate-700"
+          className="rounded-lg bg-canvas-deep px-4 text-sm font-medium text-ink hover:bg-canvas-deep"
         >
           Search
         </button>
       </form>
 
       {applications.length === 0 ? (
-        <p className="mt-10 rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-sm text-slate-400">
+        <p className="mt-10 rounded-3xl bg-canvas p-8 text-center text-sm text-muted shadow-neu-raised-sm">
           Nothing here.
         </p>
       ) : (
@@ -136,13 +136,13 @@ export default async function OwnerApplicationsPage({ searchParams }: PageProps)
             <li key={application.id}>
               <Link
                 href={`/owner/applications/${application.id}`}
-                className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+                className="flex items-center justify-between gap-4 rounded-3xl bg-canvas p-4 transition hover: shadow-neu-raised-sm"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-100">
+                  <div className="truncate text-sm font-semibold text-ink">
                     {application.clinicName}
                   </div>
-                  <div className="mt-1 truncate text-xs text-slate-400">
+                  <div className="mt-1 truncate text-xs text-muted">
                     {application.email}
                     {application.city ? ` · ${application.city}` : ""}
                     {application.applicantName ? ` · ${application.applicantName}` : ""}
@@ -150,11 +150,11 @@ export default async function OwnerApplicationsPage({ searchParams }: PageProps)
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   {application.emailVerifiedAt === null && (
-                    <span className="rounded-md border border-slate-700 px-2 py-1 text-[11px] text-slate-400">
+                    <span className="rounded-md border border-line px-2 py-1 text-[11px] text-muted">
                       Email unverified
                     </span>
                   )}
-                  <span className="text-[11px] tabular-nums text-slate-500">
+                  <span className="text-[11px] tabular-nums text-faint">
                     {formatDateOnly(application.createdAt)}
                   </span>
                   <span
@@ -172,18 +172,18 @@ export default async function OwnerApplicationsPage({ searchParams }: PageProps)
       )}
 
       {lastPage > 1 && (
-        <div className="mt-6 flex items-center justify-between text-xs text-slate-400">
+        <div className="mt-6 flex items-center justify-between text-xs text-muted">
           <span>
             Page {page} of {lastPage}
           </span>
           <div className="flex gap-2">
             {page > 1 && (
-              <Link href={pageHref(page - 1)} className="hover:text-slate-200">
+              <Link href={pageHref(page - 1)} className="hover:text-ink">
                 Previous
               </Link>
             )}
             {page < lastPage && (
-              <Link href={pageHref(page + 1)} className="hover:text-slate-200">
+              <Link href={pageHref(page + 1)} className="hover:text-ink">
                 Next
               </Link>
             )}

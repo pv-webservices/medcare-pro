@@ -84,7 +84,7 @@ export default async function AppointmentServicesPage({
           title="Services"
           back={{ href: "/appointments", label: "Back to appointments" }}
         />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot view the services this organisation offers. Ask the
           account owner if you need access.
         </div>
@@ -139,9 +139,9 @@ export default async function AppointmentServicesPage({
         back={{ href: "/appointments", label: "Back to appointments" }}
         meta={
           <>
-            <Count>{bookable}</Count>{" "}
+            <Count>{bookable}</Count>{""}
             {bookable === 1 ? "service" : "services"} bookable
-            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
+            {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}
             . Each one sets how long an appointment runs and what it costs.
           </>
         }

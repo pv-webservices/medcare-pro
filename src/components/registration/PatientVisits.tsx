@@ -49,10 +49,8 @@ export default function PatientVisits({
             <li
               key={visit.id}
               aria-current={isCurrent ? "true" : undefined}
-              className={`flex flex-wrap items-baseline justify-between gap-3 rounded border px-3 py-2 ${
-                isCurrent
-                  ? "border-black/40 dark:border-white/40"
-                  : "border-black/15 dark:border-white/20"
+              className={`flex flex-wrap items-baseline justify-between gap-3 rounded-2xl px-3 py-2 ${
+                isCurrent ? "shadow-neu-pressed" : "shadow-neu-raised-sm"
               }`}
             >
               <div className="min-w-0">
@@ -70,12 +68,12 @@ export default function PatientVisits({
                     </Link>
                   )}
                   {isCurrent && (
-                    <span className="ml-2 text-black/55 dark:text-white/55">
+                    <span className="ml-2 text-muted">
                       this visit
                     </span>
                   )}
                 </p>
-                <p className="text-sm text-black/55 dark:text-white/55">
+                <p className="text-sm text-muted">
                   {VISIT_TYPE_LABELS[visit.visitType]} · {visit.department}
                   {visit.doctorName ? ` · ${visit.doctorName}` : ""}
                 </p>

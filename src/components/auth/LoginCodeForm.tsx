@@ -59,12 +59,12 @@ interface LoginCodeFormProps {
 }
 
 const FIELD_CLASS =
-  "block w-full rounded-xl border border-slate-200 py-3.5 px-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600";
+  "block w-full rounded-2xl shadow-neu-inset py-3.5 px-4 text-sm text-ink placeholder:text-faint";
 
-const LABEL_CLASS = "block text-sm font-medium text-slate-700 mb-2";
+const LABEL_CLASS = "block text-sm font-medium text-ink mb-2";
 
 const PRIMARY_BUTTON_CLASS =
-  "mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 transition-colors";
+  "mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors";
 
 export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormProps) {
   const router = useRouter();
@@ -243,17 +243,17 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
             id="login-code-request-error"
             role="alert"
             aria-live="assertive"
-            className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+            className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
               <span className="font-semibold">Error:</span> {error}
               {offerSignup && (
                 <>
-                  {" "}
+                  {""}
                   <Link
                     href={`/signup?email=${encodeURIComponent(email)}`}
-                    className="font-semibold underline hover:text-red-900"
+                    className="font-semibold underline hover:text-alert-ink"
                   >
                     Create an account
                   </Link>
@@ -283,7 +283,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
             placeholder="dr.amelia@dentalcare.com"
             className={FIELD_CLASS}
           />
-          <p id="login-code-email-hint" className="mt-2 text-sm text-slate-500">
+          <p id="login-code-email-hint" className="mt-2 text-sm text-muted">
             We will email you a six-digit code instead of asking for your password.
           </p>
         </div>
@@ -305,7 +305,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
       <p
         role="status"
         aria-live="polite"
-        className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+        className="rounded-xl bg-canvas-deep p-3 text-sm text-ink"
       >
         {notice ?? "Enter the six-digit code from your email."}
       </p>
@@ -315,7 +315,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
           id="login-code-error"
           role="alert"
           aria-live="assertive"
-          className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>
@@ -349,7 +349,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
           placeholder="123456"
           className={`${FIELD_CLASS} tracking-[0.4em]`}
         />
-        <p id="login-code-hint" className="mt-2 text-sm text-slate-500">
+        <p id="login-code-hint" className="mt-2 text-sm text-muted">
           The code expires in 10 minutes. It never arrives as a link — do not share it.
         </p>
       </div>
@@ -362,11 +362,11 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
             type="checkbox"
             checked={rememberMe}
             onChange={(event) => setRememberMe(event.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-600"
+            className="h-4 w-4 rounded border-line text-accent"
           />
           <label
             htmlFor="login-code-remember"
-            className="ml-2 block text-sm font-medium text-slate-600"
+            className="ml-2 block text-sm font-medium text-muted"
           >
             Remember this device
           </label>
@@ -375,7 +375,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
           type="button"
           onClick={handleResend}
           disabled={isSubmitting || isCoolingDown}
-          className="text-sm font-medium text-violet-600 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:ring-offset-2 rounded disabled:text-slate-400 disabled:hover:text-slate-400"
+          className="text-sm font-medium text-accent hover:text-accent rounded disabled:text-faint disabled:hover:text-faint"
         >
           {isCoolingDown ? `Resend in ${formatCooldown(remainingMs)}` : "Resend code"}
         </button>
@@ -389,7 +389,7 @@ export default function LoginCodeForm({ email, onEmailChange }: LoginCodeFormPro
         type="button"
         onClick={returnToEmailStep}
         disabled={isSubmitting}
-        className="w-full rounded-xl py-2 text-sm font-medium text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:ring-offset-2 disabled:opacity-70"
+        className="w-full rounded-xl py-2 text-sm font-medium text-muted hover:text-ink disabled:opacity-70"
       >
         Use a different email
       </button>

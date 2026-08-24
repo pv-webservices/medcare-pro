@@ -71,11 +71,11 @@ export default function UserRoleAssignments({
   }
 
   return (
-    <section aria-labelledby="assignments-heading" className="mt-12 border-t border-slate-200 pt-8">
-      <h2 id="assignments-heading" className="mb-1 text-lg font-bold text-slate-900">
+    <section aria-labelledby="assignments-heading" className="mt-12 border-t border-line pt-8">
+      <h2 id="assignments-heading" className="mb-1 text-lg font-bold text-ink">
         Users
       </h2>
-      <p className="mb-6 text-sm text-slate-500">
+      <p className="mb-6 text-sm text-muted">
         A role with no clinic applies across the whole account. Naming a clinic
         limits it to that clinic only.
       </p>
@@ -83,7 +83,7 @@ export default function UserRoleAssignments({
       {error && (
         <p
           role="alert"
-          className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="mb-6 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -93,24 +93,24 @@ export default function UserRoleAssignments({
         {users.map((user) => (
           <li
             key={user.id}
-            className={`rounded-xl border p-5 shadow-sm transition-colors ${
-              openUserId === user.id ? "border-violet-200 bg-violet-50/30" : "border-slate-200 bg-white"
+            className={`rounded-xl border p-5 shadow-neu-raised-sm transition-colors ${
+              openUserId === user.id ? "border-line bg-accent-soft/30" : "border-line bg-canvas"
             }`}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-              <p className="font-semibold text-slate-900">
+              <p className="font-semibold text-ink">
                 {user.name ?? user.email}
                 {user.isSelf && (
-                  <span className="ml-3 rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+                  <span className="ml-3 rounded-md bg-canvas-deep px-2 py-0.5 text-xs font-medium text-muted">
                     You
                   </span>
                 )}
               </p>
-              <p className="text-sm font-medium text-slate-500">{user.email}</p>
+              <p className="text-sm font-medium text-muted">{user.email}</p>
             </div>
 
             {user.assignments.length === 0 ? (
-              <p className="text-sm text-slate-500 italic">
+              <p className="text-sm text-muted italic">
                 No roles. This user can sign in but cannot reach any module.
               </p>
             ) : (
@@ -118,12 +118,12 @@ export default function UserRoleAssignments({
                 {user.assignments.map((assignment) => (
                   <li
                     key={assignment.id}
-                    className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-3 pr-1.5"
+                    className="flex items-center gap-3 rounded-md bg-canvas-deep py-1.5 pl-3 pr-1.5"
                   >
-                    <span className="text-sm font-medium text-slate-900">
+                    <span className="text-sm font-medium text-ink">
                       {assignment.roleName}
-                      <span className="text-slate-500 font-normal">
-                        {" · "}
+                      <span className="text-muted font-normal">
+                        {"·"}
                         {assignment.clinicName ?? "all clinics"}
                       </span>
                     </span>
@@ -140,7 +140,7 @@ export default function UserRoleAssignments({
                         aria-label={`Remove ${assignment.roleName} in ${
                           assignment.clinicName ?? "all clinics"
                         } from ${user.name ?? user.email}`}
-                        className="min-h-8 rounded-md px-2.5 text-xs font-medium text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors disabled:opacity-50 ml-2"
+                        className="min-h-8 rounded-md px-2.5 text-xs font-medium text-muted hover:bg-canvas-deep hover:text-ink transition-colors disabled:opacity-50 ml-2"
                       >
                         {pending === assignment.id ? "…" : "Remove"}
                       </button>
@@ -152,7 +152,7 @@ export default function UserRoleAssignments({
 
             {canManage &&
               (openUserId === user.id ? (
-                <div className="mt-5 pt-5 border-t border-slate-200/60 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <div className="mt-5 pt-5 border-t border-line/60 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                   <div>
                     <Select
                       id={`role-${user.id}`}
@@ -216,7 +216,7 @@ export default function UserRoleAssignments({
                   </div>
                 </div>
               ) : (
-                <div className="mt-5 pt-4 border-t border-slate-100">
+                <div className="mt-5 pt-4 border-t border-line">
                   <Button
                     type="button"
                     variant="secondary"

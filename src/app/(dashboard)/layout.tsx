@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Bell, Plus, Search, Settings } from "lucide-react";
 import DashboardNav from "@/components/dashboard/DashboardNav";
 import ClinicSwitcher from "@/components/dashboard/ClinicSwitcher";
 import SignOutButton from "@/components/dashboard/SignOutButton";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-import { ToastProvider } from "@/components/ui";
+import { Avatar, ToastProvider, buttonClasses } from "@/components/ui";
 import { listClinicsForActor } from "@/lib/clinics";
 import { resolveModulesForActor } from "@/lib/features";
 import { visibleNavLinks } from "@/lib/navigation";
@@ -22,11 +24,11 @@ import { requireActor, UnauthenticatedError } from "@/lib/session";
  * `requireActor` call here is the backstop for a session that expires between
  * the middleware check and the render.
  *
- * This is also where the clinic accent is scoped. `--accent` is set from the
- * *selected* clinic's themeColor (FR-8.4), so switching clinics re-renders the
- * shell and every accent-bearing control changes with it — no client theming
- * layer, no flash. The switcher already refreshes the server tree on change,
- * so it needs no code of its own for this.
+ * THE SIDEBAR FLOATS. It is a raised panel inset from the window on all four
+ * sides rather than a full-bleed column with a dividing border, because a
+ * border is exactly the thing this design language does not have. The canvas
+ * runs behind it, which is what makes the panel read as an object resting on
+ * the page.
  */
 
 interface DashboardLayoutProps {
@@ -69,6 +71,22 @@ function signedOutDestination(error: UnauthenticatedError): string {
 function signedOutRedirect(error: UnauthenticatedError): string {
   const destination = signedOutDestination(error);
   return `/api/auth/session-ended?to=${encodeURIComponent(destination)}`;
+}
+
+/**
+ * The greeting is cosmetic, so it is derived from the SERVER's clock and may be
+ * an hour or two off for a clinic in another timezone. That is an acceptable
+ * trade for not shipping a client component purely to say "good afternoon";
+ * nothing downstream depends on it.
+ */
+function greetingFor(hour: number): string {
+  if (hour < 12) {
+    return "Good morning";
+  }
+  if (hour < 17) {
+    return "Good afternoon";
+  }
+  return "Good evening";
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -133,58 +151,159 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   const activeClinic = clinics.find((clinic) => clinic.id === selectedClinicId) ?? (clinics.length === 1 ? clinics[0] : null);
   const displayName = activeClinic?.name ?? userName;
 
+  const greeting = greetingFor(new Date().getHours());
+
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
-      {/* Sidebar */}
-      <aside className="hidden w-[280px] flex-col border-r border-slate-200 bg-white md:flex z-10 shadow-sm relative">
-        <div className="flex items-center gap-3 px-6 py-6 border-b border-slate-100">
-           <div>
-             <div className="font-bold text-slate-900 text-lg tracking-tight leading-none">Medicare Pro</div>
-             <div className="text-[10px] text-slate-500 font-medium mt-1 tracking-wide uppercase">Smart Clinic Management</div>
-           </div>
+    <div className="flex min-h-screen gap-0 bg-canvas p-4">
+      {/*
+        Sticky rather than fixed, so the panel scrolls with a short page but
+        stays put on a long one without the content needing a left margin.
+      */}
+      <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-[270px] shrink-0 flex-col rounded-4xl bg-canvas p-5 shadow-neu-raised lg:flex">
+        <div className="mb-6 flex items-center gap-3 px-1">
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-ink shadow-neu-accent"
+          >
+            <Plus strokeWidth={3} className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-section font-extrabold leading-none text-ink">
+              MedCare Pro
+            </div>
+            <div className="mt-1 text-micro font-semibold uppercase text-muted">
+              Clinic CRM
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="-mx-1 flex-1 space-y-6 overflow-y-auto px-1 pb-2">
           {clinics.length > 1 && (
-            <div className="mb-6">
-              <ClinicSwitcher
-                clinics={clinics.map(({ id, name }) => ({ id, name }))}
-                selectedClinicId={selectedClinicId}
-              />
-            </div>
+            <ClinicSwitcher
+              clinics={clinics.map(({ id, name }) => ({ id, name }))}
+              selectedClinicId={selectedClinicId}
+            />
           )}
-          
+
           <DashboardNav links={links} unreadNotifications={unreadNotifications} />
         </div>
 
-        {/* User profile / Logout at bottom */}
-        <div className="border-t border-slate-100 p-4">
-          <ThemeSwitcher />
-          <div className="flex items-center gap-3 mb-4 px-2">
-            {activeClinic?.logoUrl ? (
-              <img
-                src={activeClinic.logoUrl}
-                alt={`${displayName} logo`}
-                className="h-10 w-10 shrink-0 rounded-full object-cover border border-slate-200"
-              />
-            ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary font-bold">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
-              <p className="truncate text-xs text-slate-500 capitalize">{roleName}</p>
-            </div>
+        {/*
+          The support card is the one piece of chrome that is allowed to be
+          warm. Everything above it is a tool; this is the reminder that a
+          person is behind it.
+        */}
+        <div className="mt-4 space-y-4">
+          <div className="rounded-3xl bg-canvas p-4 shadow-neu-raised-sm">
+            <p className="text-label font-bold text-ink">Need a hand?</p>
+            <p className="mt-1 text-meta font-medium leading-relaxed text-muted">
+              Our team can walk you through any screen.
+            </p>
+            <Link
+              href="/settings"
+              className={buttonClasses("commit", "sm", "mt-3 w-full")}
+            >
+              Get support
+            </Link>
           </div>
+
+          <ThemeSwitcher />
           <SignOutButton />
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">
-        <ToastProvider>{children}</ToastProvider>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-7 md:py-6">
+          <div className="min-w-0">
+            <h2 className="truncate text-title font-extrabold text-ink">
+              {greeting}, {userName}
+            </h2>
+            <p className="mt-1 text-label font-medium text-muted">
+              Here&apos;s what&apos;s happening across your clinic today.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/*
+              PRESENTATIONAL FOR NOW. There is no search endpoint behind this —
+              it is the reference design's chrome, and it stays inert until a
+              search route exists to point it at. It is a real input rather than
+              a picture of one so that wiring it up later is a one-line change.
+            */}
+            <div className="relative hidden xl:block">
+              <Search
+                aria-hidden="true"
+                strokeWidth={2}
+                className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
+              />
+              <input
+                type="search"
+                aria-label="Search"
+                placeholder="Search anything…"
+                className="h-11 w-72 rounded-2xl border-0 bg-canvas pl-11 pr-4 text-body text-ink shadow-neu-inset placeholder:text-faint"
+              />
+            </div>
+
+            <Link
+              href="/notifications"
+              aria-label={
+                unreadNotifications > 0
+                  ? `Notifications, ${unreadNotifications} unread`
+                  : "Notifications"
+              }
+              className="relative flex h-11 w-11 items-center justify-center rounded-full bg-canvas text-muted shadow-neu-raised-sm transition-shadow duration-200 hover:text-ink hover:shadow-neu-raised active:shadow-neu-pressed"
+            >
+              <Bell aria-hidden="true" strokeWidth={2} className="h-5 w-5" />
+              {unreadNotifications > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-3 top-3 h-2 w-2 rounded-full bg-accent ring-2 ring-canvas"
+                />
+              )}
+            </Link>
+
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-canvas text-muted shadow-neu-raised-sm transition-shadow duration-200 hover:text-ink hover:shadow-neu-raised active:shadow-neu-pressed"
+            >
+              <Settings aria-hidden="true" strokeWidth={2} className="h-5 w-5" />
+            </Link>
+
+            {/*
+              The clinic's own logo wins over initials when it is set — that is
+              FR-8.4 branding, and it is the fastest way for someone covering
+              two clinics to see which one they are looking at.
+            */}
+            <div className="flex items-center gap-3">
+              {activeClinic?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={activeClinic.logoUrl}
+                  alt={`${displayName} logo`}
+                  className="h-10 w-10 shrink-0 rounded-full object-cover shadow-neu-raised-sm"
+                />
+              ) : (
+                <Avatar name={displayName} isRaised />
+              )}
+              <div className="hidden min-w-0 md:block">
+                <p className="truncate text-label font-bold text-ink">
+                  {displayName}
+                </p>
+                <p className="truncate text-meta font-medium capitalize text-muted">
+                  {roleName}
+                </p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 pb-8 md:px-7">
+          <div className="mx-auto w-full max-w-[1440px]">
+            <ToastProvider>{children}</ToastProvider>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

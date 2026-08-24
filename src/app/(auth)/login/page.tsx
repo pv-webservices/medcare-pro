@@ -204,10 +204,10 @@ function LoginContent() {
   return (
     <AuthShell>
             <div className="mb-8">
-              <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-4xl font-bold tracking-tight text-ink">
                 Welcome Back
               </h1>
-              <p className="mt-3 text-sm text-slate-500">
+              <p className="mt-3 text-sm text-muted">
                 Sign in to your clinic dashboard
               </p>
             </div>
@@ -218,7 +218,7 @@ function LoginContent() {
                 <p
                   role="status"
                   aria-live="polite"
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+                  className="rounded-xl bg-canvas-deep p-3 text-sm text-ink"
                 >
                   {sessionEndedMessage}
                 </p>
@@ -227,7 +227,7 @@ function LoginContent() {
                 <p
                   role="status"
                   aria-live="polite"
-                  className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800"
+                  className="rounded-xl bg-ok-bg p-3 text-sm text-ok-ink"
                 >
                   Your password has been changed. Sign in with it to continue.
                 </p>
@@ -236,7 +236,7 @@ function LoginContent() {
                 <p
                   role="status"
                   aria-live="polite"
-                  className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800"
+                  className="rounded-xl bg-ok-bg p-3 text-sm text-ok-ink"
                 >
                   Your email is verified. Log in to continue.
                 </p>
@@ -246,7 +246,7 @@ function LoginContent() {
             <div
               role="tablist"
               aria-label="Sign-in method"
-              className="mt-6 mb-8 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1"
+              className="mt-6 mb-8 grid grid-cols-2 gap-1 rounded-xl bg-canvas-deep p-1"
             >
               {MODES.map((entry) => {
                 const isActive = entry.id === mode;
@@ -266,10 +266,10 @@ function LoginContent() {
                     tabIndex={isActive ? 0 : -1}
                     onClick={() => selectMode(entry.id)}
                     onKeyDown={handleTabKeyDown}
-                    className={`rounded-lg py-2.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-violet-600 focus:ring-offset-2 ${
+                    className={`rounded-lg py-2.5 text-sm font-semibold transition-colors     ${
                       isActive
-                        ? "bg-white text-violet-700 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
+                        ? "bg-canvas text-accent shadow-neu-raised-sm"
+                        : "text-muted hover:text-ink"
                     }`}
                   >
                     {entry.label}
@@ -298,14 +298,14 @@ function LoginContent() {
                   <p
                     role="alert"
                     aria-live="assertive"
-                    className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+                    className="flex items-start gap-2 rounded-xl bg-warn-bg p-3 text-sm text-warn-ink"
                   >
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
-                      Please verify your email before logging in. Check your inbox for the link, or{" "}
+                      Please verify your email before logging in. Check your inbox for the link, or{""}
                       <Link
                         href={`/verify-email?email=${encodeURIComponent(email)}`}
-                        className="font-medium underline hover:text-amber-900"
+                        className="font-medium underline hover:text-warn-ink"
                       >
                         request a new one
                       </Link>
@@ -318,17 +318,17 @@ function LoginContent() {
                     id="login-password-error"
                     role="alert"
                     aria-live="assertive"
-                    className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                    className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
                   >
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
                       <span className="font-semibold">Error:</span> {error}
                       {isUnknownAccount && (
                         <>
-                          {" "}
+                          {""}
                           <Link
                             href={`/signup?email=${encodeURIComponent(email)}`}
-                            className="font-semibold underline hover:text-red-900"
+                            className="font-semibold underline hover:text-alert-ink"
                           >
                             Create an account
                           </Link>
@@ -340,12 +340,12 @@ function LoginContent() {
                 )}
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-ink mb-2">
                     Email
                   </label>
                   <div className="relative">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                      <Mail className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                      <Mail className="h-5 w-5 text-accent" aria-hidden="true" />
                     </div>
                     <input
                       id="email"
@@ -358,13 +358,13 @@ function LoginContent() {
                       aria-invalid={error ? true : undefined}
                       aria-describedby={error ? "login-password-error" : undefined}
                       placeholder="dr.amelia@dentalcare.com"
-                      className="block w-full rounded-xl border border-slate-200 py-3.5 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
+                      className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-11 pr-4 text-sm text-ink placeholder:text-faint"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-ink mb-2">
                     Password
                   </label>
                   <div className="relative">
@@ -379,14 +379,14 @@ function LoginContent() {
                       aria-invalid={error ? true : undefined}
                       aria-describedby={error ? "login-password-error" : undefined}
                       placeholder="••••••••••••••••"
-                      className="block w-full rounded-xl border border-slate-200 py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-slate-900 placeholder:text-slate-400 placeholder:tracking-[0.2em] focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
+                      className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-ink placeholder:text-faint placeholder:tracking-[0.2em]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? "Hide password" : "Show password"}
                       aria-pressed={showPassword}
-                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-600 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-600 rounded"
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent rounded"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -401,9 +401,9 @@ function LoginContent() {
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-600"
+                      className="h-4 w-4 rounded border-line text-accent"
                     />
-                    <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 font-medium">
+                    <label htmlFor="remember-me" className="ml-2 block text-sm text-muted font-medium">
                       Remember me
                     </label>
                   </div>
@@ -421,7 +421,7 @@ function LoginContent() {
                           ? `/forgot-password?email=${encodeURIComponent(email)}`
                           : "/forgot-password"
                       }
-                      className="font-medium text-violet-600 hover:text-violet-700"
+                      className="font-medium text-accent hover:text-accent"
                     >
                       Forgot password?
                     </Link>
@@ -431,7 +431,7 @@ function LoginContent() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 transition-colors"
+                  className="mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors"
                 >
                   {isSubmitting ? "Signing In..." : "Sign In"}
                 </button>
@@ -447,9 +447,9 @@ function LoginContent() {
               <LoginCodeForm email={email} onEmailChange={setEmail} />
             </div>
 
-            <p className="mt-10 text-center text-sm text-slate-500">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" className="font-semibold text-violet-600 hover:text-violet-700">
+            <p className="mt-10 text-center text-sm text-muted">
+              Don&apos;t have an account?{""}
+              <Link href="/signup" className="font-semibold text-accent hover:text-accent">
                 Sign up
               </Link>
             </p>

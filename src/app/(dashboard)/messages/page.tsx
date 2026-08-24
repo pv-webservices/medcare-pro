@@ -67,7 +67,7 @@ export default async function MessagesPage() {
     return (
       <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
         <PageHeader title="Messages" />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
           Your role cannot send WhatsApp messages. Ask an admin or the account
           owner if you need access.
         </div>
@@ -107,7 +107,7 @@ export default async function MessagesPage() {
       {device && !device.connected && (
         <p
           role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 font-medium"
+          className="rounded-xl bg-warn-bg px-4 py-3 text-sm text-warn-ink font-medium"
         >
           The WhatsApp device is {device.status.toLowerCase()}. Scan its QR code
           in the provider panel to reconnect — sends will fail until you do.
@@ -115,12 +115,12 @@ export default async function MessagesPage() {
       )}
 
       <section aria-labelledby="send-heading" className="space-y-4">
-        <h2 id="send-heading" className="text-lg font-bold text-slate-900">
+        <h2 id="send-heading" className="text-lg font-bold text-ink">
           Send a message
         </h2>
         {templates.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
+          <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+            <p className="text-sm font-medium text-muted">
               {canManageTemplates
                 ? "Add a template below before you can message patients."
                 : "No templates yet. Ask an admin to add one before you can message patients."}
@@ -141,7 +141,7 @@ export default async function MessagesPage() {
       </div>
 
       <section aria-labelledby="history-heading" className="space-y-4 pt-2">
-        <h2 id="history-heading" className="text-lg font-bold text-slate-900">
+        <h2 id="history-heading" className="text-lg font-bold text-ink">
           Message history
         </h2>
         <MessageHistory messages={messages} />

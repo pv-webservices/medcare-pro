@@ -1,32 +1,30 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Anek_Latin, IBM_Plex_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 /*
- * Two type roles, no more — see .claude/skills/admin-dashboard-ui.
+ * ONE TYPEFACE, THE FULL WEIGHT RANGE.
  *
- * Anek Latin (Ek Type, Mumbai) carries headings. Its siblings cover Devanagari
- * and the South Indian scripts, so this UI can grow Hindi or Marathi labels
- * later without changing typeface.
+ * Plus Jakarta Sans carries every role. The previous pairing split headings
+ * (Anek Latin) from body and figures (IBM Plex Sans); the neumorphic system
+ * does that separation with weight instead — 800 for a page greeting and a KPI
+ * number, 400 for a caption — because on a surface this soft, a second
+ * typeface reads as a second design rather than a second voice.
  *
- * IBM Plex Sans carries everything else, and every number without exception:
- * it was drawn for dense enterprise interfaces, has true tabular figures for
- * rupee amounts and patient counts, and keeps 1 / l / I distinct — which is
- * what a ten-digit mobile number needs.
+ * It keeps what the pairing was chosen for: true tabular figures, so rupee
+ * amounts and patient counts align down a column, and open enough shapes to
+ * keep 1 / l / I distinct in a ten-digit mobile number.
+ *
+ * 800 is loaded because the design genuinely uses it (greeting, KPI, wordmark).
+ * Adding a weight that no rule calls for is the usual way a font budget grows.
  */
 
-const anek = Anek_Latin({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-anek",
-  display: "swap",
-});
-
-const plex = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-jakarta",
   display: "swap",
 });
 
@@ -44,7 +42,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`h-full antialiased ${anek.variable} ${plex.variable}`}
+      className={`h-full antialiased ${jakarta.variable}`}
     >
       <body className="min-h-full font-sans">
         <ThemeProvider attribute="data-theme" defaultTheme="light">

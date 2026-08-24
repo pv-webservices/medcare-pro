@@ -55,12 +55,12 @@ export default function OwnerLoginForm() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-slate-200">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-canvas-deep text-ink">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
             <div className="text-lg font-semibold leading-none">Platform access</div>
-            <div className="mt-1 text-xs text-slate-400">MEDCARE PRO administration</div>
+            <div className="mt-1 text-xs text-muted">MEDCARE PRO administration</div>
           </div>
         </div>
 
@@ -75,39 +75,39 @@ export default function OwnerLoginForm() {
         */}
         <form method="post" onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <p role="alert" className="rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-200">
+            <p role="alert" className="rounded-lg bg-alert-bg px-3 py-2 text-sm text-alert-ink">
               {error}
             </p>
           )}
 
           <label className="block text-sm">
-            <span className="mb-1.5 block text-slate-300">Email</span>
+            <span className="mb-1.5 block text-muted">Email</span>
             <input
               type="email"
               required
               autoComplete="username"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-slate-500"
+              className="w-full rounded-2xl bg-canvas px-3 py-2 text-ink shadow-neu-inset"
             />
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1.5 block text-slate-300">Password</span>
+            <span className="mb-1.5 block text-muted">Password</span>
             <input
               type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-slate-500"
+              className="w-full rounded-2xl bg-canvas px-3 py-2 text-ink shadow-neu-inset"
             />
           </label>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-900 disabled:opacity-60"
+            className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-ink disabled:opacity-60"
           >
             {isSubmitting ? "Signing in…" : "Sign in"}
           </button>

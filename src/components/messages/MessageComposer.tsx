@@ -157,8 +157,8 @@ export default function MessageComposer({
 
   if (!clinicId) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-        <p className="text-sm font-medium text-slate-500">
+      <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+        <p className="text-sm font-medium text-muted">
           Pick a clinic in the sidebar to message its patients.
         </p>
       </div>
@@ -170,7 +170,7 @@ export default function MessageComposer({
       {!isConfigured && (
         <p
           role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700"
+          className="rounded-xl bg-warn-bg px-4 py-3 text-sm font-medium text-warn-ink"
         >
           WhatsApp is not connected yet. Set WHATSAPP_BSP_API_KEY in the
           environment before sending.
@@ -180,7 +180,7 @@ export default function MessageComposer({
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {error}
         </p>
@@ -209,7 +209,7 @@ export default function MessageComposer({
 
       <div className="space-y-6">
         <div className="max-w-3xl">
-          <label className="mb-2 block text-sm font-semibold text-slate-900">
+          <label className="mb-2 block text-sm font-semibold text-ink">
             Filter by visit date
           </label>
           <div className="flex items-center gap-3 py-1">
@@ -240,14 +240,14 @@ export default function MessageComposer({
             <div className="flex items-center gap-1">
               <input
                 type="date"
-                className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 h-8"
+                className="rounded-md border border-line px-3 py-1 text-sm text-ink h-8"
                 value={startDateFilter}
                 onChange={(e) => setStartDateFilter(e.target.value)}
               />
-              <span className="text-slate-500 text-sm">to</span>
+              <span className="text-muted text-sm">to</span>
               <input
                 type="date"
-                className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 h-8"
+                className="rounded-md border border-line px-3 py-1 text-sm text-ink h-8"
                 value={endDateFilter}
                 onChange={(e) => setEndDateFilter(e.target.value)}
               />
@@ -271,7 +271,7 @@ export default function MessageComposer({
           {(search.trim().length >= 2 || startDateFilter !== "" || endDateFilter !== "") && matches.length > 0 && (
             <div className="mt-2">
               <div className="flex justify-between items-center px-1 mb-1">
-                <span className="text-xs font-medium text-slate-500">{matches.length} patients found</span>
+                <span className="text-xs font-medium text-muted">{matches.length} patients found</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -282,26 +282,26 @@ export default function MessageComposer({
                     setStartDateFilter("");
                     setEndDateFilter("");
                   }}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                  className="text-xs font-medium text-accent hover:text-accent-strong transition-colors"
                 >
                   Select All
                 </button>
               </div>
-              <ul className="grid gap-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm max-h-64 overflow-y-auto">
+              <ul className="grid gap-1 rounded-md bg-canvas p-1 shadow-neu-raised-sm max-h-64 overflow-y-auto">
                 {matches.map((patient) => (
                   <li key={patient.id}>
                     <button
                       type="button"
                       onClick={() => addRecipient(patient)}
-                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-sm hover:bg-slate-50 transition-colors"
+                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-sm hover:bg-canvas-deep transition-colors"
                     >
                       <span>
-                        <span className="font-medium text-slate-900">{patient.name}</span>{" "}
-                        <span className="text-slate-500">
+                        <span className="font-medium text-ink">{patient.name}</span>{""}
+                        <span className="text-muted">
                           {patient.patientCode}
                         </span>
                       </span>
-                      <span className="tabular-nums text-slate-500">
+                      <span className="tabular-nums text-muted">
                         {patient.mobileNumber}
                       </span>
                     </button>
@@ -315,19 +315,19 @@ export default function MessageComposer({
 
       {recipients.length > 0 && (
         <div>
-          <p className="mb-2 text-sm font-semibold text-slate-900">
-            Sending to {recipients.length}{" "}
+          <p className="mb-2 text-sm font-semibold text-ink">
+            Sending to {recipients.length}{""}
             {recipients.length === 1 ? "patient" : "patients"}
           </p>
           <ul className="flex flex-wrap gap-2">
             {recipients.map((patient) => (
               <li
                 key={patient.id}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 py-1.5 pl-3 pr-1.5 bg-slate-50"
+                className="flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-1.5 bg-canvas-deep"
               >
-                <span className="text-sm font-medium text-slate-900">
-                  {patient.name}{" "}
-                  <span className="text-slate-500 font-normal">
+                <span className="text-sm font-medium text-ink">
+                  {patient.name}{""}
+                  <span className="text-muted font-normal">
                     {patient.patientCode}
                   </span>
                 </span>
@@ -335,7 +335,7 @@ export default function MessageComposer({
                   type="button"
                   onClick={() => removeRecipient(patient.id)}
                   aria-label={`Remove ${patient.name}`}
-                  className="min-h-8 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50 transition-colors"
+                  className="min-h-8 rounded-md px-2 text-xs font-medium text-muted hover:bg-canvas-deep disabled:opacity-50 transition-colors"
                 >
                   Remove
                 </button>
@@ -347,21 +347,21 @@ export default function MessageComposer({
 
       {template && (
         <div>
-          <p className="mb-2 text-sm font-semibold text-slate-900">Preview</p>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-ink">Preview</p>
+          <div className="rounded-xl bg-canvas-deep p-4">
             {template.mediaType && (
-              <p className="mb-3 text-xs font-medium text-slate-500">
+              <p className="mb-3 text-xs font-medium text-muted">
                 With {template.mediaType} attachment
               </p>
             )}
-            <p className="whitespace-pre-wrap text-sm text-slate-900">{preview}</p>
+            <p className="whitespace-pre-wrap text-sm text-ink">{preview}</p>
             {template.footer && (
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-3 text-xs text-muted">
                 {template.footer}
               </p>
             )}
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-muted">
             Doctor, department, visit date and amount are filled from each
             patient&apos;s most recent visit when the message is sent.
           </p>
@@ -400,8 +400,8 @@ function SendOutcome({ outcome }: { outcome: SendMessageResult }) {
       role="status"
       className={`rounded-xl border px-4 py-3 text-sm font-medium ${
         failures.length === 0
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : "border-amber-200 bg-amber-50 text-amber-800"
+          ? "border-line bg-ok-bg text-ok-ink"
+          : "border-line bg-warn-bg text-warn-ink"
       }`}
     >
       <p>

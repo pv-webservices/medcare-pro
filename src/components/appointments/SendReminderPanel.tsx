@@ -60,7 +60,7 @@ export default function SendReminderPanel({
 
   if (refusal) {
     return (
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+      <p className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
         {refusal}
       </p>
     );
@@ -68,11 +68,11 @@ export default function SendReminderPanel({
 
   if (templates.length === 0) {
     return (
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
-        No approved templates exist yet. An admin writes them on the{" "}
+      <p className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        No approved templates exist yet. An admin writes them on the{""}
         <Link href="/messages" className="font-semibold text-primary underline">
           Messages
-        </Link>{" "}
+        </Link>{""}
         screen — only approved wording can be sent.
       </p>
     );
@@ -151,15 +151,15 @@ export default function SendReminderPanel({
       </Select>
 
       {chosen && (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <div className="rounded-2xl bg-canvas-deep px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
             What will be sent
           </p>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-900">
+          <p className="mt-2 whitespace-pre-wrap text-sm text-ink">
             {renderTemplate(chosen.body, values)}
           </p>
           {chosen.footer && (
-            <p className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-500">
+            <p className="mt-2 border-t border-line pt-2 text-xs text-muted">
               {chosen.footer}
             </p>
           )}
@@ -176,7 +176,7 @@ export default function SendReminderPanel({
         >
           Send Reminder
         </Button>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted">
           Sending records the attempt against this patient, whether it succeeds
           or fails.
         </p>

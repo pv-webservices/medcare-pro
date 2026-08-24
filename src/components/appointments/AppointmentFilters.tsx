@@ -158,7 +158,7 @@ export default function AppointmentFilters({
 
         <label
           htmlFor="appointment-filter-history"
-          className="mt-4 flex min-h-11 w-fit cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700"
+          className="mt-4 flex min-h-11 w-fit cursor-pointer items-center gap-2.5 text-sm font-medium text-ink"
         >
           <input
             id="appointment-filter-history"
@@ -167,7 +167,7 @@ export default function AppointmentFilters({
             onChange={(e) =>
               setValues({ ...values, includeHistory: e.target.checked })
             }
-            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            className="h-4 w-4 rounded border-line text-primary focus:ring-primary"
           />
           Show cancelled, missed and moved appointments
         </label>

@@ -31,7 +31,7 @@ interface ClinicsTableProps {
 }
 
 /** Counts are the reason this screen exists, so they outrank the row's text. */
-const COUNT_CLASS = "text-xl font-semibold tabular-nums text-slate-900";
+const COUNT_CLASS = "text-xl font-semibold tabular-nums text-ink";
 
 /** Falls back to the rule colour, not the house accent — see the note above. */
 function railStyle(themeColor: string | null): CSSProperties {
@@ -83,7 +83,7 @@ export default function ClinicsTable({
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/clinics/${clinic.id}`}
-                        className="font-medium text-slate-900 underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                        className="font-medium text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                       >
                         {clinic.name}
                       </Link>
@@ -94,12 +94,12 @@ export default function ClinicsTable({
                       )}
                     </div>
                     {clinic.address && (
-                      <p className="mt-0.5 text-sm text-slate-500">{clinic.address}</p>
+                      <p className="mt-0.5 text-sm text-muted">{clinic.address}</p>
                     )}
                   </TD>
 
                   <TD>
-                    {clinic.city ?? <span className="text-slate-400">—</span>}
+                    {clinic.city ?? <span className="text-faint">—</span>}
                   </TD>
 
                   <TD isNumeric className={COUNT_CLASS}>
@@ -113,7 +113,7 @@ export default function ClinicsTable({
                   <TD align="end" className="py-0 pl-0">
                     <Link
                       href={`/clinics/${clinic.id}`}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-400 hover:text-slate-900"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-faint hover:text-ink"
                     >
                       <span className="sr-only">Open {clinic.name}</span>
                       <ChevronRight
@@ -139,7 +139,7 @@ export default function ClinicsTable({
             <li key={clinic.id} style={railStyle(clinic.themeColor)}>
               <Card
                 isFlush
-                className={cx("overflow-hidden", isCurrent && "bg-slate-50 border-violet-100")}
+                className={cx("overflow-hidden", isCurrent && "bg-canvas-deep border-line")}
               >
                 <div className="flex items-stretch">
                   <span aria-hidden="true" className="w-1 shrink-0 bg-accent" />
@@ -148,7 +148,7 @@ export default function ClinicsTable({
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/clinics/${clinic.id}`}
-                        className="font-medium text-slate-900 underline decoration-slate-200 underline-offset-4"
+                        className="font-medium text-ink underline decoration-slate-200 underline-offset-4"
                       >
                         {clinic.name}
                       </Link>
@@ -160,19 +160,19 @@ export default function ClinicsTable({
                     </div>
 
                     {clinic.city && (
-                      <p className="mt-0.5 text-sm text-slate-500">{clinic.city}</p>
+                      <p className="mt-0.5 text-sm text-muted">{clinic.city}</p>
                     )}
 
                     <div className="mt-3 flex gap-8">
                       <div>
                         <p className={COUNT_CLASS}>{clinic.doctorCount}</p>
-                        <p className="text-xs font-semibold uppercase text-slate-500">
+                        <p className="text-xs font-semibold uppercase text-muted">
                           Doctors
                         </p>
                       </div>
                       <div>
                         <p className={COUNT_CLASS}>{clinic.patientCount}</p>
-                        <p className="text-xs font-semibold uppercase text-slate-500">
+                        <p className="text-xs font-semibold uppercase text-muted">
                           Patients
                         </p>
                       </div>

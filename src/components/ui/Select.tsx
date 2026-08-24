@@ -7,9 +7,14 @@ import { controlClasses, FieldShell } from "@/components/ui/Input";
  * A native `<select>`, deliberately.
  *
  * A custom listbox would let us style the options, and would also cost us the
- * OS picker — which on the tablet at the front desk is a full-height wheel
- * that beats anything we would build. The only thing we restyle is the shell
- * and the chevron.
+ * OS picker — which on the tablet at the front desk is a full-height wheel that
+ * beats anything we would build. The only things we restyle are the shell and
+ * the chevron.
+ *
+ * The shell is the same inset well as every other field, so a select reads as
+ * something you fill rather than something you press. The one place it does not
+ * follow that rule is the clinic switcher in the sidebar, which passes
+ * `isLabelHidden` and lives inside its own raised pill — see ClinicSwitcher.
  */
 
 interface SelectProps
@@ -44,7 +49,7 @@ export default function Select({
         aria-label={isLabelHidden ? label : undefined}
         className={controlClasses(
           Boolean(error),
-          cx("min-h-11 appearance-none py-0 pl-3 pr-9", className),
+          cx("min-h-11 cursor-pointer appearance-none py-0 pl-4 pr-11", className),
         )}
         {...rest}
       >
@@ -52,8 +57,8 @@ export default function Select({
       </select>
       <ChevronDown
         aria-hidden="true"
-        strokeWidth={1.75}
-        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+        strokeWidth={2}
+        className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
       />
     </div>
   );
@@ -66,8 +71,8 @@ export default function Select({
           <p
             id={`${id}-message`}
             className={cx(
-              "mt-1.5 text-xs",
-              error ? "text-red-500" : "text-slate-500",
+              "mt-2 text-meta font-medium",
+              error ? "text-alert-ink" : "text-muted",
             )}
           >
             {error ?? hint}

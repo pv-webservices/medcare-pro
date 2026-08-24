@@ -5,11 +5,17 @@ import { cx } from "@/components/ui/cx";
  * The one badge in this app. Tones map to meaning, never to taste — see the
  * status vocabulary table in .claude/skills/admin-dashboard-ui.
  *
- *   ok       delivered, active, verified
- *   warn     queued, pending, unread
- *   alert    failed, blocked, rejected
- *   neutral  a fact with no action attached (visit type, role name)
- *   accent   the current selection — the only tone tied to clinic identity
+ *   ok       delivered, active, verified, paid, completed
+ *   warn     queued, pending, unread, waiting
+ *   alert    failed, blocked, rejected, cancelled
+ *   neutral  a fact with no action attached (visit type, role name, "updated")
+ *   accent   the current selection, and "confirmed" — the one tone tied to the
+ *            house accent rather than to a status hue
+ *
+ * THE PILL IS FLAT. Everything raised on this canvas is something you can press,
+ * and a pill is a label. Giving it depth would promise an interaction that is
+ * not there — which on a soft surface is a genuinely misleading signal, not a
+ * stylistic quibble.
  *
  * The dot is not decoration: it carries the state for anyone who cannot
  * separate the tones by hue, so the pill never relies on colour alone.
@@ -18,17 +24,11 @@ import { cx } from "@/components/ui/cx";
 export type StatusTone = "ok" | "warn" | "alert" | "neutral" | "accent";
 
 const TONES: Record<StatusTone, { pill: string; dot: string }> = {
-  ok: { pill: "border-emerald-200 bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
-  warn: { pill: "border-amber-200 bg-amber-50 text-amber-700", dot: "bg-amber-500" },
-  alert: { pill: "border-red-200 bg-red-50 text-red-700", dot: "bg-red-500" },
-  neutral: {
-    pill: "border-slate-200 bg-slate-50 text-slate-600",
-    dot: "bg-slate-400",
-  },
-  accent: {
-    pill: "border-violet-200 bg-violet-50 text-violet-700",
-    dot: "bg-violet-500",
-  },
+  ok: { pill: "bg-ok-bg text-ok-ink", dot: "bg-ok-mark" },
+  warn: { pill: "bg-warn-bg text-warn-ink", dot: "bg-warn-mark" },
+  alert: { pill: "bg-alert-bg text-alert-ink", dot: "bg-alert-mark" },
+  neutral: { pill: "bg-pill text-pill-ink", dot: "bg-pill-ink" },
+  accent: { pill: "bg-accent-soft text-accent-soft-ink", dot: "bg-accent" },
 };
 
 interface StatusPillProps {
@@ -50,8 +50,8 @@ export default function StatusPill({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5",
-        "text-[10px] font-bold uppercase tracking-wider",
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1",
+        "text-meta font-semibold whitespace-nowrap",
         pill,
         className,
       )}

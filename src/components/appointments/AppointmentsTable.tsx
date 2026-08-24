@@ -52,14 +52,14 @@ interface AppointmentsTableProps {
 }
 
 function Dash() {
-  return <span className="text-slate-400">—</span>;
+  return <span className="text-faint">—</span>;
 }
 
 function SlotTime({ start, end }: { start: string; end: string }) {
   return (
     <>
-      <span className="font-bold tabular-nums text-slate-900">{start}</span>
-      <p className="mt-0.5 text-xs tabular-nums text-slate-500">to {end}</p>
+      <span className="font-bold tabular-nums text-ink">{start}</span>
+      <p className="mt-0.5 text-xs tabular-nums text-muted">to {end}</p>
     </>
   );
 }
@@ -136,11 +136,11 @@ export default function AppointmentsTable({
                 <TD>
                   <Link
                     href={`/appointments/${appointment.id}`}
-                    className="font-semibold text-slate-900 underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                    className="font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                   >
                     {appointment.name}
                   </Link>
-                  <p className="mt-0.5 text-xs tabular-nums text-slate-500">
+                  <p className="mt-0.5 text-xs tabular-nums text-muted">
                     {appointment.mobileNumber}
                   </p>
                 </TD>
@@ -151,7 +151,7 @@ export default function AppointmentsTable({
 
                 {showClinic && <TD>{appointment.clinicName}</TD>}
 
-                <TD isNumeric className="font-bold text-slate-900">
+                <TD isNumeric className="font-bold text-ink">
                   {formatRupees(appointment.amount)}
                 </TD>
 
@@ -173,7 +173,7 @@ export default function AppointmentsTable({
                     />
                     <Link
                       href={`/appointments/${appointment.id}`}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:text-slate-900"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-faint transition-colors hover:text-ink"
                     >
                       <span className="sr-only">
                         Open {appointment.name}&apos;s appointment
@@ -200,25 +200,25 @@ export default function AppointmentsTable({
             <Card isFlush className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-lg font-bold tabular-nums text-slate-900">
+                  <p className="text-lg font-bold tabular-nums text-ink">
                     {appointment.startTime}
-                    <span className="ml-2 text-xs font-normal text-slate-500">
+                    <span className="ml-2 text-xs font-normal text-muted">
                       to {appointment.endTime}
                     </span>
                   </p>
                   <Link
                     href={`/appointments/${appointment.id}`}
-                    className="mt-1 block font-semibold text-slate-900 underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                    className="mt-1 block font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
                   >
                     {appointment.name}
                   </Link>
-                  <p className="mt-0.5 text-xs tabular-nums text-slate-500">
+                  <p className="mt-0.5 text-xs tabular-nums text-muted">
                     {appointment.mobileNumber}
                   </p>
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="font-bold tabular-nums text-slate-900">
+                  <p className="font-bold tabular-nums text-ink">
                     {formatRupees(appointment.amount)}
                   </p>
                   <div className="mt-1.5">
@@ -231,7 +231,7 @@ export default function AppointmentsTable({
                 </div>
               </div>
 
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-muted">
                 {appointment.appointmentTypeName}
                 {appointment.doctorName ? ` · ${appointment.doctorName}` : ""}
                 {showClinic ? ` · ${appointment.clinicName}` : ""}

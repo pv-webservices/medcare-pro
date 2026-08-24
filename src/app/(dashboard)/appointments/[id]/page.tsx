@@ -61,16 +61,16 @@ function Fact({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted">
         {label}
       </p>
-      <div className="mt-1 text-slate-900">{children}</div>
+      <div className="mt-1 text-ink">{children}</div>
     </div>
   );
 }
 
 function NotSet() {
-  return <span className="text-slate-400">Not recorded</span>;
+  return <span className="text-faint">Not recorded</span>;
 }
 
 export default async function AppointmentDetailPage({
@@ -166,13 +166,13 @@ export default async function AppointmentDetailPage({
         back={{ href: "/appointments", label: "Back to appointments" }}
         meta={
           <>
-            {formatAppointmentDate(appointment.date)} at{" "}
-            <span className="font-bold tabular-nums text-slate-900">
+            {formatAppointmentDate(appointment.date)} at{""}
+            <span className="font-bold tabular-nums text-ink">
               {appointment.startTime}
             </span>
-            {" – "}
+            {"–"}
             <span className="tabular-nums">{appointment.endTime}</span>
-            {" · "}
+            {"·"}
             {appointment.clinicName}
           </>
         }
@@ -186,15 +186,15 @@ export default async function AppointmentDetailPage({
       {/* The visit this became. First, because on a converted appointment it is
           the thing the desk came here to find. */}
       {appointment.registration && (
-        <Card isFlush className="border-emerald-200 bg-emerald-50 p-4">
+        <Card isFlush className="border-line bg-ok-bg p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="flex items-center gap-2 text-sm text-emerald-800">
+            <p className="flex items-center gap-2 text-sm text-ok-ink">
               <ClipboardList
                 aria-hidden="true"
                 strokeWidth={1.75}
                 className="h-4 w-4"
               />
-              Registered as{" "}
+              Registered as{""}
               <span className="serial font-semibold">
                 {appointment.registration.patientCode}
               </span>
@@ -220,7 +220,7 @@ export default async function AppointmentDetailPage({
       {appointment.rescheduledToId && (
         <Card isFlush className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               This booking was moved. The live one is on another slot.
             </p>
             <Link
@@ -278,14 +278,14 @@ export default async function AppointmentDetailPage({
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <Fact label="Doctor">
             {appointment.doctorName}
-            <p className="mt-0.5 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm text-muted">
               {appointment.doctorDepartment}
             </p>
           </Fact>
 
           <Fact label="Service">
             {appointment.appointmentTypeName}
-            <p className="mt-0.5 text-sm tabular-nums text-slate-500">
+            <p className="mt-0.5 text-sm tabular-nums text-muted">
               {appointment.durationMinutes} minutes
             </p>
           </Fact>
@@ -313,7 +313,7 @@ export default async function AppointmentDetailPage({
                 })}
               </span>
               {appointment.checkedInByName && (
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-muted">
                   Recorded by {appointment.checkedInByName}
                 </p>
               )}
@@ -331,12 +331,12 @@ export default async function AppointmentDetailPage({
                 })}
               </span>
               {appointment.cancelledByName && (
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-muted">
                   By {appointment.cancelledByName}
                 </p>
               )}
               {appointment.cancellationReason && (
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-muted">
                   {appointment.cancellationReason}
                 </p>
               )}
@@ -366,7 +366,7 @@ export default async function AppointmentDetailPage({
                 {appointment.patientCode}
               </span>
             ) : (
-              <span className="text-slate-400">Not created yet</span>
+              <span className="text-faint">Not created yet</span>
             )}
           </Fact>
 

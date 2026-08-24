@@ -118,21 +118,21 @@ export default function LeaveManager({
     return (
       <li
         key={entry.id}
-        className={`flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 py-4 last:border-b-0 ${
+        className={`flex flex-wrap items-center justify-between gap-2 border-b border-line py-4 last:border-b-0 ${
           isEnded ? "opacity-60" : ""
         }`}
       >
         <div>
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-sm font-semibold text-ink">
             {formatRange(entry)}
             {isActiveNow && (
-              <span className="ml-3 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
+              <span className="ml-3 rounded-md bg-warn-bg px-2.5 py-1 text-xs font-semibold text-warn-ink">
                 Away now
               </span>
             )}
           </p>
           {entry.reason && (
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted">
               {entry.reason}
             </p>
           )}
@@ -143,7 +143,7 @@ export default function LeaveManager({
             onClick={() => handleRemove(entry.id)}
             disabled={removingId === entry.id}
             aria-label={`Remove leave ${formatRange(entry)}`}
-            className="min-h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 transition-colors"
+            className="min-h-9 rounded-md px-3 text-xs font-medium text-muted hover:bg-canvas-deep hover:text-ink disabled:opacity-50 transition-colors"
           >
             {removingId === entry.id ? "Removing…" : "Remove"}
           </button>
@@ -154,21 +154,21 @@ export default function LeaveManager({
 
   return (
     <section aria-labelledby="leave-heading" className="space-y-4">
-      <h2 id="leave-heading" className="text-lg font-bold text-slate-900">
+      <h2 id="leave-heading" className="text-lg font-bold text-ink">
         Leave
       </h2>
 
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
         >
           {error}
         </p>
       )}
 
       {canEdit && (
-        <Card isFlush={false} className="p-4 bg-slate-50 border-slate-200">
+        <Card isFlush={false} className="p-4 bg-canvas-deep border-line">
           <form
             onSubmit={handleAdd}
             className="grid gap-4 sm:grid-cols-2"
@@ -218,8 +218,8 @@ export default function LeaveManager({
       )}
 
       {entries.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-500">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+          <p className="text-sm font-medium text-muted">
             No leave recorded.
           </p>
         </div>
@@ -228,8 +228,8 @@ export default function LeaveManager({
           <ul>{current.map((entry) => renderEntry(entry, false))}</ul>
 
           {ended.length > 0 && (
-            <details className="mt-4 border-t border-slate-200 pt-4 group">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors list-none flex items-center">
+            <details className="mt-4 border-t border-line pt-4 group">
+              <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
                 <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
                 Past leave ({ended.length})
               </summary>

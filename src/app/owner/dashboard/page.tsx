@@ -24,12 +24,12 @@ export default async function OwnerDashboardPage() {
   return (
     <div className="mx-auto max-w-4xl p-8">
       <div className="mb-8 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-slate-200">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-canvas-deep text-ink">
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div>
           <h1 className="text-xl font-semibold leading-none">Platform overview</h1>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-muted">
             {overview.totalCustomerTenants} clinic organisation
             {overview.totalCustomerTenants === 1 ? "" : "s"} on the platform
           </p>
@@ -41,17 +41,17 @@ export default async function OwnerDashboardPage() {
           <Link
             key={card.label}
             href={`/owner/applications?status=${card.status}`}
-            className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+            className="rounded-3xl bg-canvas p-4 transition hover: shadow-neu-raised-sm"
           >
             <div className="text-2xl font-semibold tabular-nums">{card.value}</div>
-            <div className="mt-1 text-xs text-slate-400">{card.label}</div>
+            <div className="mt-1 text-xs text-muted">{card.label}</div>
           </Link>
         ))}
       </div>
 
       <Link
         href="/owner/applications?status=PENDING"
-        className="mt-8 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-white"
+        className="mt-8 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong"
       >
         Review clinic applications
         <ArrowRight className="h-4 w-4" />
@@ -67,26 +67,26 @@ export default async function OwnerDashboardPage() {
       <div className="mt-8 grid gap-3 sm:grid-cols-3">
         <Link
           href="/owner/features"
-          className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+          className="rounded-3xl bg-canvas p-4 transition hover: shadow-neu-raised-sm"
         >
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
             <ToggleLeft className="h-4 w-4" />
             Platform features
           </div>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-muted">
             Switch a feature off for every organisation at once. Layer 1.
           </p>
         </Link>
 
         <Link
           href="/owner/plans"
-          className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+          className="rounded-3xl bg-canvas p-4 transition hover: shadow-neu-raised-sm"
         >
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
             <Layers className="h-4 w-4" />
             Plans
           </div>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-muted">
             What each plan includes, and who follows it. Layer 2.
           </p>
         </Link>
@@ -98,13 +98,13 @@ export default async function OwnerDashboardPage() {
         */}
         <Link
           href="/owner/audit"
-          className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-600"
+          className="rounded-3xl bg-canvas p-4 transition hover: shadow-neu-raised-sm"
         >
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
             <ScrollText className="h-4 w-4" />
             Activity log
           </div>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-muted">
             Every decision taken on the platform. Append-only, exportable.
           </p>
         </Link>

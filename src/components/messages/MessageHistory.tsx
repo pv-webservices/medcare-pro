@@ -32,9 +32,9 @@ function formatTimestamp(value: Date): string {
 export default function MessageHistory({ messages }: MessageHistoryProps) {
   if (messages.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
-        <p className="mb-1 font-semibold text-slate-900">No messages sent yet</p>
-        <p className="text-sm text-slate-500">
+      <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+        <p className="mb-1 font-semibold text-ink">No messages sent yet</p>
+        <p className="text-sm text-muted">
           Messages you send to patients appear here with their result.
         </p>
       </div>
@@ -46,20 +46,20 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
       <Card isFlush>
         <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/50">
-              <th scope="col" className="py-3 pl-4 pr-3 font-semibold text-slate-900">
+            <tr className="border-b border-line bg-canvas-deep/50">
+              <th scope="col" className="py-3 pl-4 pr-3 font-semibold text-ink">
                 Patient
               </th>
-              <th scope="col" className="py-3 pr-3 font-semibold text-slate-900">
+              <th scope="col" className="py-3 pr-3 font-semibold text-ink">
                 Template
               </th>
-              <th scope="col" className="py-3 pr-3 font-semibold text-slate-900">
+              <th scope="col" className="py-3 pr-3 font-semibold text-ink">
                 Clinic
               </th>
-              <th scope="col" className="py-3 pr-3 font-semibold text-slate-900">
+              <th scope="col" className="py-3 pr-3 font-semibold text-ink">
                 Result
               </th>
-              <th scope="col" className="py-3 pr-4 font-semibold text-slate-900">
+              <th scope="col" className="py-3 pr-4 font-semibold text-ink">
                 Sent
               </th>
             </tr>
@@ -68,38 +68,38 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
             {messages.map((message) => (
               <tr
                 key={message.id}
-                className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors"
+                className="border-b border-line last:border-b-0 hover:bg-canvas-deep/50 transition-colors"
               >
                 <td className="py-3 pl-4 pr-3">
-                  <span className="font-medium text-slate-900">{message.patientName}</span>{" "}
-                  <span className="text-slate-500">
+                  <span className="font-medium text-ink">{message.patientName}</span>{""}
+                  <span className="text-muted">
                     {message.patientCode}
                   </span>
-                  <span className="block tabular-nums text-slate-500">
+                  <span className="block tabular-nums text-muted">
                     {message.mobileNumber}
                   </span>
                 </td>
-                <td className="py-3 pr-3 text-slate-900">{message.templateName}</td>
-                <td className="py-3 pr-3 text-slate-900">{message.clinicName}</td>
+                <td className="py-3 pr-3 text-ink">{message.templateName}</td>
+                <td className="py-3 pr-3 text-ink">{message.clinicName}</td>
                 <td className="py-3 pr-3">
                   {message.status === "sent" ? (
-                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Accepted</span>
+                    <span className="inline-flex items-center rounded-md bg-ok-bg px-2 py-1 text-xs font-medium text-ok-ink ring-1 ring-inset ring-ok-mark/30">Accepted</span>
                   ) : (
                     <>
                       {/* Red is reserved for things needing action — a failed
                           send is exactly that. */}
-                      <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
+                      <span className="inline-flex items-center rounded-md bg-alert-bg px-2 py-1 text-xs font-medium text-alert-ink ring-1 ring-inset ring-alert-mark/30">
                         Failed
                       </span>
                       {message.failureReason && (
-                        <span className="mt-1 block text-slate-500">
+                        <span className="mt-1 block text-muted">
                           {message.failureReason}
                         </span>
                       )}
                     </>
                   )}
                 </td>
-                <td className="py-3 pr-4 tabular-nums text-slate-500">
+                <td className="py-3 pr-4 tabular-nums text-muted">
                   {formatTimestamp(message.sentAt)}
                 </td>
               </tr>
@@ -108,7 +108,7 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
         </table>
       </Card>
 
-      <p className="mt-4 text-xs text-slate-500 max-w-3xl">
+      <p className="mt-4 text-xs text-muted max-w-3xl">
         &ldquo;Accepted&rdquo; means the WhatsApp gateway took the message. This
         provider does not report back delivered or read receipts, so no further
         status is available.
