@@ -27,10 +27,17 @@ const FALLBACK_COLOR = "#1d4ed8";
 interface BrandingFormProps {
   clinicId: string;
   clinicName: string;
+  clinicAddress: string | null;
+  clinicCity: string | null;
   logoUrl: string | null;
   themeColor: string | null;
   canEdit: boolean;
 }
+
+/** Mirrors createClinicSchema in src/lib/clinics.ts. */
+const MAX_NAME = 255;
+const MAX_ADDRESS = 1000;
+const MAX_CITY = 255;
 
 function validateLogoUrl(value: string): string | null {
   if (value === "") {
@@ -56,11 +63,19 @@ function validateLogoUrl(value: string): string | null {
 export default function BrandingForm({
   clinicId,
   clinicName,
+  clinicAddress,
+  clinicCity,
   logoUrl,
   themeColor,
   canEdit,
 }: BrandingFormProps) {
   const router = useRouter();
+  // The clinic's own details, which used to be edited on the Clinics screen.
+  // They save through the same PATCH /api/clinics/[id] the logo already used,
+  // so removing that screen took no endpoint with it.
+  const [name, setName] = useState(clinicName);
+  const [address, setAddress] = useState(clinicAddress ?? "");
+  const [city, setCity] = useState(clinicCity ?? "");
   const [logo, setLogo] = useState(logoUrl ?? "");
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +112,11 @@ export default function BrandingForm({
   }
 
   const logoError = validateLogoUrl(logo);
-  const hasErrors = logoError !== null;
+  // A clinic with no name is what the server would reject anyway; catching it
+  // here means the user is told at the keystroke rather than after a round trip.
+  const nameError =
+    name.trim() === "" ? "Clinic name is required." : null;
+  const hasErrors = logoError !== null || nameError !== null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,14 +133,19 @@ export default function BrandingForm({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         // Empty string clears the field — the server maps it to null.
-        body: JSON.stringify({ logoUrl: logo }),
+        body: JSON.stringify({
+          name: name.trim(),
+          address,
+          city,
+          logoUrl: logo,
+        }),
       });
       const payload: { success?: boolean; error?: string } = await response
         .json()
         .catch(() => ({}));
 
       if (!response.ok || !payload.success) {
-        setError(payload.error ?? "Could not save branding. Try again.");
+        setError(payload.error ?? "Could not save your changes. Try again.");
         return;
       }
 
@@ -150,12 +174,54 @@ export default function BrandingForm({
           role="status"
           className="rounded-xl bg-ok-bg px-4 py-3 text-sm font-medium text-ok-ink"
         >
-          Branding saved for {clinicName}.
+          Saved.
         </p>
       )}
 
       <div className="grid gap-6">
         <div className="grid gap-4 max-w-2xl">
+          <Input
+            id="clinic-name"
+            name="name"
+            label="Clinic name"
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value);
+              setSaved(false);
+            }}
+            disabled={!canEdit}
+            maxLength={MAX_NAME}
+            error={nameError ?? undefined}
+          />
+
+          <Input
+            id="clinic-address"
+            name="address"
+            label="Address"
+            value={address}
+            onChange={(event) => {
+              setAddress(event.target.value);
+              setSaved(false);
+            }}
+            disabled={!canEdit}
+            maxLength={MAX_ADDRESS}
+            placeholder="Street, area, landmark"
+            hint="Shown on registration records and printed slips."
+          />
+
+          <Input
+            id="clinic-city"
+            name="city"
+            label="City"
+            value={city}
+            onChange={(event) => {
+              setCity(event.target.value);
+              setSaved(false);
+            }}
+            disabled={!canEdit}
+            maxLength={MAX_CITY}
+          />
+
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-ink">
               Logo
@@ -252,12 +318,12 @@ export default function BrandingForm({
             isBusy={isSaving}
             busyLabel="Saving…"
           >
-            Save Branding
+            Save changes
           </Button>
         </div>
       ) : (
         <p className="mt-4 rounded-xl bg-canvas-deep px-4 py-3 text-sm text-muted">
-          Your role cannot edit this clinic&apos;s branding. Ask an admin or the
+          Your role cannot edit this clinic&apos;s details. Ask an admin or the
           account owner if you need access.
         </p>
       )}

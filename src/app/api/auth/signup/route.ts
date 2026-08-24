@@ -160,6 +160,38 @@ export async function POST(request: Request): Promise<NextResponse<ApiResponse<n
           select: { id: true },
         });
 
+        /**
+         * THE ACCOUNT'S FIRST CLINIC, created from the very details this form
+         * already collects.
+         *
+         * WHY THIS IS HERE. Signup captured the clinic's name, city and address
+         * and wrote all three onto the TENANT, then created no `clinics` row at
+         * all. Every clinical table — doctors, patients, registrations,
+         * appointments — is scoped by `clinic_id`, so a brand new account had
+         * nowhere to put any of them: the modules rendered, and every one of
+         * them was permanently empty. The only way to get a clinic was the
+         * Clinics screen, which is exactly the screen this change removes.
+         *
+         * One account, one clinic, created at signup. The multi-clinic data
+         * model is untouched — `clinics` is still a table with a tenant_id and
+         * nothing stops a tenant owning several rows — this only guarantees that
+         * the count is never zero, which is the case that was broken.
+         *
+         * The tenant keeps its own copy of these fields: those are the BUSINESS's
+         * details as given on the application, and the Platform Owner judges the
+         * application against them. This row is the operational clinic that
+         * records hang off. They start identical and are edited in different
+         * places, which is intended.
+         */
+        await tx.clinic.create({
+          data: {
+            tenantId: tenant.id,
+            name: input.clinicName,
+            city: input.city,
+            address: input.address,
+          },
+        });
+
         const applicant = await tx.user.create({
           data: {
             tenantId: tenant.id,

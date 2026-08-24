@@ -43,7 +43,8 @@
     "verify:ap5-appointment-conversion": "tsx scripts/verify-ap5-appointment-conversion.mts",
     "verify:ap7-appointment-types": "tsx scripts/verify-ap7-appointment-types.mts",
     "verify:ap8-appointment-notifications": "tsx scripts/verify-ap8-appointment-notifications.mts",
-    "verify:ap9-appointment-edit": "tsx scripts/verify-ap9-appointment-edit.mts"
+    "verify:ap9-appointment-edit": "tsx scripts/verify-ap9-appointment-edit.mts",
+    "clinics:backfill": "tsx scripts/backfill-tenant-clinics.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -75,9 +75,15 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   },
   {
     href: "/settings/branding",
-    title: "Branding",
+    title: "Clinic details",
+    // Retitled when the Clinics tab was removed. This screen was already the
+    // only place branding was edited; it now also carries the name, address and
+    // city that the Clinics screen used to own, so "Branding" undersold it.
+    // The href is deliberately unchanged — it is linked from the settings
+    // landing page and appears in the audit trail, and renaming a live URL to
+    // match a label buys nothing.
     description:
-      "The logo and theme colour shown across the app. Set per clinic — switch clinics in the sidebar to brand another.",
+      "Your clinic's name, address and city, and the logo shown across the app.",
     // `clinic:read` and `clinic:edit` are listed beside the settings keys, not
     // replaced by them. Branding has answered to the clinic permissions since it
     // was built, and Stage 10 makes `settings:view` / `settings:manage` real

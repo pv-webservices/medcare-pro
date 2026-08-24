@@ -9,7 +9,14 @@ import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import { SETTINGS_SECTIONS } from "@/lib/settingsSections";
 
-// Branding — PRD §6.8 (FR-8.3, FR-8.4): logo and theme colour.
+// Clinic details — PRD §6.8 (FR-8.3, FR-8.4) plus the clinic's own name,
+// address and city.
+//
+// The name/address/city half arrived when the Clinics tab was removed: an
+// account is created with its clinic (api/auth/signup), so the screen whose job
+// was ADDING one had nothing left to do, and its remaining job — editing those
+// fields — belongs next to the logo rather than on a tab of its own. The route
+// keeps its /settings/branding path; only the label changed.
 //
 // Branding is per clinic, because that is where PRD §7 puts `logo_url` and
 // `theme_color`; the account carries no such columns. The clinic edited is the
@@ -72,10 +79,10 @@ export default async function BrandingSettingsPage() {
   if (!BRANDING.viewPermissions.some(holds)) {
     return (
       <Shell>
-        <PageHeader title="Branding" />
+        <PageHeader title="Clinic details" />
         <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
-          Your role cannot view branding. Ask the account owner if you need
-          access.
+          Your role cannot view this clinic&apos;s details. Ask the account
+          owner if you need access.
         </div>
       </Shell>
     );
@@ -89,12 +96,12 @@ export default async function BrandingSettingsPage() {
   if (clinics.length === 0) {
     return (
       <Shell>
-        <PageHeader title="Branding" />
+        <PageHeader title="Clinic details" />
         <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
           <p className="text-sm font-medium text-muted">
             {holds("clinic:read")
-              ? "No clinics to brand yet. Add a clinic first — its logo and colour are set here."
-              : "Your role does not reach any clinic, and branding is set per clinic. Ask the account owner if you need access."}
+              ? "This account has no clinic on record. An account is normally given one when it is created — contact support so it can be restored."
+              : "Your role does not reach any clinic. Ask the account owner if you need access."}
           </p>
         </div>
       </Shell>
@@ -109,11 +116,11 @@ export default async function BrandingSettingsPage() {
   if (!clinicId) {
     return (
       <Shell>
-        <PageHeader title="Branding" />
+        <PageHeader title="Clinic details" />
         <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
           <p className="text-sm font-medium text-muted">
-            Pick a clinic in the sidebar to set its logo and colour. Each clinic is
-            branded separately.
+            Pick a clinic in the sidebar to edit its details. Each clinic keeps
+            its own name, address and logo.
           </p>
         </div>
       </Shell>
@@ -139,11 +146,11 @@ export default async function BrandingSettingsPage() {
   return (
     <Shell>
       <PageHeader
-        title="Branding"
+        title="Clinic details"
         meta={
           <span>
             {clinic.name}
-            {clinics.length > 1 && "· switch clinics in the sidebar to brand another"}
+            {clinics.length > 1 && "· switch clinics in the sidebar to edit another"}
             {!canEdit && "· view only"}
           </span>
         }
@@ -152,6 +159,8 @@ export default async function BrandingSettingsPage() {
       <BrandingForm
         clinicId={clinic.id}
         clinicName={clinic.name}
+        clinicAddress={clinic.address}
+        clinicCity={clinic.city}
         logoUrl={clinic.logoUrl}
         themeColor={clinic.themeColor}
         canEdit={canEdit}

@@ -59,7 +59,15 @@ export const NAV_LINKS: readonly NavLink[] = [
   { href: "/appointments", label: "Appointments", permission: "appointment:read", feature: "appointments" },
   { href: "/registration", label: "Registrations", permission: "registration:read", feature: "registrations" },
   { href: "/doctors", label: "Doctors", permission: "doctor:read", feature: "doctors" },
-  { href: "/clinics", label: "Clinics", permission: "clinic:read", feature: "clinics" },
+  // NO CLINICS TAB. An account is created WITH its clinic — signup collects the
+  // name, city and address, and api/auth/signup creates the row — so a screen
+  // whose main purpose was adding one had nothing left to do. Its remaining job,
+  // editing those details, moved to Settings -> Clinic details, which is where
+  // the logo already lived.
+  //
+  // THE MODULE IS NOT GONE, only its tab: MODULE_FEATURES.clinics still gates
+  // /api/clinics, which is what Settings -> Clinic details saves through. Do not
+  // "tidy up" that feature key on the strength of this list.
   { href: "/reports", label: "Reports", permission: "report:read", feature: "reports" },
   { href: "/notifications", label: "Notifications", permission: "notification:read", feature: "notifications" },
   { href: "/messages", label: "Messages", permission: "message:send", feature: "whatsapp" },
