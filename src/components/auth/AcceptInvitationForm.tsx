@@ -2,7 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import AuthAlert from "@/components/auth/AuthAlert";
+import AuthButton from "@/components/auth/AuthButton";
+import AuthField from "@/components/auth/AuthField";
+import PasswordField from "@/components/auth/PasswordField";
 
 /**
  * Setting a password against an invitation — Stage 6.
@@ -30,11 +33,6 @@ interface AcceptInvitationFormProps {
 
 /** Mirrors MIN_PASSWORD_LENGTH in src/lib/signupInput.ts. */
 const MIN_PASSWORD_LENGTH = 12;
-
-const FIELD_CLASS =
-  "block w-full rounded-2xl shadow-neu-inset py-3.5 px-4 text-sm text-ink placeholder:text-faint disabled:bg-canvas-deep disabled:text-muted";
-
-const LABEL_CLASS = "block text-sm font-medium text-ink mb-2";
 
 export default function AcceptInvitationForm({
   token,
@@ -113,18 +111,11 @@ export default function AcceptInvitationForm({
 
   if (isDone) {
     return (
-      <p
-        role="status"
-        aria-live="polite"
-        className="flex items-start gap-2 rounded-xl bg-ok-bg p-4 text-sm text-ok-ink"
-      >
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>
-          Your account is ready. Taking you to the sign-in page — use{""}
-          <span className="font-semibold">{email}</span> and the password you just
-          chose.
-        </span>
-      </p>
+      <AuthAlert tone="success" title="Your account is ready">
+        Taking you to the sign-in page — use{" "}
+        <span className="font-semibold">{email}</span> and the password you just
+        chose.
+      </AuthAlert>
     );
   }
 
@@ -136,103 +127,68 @@ export default function AcceptInvitationForm({
   return (
     <form method="post" onSubmit={handleSubmit} className="space-y-5" noValidate>
       {error && (
-        <p
-          id="invite-error"
-          role="alert"
-          aria-live="assertive"
-          className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
-        >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>
-            <span className="font-semibold">Error:</span> {error}
-          </span>
-        </p>
+        <AuthAlert id="invite-error" tone="error">
+          {error}
+        </AuthAlert>
       )}
 
-      <div>
-        <label htmlFor="invite-email" className={LABEL_CLASS}>
-          Email
-        </label>
-        <input
-          id="invite-email"
-          name="email"
-          type="email"
-          value={email}
-          readOnly
-          disabled
-          autoComplete="username"
-          className={FIELD_CLASS}
-        />
-        <p className="mt-2 text-sm text-muted">
-          The invitation was sent to this address, so only it can accept.
-        </p>
-      </div>
+      <AuthField
+        id="invite-email"
+        name="email"
+        type="email"
+        label="Email"
+        value={email}
+        readOnly
+        disabled
+        autoComplete="username"
+        hint="The invitation was sent to this address, so only it can accept."
+      />
 
-      <div>
-        <label htmlFor="invite-name" className={LABEL_CLASS}>
-          Your name
-        </label>
-        <input
-          id="invite-name"
-          name="name"
-          type="text"
-          autoComplete="name"
-          required
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? "invite-error" : undefined}
-          placeholder="Amelia Rao"
-          className={FIELD_CLASS}
-        />
-      </div>
+      <AuthField
+        id="invite-name"
+        name="name"
+        type="text"
+        label="Your name"
+        autoComplete="name"
+        required
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        aria-invalid={error ? true : undefined}
+        describedBy={error ? "invite-error" : undefined}
+      />
 
-      <div>
-        <label htmlFor="invite-password" className={LABEL_CLASS}>
-          Choose a password
-        </label>
-        <input
-          id="invite-password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={MIN_PASSWORD_LENGTH}
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          aria-invalid={error ? true : undefined}
-          aria-describedby="invite-password-hint"
-          className={FIELD_CLASS}
-        />
-        <p id="invite-password-hint" className="mt-2 text-sm text-muted">
-          At least {MIN_PASSWORD_LENGTH} characters.
-        </p>
-      </div>
+      <PasswordField
+        id="invite-password"
+        name="password"
+        label="Choose a password"
+        autoComplete="new-password"
+        required
+        minLength={MIN_PASSWORD_LENGTH}
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        showGuidance
+        minPasswordLength={MIN_PASSWORD_LENGTH}
+      />
 
-      <div>
-        <label htmlFor="invite-confirm" className={LABEL_CLASS}>
-          Confirm password
-        </label>
-        <input
-          id="invite-confirm"
-          name="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={confirmation}
-          onChange={(event) => setConfirmation(event.target.value)}
-          aria-invalid={error ? true : undefined}
-          className={FIELD_CLASS}
-        />
-      </div>
+      <PasswordField
+        id="invite-confirm"
+        name="confirmPassword"
+        label="Confirm password"
+        autoComplete="new-password"
+        required
+        value={confirmation}
+        onChange={(event) => setConfirmation(event.target.value)}
+        aria-invalid={error ? true : undefined}
+      />
 
-      <button
+      <AuthButton
         type="submit"
-        disabled={isSubmitting}
-        className="mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors"
+        isBusy={isSubmitting}
+        busyLabel="Setting up..."
+        className="mt-1"
       >
-        {isSubmitting ? "Setting up..." : "Accept Invitation"}
-      </button>
+        Accept invitation
+      </AuthButton>
     </form>
   );
 }

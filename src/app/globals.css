@@ -202,6 +202,65 @@
   --neu-accent-cast: rgb(45 212 191 / 0.22);
 }
 
+/*
+ * --- The authentication surface -----------------------------------------
+ *
+ * A SECOND, DELIBERATELY SEPARATE PALETTE, AND THE ONLY ONE IN THIS FILE THAT
+ * IS NOT THEMED. Everything above describes the signed-in application: one
+ * neumorphic canvas, a teal accent, a dark variant a tenant can switch on. The
+ * front door is a different room. It is the first thing a clinic owner sees, it
+ * is a conversion surface rather than a work surface, and it is global to the
+ * platform — no tenant brand, no theme preference, because neither exists yet
+ * when these screens render.
+ *
+ * So the auth tokens are defined ONCE, on :root, and no [data-theme] block
+ * overrides them. That is what makes /login, /signup and /verify-email light in
+ * every theme without a single `dark:` escape hatch: there is nothing to
+ * override. They apply only under `.auth-scope` (see the rules at the bottom of
+ * this file), so nothing in the dashboard can accidentally reach them.
+ *
+ * Surfaces are WHITE ON A COOL NEUTRAL here — the opposite of the one-surface
+ * rule above — and depth comes from a hairline border plus a low, soft shadow.
+ * That is intentional, not drift: neumorphism reads as "an instrument panel",
+ * and the sign-in screen should read as "a front desk".
+ */
+:root {
+  /* --- Surfaces --------------------------------------------------------- */
+  --auth-bg: #f7f8fc; /* the page */
+  --auth-bg-tint: #eef0fa; /* segmented controls, wells, skeleton bars */
+  --auth-card: #ffffff; /* the form card, and every card in the preview */
+  --auth-line: #e7e9f2; /* hairlines: card edges, field edges, dividers */
+  --auth-line-strong: #d7dbea; /* a hairline that has to be seen (hover) */
+
+  /* --- Text ramp (deep navy, never pure black) --------------------------- */
+  --auth-ink: #171c30; /* headings                    14.9:1 on white */
+  --auth-ink-soft: #39415c; /* body copy on the panel       9.2:1 */
+  --auth-muted: #667192; /* labels, secondary copy       5.0:1 */
+  --auth-faint: #98a0ba; /* placeholders only            2.6:1 */
+
+  /* --- Indigo / violet primary ------------------------------------------ */
+  --auth-primary: #5b4bff;
+  --auth-primary-bright: #6d5dfb; /* the second stop of the one gradient */
+  --auth-primary-hover: #4a39ec;
+  --auth-primary-ink: #ffffff;
+  --auth-primary-soft: #eeecff; /* icon tiles, active segment tint */
+  --auth-primary-soft-ink: #4436cc; /* text ON --auth-primary-soft  7.4:1 */
+
+  /* --- Status ----------------------------------------------------------- */
+  --auth-ok-bg: #e8f8f0;
+  --auth-ok-line: #c3ead8;
+  --auth-ok-ink: #086c46;
+  --auth-ok-mark: #12a06a;
+  --auth-warn-bg: #fef6e7;
+  --auth-warn-line: #f7e2b8;
+  --auth-warn-ink: #96590a;
+  --auth-warn-mark: #d98a09;
+  --auth-alert-bg: #feeeed;
+  --auth-alert-line: #f8d3d0;
+  --auth-alert-ink: #a8231a;
+  --auth-alert-mark: #e0453a;
+}
+
 @theme inline {
   /* --- Surfaces --------------------------------------------------------- */
   --color-canvas: var(--bg);
@@ -255,6 +314,54 @@
   --color-primary-hover: var(--accent-strong);
   --color-primary-light: var(--accent-soft-bg);
   --color-primary-foreground: var(--accent-ink);
+
+  /*
+   * --- Authentication tokens --------------------------------------------
+   * Utilities for the front-door palette above: bg-auth-card, text-auth-ink,
+   * border-auth-line, shadow-auth-card, and so on. They resolve from :root
+   * only, so they stay light in every theme.
+   */
+  --color-auth-bg: var(--auth-bg);
+  --color-auth-bg-tint: var(--auth-bg-tint);
+  --color-auth-card: var(--auth-card);
+  --color-auth-line: var(--auth-line);
+  --color-auth-line-strong: var(--auth-line-strong);
+
+  --color-auth-ink: var(--auth-ink);
+  --color-auth-ink-soft: var(--auth-ink-soft);
+  --color-auth-muted: var(--auth-muted);
+  --color-auth-faint: var(--auth-faint);
+
+  --color-auth-primary: var(--auth-primary);
+  --color-auth-primary-bright: var(--auth-primary-bright);
+  --color-auth-primary-hover: var(--auth-primary-hover);
+  --color-auth-primary-ink: var(--auth-primary-ink);
+  --color-auth-primary-soft: var(--auth-primary-soft);
+  --color-auth-primary-soft-ink: var(--auth-primary-soft-ink);
+
+  --color-auth-ok-bg: var(--auth-ok-bg);
+  --color-auth-ok-line: var(--auth-ok-line);
+  --color-auth-ok-ink: var(--auth-ok-ink);
+  --color-auth-ok-mark: var(--auth-ok-mark);
+  --color-auth-warn-bg: var(--auth-warn-bg);
+  --color-auth-warn-line: var(--auth-warn-line);
+  --color-auth-warn-ink: var(--auth-warn-ink);
+  --color-auth-warn-mark: var(--auth-warn-mark);
+  --color-auth-alert-bg: var(--auth-alert-bg);
+  --color-auth-alert-line: var(--auth-alert-line);
+  --color-auth-alert-ink: var(--auth-alert-ink);
+  --color-auth-alert-mark: var(--auth-alert-mark);
+
+  /*
+   * Elevation on the auth surface is a HAIRLINE PLUS A LOW SHADOW, never a
+   * heavy drop. -card lifts the form off the page, -cta gives the one primary
+   * button a coloured cast so the eye finds it, -sm is for the small white
+   * objects inside the brand panel's product preview.
+   */
+  --shadow-auth-sm: 0 1px 2px rgb(23 28 48 / 0.05), 0 2px 6px -2px rgb(23 28 48 / 0.06);
+  --shadow-auth-card: 0 1px 2px rgb(23 28 48 / 0.04), 0 14px 34px -18px rgb(23 28 48 / 0.22);
+  --shadow-auth-float: 0 2px 6px -2px rgb(23 28 48 / 0.08), 0 22px 44px -24px rgb(23 28 48 / 0.28);
+  --shadow-auth-cta: 0 1px 2px rgb(91 75 255 / 0.28), 0 10px 22px -10px rgb(91 75 255 / 0.55);
 
   /*
    * --- The depth vocabulary ---------------------------------------------
@@ -453,4 +560,100 @@ body {
   --viz-grid: var(--line);
   --viz-axis: var(--text-faint);
   --viz-muted: var(--text-muted);
+}
+
+/*
+ * --- The authentication scope -------------------------------------------
+ *
+ * `.auth-scope` wraps /login, /signup, /verify-email and the rest of the
+ * (auth) route group. Three things happen here and nowhere else.
+ *
+ * 1. LIGHT, FULL STOP. `color-scheme: light` keeps form controls, scrollbars
+ *    and autofill light even when the visitor's OS or the app's theme cookie
+ *    says dark. The tokens themselves are already un-themed; this covers what
+ *    the browser draws for us.
+ *
+ * 2. THE FOCUS RING CHANGES COLOUR. The global rule above paints it in the
+ *    teal --accent, which is not a colour that appears anywhere on these
+ *    screens. Same 2px ring, same offset, indigo instead — this overrides the
+ *    colour and nothing else, so the ring is never lost.
+ *
+ * 3. AUTOFILL IS STYLED, NOT DISABLED. Chrome paints its own pale-yellow fill
+ *    over an autofilled input, which on a white card reads as an error state.
+ *    The inset shadow repaints the surface and -webkit-text-fill-color keeps
+ *    the text legible; the field is still autofilled, and password managers
+ *    are unaffected. Do not replace this with autocomplete="off".
+ */
+.auth-scope {
+  color-scheme: light;
+}
+
+.auth-scope
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--auth-primary);
+  outline-offset: 2px;
+}
+
+.auth-scope input:-webkit-autofill,
+.auth-scope input:-webkit-autofill:hover,
+.auth-scope input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--auth-ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--auth-card) inset;
+  caret-color: var(--auth-ink);
+  transition: background-color 100000s ease-in-out 0s;
+}
+
+/*
+ * The one moving thing on these screens: the "live" dot in the brand panel's
+ * product preview. Two seconds, opacity only, and it stops entirely under
+ * prefers-reduced-motion via the global rule above.
+ */
+@keyframes auth-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@utility auth-breathe {
+  animation: auth-breathe 2.4s ease-in-out infinite;
+}
+
+/* A form column that fades in once rather than sliding, staggering or bouncing. */
+@keyframes auth-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility auth-enter {
+  animation: auth-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * The brand panel's product preview is the first thing to go on a short
+ * viewport. On a 1280x720 laptop the headline, the supporting copy and the
+ * preview together overflow the sticky column, and a decoration clipped by the
+ * fold reads as a bug - the panel is complete without it.
+ *
+ * A height media query rather than a Tailwind variant: the utility framework
+ * has no viewport-height variant, and the arbitrary-variant spelling of one is
+ * a class name nobody can read six months later.
+ */
+.auth-preview-slot {
+  display: none;
+}
+
+@media (min-height: 800px) {
+  .auth-preview-slot {
+    display: block;
+  }
 }

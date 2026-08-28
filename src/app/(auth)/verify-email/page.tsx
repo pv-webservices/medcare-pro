@@ -1,15 +1,52 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  type FormEvent,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { Globe, Calendar, Users, IndianRupee, Mail, Plus } from "lucide-react";
+import { ArrowLeft, Mail, MailWarning } from "lucide-react";
+import AuthAlert from "@/components/auth/AuthAlert";
+import AuthButton, { authLinkClasses } from "@/components/auth/AuthButton";
+import AuthCard from "@/components/auth/AuthCard";
+import AuthField from "@/components/auth/AuthField";
+import AuthFooter from "@/components/auth/AuthFooter";
+import AuthHeader from "@/components/auth/AuthHeader";
+import AuthLayout from "@/components/auth/AuthLayout";
+import VerificationBadge from "@/components/auth/VerificationBadge";
+import {
+  formatCooldown,
+  remainingCooldownMs,
+} from "@/components/auth/loginCodeState";
 
 // Email verification screen — PRD §6.1 (FR-1.2, FR-1.5).
+//
+// TWO SCREENS IN ONE ROUTE, chosen by `?status=`. With no status it is the page
+// signup hands off to: "we have sent you a link". With one, the user has just
+// followed a link that did not work, and the page leads with the reason.
+//
+// THE POST IS UNCHANGED. One request, to /api/auth/verify-email, with one field.
+// The server decides what to say and whether an address even exists — the copy
+// below is the acknowledgement, never a claim about an account.
 
 const UNREACHABLE_MESSAGE =
   "Could not reach the server. Check your connection and try again.";
+
+const RESEND_FAILED_MESSAGE = "Could not send the link. Try again shortly.";
+
+const RESEND_SENT_MESSAGE =
+  "If that address needs verification, a new link is on its way.";
+
+/**
+ * How long the resend button stays down after a successful send. It is this
+ * screen's own number, not an import of the login-code cooldown: the two
+ * endpoints are different and the shared constant would tie them together for
+ * no reason. The countdown helpers are shared; the value is not.
+ */
+const RESEND_COOLDOWN_MS = 60 * 1000;
 
 const STATUS_MESSAGES: Record<string, string> = {
   invalid: "That verification link is not valid. Request a new one below.",
@@ -20,18 +57,50 @@ const STATUS_MESSAGES: Record<string, string> = {
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
+  /**
+   * Carried over by signup and by the login screen's unverified notice. It is
+   * forgeable and is treated as a default field value only — it is never
+   * rendered as a claim that the address has an account.
+   */
   const emailFromSignup = searchParams.get("email") ?? "";
 
   const [email, setEmail] = useState(emailFromSignup);
+  /** Reveals the address field when the prefilled one is wrong. */
+  const [isEditingEmail, setIsEditingEmail] = useState(emailFromSignup === "");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /**
+   * A CLIENT-SIDE COURTESY, NOT THE RATE LIMIT. The server has its own, and it
+   * is the one that counts; this only stops the button being pressed six times
+   * while the first mail is still in flight, and gives the wait a number.
+   */
+  const [lastSentAt, setLastSentAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  const remainingMs = remainingCooldownMs(lastSentAt, now, RESEND_COOLDOWN_MS);
+  const isCoolingDown = remainingMs > 0;
+
+  // Ticks only while there is something to count down — a permanent interval on
+  // an idle page is a render a second for the life of the tab.
+  useEffect(() => {
+    if (!isCoolingDown) {
+      return;
+    }
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isCoolingDown]);
 
   const statusMessage = status ? STATUS_MESSAGES[status] : undefined;
   const isPostSignup = !status;
 
   async function handleResend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting || isCoolingDown) {
+      return;
+    }
+
     setNotice(null);
     setError(null);
     setIsSubmitting(true);
@@ -47,11 +116,13 @@ function VerifyEmailContent() {
         await response.json().catch(() => ({}));
 
       if (!response.ok || !body.success) {
-        setError(body.error ?? "Could not send the link. Try again shortly.");
+        setError(body.error ?? RESEND_FAILED_MESSAGE);
         return;
       }
 
-      setNotice(body.message ?? "If that address needs verification, a new link is on its way.");
+      setNotice(body.message ?? RESEND_SENT_MESSAGE);
+      setLastSentAt(Date.now());
+      setNow(Date.now());
     } catch {
       setError(UNREACHABLE_MESSAGE);
     } finally {
@@ -60,211 +131,118 @@ function VerifyEmailContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas-deep p-4 sm:p-8">
-      <div className="flex w-full max-w-[1200px] overflow-hidden rounded-[2rem] bg-canvas shadow-neu-float min-h-[720px]">
-        
-        {/* Left side: Verify Email Form */}
-        <div className="flex w-full flex-col p-8 lg:w-[55%] lg:p-12 xl:p-16">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-primary">
-              <Plus className="h-6 w-6 stroke-[3]" />
-            </div>
-            <div>
-              <div className="font-bold text-ink text-xl tracking-tight leading-none">Medicare Pro</div>
-              <div className="text-xs text-muted font-medium mt-0.5">Smart Clinic Management</div>
-            </div>
-          </div>
-
-          <div className="mx-auto w-full max-w-sm flex-grow flex flex-col justify-center">
-            <div className="mb-10 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-light text-primary mb-6">
-                <Mail className="h-8 w-8" />
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-ink">
-                {isPostSignup ? "Check your email" : "Verify your email"}
-              </h1>
+    <AuthLayout>
+      <AuthCard>
+        <AuthHeader
+          badge={
+            <VerificationBadge tone={isPostSignup ? "pending" : "warning"}>
               {isPostSignup ? (
-                <p className="mt-3 text-sm text-muted leading-relaxed">
-                  We&apos;ve sent a verification link{emailFromSignup ? ` to ` : ""}{emailFromSignup ? <span className="font-semibold text-ink">{emailFromSignup}</span> : ""}. 
-                  Open it to activate your account — you won&apos;t be able to log in until you do.
-                </p>
+                <Mail className="h-6 w-6" strokeWidth={1.9} />
               ) : (
-                <p className="mt-3 text-sm text-muted">
-                  Enter your email to request a new verification link.
-                </p>
+                <MailWarning className="h-6 w-6" strokeWidth={1.9} />
               )}
-            </div>
+            </VerificationBadge>
+          }
+          title={isPostSignup ? "Check your inbox" : "Verify your email"}
+          description={
+            isPostSignup ? (
+              <>
+                We sent a verification link to{" "}
+                {emailFromSignup ? (
+                  <span className="font-semibold text-auth-ink">
+                    {emailFromSignup}
+                  </span>
+                ) : (
+                  "your email address"
+                )}
+                . Open it to activate your account — you cannot sign in until you
+                do.
+              </>
+            ) : (
+              "Request a new verification link and we will email it straight away."
+            )
+          }
+        />
 
-            <form onSubmit={handleResend} noValidate={false} className="space-y-6">
-              {statusMessage && (
-                <p
-                  role="alert"
-                  className="rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
-                >
-                  {statusMessage}
-                </p>
-              )}
-
-              {notice && (
-                <p
-                  role="status"
-                  className="rounded-xl bg-ok-bg p-3 text-sm text-ok-ink"
-                >
-                  {notice}
-                </p>
-              )}
-
-              {error && (
-                <p
-                  role="alert"
-                  id="resend-error"
-                  className="rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
-                >
-                  {error}
-                </p>
-              )}
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-ink mb-2">
-                  Email address
-                </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <Mail className="h-5 w-5 text-faint" aria-hidden="true" />
-                  </div>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    aria-describedby={error ? "resend-error" : undefined}
-                    placeholder="dr.amelia@dentalcare.com"
-                    className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-11 pr-4 text-sm text-ink placeholder:text-faint focus:border-primary focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-primary-foreground shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors"
-              >
-                {isSubmitting ? "Sending..." : "Resend verification link"}
-              </button>
-            </form>
-
-            <p className="mt-10 text-center text-sm text-muted">
-              Already verified?{""}
-              <Link href="/login" className="font-semibold text-primary hover:text-primary-hover">
-                Sign In
-              </Link>
-            </p>
+        <form onSubmit={handleResend} className="space-y-5">
+          <div className="space-y-3 empty:hidden">
+            {statusMessage && !error && (
+              <AuthAlert tone="warning">{statusMessage}</AuthAlert>
+            )}
+            {notice && (
+              <AuthAlert tone="success" title="Verification email sent">
+                {notice}
+              </AuthAlert>
+            )}
+            {error && (
+              <AuthAlert id="resend-error" tone="error">
+                {error}
+              </AuthAlert>
+            )}
           </div>
-        </div>
 
-        {/* Right side: Image and Stats */}
-        <div className="relative hidden w-[45%] lg:block p-4 pl-0">
-          <div className="relative h-full w-full rounded-2xl overflow-hidden shadow-neu-raised-sm">
-            <Image
-              src="/clinic-bg-generic.jpg"
-              alt="Generic Clinic"
-              fill
-              className="object-cover"
-              priority
+          {isEditingEmail ? (
+            <AuthField
+              id="email"
+              name="email"
+              type="email"
+              label="Email address"
+              autoComplete="email"
+              required
+              autoFocus={emailFromSignup !== ""}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              icon={<Mail className="h-[18px] w-[18px]" strokeWidth={2} />}
+              describedBy={error ? "resend-error" : undefined}
+              placeholder="you@clinic.com"
             />
-            {/* Top Right EN button */}
-            <div className="absolute top-6 right-6">
-              <button className="flex items-center gap-2 rounded-xl bg-canvas/95 backdrop-blur-md px-4 py-2 text-sm font-medium text-ink shadow-neu-raised-sm">
-                <Globe className="h-4 w-4" />
-                EN
-                <svg className="h-4 w-4 text-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+          ) : (
+            // The address is already known, so it is shown rather than asked
+            // for again. The hidden input keeps the submitted body identical to
+            // the edited case.
+            <div className="flex items-center justify-between gap-3 rounded-[14px] border border-auth-line bg-auth-bg px-4 py-3.5">
+              <span className="min-w-0 truncate text-[14px] font-medium text-auth-ink">
+                {email}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsEditingEmail(true)}
+                className="shrink-0 rounded text-[13px] font-semibold text-auth-primary transition-colors duration-150 hover:text-auth-primary-hover"
+              >
+                Change
               </button>
+              <input type="hidden" name="email" value={email} />
             </div>
+          )}
 
-            {/* Top Left floating card */}
-            <div className="absolute top-16 left-8 rounded-2xl bg-canvas/95 backdrop-blur-md px-5 py-4 shadow-neu-float flex items-center gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-light text-primary">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-xs font-medium text-muted mb-0.5">Today's Appointments</div>
-                <div className="text-[15px] font-bold text-primary">8 Scheduled</div>
-              </div>
-              {/* Little purple dot */}
-              <div className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
-            </div>
+          <AuthButton
+            type="submit"
+            disabled={isCoolingDown}
+            isBusy={isSubmitting}
+            busyLabel="Sending..."
+          >
+            {isCoolingDown
+              ? `Resend in ${formatCooldown(remainingMs)}`
+              : "Resend verification email"}
+          </AuthButton>
 
-            {/* Bottom Left floating card */}
-            <div className="absolute bottom-16 left-8 rounded-3xl bg-canvas/95 backdrop-blur-md p-6 shadow-neu-float w-64">
-              <h3 className="text-sm font-bold text-ink mb-5">Today's Overview</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-ink">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-medium text-muted">Patients</div>
-                      <div className="font-bold text-sm text-ink leading-tight">24</div>
-                    </div>
-                  </div>
-                  <div className="text-xs font-bold text-ok-mark bg-ok-bg px-2 py-1 rounded-md">+12%</div>
-                </div>
+          <Link
+            href="/login"
+            className="flex min-h-[46px] items-center justify-center gap-2 rounded-[14px] text-[14px] font-semibold text-auth-muted transition-colors duration-150 hover:bg-auth-bg-tint hover:text-auth-ink"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to sign in
+          </Link>
+        </form>
+      </AuthCard>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-ink">
-                      <Calendar className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-medium text-muted">Appointments</div>
-                      <div className="font-bold text-sm text-ink leading-tight">18</div>
-                    </div>
-                  </div>
-                  <div className="text-xs font-bold text-ok-mark bg-ok-bg px-2 py-1 rounded-md">+8%</div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-ink">
-                      <IndianRupee className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-medium text-muted">Revenue</div>
-                      <div className="font-bold text-sm text-ink leading-tight">₹45,230</div>
-                    </div>
-                  </div>
-                  <div className="text-xs font-bold text-ok-mark bg-ok-bg px-2 py-1 rounded-md">+15%</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Right Quote card */}
-            <div className="absolute bottom-16 right-8 rounded-3xl bg-accent p-7 shadow-neu-float w-60 text-accent-ink">
-              {/* Avatars */}
-              <div className="flex -space-x-3 mb-6 relative -top-12 -mt-2">
-                <img src="https://ui-avatars.com/api/?name=J+D&background=e0e7ff&color=4f46e5&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-canvas object-cover shadow-neu-raised-sm" />
-                <img src="https://ui-avatars.com/api/?name=A+S&background=dcfce7&color=16a34a&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-canvas object-cover shadow-neu-raised-sm" />
-                <img src="https://ui-avatars.com/api/?name=M+R&background=fce7f3&color=db2777&size=128" alt="Doctor" className="h-12 w-12 rounded-full border-2 border-primary bg-canvas object-cover shadow-neu-raised-sm" />
-              </div>
-              <div className="text-5xl font-serif leading-none mb-2 text-accent-ink opacity-80">&ldquo;</div>
-              <p className="text-base font-medium leading-relaxed mb-6 -mt-2">
-                Delivering better care, every day.
-              </p>
-              <p className="text-xs font-medium text-primary-light">
-                Medicare Pro Team
-              </p>
-            </div>
-            
-          </div>
-        </div>
-      </div>
-    </div>
+      <AuthFooter>
+        Wrong address?{" "}
+        <Link href="/signup" className={authLinkClasses}>
+          Create a new account
+        </Link>
+      </AuthFooter>
+    </AuthLayout>
   );
 }
 

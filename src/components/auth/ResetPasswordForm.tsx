@@ -3,7 +3,11 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import AuthAlert from "@/components/auth/AuthAlert";
+import AuthButton, { authLinkClasses } from "@/components/auth/AuthButton";
+import AuthFooter from "@/components/auth/AuthFooter";
+import AuthHeader from "@/components/auth/AuthHeader";
+import PasswordField from "@/components/auth/PasswordField";
 import {
   describeResetConfirm,
   passwordsMatch,
@@ -29,14 +33,6 @@ import {
  * link does not get to be a credential.
  */
 
-const FIELD_CLASS =
-  "block w-full rounded-2xl shadow-neu-inset py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-ink placeholder:text-faint placeholder:tracking-[0.2em]";
-
-const LABEL_CLASS = "block text-sm font-medium text-ink mb-2";
-
-const PRIMARY_BUTTON_CLASS =
-  "mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors";
-
 const GENERIC_WEAK_PASSWORD_MESSAGE =
   "That password does not meet the requirements. Choose a longer one.";
 
@@ -55,9 +51,9 @@ export default function ResetPasswordForm({
 
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The one problem that belongs to a single field rather than the submit. */
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -67,12 +63,13 @@ export default function ResetPasswordForm({
     }
 
     setError(null);
+    setConfirmError(null);
 
     // Checked here as well as on the server because the server cannot check it
     // at all: only one of the two fields is sent. This is the whole of the
     // confirmation field's purpose.
     if (!passwordsMatch(password, confirmation)) {
-      setError(RESET_MISMATCH_MESSAGE);
+      setConfirmError(RESET_MISMATCH_MESSAGE);
       return;
     }
 
@@ -118,15 +115,10 @@ export default function ResetPasswordForm({
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight text-ink">
-          Choose a new password
-        </h1>
-        <p className="mt-3 text-sm text-muted">
-          At least {minPasswordLength} characters. Setting it signs you out
-          everywhere else.
-        </p>
-      </div>
+      <AuthHeader
+        title="Choose a new password"
+        description={`At least ${minPasswordLength} characters. Setting it signs you out everywhere else.`}
+      />
 
       {/*
         `method="post"` IS LOAD-BEARING, and is not about where this form
@@ -147,101 +139,62 @@ export default function ResetPasswordForm({
         compile, `isMounted` stayed false, and the button was dead with nothing
         on screen to say why.
       */}
-      <form method="POST" action="#" onSubmit={handleSubmit} className="space-y-6">
+      <form method="POST" action="#" onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <p
-            id="reset-password-error"
-            role="alert"
-            aria-live="assertive"
-            className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>
-              <span className="font-semibold">Error:</span> {error}
-            </span>
-          </p>
+          <AuthAlert id="reset-password-error" tone="error">
+            {error}
+          </AuthAlert>
         )}
 
-        <div>
-          <label htmlFor="reset-password" className={LABEL_CLASS}>
-            New password
-          </label>
-          <div className="relative">
-            <input
-              id="reset-password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              required
-              minLength={minPasswordLength}
-              autoFocus
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? "reset-password-error" : undefined}
-              placeholder="••••••••••••••••"
-              className={FIELD_CLASS}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent rounded"
-            >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
+        <PasswordField
+          id="reset-password"
+          name="password"
+          label="New password"
+          autoComplete="new-password"
+          required
+          minLength={minPasswordLength}
+          autoFocus
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          aria-invalid={error ? true : undefined}
+          describedBy={error ? "reset-password-error" : undefined}
+          showGuidance
+          minPasswordLength={minPasswordLength}
+        />
 
-        <div>
-          <label htmlFor="reset-password-confirm" className={LABEL_CLASS}>
-            Confirm new password
-          </label>
-          <div className="relative">
-            <input
-              id="reset-password-confirm"
-              name="confirmPassword"
-              type={showConfirmation ? "text" : "password"}
-              autoComplete="new-password"
-              required
-              minLength={minPasswordLength}
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? "reset-password-error" : undefined}
-              placeholder="••••••••••••••••"
-              className={FIELD_CLASS}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmation(!showConfirmation)}
-              aria-label={
-                showConfirmation ? "Hide confirmed password" : "Show confirmed password"
-              }
-              aria-pressed={showConfirmation}
-              className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent rounded"
-            >
-              {showConfirmation ? (
-                <EyeOff className="h-5 w-5" />
-              ) : (
-                <Eye className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
+        <PasswordField
+          id="reset-password-confirm"
+          name="confirmPassword"
+          label="Confirm new password"
+          autoComplete="new-password"
+          required
+          minLength={minPasswordLength}
+          value={confirmation}
+          onChange={(event) => {
+            setConfirmation(event.target.value);
+            if (confirmError) {
+              setConfirmError(null);
+            }
+          }}
+          error={confirmError ?? undefined}
+        />
 
-        <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON_CLASS}>
-          {isSubmitting ? "Saving..." : "Set new password"}
-        </button>
+        <AuthButton
+          type="submit"
+          isBusy={isSubmitting}
+          busyLabel="Saving..."
+          className="mt-1"
+        >
+          Set new password
+        </AuthButton>
       </form>
 
-      <p className="mt-8 text-center text-sm text-muted">
-        Remembered it?{""}
-        <Link href="/login" className="font-semibold text-accent hover:text-accent">
+      <AuthFooter>
+        Remembered it?{" "}
+        <Link href="/login" className={authLinkClasses}>
           Back to sign in
         </Link>
-      </p>
+      </AuthFooter>
     </>
   );
 }

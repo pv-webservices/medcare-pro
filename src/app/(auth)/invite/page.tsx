@@ -1,6 +1,11 @@
 import Link from "next/link";
-import { Plus, ShieldX } from "lucide-react";
+import { ShieldX } from "lucide-react";
 import AcceptInvitationForm from "@/components/auth/AcceptInvitationForm";
+import { authButtonClasses } from "@/components/auth/AuthButton";
+import AuthCard from "@/components/auth/AuthCard";
+import AuthHeader from "@/components/auth/AuthHeader";
+import AuthLayout from "@/components/auth/AuthLayout";
+import VerificationBadge from "@/components/auth/VerificationBadge";
 import { loadInvitationPreview } from "@/lib/invitations";
 
 /**
@@ -31,29 +36,6 @@ function readToken(params: Record<string, string | string[] | undefined>): strin
   return typeof raw === "string" ? raw : "";
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas-deep p-4 sm:p-8">
-      <div className="w-full max-w-md rounded-[2rem] bg-canvas p-8 shadow-neu-float sm:p-10">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
-            <Plus className="h-6 w-6 stroke-[3]" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="text-xl font-bold leading-none tracking-tight text-ink">
-              Medicare Pro
-            </div>
-            <div className="mt-0.5 text-xs font-medium text-muted">
-              Smart Clinic Management
-            </div>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export default async function AcceptInvitationPage({ searchParams }: PageProps) {
   const token = readToken(await searchParams);
   const result = token
@@ -67,47 +49,55 @@ export default async function AcceptInvitationPage({ searchParams }: PageProps) 
 
   if (result.status === "refused") {
     return (
-      <Shell>
-        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-alert-bg text-alert-ink">
-          <ShieldX className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
-        </div>
-        <h1 className="text-xl font-bold tracking-tight text-ink">
-          This invitation cannot be used
-        </h1>
-        {/*
-          The message comes from a fixed set in lib/invitationPolicy.ts, never
-          from the URL — nothing the visitor typed is echoed back into the page.
-        */}
-        <p className="mt-3 text-sm text-muted">{result.message}</p>
-        <Link
-          href="/login"
-          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-5 text-sm font-semibold text-accent-ink hover:bg-accent-strong"
-        >
-          Go to sign in
-        </Link>
-      </Shell>
+      <AuthLayout>
+        <AuthCard>
+          <AuthHeader
+            badge={
+              <VerificationBadge tone="error">
+                <ShieldX className="h-6 w-6" strokeWidth={1.9} />
+              </VerificationBadge>
+            }
+            title="This invitation cannot be used"
+            /*
+              The message comes from a fixed set in lib/invitationPolicy.ts,
+              never from the URL — nothing the visitor typed is echoed back.
+            */
+            description={result.message}
+          />
+
+          <Link href="/login" className={authButtonClasses("secondary")}>
+            Go to sign in
+          </Link>
+        </AuthCard>
+      </AuthLayout>
     );
   }
 
   const { preview } = result;
 
   return (
-    <Shell>
-      <h1 className="text-xl font-bold tracking-tight text-ink">
-        Join {preview.businessName}
-      </h1>
-      <p className="mt-2 text-sm text-muted">
-        {preview.invitedByName
-          ? `${preview.invitedByName} invited you as `
-          : "You have been invited as"}
-        <span className="font-semibold text-ink">{preview.roleName}</span>
-        {preview.clinicName ? ` at ${preview.clinicName}` : "across the whole account"}
-        . Choose a password to finish setting up your login.
-      </p>
+    <AuthLayout>
+      <AuthCard>
+        <AuthHeader
+          title={`Join ${preview.businessName}`}
+          description={
+            <>
+              {preview.invitedByName
+                ? `${preview.invitedByName} invited you as `
+                : "You have been invited as "}
+              <span className="font-semibold text-auth-ink">
+                {preview.roleName}
+              </span>
+              {preview.clinicName
+                ? ` at ${preview.clinicName}`
+                : " across the whole account"}
+              . Choose a password to finish setting up your login.
+            </>
+          }
+        />
 
-      <div className="mt-6">
         <AcceptInvitationForm token={token} email={preview.email} />
-      </div>
-    </Shell>
+      </AuthCard>
+    </AuthLayout>
   );
 }

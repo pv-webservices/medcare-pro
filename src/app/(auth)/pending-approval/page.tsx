@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { Clock, Plus, ShieldX, PauseCircle } from "lucide-react";
+import { Clock, PauseCircle, ShieldX } from "lucide-react";
+import AuthCard from "@/components/auth/AuthCard";
+import AuthFooter from "@/components/auth/AuthFooter";
+import AuthHeader from "@/components/auth/AuthHeader";
+import AuthLayout from "@/components/auth/AuthLayout";
+import VerificationBadge, {
+  type VerificationTone,
+} from "@/components/auth/VerificationBadge";
+import { authLinkClasses } from "@/components/auth/AuthButton";
 
 /**
  * The applicant's status screen — Stage 3 item 4.
@@ -20,25 +28,25 @@ type PendingStatus = "pending" | "rejected" | "suspended";
 
 const COPY: Record<
   PendingStatus,
-  { icon: typeof Clock; title: string; body: string; tone: string }
+  { icon: typeof Clock; title: string; body: string; tone: VerificationTone }
 > = {
   pending: {
     icon: Clock,
     title: "Your registration is under review",
-    body: "Thanks — we have your details. A member of the MEDCARE PRO team reviews every clinic before it goes live. You will get an email as soon as a decision is made, and you can sign in from that point.",
-    tone: "bg-warn-bg text-warn-ink",
+    body: "Thanks — we have your details. A member of the MedCare Pro team reviews every clinic before it goes live. You will get an email as soon as a decision is made, and you can sign in from that point.",
+    tone: "warning",
   },
   rejected: {
     icon: ShieldX,
     title: "Your registration was not approved",
     body: "We were not able to approve this clinic. The reason was sent to the email address you registered with. If you think this was a mistake, reply to that email.",
-    tone: "bg-alert-bg text-alert-ink",
+    tone: "error",
   },
   suspended: {
     icon: PauseCircle,
     title: "This account is suspended",
     body: "Access for this clinic is currently suspended. The reason was sent to the email address on the account. Reply to that email to sort it out.",
-    tone: "bg-orange-50 text-orange-600",
+    tone: "warning",
   },
 };
 
@@ -59,50 +67,36 @@ export default async function PendingApprovalPage({ searchParams }: PageProps) {
   const Icon = copy.icon;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas-deep p-4 sm:p-8">
-      <div className="w-full max-w-md rounded-[2rem] bg-canvas p-8 shadow-neu-float sm:p-10">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
-            <Plus className="h-6 w-6 stroke-[3]" />
-          </div>
-          <div>
-            <div className="text-xl font-bold leading-none tracking-tight text-ink">
-              Medicare Pro
-            </div>
-            <div className="mt-0.5 text-xs font-medium text-muted">
-              Smart Clinic Management
-            </div>
-          </div>
-        </div>
+    <AuthLayout>
+      <AuthCard>
+        <AuthHeader
+          badge={
+            <VerificationBadge tone={copy.tone}>
+              <Icon className="h-6 w-6" strokeWidth={1.9} />
+            </VerificationBadge>
+          }
+          title={copy.title}
+          description={copy.body}
+        />
 
-        <div
-          className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${copy.tone}`}
-        >
-          <Icon className="h-6 w-6" aria-hidden="true" />
-        </div>
-
-        <h1 className="text-2xl font-bold tracking-tight text-ink">
-          {copy.title}
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted">{copy.body}</p>
-
-        <div className="mt-8 flex flex-wrap gap-4 text-sm">
-          <Link
-            href="/login"
-            className="font-semibold text-accent hover:text-accent"
-          >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-[14px]">
+          <Link href="/login" className={authLinkClasses}>
             Back to sign in
           </Link>
           {status === "rejected" && (
             <Link
               href="/signup"
-              className="font-semibold text-muted hover:text-ink"
+              className="rounded font-semibold text-auth-muted transition-colors duration-150 hover:text-auth-ink"
             >
               Register a different clinic
             </Link>
           )}
         </div>
-      </div>
-    </div>
+      </AuthCard>
+
+      <AuthFooter>
+        Questions about a decision? Reply to the email we sent you.
+      </AuthFooter>
+    </AuthLayout>
   );
 }

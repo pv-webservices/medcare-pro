@@ -10,16 +10,27 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { Mail, Eye, EyeOff, AlertCircle } from "lucide-react";
-import AuthShell from "@/components/auth/AuthShell";
+import { Mail } from "lucide-react";
+import AuthAlert from "@/components/auth/AuthAlert";
+import AuthButton, { authLinkClasses } from "@/components/auth/AuthButton";
+import AuthCard from "@/components/auth/AuthCard";
+import AuthField from "@/components/auth/AuthField";
+import AuthFooter from "@/components/auth/AuthFooter";
+import AuthHeader from "@/components/auth/AuthHeader";
+import AuthLayout from "@/components/auth/AuthLayout";
 import LoginCodeForm from "@/components/auth/LoginCodeForm";
+import PasswordField from "@/components/auth/PasswordField";
 import { getSessionEndedMessage } from "@/lib/sessionEndedMessage";
+import { cx } from "@/components/ui/cx";
 
 // Login screen — PRD §6.1 (FR-1.3, FR-1.4, FR-1.5), with Stage 5's second
 // authentication method alongside the password one.
+//
+// The presentation was rebuilt onto the auth design system (components/auth/*,
+// tokens in globals.css). Every branch below — which refusal codes exist, what
+// each one is allowed to disclose, where each one navigates — is unchanged.
 
-const INVALID_CREDENTIALS_MESSAGE =
-  "Invalid email or password. Check your details and try again.";
+const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
 
 const UNREACHABLE_MESSAGE =
   "Could not reach the server. Check your connection and try again.";
@@ -33,14 +44,13 @@ const EMAIL_NOT_VERIFIED_CODE = "EmailNotVerified";
  */
 const ACCOUNT_NOT_FOUND_CODE = "AccountNotFound";
 
-const ACCOUNT_NOT_FOUND_MESSAGE =
-  "No account exists for that email address. Sign up to create one.";
+const ACCOUNT_NOT_FOUND_MESSAGE = "No account exists for that email address.";
 
 /**
- * Stage 3 item 4 — the applicant's organisation exists and their password is
- * right, but the application has not been approved. Auth.js surfaces these as
- * `result.code`; see ClinicStateError in src/lib/auth.ts for what each one is
- * allowed to disclose and why.
+ * Stage 3 item 4 — the organisation exists and the password is right, but the
+ * application has not been approved. Auth.js surfaces these as `result.code`;
+ * see ClinicStateError in src/lib/auth.ts for what each one is allowed to
+ * disclose and why.
  */
 const CLINIC_STATE_CODES: Record<string, string> = {
   ClinicPending: "pending",
@@ -88,7 +98,6 @@ function LoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUnverified, setIsUnverified] = useState(false);
   /** True only for the "no such account" refusal, which has an action attached. */
@@ -202,258 +211,197 @@ function LoginContent() {
   }
 
   return (
-    <AuthShell>
-            <div className="mb-8">
-              <h1 className="text-4xl font-bold tracking-tight text-ink">
-                Welcome Back
-              </h1>
-              <p className="mt-3 text-sm text-muted">
-                Sign in to your clinic dashboard
-              </p>
-            </div>
+    <AuthLayout>
+      <AuthCard>
+        <AuthHeader
+          title="Welcome back"
+          description="Sign in to continue to your MedCare Pro workspace."
+        />
 
-            {/* Page-level notices — they apply whichever method is chosen. */}
-            <div className="space-y-4 empty:hidden">
-              {sessionEndedMessage && !error && (
-                <p
-                  role="status"
-                  aria-live="polite"
-                  className="rounded-xl bg-canvas-deep p-3 text-sm text-ink"
-                >
-                  {sessionEndedMessage}
-                </p>
-              )}
-              {justReset && !error && (
-                <p
-                  role="status"
-                  aria-live="polite"
-                  className="rounded-xl bg-ok-bg p-3 text-sm text-ok-ink"
-                >
-                  Your password has been changed. Sign in with it to continue.
-                </p>
-              )}
-              {justVerified && !error && !isUnverified && (
-                <p
-                  role="status"
-                  aria-live="polite"
-                  className="rounded-xl bg-ok-bg p-3 text-sm text-ok-ink"
-                >
-                  Your email is verified. Log in to continue.
-                </p>
-              )}
-            </div>
+        {/* Page-level notices — they apply whichever method is chosen. */}
+        <div className="mb-6 space-y-3 empty:hidden">
+          {sessionEndedMessage && !error && (
+            <AuthAlert tone="info">{sessionEndedMessage}</AuthAlert>
+          )}
+          {justReset && !error && (
+            <AuthAlert tone="success">
+              Your password has been changed. Sign in with it to continue.
+            </AuthAlert>
+          )}
+          {justVerified && !error && !isUnverified && (
+            <AuthAlert tone="success">
+              Your email is verified. Sign in to continue.
+            </AuthAlert>
+          )}
+        </div>
 
-            <div
-              role="tablist"
-              aria-label="Sign-in method"
-              className="mt-6 mb-8 grid grid-cols-2 gap-1 rounded-xl bg-canvas-deep p-1"
-            >
-              {MODES.map((entry) => {
-                const isActive = entry.id === mode;
-                return (
-                  <button
-                    key={entry.id}
-                    ref={(node) => {
-                      tabRefs.current[entry.id] = node;
-                    }}
-                    id={`login-tab-${entry.id}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-controls={`login-panel-${entry.id}`}
-                    // Roving tabindex: one stop for the whole tablist, then the
-                    // arrow keys move within it.
-                    tabIndex={isActive ? 0 : -1}
-                    onClick={() => selectMode(entry.id)}
-                    onKeyDown={handleTabKeyDown}
-                    className={`rounded-lg py-2.5 text-sm font-semibold transition-colors     ${
-                      isActive
-                        ? "bg-canvas text-accent shadow-neu-raised-sm"
-                        : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    {entry.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div
-              role="tabpanel"
-              id="login-panel-password"
-              aria-labelledby="login-tab-password"
-              hidden={mode !== "password"}
-            >
-              {/*
-                `method="post"` guards the instant before hydration: a <form> with no
-                `method` defaults to GET, so a submit landing before React attaches its
-                handler would send the password as a QUERY STRING — into the URL bar,
-                into history, and into every proxy log on the way. POST puts it in a
-                body instead. handleSubmit still preventDefaults and posts with fetch;
-                this only bounds what a stray native submit can do. Longer note in
-                src/components/auth/ResetPasswordForm.tsx.
-              */}
-              <form method="post" onSubmit={handleSubmit} className="space-y-6">
-                {isUnverified && (
-                  <p
-                    role="alert"
-                    aria-live="assertive"
-                    className="flex items-start gap-2 rounded-xl bg-warn-bg p-3 text-sm text-warn-ink"
-                  >
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>
-                      Please verify your email before logging in. Check your inbox for the link, or{""}
-                      <Link
-                        href={`/verify-email?email=${encodeURIComponent(email)}`}
-                        className="font-medium underline hover:text-warn-ink"
-                      >
-                        request a new one
-                      </Link>
-                      .
-                    </span>
-                  </p>
+        <div
+          role="tablist"
+          aria-label="Sign-in method"
+          className="mb-7 grid grid-cols-2 gap-1 rounded-[14px] bg-auth-bg-tint p-1"
+        >
+          {MODES.map((entry) => {
+            const isActive = entry.id === mode;
+            return (
+              <button
+                key={entry.id}
+                ref={(node) => {
+                  tabRefs.current[entry.id] = node;
+                }}
+                id={`login-tab-${entry.id}`}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`login-panel-${entry.id}`}
+                // Roving tabindex: one stop for the whole tablist, then the
+                // arrow keys move within it.
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => selectMode(entry.id)}
+                onKeyDown={handleTabKeyDown}
+                className={cx(
+                  "min-h-10 rounded-[11px] text-[13.5px] font-semibold transition-[background-color,color,box-shadow] duration-150",
+                  isActive
+                    ? "bg-auth-card text-auth-primary shadow-auth-sm"
+                    : "text-auth-muted hover:text-auth-ink",
                 )}
-                {error && (
-                  <p
-                    id="login-password-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="flex items-start gap-2 rounded-xl bg-alert-bg p-3 text-sm text-alert-ink"
+              >
+                {entry.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          role="tabpanel"
+          id="login-panel-password"
+          aria-labelledby="login-tab-password"
+          hidden={mode !== "password"}
+        >
+          {/*
+            `method="post"` guards the instant before hydration: a <form> with no
+            `method` defaults to GET, so a submit landing before React attaches its
+            handler would send the password as a QUERY STRING — into the URL bar,
+            into history, and into every proxy log on the way. POST puts it in a
+            body instead. handleSubmit still preventDefaults and posts with fetch;
+            this only bounds what a stray native submit can do. Longer note in
+            src/components/auth/ResetPasswordForm.tsx.
+          */}
+          <form method="post" onSubmit={handleSubmit} className="space-y-5">
+            {isUnverified && (
+              <AuthAlert
+                tone="warning"
+                title="Your email address has not been verified yet."
+                action={
+                  <Link
+                    href={`/verify-email?email=${encodeURIComponent(email)}`}
+                    className={authLinkClasses}
                   >
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>
-                      <span className="font-semibold">Error:</span> {error}
-                      {isUnknownAccount && (
-                        <>
-                          {""}
-                          <Link
-                            href={`/signup?email=${encodeURIComponent(email)}`}
-                            className="font-semibold underline hover:text-alert-ink"
-                          >
-                            Create an account
-                          </Link>
-                          .
-                        </>
-                      )}
-                    </span>
-                  </p>
-                )}
+                    Resend verification email
+                  </Link>
+                }
+              >
+                Open the link we sent you, then sign in again.
+              </AuthAlert>
+            )}
 
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-ink mb-2">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                      <Mail className="h-5 w-5 text-accent" aria-hidden="true" />
-                    </div>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      aria-invalid={error ? true : undefined}
-                      aria-describedby={error ? "login-password-error" : undefined}
-                      placeholder="dr.amelia@dentalcare.com"
-                      className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-11 pr-4 text-sm text-ink placeholder:text-faint"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-ink mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      aria-invalid={error ? true : undefined}
-                      aria-describedby={error ? "login-password-error" : undefined}
-                      placeholder="••••••••••••••••"
-                      className="block w-full rounded-2xl shadow-neu-inset py-3.5 pl-4 pr-11 text-sm tracking-[0.2em] text-ink placeholder:text-faint placeholder:tracking-[0.2em]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      aria-pressed={showPassword}
-                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-accent hover:text-accent rounded"
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center">
-                    <input
-                      id="remember-me"
-                      name="rememberMe"
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 rounded border-line text-accent"
-                    />
-                    <label htmlFor="remember-me" className="ml-2 block text-sm text-muted font-medium">
-                      Remember me
-                    </label>
-                  </div>
-                  <div className="text-sm">
-                    {/*
-                      Was `<a href="#">`, which reloaded the page and went
-                      nowhere — there was no reset flow behind it at all. The
-                      address already typed here is carried over so it does not
-                      have to be typed again; /forgot-password treats it as a
-                      default field value and nothing more.
-                    */}
+            {error && (
+              <AuthAlert
+                id="login-password-error"
+                tone="error"
+                action={
+                  isUnknownAccount ? (
                     <Link
-                      href={
-                        email
-                          ? `/forgot-password?email=${encodeURIComponent(email)}`
-                          : "/forgot-password"
-                      }
-                      className="font-medium text-accent hover:text-accent"
+                      href={`/signup?email=${encodeURIComponent(email)}`}
+                      className={authLinkClasses}
                     >
-                      Forgot password?
+                      Create an account
                     </Link>
-                  </div>
-                </div>
+                  ) : undefined
+                }
+              >
+                {error}
+              </AuthAlert>
+            )}
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="mt-2 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary disabled:opacity-70 transition-colors"
+            <AuthField
+              id="email"
+              name="email"
+              type="email"
+              label="Email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              icon={<Mail className="h-[18px] w-[18px]" strokeWidth={2} />}
+              aria-invalid={error ? true : undefined}
+              describedBy={error ? "login-password-error" : undefined}
+              placeholder="you@clinic.com"
+            />
+
+            <PasswordField
+              id="password"
+              name="password"
+              label="Password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              aria-invalid={error ? true : undefined}
+              describedBy={error ? "login-password-error" : undefined}
+              labelAction={
+                <Link
+                  href={
+                    email
+                      ? `/forgot-password?email=${encodeURIComponent(email)}`
+                      : "/forgot-password"
+                  }
+                  className="rounded text-[13px] font-medium text-auth-muted transition-colors duration-150 hover:text-auth-primary"
                 >
-                  {isSubmitting ? "Signing In..." : "Sign In"}
-                </button>
-              </form>
-            </div>
+                  Forgot password?
+                </Link>
+              }
+            />
 
-            <div
-              role="tabpanel"
-              id="login-panel-code"
-              aria-labelledby="login-tab-code"
-              hidden={mode !== "code"}
+            <label className="flex w-fit items-center gap-2.5 text-[13.5px] font-medium text-auth-ink-soft">
+              <input
+                id="remember-me"
+                name="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+                className="h-4 w-4 rounded-[5px] border-auth-line-strong accent-auth-primary"
+              />
+              Keep me signed in
+            </label>
+
+            <AuthButton
+              type="submit"
+              isBusy={isSubmitting}
+              busyLabel="Signing in..."
+              className="mt-1"
             >
-              <LoginCodeForm email={email} onEmailChange={setEmail} />
-            </div>
+              Sign in
+            </AuthButton>
+          </form>
+        </div>
 
-            <p className="mt-10 text-center text-sm text-muted">
-              Don&apos;t have an account?{""}
-              <Link href="/signup" className="font-semibold text-accent hover:text-accent">
-                Sign up
-              </Link>
-            </p>
-    </AuthShell>
+        <div
+          role="tabpanel"
+          id="login-panel-code"
+          aria-labelledby="login-tab-code"
+          hidden={mode !== "code"}
+        >
+          <LoginCodeForm email={email} onEmailChange={setEmail} />
+        </div>
+      </AuthCard>
+
+      <AuthFooter>
+        Don&apos;t have an account?{" "}
+        <Link href="/signup" className={authLinkClasses}>
+          Create one
+        </Link>
+      </AuthFooter>
+    </AuthLayout>
   );
 }
 

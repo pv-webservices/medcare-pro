@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
+import AuthAlert from "@/components/auth/AuthAlert";
+import { authButtonClasses, authLinkClasses } from "@/components/auth/AuthButton";
+import AuthFooter from "@/components/auth/AuthFooter";
+import AuthHeader from "@/components/auth/AuthHeader";
 import AuthShell from "@/components/auth/AuthShell";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import VerificationBadge from "@/components/auth/VerificationBadge";
 import { prisma } from "@/lib/prisma";
 import { isPasswordResetTokenLive, RESET_LINK_INVALID_MESSAGE } from "@/lib/passwordReset";
 import { MIN_PASSWORD_LENGTH } from "@/lib/signupInput";
@@ -48,35 +53,38 @@ export default async function ResetPasswordPage({
   if (!token || !isLive) {
     return (
       <AuthShell>
-        <div className="mb-8">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-alert-bg text-alert-ink">
-            <AlertCircle className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight text-ink">
-            This link has expired
-          </h1>
-          <p role="status" className="mt-3 text-sm text-muted">
-            {RESET_LINK_INVALID_MESSAGE}
-          </p>
-        </div>
+        <AuthHeader
+          badge={
+            <VerificationBadge tone="error">
+              <AlertCircle className="h-6 w-6" strokeWidth={1.9} />
+            </VerificationBadge>
+          }
+          title="This link has expired"
+          description={RESET_LINK_INVALID_MESSAGE}
+        />
 
-        <p className="rounded-xl bg-canvas-deep p-3 text-sm text-ink">
+        <AuthAlert tone="info">
           Reset links work once and last 24 hours. Requesting a new one also
           cancels any older link still sitting in your inbox.
-        </p>
+        </AuthAlert>
 
+        {/*
+          A link wearing the primary button's clothes, rather than a button
+          inside a link: nesting two interactive elements gives a keyboard user
+          two stops for one action and a screen reader a control it cannot name.
+        */}
         <Link
           href="/forgot-password"
-          className="mt-8 flex w-full justify-center rounded-xl bg-primary hover:bg-primary-hover py-3.5 px-4 text-sm font-semibold text-accent-ink shadow-neu-raised-sm focus:ring-primary transition-colors"
+          className={authButtonClasses("primary", "mt-6")}
         >
           Request a new link
         </Link>
 
-        <p className="mt-6 text-center text-sm text-muted">
-          <Link href="/login" className="font-semibold text-accent hover:text-accent">
+        <AuthFooter>
+          <Link href="/login" className={authLinkClasses}>
             Back to sign in
           </Link>
-        </p>
+        </AuthFooter>
       </AuthShell>
     );
   }
