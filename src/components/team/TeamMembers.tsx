@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import type { MembershipStatus } from "@prisma/client";
+import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import StatusPill, { type StatusTone } from "@/components/ui/StatusPill";
 import Table, { TBody, TD, TH, THead, TR } from "@/components/ui/Table";
+import { ConfirmDialog } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import type { TeamMember } from "@/lib/team";
 
@@ -57,10 +59,21 @@ const STATUS_LABEL: Record<MembershipStatus, string> = {
  */
 const CONFIRM: Partial<Record<TeamAction, (name: string) => string>> = {
   suspend: (name) =>
-    `Suspend ${name}? They will be signed out everywhere and cannot sign in until you reactivate them.`,
-  reject: (name) => `Reject ${name}? They will not be able to sign in.`,
+    `${name} will be signed out everywhere and cannot sign in until you reactivate them.`,
+  reject: (name) => `${name} will not be able to sign in.`,
   remove: (name) =>
-    `Remove ${name}? This cannot be undone — they would need a new invitation, and their email address stays taken.`,
+    `This cannot be undone. ${name} would need a new invitation, and their email address stays taken.`,
+};
+
+/**
+ * The verb, used for both the dialog's title and its confirm button — a
+ * confirmation whose button says "OK" makes the reader reconstruct which choice
+ * is the destructive one from the sentence above it.
+ */
+const CONFIRM_TITLE: Partial<Record<TeamAction, string>> = {
+  suspend: "Suspend this person",
+  reject: "Reject this person",
+  remove: "Remove this person",
 };
 
 function formatLastSeen(value: string | null): string {
@@ -82,17 +95,37 @@ export default function TeamMembers({
   const router = useRouter();
   const showToast = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * The member and action waiting on a confirmation. Suspending, rejecting and
+   * removing all change someone's access, so they are asked about in a dialog
+   * rather than a browser confirm() — which cannot be styled, speaks in the
+   * browser's voice rather than the product's, and on a shared tablet looks
+   * like the machine warning you about the page.
+   */
+  const [pending, setPending] = useState<{
+    member: TeamMember;
+    action: TeamAction;
+  } | null>(null);
 
-  async function run(member: TeamMember, action: TeamAction) {
-    const who = member.name?.trim() || member.email;
-    const confirmation = CONFIRM[action]?.(who);
-    if (confirmation && !window.confirm(confirmation)) {
+  /** What a button calls: confirm first where CONFIRM has wording, else run. */
+  function request(member: TeamMember, action: TeamAction) {
+    if (CONFIRM[action]) {
+      setPending({ member, action });
       return;
     }
+    void run(member, action);
+  }
+
+  /**
+   * Runs the action. The three destructive ones ask first — see `request`
+   * above, which is what the buttons actually call.
+   */
+  async function run(member: TeamMember, action: TeamAction) {
     if (busyId) {
       return;
     }
 
+    const who = member.name?.trim() || member.email;
     setBusyId(member.id);
     try {
       const response = await fetch("/api/team", {
@@ -151,16 +184,23 @@ export default function TeamMembers({
 
           return (
             <TR key={member.id}>
-              <TD>
-                <span className="block font-semibold text-ink">
-                  {member.name?.trim() || "—"}
-                  {member.isSelf && (
-                    <span className="ml-2 text-xs font-medium text-faint">
-                      You
+              <TD isPrimary>
+                <span className="flex items-center gap-2.5">
+                  <Avatar name={member.name?.trim() || member.email} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block truncate">
+                      {member.name?.trim() || member.email}
+                      {member.isSelf && (
+                        <span className="ml-2 text-meta font-medium text-faint">
+                          You
+                        </span>
+                      )}
                     </span>
-                  )}
+                    <span className="block truncate text-meta text-muted">
+                      {member.email}
+                    </span>
+                  </span>
                 </span>
-                <span className="block text-xs text-muted">{member.email}</span>
               </TD>
 
               <TD>
@@ -175,7 +215,7 @@ export default function TeamMembers({
                         hasDot={false}
                       >
                         {role.roleName}
-                        {role.clinicName ? ` · ${role.clinicName}` : ""}
+                        {role.clinicName ? ` · ${role.clinicName}` : " · Account-wide"}
                       </StatusPill>
                     ))}
                   </span>
@@ -189,7 +229,7 @@ export default function TeamMembers({
                   </StatusPill>
                   {member.isBlockedByPlatform && (
                     <span
-                      className="inline-flex items-center gap-1 text-xs font-medium text-warn-ink"
+                      className="inline-flex items-center gap-1 text-meta font-medium text-warn-ink"
                       title="Access is on hold at the platform level. Contact support."
                     >
                       <ShieldAlert
@@ -203,7 +243,7 @@ export default function TeamMembers({
                 </span>
               </TD>
 
-              <TD className="tabular-nums">{formatLastSeen(member.lastLoginAt)}</TD>
+              <TD className="tnum">{formatLastSeen(member.lastLoginAt)}</TD>
 
               <TD align="end">
                 <span className="flex flex-wrap justify-end gap-2">
@@ -211,10 +251,10 @@ export default function TeamMembers({
                     <>
                       <Button
                         size="sm"
-                        variant="commit"
+                        variant="primary"
                         isBusy={isBusy}
                         busyLabel="Working..."
-                        onClick={() => run(member, "approve")}
+                        onClick={() => request(member, "approve")}
                       >
                         Approve
                       </Button>
@@ -222,7 +262,7 @@ export default function TeamMembers({
                         size="sm"
                         variant="danger"
                         disabled={isBusy}
-                        onClick={() => run(member, "reject")}
+                        onClick={() => request(member, "reject")}
                       >
                         Reject
                       </Button>
@@ -234,7 +274,7 @@ export default function TeamMembers({
                       size="sm"
                       variant="secondary"
                       disabled={isBusy}
-                      onClick={() => run(member, "suspend")}
+                      onClick={() => request(member, "suspend")}
                     >
                       Suspend
                     </Button>
@@ -245,7 +285,7 @@ export default function TeamMembers({
                       size="sm"
                       variant="secondary"
                       disabled={isBusy}
-                      onClick={() => run(member, "reactivate")}
+                      onClick={() => request(member, "reactivate")}
                     >
                       Reactivate
                     </Button>
@@ -256,14 +296,14 @@ export default function TeamMembers({
                       size="sm"
                       variant="danger"
                       disabled={isBusy}
-                      onClick={() => run(member, "remove")}
+                      onClick={() => request(member, "remove")}
                     >
                       Remove
                     </Button>
                   )}
 
                   {isLocked && (
-                    <span className="text-xs text-faint">
+                    <span className="text-meta text-faint">
                       Ask another admin
                     </span>
                   )}
@@ -275,13 +315,44 @@ export default function TeamMembers({
       </TBody>
     </Table>
 
-    <p className="px-1 text-xs text-muted">
-      Roles are changed on the{""}
-      <Link href="/settings/roles" className="font-medium text-primary underline">
+    <p className="px-1 text-meta text-muted">
+      Roles are changed on the{" "}
+      <Link
+        href="/settings/roles"
+        className="rounded font-medium text-accent transition-colors duration-150 hover:text-accent-strong"
+      >
         Roles screen
       </Link>
       , where the permission checks for them live.
     </p>
+
+    <ConfirmDialog
+      isOpen={pending !== null}
+      onCancel={() => setPending(null)}
+      onConfirm={() => {
+        const request = pending;
+        setPending(null);
+        if (request) {
+          void run(request.member, request.action);
+        }
+      }}
+      title={
+        pending
+          ? `${CONFIRM_TITLE[pending.action] ?? "Confirm"}?`
+          : "Confirm"
+      }
+      body={
+        pending
+          ? (CONFIRM[pending.action]?.(
+              pending.member.name?.trim() || pending.member.email,
+            ) ?? "")
+          : ""
+      }
+      confirmLabel={pending ? (CONFIRM_TITLE[pending.action] ?? "Confirm") : "Confirm"}
+      cancelLabel="Keep as is"
+      isBusy={busyId !== null}
+      busyLabel="Saving..."
+    />
     </div>
   );
 }

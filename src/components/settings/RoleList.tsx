@@ -44,7 +44,7 @@ function PermissionCheckboxes({
     <div className="grid gap-6 sm:grid-cols-2">
       {PERMISSION_GROUPS.map((group) => (
         <fieldset key={group.module} className="min-w-0">
-          <legend className="mb-2 text-sm font-bold text-ink">{group.module}</legend>
+          <legend className="mb-2 text-body font-semibold text-ink">{group.module}</legend>
           <ul className="grid gap-2">
             {group.permissions.map((permission) => {
               const id = `${idPrefix}-${permission.key}`;
@@ -54,7 +54,7 @@ function PermissionCheckboxes({
                 <li key={permission.key}>
                   <label
                     htmlFor={id}
-                    className={`flex items-start gap-3 rounded-md p-2 transition-colors ${
+                    className={`flex items-start gap-3 rounded-lg p-2 transition-colors ${
                       isGrantable ? "hover:bg-canvas-deep cursor-pointer" : "opacity-60 cursor-not-allowed"
                     }`}
                   >
@@ -69,21 +69,21 @@ function PermissionCheckboxes({
                       className="mt-1 size-4 shrink-0 rounded border-line text-accent"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-ink">
+                      <span className="block text-body font-semibold text-ink">
                         {permission.label}
                       </span>
-                      <span className="block text-xs text-muted">
+                      <span className="block text-meta text-muted">
                         {permission.description}
                       </span>
                       {permission.pendingNote && (
                         // Says so rather than implying protection that does not
                         // exist yet — ticking this box changes nothing today.
-                        <span className="mt-1 block text-xs text-warn-ink font-medium">
+                        <span className="mt-1 block text-meta text-warn-ink font-medium">
                           {permission.pendingNote}
                         </span>
                       )}
                       {!isGrantable && (
-                        <span className="mt-1 block text-xs text-faint">
+                        <span className="mt-1 block text-meta text-faint">
                           You do not hold this permission, so you cannot grant it.
                         </span>
                       )}
@@ -187,11 +187,11 @@ export default function RoleList({
   return (
     <section aria-labelledby="roles-heading">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-4">
-        <h2 id="roles-heading" className="text-lg font-bold text-ink">
+        <h2 id="roles-heading" className="text-heading font-semibold text-ink">
           Roles
         </h2>
         {canManage && !isAdding && (
-          <Button onClick={() => setIsAdding(true)} variant="commit">
+          <Button onClick={() => setIsAdding(true)} variant="primary">
             Add Role
           </Button>
         )}
@@ -200,7 +200,7 @@ export default function RoleList({
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
@@ -222,7 +222,7 @@ export default function RoleList({
               />
             </div>
 
-            <div className="bg-canvas rounded-3xl p-5 shadow-neu-raised-sm">
+            <div className="bg-canvas rounded-3xl p-5 border border-line shadow-card">
               <PermissionCheckboxes
                 idPrefix="new-role"
                 selected={newPermissions}
@@ -237,11 +237,11 @@ export default function RoleList({
               <Button
                 type="submit"
                 disabled={isSaving}
-                variant="commit"
+                variant="primary"
                 isBusy={isSaving}
                 busyLabel="Creating…"
               >
-                Create Role
+                Create role
               </Button>
               <Button
                 type="button"
@@ -266,13 +266,13 @@ export default function RoleList({
           return (
             <li
               key={role.id}
-              className={`rounded-xl border p-5 shadow-neu-raised-sm transition-colors ${
+              className={`rounded-xl border p-5 border border-line shadow-card transition-colors ${
                 isEditing ? "border-line bg-accent-soft/30" : "border-line bg-canvas"
               }`}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
                 <p className="font-semibold text-ink">{role.name}</p>
-                <p className="text-sm font-medium text-muted">
+                <p className="text-body font-medium text-muted">
                   {role.assignmentCount === 1
                     ? "1 assignment"
                     : `${role.assignmentCount} assignments`}
@@ -280,12 +280,12 @@ export default function RoleList({
               </div>
 
               {role.isWildcard ? (
-                <p className="text-sm text-muted">
+                <p className="text-body text-muted">
                   Full access to everything. Permissions for this role are not
                   editable here — create a custom role instead.
                 </p>
               ) : (
-                <p className="text-sm text-muted">
+                <p className="text-body text-muted">
                   {role.permissions.length === 0
                     ? "No permissions — this role can sign in and do nothing else."
                     : `${role.permissions.length} permission${
@@ -310,7 +310,7 @@ export default function RoleList({
 
               {isEditing && editing && (
                 <div className="mt-6 pt-6 border-t border-line/60">
-                  <div className="bg-canvas rounded-xl p-5 mb-5 shadow-neu-raised-sm">
+                  <div className="bg-canvas rounded-xl p-5 mb-5 border border-line shadow-card">
                     <PermissionCheckboxes
                       idPrefix={`role-${role.id}`}
                       selected={editing.permissions}
@@ -332,7 +332,7 @@ export default function RoleList({
                       type="button"
                       onClick={() => handleSaveRole(role.id)}
                       disabled={savingRoleId === role.id}
-                      variant="commit"
+                      variant="primary"
                       isBusy={savingRoleId === role.id}
                       busyLabel="Saving…"
                     >

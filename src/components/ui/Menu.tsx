@@ -1,0 +1,204 @@
+"use client";
+
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { cx } from "@/components/ui/cx";
+
+/**
+ * A dropdown: a trigger, and a panel of choices under it.
+ *
+ * Used by the clinic switcher, the account menu and every row-level "more
+ * actions" control, so those three cannot drift into behaving differently.
+ *
+ * THE KEYBOARD CONTRACT IS THE WHOLE COMPONENT. A menu that only answers the
+ * mouse is a menu a front-desk user cannot reach while their hands are on the
+ * keyboard: Escape closes and returns focus to the trigger, Tab or a click
+ * outside closes, ArrowDown from the trigger opens and lands on the first item,
+ * and the arrows move between items once inside. `aria-expanded` and
+ * `aria-haspopup` on the trigger say what will happen before it happens.
+ *
+ * IT IS NOT A `<select>` REPLACEMENT. Where the choice is a form value, use the
+ * native select — the OS picker on a tablet beats anything built here. This is
+ * for navigation and actions.
+ */
+
+interface MenuProps {
+  /** The control that opens the panel. Receives the open state for its chevron. */
+  trigger: (state: { isOpen: boolean }) => ReactNode;
+  /** Announced as the panel's name, e.g. "Switch clinic". */
+  label: string;
+  /** Which edge of the trigger the panel lines up with. */
+  align?: "start" | "end";
+  /** Panel width. Defaults to a comfortable menu measure. */
+  panelClassName?: string;
+  className?: string;
+  children: ReactNode;
+}
+
+export default function Menu({
+  trigger,
+  label,
+  align = "start",
+  panelClassName,
+  className,
+  children,
+}: MenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const panelId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  /** Anything focusable inside the panel, in DOM order. */
+  function items(): HTMLElement[] {
+    const panel = panelRef.current;
+    if (!panel) {
+      return [];
+    }
+    return Array.from(
+      panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+  }
+
+  function close(options: { restoreFocus?: boolean } = {}) {
+    setIsOpen(false);
+    if (options.restoreFocus) {
+      triggerRef.current?.focus();
+    }
+  }
+
+  /** A click or a focus move outside the menu closes it. */
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleFocusIn(event: FocusEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("focusin", handleFocusIn);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("focusin", handleFocusIn);
+    };
+  }, [isOpen]);
+
+  function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+      if (!isOpen) {
+        event.preventDefault();
+        setIsOpen(true);
+        // The panel has not rendered yet; focus lands on the next frame.
+        requestAnimationFrame(() => items()[0]?.focus());
+      }
+    }
+  }
+
+  function handlePanelKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close({ restoreFocus: true });
+      return;
+    }
+
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+      return;
+    }
+
+    event.preventDefault();
+    const focusable = items();
+    if (focusable.length === 0) {
+      return;
+    }
+    const current = focusable.indexOf(document.activeElement as HTMLElement);
+    const step = event.key === "ArrowDown" ? 1 : focusable.length - 1;
+    const next = (current + step + focusable.length) % focusable.length;
+    focusable[next]?.focus();
+  }
+
+  return (
+    <div ref={rootRef} className={cx("relative", className)}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? panelId : undefined}
+        onClick={() => setIsOpen((current) => !current)}
+        onKeyDown={handleTriggerKeyDown}
+        className="w-full rounded-2xl text-left"
+      >
+        {trigger({ isOpen })}
+      </button>
+
+      {isOpen && (
+        <div
+          ref={panelRef}
+          id={panelId}
+          role="menu"
+          aria-label={label}
+          onKeyDown={handlePanelKeyDown}
+          onClick={() => setIsOpen(false)}
+          className={cx(
+            "panel-in absolute z-40 mt-2 min-w-[15rem] overflow-hidden rounded-2xl",
+            "border border-line bg-canvas p-1.5 shadow-float",
+            align === "end" ? "right-0" : "left-0",
+            panelClassName,
+          )}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A caption above a group of items. Not focusable, not a heading. */
+export function MenuLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="px-3 pb-1.5 pt-2 text-micro font-semibold uppercase text-faint">
+      {children}
+    </p>
+  );
+}
+
+export function MenuSeparator() {
+  return <hr className="my-1.5 border-0 border-t border-line" />;
+}
+
+/**
+ * The row inside a menu. Rendered as whatever the caller passes as `as` — a
+ * `<Link>` for navigation, a `<button>` for an action — so the element matches
+ * the behaviour rather than everything being a div with a click handler.
+ */
+export function menuItemClasses(isActive = false, tone: "default" | "danger" = "default") {
+  return cx(
+    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-body font-medium",
+    "transition-colors duration-150",
+    tone === "danger"
+      ? "text-alert-ink hover:bg-alert-bg"
+      : isActive
+        ? "bg-accent-soft text-accent-soft-ink"
+        : "text-ink-soft hover:bg-canvas-deep hover:text-ink",
+  );
+}

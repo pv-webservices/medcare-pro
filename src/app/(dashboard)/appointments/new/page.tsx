@@ -63,11 +63,11 @@ export default async function BookAppointmentPage() {
   const bookable = services.filter((service) => service.isActive);
 
   return (
-    <section className="mx-auto w-full max-w-[1100px] animate-in fade-in duration-500">
+    <section className="mx-auto w-full max-w-4xl">
       <PageHeader
-        title="Book Appointment"
-        meta="Hold a slot in a doctor's day. The patient record is created later, when they arrive and the appointment is registered."
-        back={{ href: "/appointments", label: "Back to appointments" }}
+        title="Book an appointment"
+        description="Hold a slot in a doctor's day. The patient record is created later, when they arrive and the appointment is registered."
+        breadcrumbs={[{ label: "Appointments", href: "/appointments" }, { label: "Book an appointment" }]}
       />
 
       {bookable.length === 0 ? (
@@ -82,7 +82,7 @@ export default async function BookAppointmentPage() {
             canManageServices ? (
               <Link
                 href="/appointments/types"
-                className={buttonClasses("commit", "md")}
+                className={buttonClasses("primary", "md")}
               >
                 Add a Service
               </Link>

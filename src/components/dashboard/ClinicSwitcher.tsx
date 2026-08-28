@@ -2,81 +2,216 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import Select from "@/components/ui/Select";
+import { Building2, Check, ChevronsUpDown, Layers } from "lucide-react";
+import { Menu, MenuLabel, MenuSeparator, menuItemClasses, cx } from "@/components/ui";
 import { SELECTED_CLINIC_COOKIE } from "@/lib/cookieNames";
 
 /**
- * Clinic switcher — FR-2.3 (every module is scoped by clinic).
+ * Clinic switcher — FR-2.3. Every module is scoped by clinic, so this control
+ * changes what every number on every screen means. It is treated accordingly:
+ * it sits in the header, it shows what is selected without being opened, and it
+ * marks the current choice inside the menu.
  *
- * Records the choice in a cookie and refreshes, so server components re-render
- * against the new selection.
- *
- * The cookie is a CONVENIENCE ONLY and is trivially editable by the user. Any
+ * THE COOKIE IS A CONVENIENCE ONLY and is trivially editable by the user. Any
  * page or route that reads it must pass it through `resolveSelectedClinicId()`,
  * which re-checks the id against the actor's own clinic scope. Never query on
  * this value directly.
  *
- * It sits at the top of the sidebar as an inset well, because it is the one
- * control up there that changes what every screen below it means. The label is
- * hidden from sight but not from screen readers, and replaced by the caption —
- * "Viewing clinic" twice over would be noise for a sighted reader and the whole
- * context for a blind one.
+ * IT ONLY EVER LISTS WHAT THE ACTOR CAN REACH. The array arrives from
+ * `listClinicsForActor` in the layout, which is already scoped by
+ * `clinic:read`; nothing is filtered here, and nothing may be added here.
+ *
+ * "All clinics" means account-wide. It is the absence of a selection rather
+ * than a value, which is why it posts an empty string — the same thing
+ * `resolveSelectedClinicId` reads as "no clinic chosen".
  */
 
-interface ClinicOption {
+export interface ClinicOption {
   id: string;
   name: string;
+  city?: string | null;
+  logoUrl?: string | null;
 }
 
 interface ClinicSwitcherProps {
   clinics: readonly ClinicOption[];
   selectedClinicId: string | null;
+  /** Compact drops the caption line — for the mobile drawer. */
+  isCompact?: boolean;
+  className?: string;
 }
 
 /** One year. The selection is a preference, not a credential. */
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
+function ClinicMark({
+  clinic,
+  className,
+}: {
+  clinic: ClinicOption | null;
+  className?: string;
+}) {
+  if (clinic?.logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={clinic.logoUrl}
+        alt=""
+        className={cx("h-8 w-8 shrink-0 rounded-xl border border-line object-cover", className)}
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className={cx(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink",
+        className,
+      )}
+    >
+      {clinic ? (
+        <Building2 strokeWidth={2} className="h-4 w-4" />
+      ) : (
+        <Layers strokeWidth={2} className="h-4 w-4" />
+      )}
+    </span>
+  );
+}
+
 export default function ClinicSwitcher({
   clinics,
   selectedClinicId,
+  isCompact = false,
+  className,
 }: ClinicSwitcherProps) {
   const router = useRouter();
-  const [value, setValue] = useState(selectedClinicId ?? "");
+  const [selected, setSelected] = useState(selectedClinicId ?? "");
 
-  // Nothing to switch between.
-  if (clinics.length < 2) {
-    return null;
-  }
+  const active = clinics.find((clinic) => clinic.id === selected) ?? null;
 
-  function handleChange(next: string) {
-    setValue(next);
+  function choose(next: string) {
+    setSelected(next);
     document.cookie = `${SELECTED_CLINIC_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax`;
     router.refresh();
   }
 
-  return (
-    <div>
-      <p
-        aria-hidden="true"
-        className="mb-2 px-4 text-micro font-semibold uppercase text-muted"
-      >
-        Viewing clinic
-      </p>
+  // Nothing to switch between: state the scope, do not offer a menu that has
+  // one entry and no consequence.
+  if (clinics.length < 2) {
+    const only = clinics[0] ?? null;
 
-      <Select
-        id="clinic-switcher"
-        label="Viewing clinic"
-        isLabelHidden
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
+    return (
+      <div
+        className={cx(
+          "flex min-w-0 items-center gap-2.5 rounded-2xl border border-line bg-canvas px-3 py-2 shadow-card",
+          className,
+        )}
       >
-        <option value="">All clinics</option>
-        {clinics.map((clinic) => (
-          <option key={clinic.id} value={clinic.id}>
-            {clinic.name}
-          </option>
-        ))}
-      </Select>
-    </div>
+        <ClinicMark clinic={only} />
+        <div className="min-w-0">
+          <p className="truncate text-label font-semibold text-ink">
+            {only?.name ?? "All clinics"}
+          </p>
+          {!isCompact && (
+            <p className="truncate text-meta text-muted">
+              {only?.city ?? "Account-wide view"}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Menu
+      label="Switch clinic"
+      className={cx("min-w-0", className)}
+      panelClassName="w-[19rem]"
+      trigger={({ isOpen }) => (
+        <span
+          className={cx(
+            "flex min-w-0 items-center gap-2.5 rounded-2xl border bg-canvas px-3 py-2 shadow-card",
+            "transition-colors duration-150",
+            isOpen ? "border-line-strong" : "border-line hover:border-line-strong",
+          )}
+        >
+          <ClinicMark clinic={active} />
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-label font-semibold text-ink">
+              {active?.name ?? "All clinics"}
+            </span>
+            {!isCompact && (
+              <span className="block truncate text-meta text-muted">
+                {active ? (active.city ?? "Clinic") : "Account-wide view"}
+              </span>
+            )}
+          </span>
+          <ChevronsUpDown
+            aria-hidden="true"
+            strokeWidth={2}
+            className="h-4 w-4 shrink-0 text-faint"
+          />
+        </span>
+      )}
+    >
+      <MenuLabel>Viewing</MenuLabel>
+
+      <button
+        type="button"
+        role="menuitemradio"
+        aria-checked={selected === ""}
+        onClick={() => choose("")}
+        className={menuItemClasses(selected === "")}
+      >
+        <ClinicMark clinic={null} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">All clinics</span>
+          <span className="block truncate text-meta font-normal text-muted">
+            Everything in this account
+          </span>
+        </span>
+        {selected === "" && (
+          <Check aria-hidden="true" strokeWidth={2.5} className="h-4 w-4 shrink-0" />
+        )}
+      </button>
+
+      <MenuSeparator />
+      <MenuLabel>Clinics</MenuLabel>
+
+      <div className="max-h-72 overflow-y-auto">
+        {clinics.map((clinic) => {
+          const isCurrent = clinic.id === selected;
+
+          return (
+            <button
+              key={clinic.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={isCurrent}
+              onClick={() => choose(clinic.id)}
+              className={menuItemClasses(isCurrent)}
+            >
+              <ClinicMark clinic={clinic} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{clinic.name}</span>
+                {clinic.city && (
+                  <span className="block truncate text-meta font-normal text-muted">
+                    {clinic.city}
+                  </span>
+                )}
+              </span>
+              {isCurrent && (
+                <Check
+                  aria-hidden="true"
+                  strokeWidth={2.5}
+                  className="h-4 w-4 shrink-0"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </Menu>
   );
 }

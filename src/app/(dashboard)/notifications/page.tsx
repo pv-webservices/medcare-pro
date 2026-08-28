@@ -68,9 +68,9 @@ export default async function NotificationsPage({
 
   if (!feed) {
     return (
-      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <section className="space-y-4">
         <PageHeader title="Notifications" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view notifications. Ask an admin or the account owner
           if you need access.
         </div>
@@ -79,20 +79,13 @@ export default async function NotificationsPage({
   }
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
         title="Notifications"
-        meta={
-          <div className="flex flex-col gap-1">
-            <span>Changes to patients, doctors and clinics.</span>
-            <span>Marking an item read clears it for everyone on this account.</span>
-          </div>
-        }
+        description="Delivery updates and system activity for your clinics."
       />
 
-      <div className="pt-2">
-        <StatusFilter selected={status} unreadCount={feed.unreadCount} />
-      </div>
+      <StatusFilter selected={status} unreadCount={feed.unreadCount} />
 
       <NotificationList
         items={feed.items.map((item) => ({

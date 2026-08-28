@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
 import { LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { cx, menuItemClasses } from "@/components/ui";
 
 /**
  * Ends the session and returns to the login screen.
@@ -22,8 +23,21 @@ import { LogOut } from "lucide-react";
  * UI because the network blipped is worse than clearing the cookie and leaving
  * the row to expire — and "sign out of all devices" remains available to finish
  * the job properly.
+ *
+ * ONE IMPLEMENTATION, TWO APPEARANCES. It is a row in the account menu on
+ * desktop and a button in the mobile drawer; both run this exact sequence,
+ * because a second copy of it is a second chance to get the order wrong.
  */
-export default function SignOutButton() {
+
+interface SignOutButtonProps {
+  appearance?: "menuItem" | "button";
+  className?: string;
+}
+
+export default function SignOutButton({
+  appearance = "menuItem",
+  className,
+}: SignOutButtonProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -44,12 +58,20 @@ export default function SignOutButton() {
   return (
     <button
       type="button"
+      role={appearance === "menuItem" ? "menuitem" : undefined}
       onClick={handleSignOut}
       disabled={isSigningOut}
-      className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-canvas text-body font-semibold text-muted shadow-neu-raised-sm transition-shadow duration-200 hover:text-ink hover:shadow-neu-raised active:shadow-neu-pressed disabled:opacity-60 disabled:shadow-none"
+      aria-busy={isSigningOut || undefined}
+      className={cx(
+        appearance === "menuItem"
+          ? menuItemClasses(false, "danger")
+          : "flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-line bg-canvas text-body font-medium text-ink shadow-card transition-colors duration-150 hover:bg-canvas-deep",
+        "disabled:cursor-not-allowed disabled:opacity-60",
+        className,
+      )}
     >
-      <LogOut aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-      {isSigningOut ? "Logging out…" : "Log out"}
+      <LogOut aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0" />
+      {isSigningOut ? "Signing out..." : "Sign out"}
     </button>
   );
 }

@@ -47,9 +47,11 @@ export default async function DoctorsListPage() {
     : undefined;
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
         title="Doctors"
+        description="Manage doctors, availability and leave."
+        scope={selectedClinic ? selectedClinic.name : "All clinics"}
         meta={
           <>
             {/* FR-4.1 — the total, reflecting the current clinic filter. */}
@@ -57,13 +59,12 @@ export default async function DoctorsListPage() {
             {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}.
           </>
         }
+        actions={
+          canCreate ? (
+            <AddDoctorPanel clinics={clinics.map(({ id, name }) => ({ id, name }))} />
+          ) : undefined
+        }
       />
-
-      {canCreate && (
-        <AddDoctorPanel
-          clinics={clinics.map(({ id, name }) => ({ id, name }))}
-        />
-      )}
 
       <DoctorsTable doctors={doctors} showClinic={!selectedClinic} />
     </section>

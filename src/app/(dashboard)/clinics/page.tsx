@@ -60,14 +60,18 @@ export default async function ClinicsListPage() {
   );
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       {/* Adding a clinic is the only action on this page. The button lives with
           the title; the form it opens needs the full width, so the component
           owns both slots rather than being wedged into the header. */}
       {canCreate ? (
         <AddClinicPanel meta={meta} />
       ) : (
-        <PageHeader title="Clinics" meta={meta} />
+        <PageHeader
+          title="Clinics"
+          description="Every clinic in this account, with its doctors and patients."
+          meta={meta}
+        />
       )}
 
       <ClinicsTable clinics={clinics} selectedClinicId={selectedClinicId} />

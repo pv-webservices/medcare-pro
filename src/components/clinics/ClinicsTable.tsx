@@ -31,7 +31,7 @@ interface ClinicsTableProps {
 }
 
 /** Counts are the reason this screen exists, so they outrank the row's text. */
-const COUNT_CLASS = "text-xl font-semibold tabular-nums text-ink";
+const COUNT_CLASS = "text-xl font-semibold tnum text-ink";
 
 /** Falls back to the rule colour, not the house accent — see the note above. */
 function railStyle(themeColor: string | null): CSSProperties {
@@ -83,7 +83,7 @@ export default function ClinicsTable({
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/clinics/${clinic.id}`}
-                        className="font-medium text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                        className="font-medium text-ink underline"
                       >
                         {clinic.name}
                       </Link>
@@ -94,7 +94,7 @@ export default function ClinicsTable({
                       )}
                     </div>
                     {clinic.address && (
-                      <p className="mt-0.5 text-sm text-muted">{clinic.address}</p>
+                      <p className="mt-0.5 text-body text-muted">{clinic.address}</p>
                     )}
                   </TD>
 
@@ -113,7 +113,7 @@ export default function ClinicsTable({
                   <TD align="end" className="py-0 pl-0">
                     <Link
                       href={`/clinics/${clinic.id}`}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-faint hover:text-ink"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-faint hover:text-ink"
                     >
                       <span className="sr-only">Open {clinic.name}</span>
                       <ChevronRight
@@ -148,7 +148,7 @@ export default function ClinicsTable({
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/clinics/${clinic.id}`}
-                        className="font-medium text-ink underline decoration-slate-200 underline-offset-4"
+                        className="font-medium text-ink  underline-offset-4"
                       >
                         {clinic.name}
                       </Link>
@@ -160,19 +160,19 @@ export default function ClinicsTable({
                     </div>
 
                     {clinic.city && (
-                      <p className="mt-0.5 text-sm text-muted">{clinic.city}</p>
+                      <p className="mt-0.5 text-body text-muted">{clinic.city}</p>
                     )}
 
-                    <div className="mt-3 flex gap-8">
+                    <div className="mt-3 flex gap-6">
                       <div>
                         <p className={COUNT_CLASS}>{clinic.doctorCount}</p>
-                        <p className="text-xs font-semibold uppercase text-muted">
+                        <p className="text-meta font-semibold uppercase text-muted">
                           Doctors
                         </p>
                       </div>
                       <div>
                         <p className={COUNT_CLASS}>{clinic.patientCount}</p>
-                        <p className="text-xs font-semibold uppercase text-muted">
+                        <p className="text-meta font-semibold uppercase text-muted">
                           Patients
                         </p>
                       </div>

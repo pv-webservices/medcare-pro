@@ -20,16 +20,16 @@ interface ClinicDetailProps {
   canEdit: boolean;
 }
 
-const COUNT_CLASS = "text-3xl font-bold tabular-nums text-ink";
-const COUNT_LABEL_CLASS = "mt-0.5 text-sm font-medium text-muted uppercase";
-const FIELD_LABEL_CLASS = "text-sm font-semibold text-muted";
+const COUNT_CLASS = "text-metric-lg font-semibold tnum text-ink";
+const COUNT_LABEL_CLASS = "mt-0.5 text-body font-medium text-muted uppercase";
+const FIELD_LABEL_CLASS = "text-body font-semibold text-muted";
 
 export default function ClinicDetail({ clinic, canEdit }: ClinicDetailProps) {
   const [isEditing, setIsEditing] = useState(false);
 
   if (isEditing) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <PageHeader title={`Edit ${clinic.name}`} />
         <Card>
         <ClinicForm
@@ -49,7 +49,7 @@ export default function ClinicDetail({ clinic, canEdit }: ClinicDetailProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         back={{ href: "/clinics", label: "All clinics" }}
         title={clinic.name}
@@ -58,10 +58,10 @@ export default function ClinicDetail({ clinic, canEdit }: ClinicDetailProps) {
             <div className="flex items-center gap-2 mt-1">
               <span
                 aria-hidden
-                className="h-4 w-4 shrink-0 rounded-full shadow-neu-raised-sm"
+                className="h-4 w-4 shrink-0 rounded-full border border-line shadow-card"
                 style={{ backgroundColor: clinic.themeColor }}
               />
-              <span className="text-sm font-medium text-muted">{clinic.themeColor}</span>
+              <span className="text-body font-medium text-muted">{clinic.themeColor}</span>
             </div>
           )
         }
@@ -90,19 +90,19 @@ export default function ClinicDetail({ clinic, canEdit }: ClinicDetailProps) {
         <dl className="grid gap-6 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <dt className={FIELD_LABEL_CLASS}>Address</dt>
-            <dd className="mt-1 text-base text-ink whitespace-pre-line">
+            <dd className="mt-1 text-body font-medium text-ink whitespace-pre-line">
               {clinic.address ?? <span className="text-faint">Not set</span>}
             </dd>
           </div>
           <div>
             <dt className={FIELD_LABEL_CLASS}>City</dt>
-            <dd className="mt-1 text-base text-ink">
+            <dd className="mt-1 text-body font-medium text-ink">
               {clinic.city ?? <span className="text-faint">Not set</span>}
             </dd>
           </div>
           <div>
             <dt className={FIELD_LABEL_CLASS}>Brand colour</dt>
-            <dd className="mt-1 text-base text-ink">
+            <dd className="mt-1 text-body font-medium text-ink">
               {clinic.themeColor ?? (
                 <span className="text-faint">Not set</span>
               )}
@@ -110,7 +110,7 @@ export default function ClinicDetail({ clinic, canEdit }: ClinicDetailProps) {
           </div>
           <div className="sm:col-span-2">
             <dt className={FIELD_LABEL_CLASS}>Logo URL</dt>
-            <dd className="mt-1 text-base text-ink break-all">
+            <dd className="mt-1 text-body font-medium text-ink break-all">
               {clinic.logoUrl ?? (
                 <span className="text-faint">Not set</span>
               )}

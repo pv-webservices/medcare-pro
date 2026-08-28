@@ -70,15 +70,15 @@ export default function DashboardError({ error, reset }: DashboardErrorProps) {
   }, [error]);
 
   return (
-    <section className="mx-auto flex w-full max-w-xl flex-col items-center rounded-4xl bg-canvas p-8 text-center shadow-neu-raised">
+    <section className="mx-auto flex w-full max-w-xl flex-col items-center rounded-3xl border border-line bg-canvas p-8 text-center shadow-card">
       <span
         aria-hidden="true"
-        className="flex h-14 w-14 items-center justify-center rounded-3xl bg-canvas text-alert-ink shadow-neu-inset"
+        className="flex h-14 w-14 items-center justify-center rounded-2xl border border-alert-line bg-alert-bg text-alert-ink"
       >
         <AlertTriangle strokeWidth={2} className="h-7 w-7" />
       </span>
 
-      <h1 className="mt-5 text-title font-extrabold text-ink">
+      <h1 className="mt-5 text-title font-semibold text-ink">
         This screen didn&apos;t load
       </h1>
 
@@ -89,8 +89,8 @@ export default function DashboardError({ error, reset }: DashboardErrorProps) {
       </p>
 
       {error.digest && (
-        <p className="mt-4 rounded-2xl bg-canvas px-4 py-2 text-meta font-medium text-faint shadow-neu-inset">
-          Reference: <span className="tnum font-bold">{error.digest}</span>
+        <p className="mt-4 rounded-2xl bg-canvas px-4 py-2 text-meta font-medium text-faint border border-line">
+          Reference: <span className="tnum font-semibold">{error.digest}</span>
         </p>
       )}
 
@@ -98,7 +98,7 @@ export default function DashboardError({ error, reset }: DashboardErrorProps) {
         <button
           type="button"
           onClick={handleRetry}
-          className={buttonClasses("commit", "md")}
+          className={buttonClasses("primary", "md")}
         >
           <RefreshCw aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
           Try again

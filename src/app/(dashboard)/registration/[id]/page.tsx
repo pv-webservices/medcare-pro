@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import RegistrationDetail from "@/components/registration/RegistrationDetail";
 import { nowClockTime, todayDateOnly } from "@/lib/dates";
@@ -66,7 +65,7 @@ export default async function RegistrationDetailPage({
     ]);
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <RegistrationDetail
         registration={registration}
         doctors={doctors.map(({ id: doctorId, name, clinicId, department }) => ({

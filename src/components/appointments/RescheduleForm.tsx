@@ -201,7 +201,7 @@ export default function RescheduleForm({
         {formError && (
           <p
             role="alert"
-            className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm font-medium text-alert-ink"
+            className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body font-medium text-alert-ink"
           >
             {formError}
           </p>
@@ -240,7 +240,7 @@ export default function RescheduleForm({
         </div>
 
         <div className="mt-5">
-          <p className="mb-2 text-sm font-semibold text-ink">New slot</p>
+          <p className="mb-2 text-body font-semibold text-ink">New slot</p>
           <SlotPicker
             result={slots}
             isLoading={isLoadingSlots}
@@ -263,7 +263,7 @@ export default function RescheduleForm({
         <div className="mt-5">
           <Button
             type="submit"
-            variant="commit"
+            variant="primary"
             isBusy={isSaving}
             busyLabel="Moving…"
           >

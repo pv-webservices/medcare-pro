@@ -24,7 +24,7 @@ interface PeriodSelectorProps {
 export default function PeriodSelector({ selected }: PeriodSelectorProps) {
   return (
     <nav aria-label="Report period">
-      <ul className="flex flex-wrap gap-2">
+      <ul className="flex flex-wrap items-center gap-1 rounded-2xl border border-line bg-canvas p-1 shadow-card">
         {REPORT_PERIODS.map((period) => {
           const isSelected = period === selected;
 
@@ -33,10 +33,10 @@ export default function PeriodSelector({ selected }: PeriodSelectorProps) {
               <Link
                 href={`/reports?period=${period}`}
                 aria-current={isSelected ? "page" : undefined}
-                className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors ${
+                className={`inline-flex min-h-10 items-center justify-center rounded-xl px-3.5 text-body font-medium transition-colors duration-150 ${
                   isSelected
-                    ? "bg-primary text-primary-foreground shadow-neu-raised-sm"
-                    : "bg-canvas text-ink hover:bg-canvas-deep"
+                    ? "border border-accent bg-accent text-accent-ink shadow-cta"
+                    : "border border-transparent text-muted hover:bg-canvas-deep hover:text-ink"
                 }`}
               >
                 {REPORT_PERIOD_LABELS[period]}

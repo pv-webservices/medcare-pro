@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button, { buttonClasses } from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Panel from "@/components/ui/Panel";
+import FilterBar from "@/components/ui/FilterBar";
 import Select from "@/components/ui/Select";
 
 /**
@@ -111,96 +111,99 @@ export default function RegistrationFilters({
     router.push("/registration");
   }
 
+  const activeCount = Object.values(initial).filter((value) => value.trim() !== "").length;
+
   return (
-    <Panel
-      title="Find a registration"
-      description="Search by patient name or phone number, then narrow by doctor, department or date."
-      className="mb-5"
-      actions={
-        // FR-3.4 — exports exactly the rows currently listed, which is why it
-        // takes the applied filters rather than what is typed but unapplied.
-        <a
-          href={`/api/registrations?${exportQueryString(initial, clinicId)}`}
-          className={buttonClasses("secondary", "sm")}
-        >
-          <Download aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-          Export CSV
-        </a>
-      }
-    >
-      <form onSubmit={handleSubmit}>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input
-            id="registration-search"
-            type="search"
-            autoComplete="off"
-            label="Patient name or phone number"
-            placeholder="Priya, or 98765…"
-            value={values.search}
-            onChange={(e) => update("search", e.target.value)}
-            fieldClassName="lg:col-span-3"
-          />
-
-          <Select
-            id="registration-filter-doctor"
-            label="Doctor"
-            value={values.doctorId}
-            onChange={(e) => update("doctorId", e.target.value)}
-          >
-            <option value="">All doctors</option>
-            {doctors.map((doctor) => (
-              <option key={doctor.id} value={doctor.id}>
-                {doctor.name}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            id="registration-filter-department"
-            label="Department"
-            value={values.department}
-            onChange={(e) => update("department", e.target.value)}
-          >
-            <option value="">All departments</option>
-            {departments.map((department) => (
-              <option key={department} value={department}>
-                {department}
-              </option>
-            ))}
-          </Select>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              id="registration-filter-from"
-              type="date"
-              label="From"
-              value={values.from}
-              onChange={(e) => update("from", e.target.value)}
-            />
-            <Input
-              id="registration-filter-to"
-              type="date"
-              label="To"
-              value={values.to}
-              onChange={(e) => update("to", e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="submit" variant="commit">
-            <Search aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-            Apply Filters
-          </Button>
-
-          {isFiltered && (
-            <Button variant="quiet" onClick={handleClear}>
-              <X aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-              Clear Filters
+    <form onSubmit={handleSubmit}>
+      <FilterBar
+        activeCount={activeCount}
+        clearAction={
+          isFiltered ? (
+            <Button type="button" size="sm" variant="ghost" onClick={handleClear}>
+              <X aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Clear filters
             </Button>
-          )}
-        </div>
-      </form>
-    </Panel>
+          ) : null
+        }
+        actions={
+          <>
+            {/*
+              FR-3.4 — exports exactly the rows currently listed, which is why
+              it takes the APPLIED filters rather than what is typed but not yet
+              applied.
+            */}
+            <a
+              href={`/api/registrations?${exportQueryString(initial, clinicId)}`}
+              className={buttonClasses("secondary", "sm")}
+            >
+              <Download aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Export CSV
+            </a>
+            <Button type="submit" size="sm" variant="primary">
+              <Search aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Apply
+            </Button>
+          </>
+        }
+      >
+        <Input
+          id="registration-search"
+          type="search"
+          autoComplete="off"
+          label="Patient name or phone number"
+          placeholder="Priya, or 98765..."
+          value={values.search}
+          onChange={(e) => update("search", e.target.value)}
+          fieldClassName="md:w-64"
+        />
+
+        <Select
+          id="registration-filter-doctor"
+          label="Doctor"
+          fieldClassName="md:w-48"
+          value={values.doctorId}
+          onChange={(e) => update("doctorId", e.target.value)}
+        >
+          <option value="">All doctors</option>
+          {doctors.map((doctor) => (
+            <option key={doctor.id} value={doctor.id}>
+              {doctor.name}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          id="registration-filter-department"
+          label="Department"
+          fieldClassName="md:w-44"
+          value={values.department}
+          onChange={(e) => update("department", e.target.value)}
+        >
+          <option value="">All departments</option>
+          {departments.map((department) => (
+            <option key={department} value={department}>
+              {department}
+            </option>
+          ))}
+        </Select>
+
+        <Input
+          id="registration-filter-from"
+          type="date"
+          label="From"
+          fieldClassName="md:w-40"
+          value={values.from}
+          onChange={(e) => update("from", e.target.value)}
+        />
+        <Input
+          id="registration-filter-to"
+          type="date"
+          label="To"
+          fieldClassName="md:w-40"
+          value={values.to}
+          onChange={(e) => update("to", e.target.value)}
+        />
+      </FilterBar>
+    </form>
   );
 }

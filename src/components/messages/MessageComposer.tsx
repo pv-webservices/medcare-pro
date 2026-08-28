@@ -7,7 +7,8 @@ import { renderTemplate } from "@/lib/whatsappTemplateText";
 import type { TemplateRecord } from "@/lib/whatsappTemplates";
 import type { RecipientResult, SendMessageResult } from "@/lib/whatsappMessages";
 import Button from "@/components/ui/Button";
-import Input, { Select } from "@/components/ui/Input";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import Card from "@/components/ui/Card";
 import { cx } from "@/components/ui/cx";
 import { todayDateOnly } from "@/lib/dates";
@@ -53,8 +54,19 @@ export default function MessageComposer({
   const [isSending, setIsSending] = useState(false);
   const [outcome, setOutcome] = useState<SendMessageResult | null>(null);
 
-  const todayStr = todayDateOnly();
-  const yesterdayStr = todayDateOnly(new Date(Date.now() - 86400000));
+  /**
+   * Today and yesterday, read ONCE when this component mounts.
+   *
+   * They were computed in the render body, which reads the clock on every
+   * render — an impure read that React's rules forbid, and one that could hand
+   * two renders different answers across midnight. A state initialiser runs
+   * once; a shift that spans midnight is the one case this gets wrong, and
+   * reloading the page fixes it.
+   */
+  const [todayStr] = useState(() => todayDateOnly());
+  const [yesterdayStr] = useState(() =>
+    todayDateOnly(new Date(Date.now() - 86_400_000)),
+  );
 
   const template = templates.find((entry) => entry.id === templateId) ?? null;
 
@@ -157,8 +169,8 @@ export default function MessageComposer({
 
   if (!clinicId) {
     return (
-      <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-        <p className="text-sm font-medium text-muted">
+      <div className="rounded-3xl border border-line bg-canvas px-6 py-10 text-center shadow-card">
+        <p className="text-body font-medium text-muted">
           Pick a clinic in the sidebar to message its patients.
         </p>
       </div>
@@ -166,11 +178,11 @@ export default function MessageComposer({
   }
 
   return (
-    <Card className="p-4 sm:p-6 space-y-6">
+    <Card className="space-y-5 sm:p-6">
       {!isConfigured && (
         <p
           role="alert"
-          className="rounded-xl bg-warn-bg px-4 py-3 text-sm font-medium text-warn-ink"
+          className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-body text-warn-ink"
         >
           WhatsApp is not connected yet. Set WHATSAPP_BSP_API_KEY in the
           environment before sending.
@@ -180,7 +192,7 @@ export default function MessageComposer({
       {error && (
         <p
           role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
@@ -207,47 +219,47 @@ export default function MessageComposer({
         </Select>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="max-w-3xl">
-          <label className="mb-2 block text-sm font-semibold text-ink">
+          <label className="mb-2 block text-body font-semibold text-ink">
             Filter by visit date
           </label>
           <div className="flex items-center gap-3 py-1">
             <Button
               type="button"
-              variant={startDateFilter === "" && endDateFilter === "" ? "commit" : "secondary"}
+              variant={startDateFilter === "" && endDateFilter === "" ? "primary" : "secondary"}
               onClick={() => { setStartDateFilter(""); setEndDateFilter(""); }}
-              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === "" && endDateFilter === "" && "ring-2 ring-primary ring-offset-2")}
+              className={cx("text-meta px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === "" && endDateFilter === "" && "ring-2 ring-primary ring-offset-2")}
             >
               Any
             </Button>
             <Button
               type="button"
-              variant={startDateFilter === todayStr && endDateFilter === todayStr ? "commit" : "secondary"}
+              variant={startDateFilter === todayStr && endDateFilter === todayStr ? "primary" : "secondary"}
               onClick={() => { setStartDateFilter(todayStr); setEndDateFilter(todayStr); }}
-              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === todayStr && endDateFilter === todayStr && "ring-2 ring-primary ring-offset-2")}
+              className={cx("text-meta px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === todayStr && endDateFilter === todayStr && "ring-2 ring-primary ring-offset-2")}
             >
               Today
             </Button>
             <Button
               type="button"
-              variant={startDateFilter === yesterdayStr && endDateFilter === yesterdayStr ? "commit" : "secondary"}
+              variant={startDateFilter === yesterdayStr && endDateFilter === yesterdayStr ? "primary" : "secondary"}
               onClick={() => { setStartDateFilter(yesterdayStr); setEndDateFilter(yesterdayStr); }}
-              className={cx("text-xs px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === yesterdayStr && endDateFilter === yesterdayStr && "ring-2 ring-primary ring-offset-2")}
+              className={cx("text-meta px-4 py-1.5 min-h-[32px] h-8 rounded-full", startDateFilter === yesterdayStr && endDateFilter === yesterdayStr && "ring-2 ring-primary ring-offset-2")}
             >
               Yesterday
             </Button>
             <div className="flex items-center gap-1">
               <input
                 type="date"
-                className="rounded-md border border-line px-3 py-1 text-sm text-ink h-8"
+                className="h-9 rounded-xl border border-line bg-canvas px-3 text-body text-ink"
                 value={startDateFilter}
                 onChange={(e) => setStartDateFilter(e.target.value)}
               />
-              <span className="text-muted text-sm">to</span>
+              <span className="text-muted text-body">to</span>
               <input
                 type="date"
-                className="rounded-md border border-line px-3 py-1 text-sm text-ink h-8"
+                className="h-9 rounded-xl border border-line bg-canvas px-3 text-body text-ink"
                 value={endDateFilter}
                 onChange={(e) => setEndDateFilter(e.target.value)}
               />
@@ -271,7 +283,7 @@ export default function MessageComposer({
           {(search.trim().length >= 2 || startDateFilter !== "" || endDateFilter !== "") && matches.length > 0 && (
             <div className="mt-2">
               <div className="flex justify-between items-center px-1 mb-1">
-                <span className="text-xs font-medium text-muted">{matches.length} patients found</span>
+                <span className="text-meta font-medium text-muted">{matches.length} patients found</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -282,18 +294,18 @@ export default function MessageComposer({
                     setStartDateFilter("");
                     setEndDateFilter("");
                   }}
-                  className="text-xs font-medium text-accent hover:text-accent-strong transition-colors"
+                  className="text-meta font-medium text-accent hover:text-accent-strong transition-colors"
                 >
                   Select All
                 </button>
               </div>
-              <ul className="grid gap-1 rounded-md bg-canvas p-1 shadow-neu-raised-sm max-h-64 overflow-y-auto">
+              <ul className="grid gap-1 rounded-md bg-canvas p-1 border border-line shadow-card max-h-64 overflow-y-auto">
                 {matches.map((patient) => (
                   <li key={patient.id}>
                     <button
                       type="button"
                       onClick={() => addRecipient(patient)}
-                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-sm hover:bg-canvas-deep transition-colors"
+                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-body hover:bg-canvas-deep transition-colors"
                     >
                       <span>
                         <span className="font-medium text-ink">{patient.name}</span>{""}
@@ -301,7 +313,7 @@ export default function MessageComposer({
                           {patient.patientCode}
                         </span>
                       </span>
-                      <span className="tabular-nums text-muted">
+                      <span className="tnum text-muted">
                         {patient.mobileNumber}
                       </span>
                     </button>
@@ -315,7 +327,7 @@ export default function MessageComposer({
 
       {recipients.length > 0 && (
         <div>
-          <p className="mb-2 text-sm font-semibold text-ink">
+          <p className="mb-2 text-body font-semibold text-ink">
             Sending to {recipients.length}{""}
             {recipients.length === 1 ? "patient" : "patients"}
           </p>
@@ -325,7 +337,7 @@ export default function MessageComposer({
                 key={patient.id}
                 className="flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-1.5 bg-canvas-deep"
               >
-                <span className="text-sm font-medium text-ink">
+                <span className="text-body font-medium text-ink">
                   {patient.name}{""}
                   <span className="text-muted font-normal">
                     {patient.patientCode}
@@ -335,7 +347,7 @@ export default function MessageComposer({
                   type="button"
                   onClick={() => removeRecipient(patient.id)}
                   aria-label={`Remove ${patient.name}`}
-                  className="min-h-8 rounded-md px-2 text-xs font-medium text-muted hover:bg-canvas-deep disabled:opacity-50 transition-colors"
+                  className="min-h-8 rounded-md px-2 text-meta font-medium text-muted hover:bg-canvas-deep disabled:opacity-50 transition-colors"
                 >
                   Remove
                 </button>
@@ -347,21 +359,21 @@ export default function MessageComposer({
 
       {template && (
         <div>
-          <p className="mb-2 text-sm font-semibold text-ink">Preview</p>
-          <div className="rounded-xl bg-canvas-deep p-4">
+          <p className="mb-2 text-body font-semibold text-ink">Preview</p>
+          <div className="rounded-2xl border border-line bg-canvas-deep p-4">
             {template.mediaType && (
-              <p className="mb-3 text-xs font-medium text-muted">
+              <p className="mb-3 text-meta font-medium text-muted">
                 With {template.mediaType} attachment
               </p>
             )}
-            <p className="whitespace-pre-wrap text-sm text-ink">{preview}</p>
+            <p className="whitespace-pre-wrap text-body text-ink">{preview}</p>
             {template.footer && (
-              <p className="mt-3 text-xs text-muted">
+              <p className="mt-3 text-meta text-muted">
                 {template.footer}
               </p>
             )}
           </div>
-          <p className="mt-2 text-xs text-muted">
+          <p className="mt-2 text-meta text-muted">
             Doctor, department, visit date and amount are filled from each
             patient&apos;s most recent visit when the message is sent.
           </p>
@@ -373,7 +385,7 @@ export default function MessageComposer({
           type="button"
           onClick={handleSend}
           disabled={!template || recipients.length === 0 || isSending || !isConfigured}
-          variant="commit"
+          variant="primary"
           isBusy={isSending}
           busyLabel={`Sending to ${recipients.length}…`}
         >
@@ -398,7 +410,7 @@ function SendOutcome({ outcome }: { outcome: SendMessageResult }) {
   return (
     <div
       role="status"
-      className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+      className={`rounded-xl border px-4 py-3 text-body font-medium ${
         failures.length === 0
           ? "border-line bg-ok-bg text-ok-ink"
           : "border-line bg-warn-bg text-warn-ink"
@@ -409,7 +421,7 @@ function SendOutcome({ outcome }: { outcome: SendMessageResult }) {
         {outcome.failed > 0 && `, ${outcome.failed} failed`} — {outcome.templateName}
       </p>
       {failures.length > 0 && (
-        <ul className="mt-2 grid gap-1 text-xs">
+        <ul className="mt-2 grid gap-1 text-meta">
           {failures.map((result) => (
             <li key={result.patientId}>
               {result.patientName} ({result.patientCode}): {result.failureReason}

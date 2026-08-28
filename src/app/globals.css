@@ -2,110 +2,126 @@
 @config "../../tailwind.config.ts";
 
 /*
- * MEDCARE PRO design tokens — Neumorphism (Soft UI).
+ * MEDCARE PRO design tokens.
  *
- * Three ideas hold the whole system together:
+ * ONE SYSTEM, TWO SURFACES. The front door (/login, /signup, /verify-email) and
+ * the signed-in application share a palette, a type scale and an elevation
+ * recipe. They differ only in density: auth is spacious and single-purpose, the
+ * app is operational. Nothing else about them is allowed to diverge.
  *
- * 1. ONE SURFACE COLOUR. The page canvas and every card, panel, table and
- *    popover are the *same* colour (--bg). Depth is carried entirely by paired
- *    shadows — a cool shade bottom-right, a white highlight top-left — never by
- *    a lighter fill or a border. This is the defining rule of the style; a
- *    white card on this canvas is a bug, not a variation.
+ * THE THREE RULES THAT HOLD IT TOGETHER
  *
- * 2. DEPTH IS A VOCABULARY, NOT A DECORATION. Raised means "this is an object
- *    you can act on". Inset means "this is a well you can put something into".
- *    Pressed means "this is the one that is currently on". A control that lies
- *    about its depth is worse than a flat one.
+ * 1. THE PAGE IS COOL GREY, EVERY SURFACE IS WHITE. --app is the canvas; --bg
+ *    is the white a card, table, sidebar, field or popover sits on. A surface
+ *    separates from the page with a HAIRLINE plus a low shadow — never with a
+ *    heavy drop shadow, and never with a second fill.
  *
- * 3. ONE CONFIDENT ACCENT. A single teal carries primary action, active state,
- *    links and the chart line. Status hues (ok / warn / alert) are reserved for
- *    state that needs a decision. Clinic identity moved to --clinic-accent so a
- *    tenant brand colour can tint a rail without ever competing with the accent
- *    that means "press this".
+ * 2. ELEVATION IS A VOCABULARY OF FOUR. flat (in the flow), card (an object on
+ *    the page), float (an overlay above it), cta (the one primary action, which
+ *    casts a coloured shadow so the eye finds it without reading). If a fifth
+ *    is needed, the design is wrong.
  *
- * ACCESSIBILITY, NON-NEGOTIABLE. Shadows carry no contrast, so they can never
- * be the only signal. Every interactive element also takes a visible focus
- * outline (see the :focus-visible rule below), every status pill pairs its hue
- * with a word, and every text token clears 4.5:1 on --bg in both themes.
+ * 3. ONE ACCENT. A single indigo carries primary action, active state, links and
+ *    the chart line. Status hues (ok / warn / alert / info) are reserved for
+ *    state that needs a decision. A tenant brand colour lives in
+ *    --clinic-accent and is allowed on rails, dots and swatches only — never
+ *    behind a label and never as a focus ring, because it is an arbitrary hex
+ *    that may be unreadable.
+ *
+ * ACCESSIBILITY, NON-NEGOTIABLE. Every text token clears 4.5:1 on the surface it
+ * is used on, in both themes. Every status pill pairs its hue with a word and a
+ * mark. Every interactive element takes a visible focus ring.
+ *
+ * WHAT THIS REPLACED. Until this pass the app was neumorphic: one surface colour
+ * for the page and every card, with paired light/dark shadows doing all the
+ * separating. It was distinctive and it did not scale — depth carries no
+ * contrast, so tables, dense forms and long lists lost their structure exactly
+ * where structure matters most. The `--shadow-neu-*` names survive as aliases
+ * (see the theme block) so no screen broke on the day of the change; new code
+ * uses the semantic names.
  */
 
 /* next-themes writes data-theme, so the dark variant must key off that rather
-   than Tailwind's default prefers-color-scheme. Without this, `dark:` silently
-   matches nothing — which is exactly what it did before this rewrite. */
+   than Tailwind's default prefers-color-scheme. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  /* --- The one surface ------------------------------------------------- */
-  --bg: #e8ecf5; /* page canvas AND every card. Not a typo. */
-  --bg-deep: #e1e6f1; /* wells, table header row, striped rows */
-  --line: #dde3ee; /* the only rule we draw: table row separators */
+  /* --- Surfaces --------------------------------------------------------- */
+  --app: #f6f8fc; /* the page behind everything */
+  --bg: #ffffff; /* every surface: card, table, field, sidebar, popover */
+  --bg-deep: #f4f6fb; /* wells, table header row, hover fills, segmented bg */
+  --line: #e7e9f2; /* the hairline that bounds a surface */
+  --line-strong: #d7dbea; /* a hairline that has to be noticed (hover, drag) */
 
-  /* --- Text ramp -------------------------------------------------------- */
-  --text: #1e2a3b; /* headings, KPI numbers      13.4:1 on --bg */
-  --text-muted: #69778c; /* labels, secondary text      4.9:1 on --bg */
-  --text-faint: #9aa6bb; /* placeholders, captions      2.9:1 — never body */
+  /* --- Text ramp (deep navy, never pure black) -------------------------- */
+  --text: #171c30; /* headings, KPI numbers, table cells  14.9:1 on white */
+  --text-soft: #39415c; /* body copy in prose blocks            9.2:1 */
+  --text-muted: #667192; /* labels, secondary text, captions     5.0:1 */
+  --text-faint: #98a0ba; /* placeholders, disabled marks         2.6:1 — never body */
 
   /* --- Accent ----------------------------------------------------------- */
-  --accent: #0d9488;
-  --accent-strong: #0f766e;
-  --accent-soft-bg: #d6f0ec;
-  --accent-soft-text: #0f766e;
+  --accent: #5b4bff;
+  --accent-bright: #6d5dfb; /* the second stop of the one gradient we use */
+  --accent-strong: #4a39ec; /* hover on a solid fill */
+  --accent-soft-bg: #eeecff;
+  --accent-soft-text: #4436cc; /* on --accent-soft-bg            7.4:1 */
   --accent-ink: #ffffff; /* what a solid accent fill can carry */
 
   /*
-   * Clinic identity — FR-8.4, kept separate from --accent on purpose.
-   *
-   * A tenant picks this in settings, so it is an arbitrary hex that may be
-   * unreadable, low-contrast, or the same teal as the accent. It is therefore
-   * allowed on rails, swatches and dots ONLY — never behind a label, never as
-   * a focus ring. Components override it per row or per scope; it falls back
-   * to the house accent when a clinic has set no colour.
+   * Clinic identity — FR-8.4, kept separate from --accent on purpose. A tenant
+   * picks this in settings, so it is an arbitrary hex that may be unreadable or
+   * identical to the house accent. Rails, swatches and dots ONLY. Falls back to
+   * the house accent when a clinic has set no colour.
    */
   --clinic-accent: var(--accent);
 
   /* --- Status ----------------------------------------------------------- */
-  --ok-bg: #d9f5e9;
-  --ok-ink: #047857;
-  --ok-mark: #0e9f6e; /* the dot or icon, not the text */
-  --warn-bg: #fdf0d5;
-  --warn-ink: #b45309;
-  --warn-mark: #d97706;
-  --alert-bg: #fde4e1;
-  --alert-ink: #b42318;
-  --alert-mark: #e02424;
-  --pill-bg: #e4e9f2;
-  --pill-ink: #5b6b82;
+  --ok-bg: #e8f8f0;
+  --ok-line: #c3ead8;
+  --ok-ink: #086c46;
+  --ok-mark: #12a06a;
+  --warn-bg: #fef6e7;
+  --warn-line: #f7e2b8;
+  --warn-ink: #96590a;
+  --warn-mark: #d98a09;
+  --alert-bg: #feeeed;
+  --alert-line: #f8d3d0;
+  --alert-ink: #a8231a;
+  --alert-mark: #e0453a;
+  --info-bg: #eaf2ff;
+  --info-line: #cfe0fb;
+  --info-ink: #1d4ed8;
+  --info-mark: #3b82f6;
+  --pill-bg: #eff1f7;
+  --pill-ink: #55607d;
 
   /*
    * --- Avatar palette ---------------------------------------------------
    * Soft tinted circle, saturated initial. The tint is applied with alpha
-   * rather than a baked hex so one set works on both canvases. Assignment is
-   * by name hash at the call site, so a given patient keeps their colour.
+   * rather than a baked hex so one set works on both canvases. Assignment is by
+   * name hash at the call site, so a given patient keeps their colour.
    */
-  --avatar-1: #f97066; /* coral  */
-  --avatar-2: #14b8a6; /* teal   */
-  --avatar-3: #8b5cf6; /* violet */
-  --avatar-4: #f59e0b; /* amber  */
-  --avatar-5: #0ea5e9; /* sky    */
-  --avatar-tint: 15%;
+  --avatar-1: #e0574d; /* coral  */
+  --avatar-2: #0f9d76; /* green  */
+  --avatar-3: #6d5dfb; /* violet */
+  --avatar-4: #c2760a; /* amber  */
+  --avatar-5: #0d80c4; /* sky    */
+  --avatar-tint: 12%;
 
   /*
-   * --- Shadow ingredients -----------------------------------------------
-   * The recipes below are built from these values, so the dark theme re-tunes
-   * depth by overriding six variables instead of nine shadows. d is the cool
-   * shade, l the white highlight; the numbers are opacity steps, not sizes.
+   * --- Elevation ingredients --------------------------------------------
+   * One ink for every shadow, at four opacities. Keeping the colour in a
+   * variable is what lets the dark theme re-tune depth by overriding three
+   * values instead of eight shadows.
    */
-  --neu-d1: rgb(163 177 198 / 0.45); /* raised */
-  --neu-d2: rgb(163 177 198 / 0.4); /* raised-sm, inset */
-  --neu-d3: rgb(163 177 198 / 0.5); /* pressed */
-  --neu-l1: rgb(255 255 255 / 0.9);
-  --neu-l2: rgb(255 255 255 / 0.95);
-  --neu-accent-cast: rgb(13 148 136 / 0.28);
+  --shade-1: rgb(23 28 48 / 0.04);
+  --shade-2: rgb(23 28 48 / 0.06);
+  --shade-3: rgb(23 28 48 / 0.14);
+  --shade-4: rgb(23 28 48 / 0.22);
+  --cta-cast: rgb(91 75 255 / 0.45);
+  --cta-edge: rgb(91 75 255 / 0.28);
 
-  /* --- Aliases ----------------------------------------------------------
-   * Kept so the screens not yet migrated off the previous system keep
-   * rendering, and keep rendering in the NEW palette rather than the old one.
-   * Delete a line here only once nothing references it. */
+  /* --- Aliases kept so older screens keep rendering ---------------------- */
   --paper: var(--bg);
   --surface: var(--bg);
   --surface-sunk: var(--bg-deep);
@@ -115,7 +131,7 @@
   --warn: var(--warn-ink);
   --alert: var(--alert-ink);
   --accent-solid: var(--accent);
-  --background: var(--bg);
+  --background: var(--app);
   --foreground: var(--text);
   --primary: var(--accent);
   --primary-hover: var(--accent-strong);
@@ -124,129 +140,128 @@
 }
 
 /*
- * Accent variants. These override the accent FAMILY only — the canvas, the
- * depth recipe and the text ramp are identical in every variant, because they
- * are what makes the app legible.
- *
- * Butter is the one that needs explaining. #fffd74 is the brand pale yellow and
- * it survives as the swatch in the theme picker, but it cannot carry white text
- * and it cannot be a focus ring on a light canvas — it fails 4.5:1 against
- * both. So the *control* accent is the deep gold below (5.0:1 on --bg) and the
- * pale yellow appears only as a soft pill tint, where nothing sits on it but
- * dark text.
+ * Accent variants — FR-8.4's theme picker. These override the accent FAMILY
+ * only: the canvas, the elevation recipe and the text ramp are identical in
+ * every variant, because they are what makes the app legible.
  */
 [data-theme="emerald"] {
-  --accent: #059669;
-  --accent-strong: #047857;
-  --accent-soft-bg: #d1fae5;
-  --accent-soft-text: #047857;
+  --accent: #0f9d76;
+  --accent-bright: #14b085;
+  --accent-strong: #0b7f5f;
+  --accent-soft-bg: #e2f6ef;
+  --accent-soft-text: #0b6b50;
   --accent-ink: #ffffff;
-  --neu-accent-cast: rgb(5 150 105 / 0.28);
+  --cta-cast: rgb(15 157 118 / 0.4);
+  --cta-edge: rgb(15 157 118 / 0.26);
 }
 
 [data-theme="butter"] {
-  --accent: #a16207;
-  --accent-strong: #854d0e;
-  --accent-soft-bg: #fef9c3;
-  --accent-soft-text: #854d0e;
+  /*
+   * #fffd74 is the brand pale yellow and it survives as the swatch in the theme
+   * picker, but it cannot carry white text and it cannot be a focus ring on a
+   * light canvas — it fails 4.5:1 against both. So the CONTROL accent is the
+   * deep gold below, and the pale yellow appears only as a soft pill tint,
+   * where nothing sits on it but dark text.
+   */
+  --accent: #9a6207;
+  --accent-bright: #b0720d;
+  --accent-strong: #7d4e06;
+  --accent-soft-bg: #fdf4d3;
+  --accent-soft-text: #7d4e06;
   --accent-ink: #ffffff;
-  --neu-accent-cast: rgb(161 98 7 / 0.28);
+  --cta-cast: rgb(154 98 7 / 0.38);
+  --cta-edge: rgb(154 98 7 / 0.26);
 }
 
 /*
  * --- Dark ---------------------------------------------------------------
- * A true dark-neumorphic surface, not an inversion. The highlight drops to 5%
- * white — any more and every card looks frosted — the shade goes to near-black,
- * and the accent brightens two steps because #0d9488 is illegible on #24272f.
+ * A navy-slate dark, not an inversion. The page goes darkest, surfaces sit one
+ * step above it — the same figure/ground relationship as the light theme, which
+ * is what keeps a table readable — and the hairline becomes the main separator
+ * because shadows are nearly invisible on a dark ground.
  *
- * Status pills go translucent here: a solid #d9f5e9 chip on a charcoal card
- * reads as a light-mode fragment that failed to repaint.
+ * The accent brightens two steps: #5b4bff on #12151f is illegible.
  */
 [data-theme="dark"] {
-  --bg: #24272f;
-  --bg-deep: #1e2128;
-  --line: #343843;
+  --app: #0e111a;
+  --bg: #161a26;
+  --bg-deep: #1c2131;
+  --line: #262c3d;
+  --line-strong: #333b52;
 
-  --text: #e8eaf0;
-  --text-muted: #9aa3b5;
-  --text-faint: #6d7688;
+  --text: #eef1f8;
+  --text-soft: #c3cad9;
+  --text-muted: #98a1b8;
+  --text-faint: #6b7590;
 
-  --accent: #2dd4bf;
-  --accent-strong: #5eead4;
-  --accent-soft-bg: rgb(45 212 191 / 0.16);
-  --accent-soft-text: #5eead4;
-  --accent-ink: #10221f; /* dark ink on a bright teal fill */
+  --accent: #8b7dff;
+  --accent-bright: #a396ff;
+  --accent-strong: #a396ff;
+  --accent-soft-bg: rgb(139 125 255 / 0.16);
+  --accent-soft-text: #b9afff;
+  --accent-ink: #10102a;
 
-  --ok-bg: rgb(16 185 129 / 0.16);
-  --ok-ink: #6ee7b7;
-  --ok-mark: #34d399;
-  --warn-bg: rgb(245 158 11 / 0.16);
-  --warn-ink: #fcd34d;
-  --warn-mark: #f59e0b;
-  --alert-bg: rgb(248 113 113 / 0.16);
-  --alert-ink: #fca5a5;
-  --alert-mark: #f87171;
+  --ok-bg: rgb(18 160 106 / 0.16);
+  --ok-line: rgb(18 160 106 / 0.32);
+  --ok-ink: #5fd6a4;
+  --ok-mark: #23b57e;
+  --warn-bg: rgb(217 138 9 / 0.16);
+  --warn-line: rgb(217 138 9 / 0.32);
+  --warn-ink: #f2c261;
+  --warn-mark: #d98a09;
+  --alert-bg: rgb(224 69 58 / 0.16);
+  --alert-line: rgb(224 69 58 / 0.32);
+  --alert-ink: #f79187;
+  --alert-mark: #e0453a;
+  --info-bg: rgb(59 130 246 / 0.16);
+  --info-line: rgb(59 130 246 / 0.32);
+  --info-ink: #8ab6f8;
+  --info-mark: #3b82f6;
   --pill-bg: rgb(255 255 255 / 0.07);
-  --pill-ink: #9aa3b5;
+  --pill-ink: #a7b0c6;
 
-  --avatar-tint: 22%;
+  --avatar-tint: 24%;
 
-  /* The highlight runs a shade hotter than the 5% the style guide suggests.
-     At 5% an inset well on #24272f is very nearly invisible, and a field you
-     cannot find is worse than one that is slightly too bright. */
-  --neu-d1: rgb(0 0 0 / 0.55);
-  --neu-d2: rgb(0 0 0 / 0.5);
-  --neu-d3: rgb(0 0 0 / 0.62);
-  --neu-l1: rgb(255 255 255 / 0.07);
-  --neu-l2: rgb(255 255 255 / 0.08);
-  --neu-accent-cast: rgb(45 212 191 / 0.22);
+  --shade-1: rgb(0 0 0 / 0.3);
+  --shade-2: rgb(0 0 0 / 0.36);
+  --shade-3: rgb(0 0 0 / 0.5);
+  --shade-4: rgb(0 0 0 / 0.62);
+  --cta-cast: rgb(139 125 255 / 0.34);
+  --cta-edge: rgb(139 125 255 / 0.24);
 }
 
 /*
  * --- The authentication surface -----------------------------------------
  *
- * A SECOND, DELIBERATELY SEPARATE PALETTE, AND THE ONLY ONE IN THIS FILE THAT
- * IS NOT THEMED. Everything above describes the signed-in application: one
- * neumorphic canvas, a teal accent, a dark variant a tenant can switch on. The
- * front door is a different room. It is the first thing a clinic owner sees, it
- * is a conversion surface rather than a work surface, and it is global to the
- * platform — no tenant brand, no theme preference, because neither exists yet
- * when these screens render.
+ * The same palette, frozen light. No [data-theme] block overrides these, which
+ * is what makes /login, /signup and /verify-email light in every theme without
+ * a single `dark:` escape hatch: there is nothing to override. They apply only
+ * under `.auth-scope` (rules at the bottom of this file).
  *
- * So the auth tokens are defined ONCE, on :root, and no [data-theme] block
- * overrides them. That is what makes /login, /signup and /verify-email light in
- * every theme without a single `dark:` escape hatch: there is nothing to
- * override. They apply only under `.auth-scope` (see the rules at the bottom of
- * this file), so nothing in the dashboard can accidentally reach them.
- *
- * Surfaces are WHITE ON A COOL NEUTRAL here — the opposite of the one-surface
- * rule above — and depth comes from a hairline border plus a low, soft shadow.
- * That is intentional, not drift: neumorphism reads as "an instrument panel",
- * and the sign-in screen should read as "a front desk".
+ * They are duplicated rather than aliased to the tokens above ON PURPOSE. The
+ * app tokens are themeable — a tenant can switch the accent family, a user can
+ * switch to dark — and the front door belongs to the platform, not to a tenant
+ * whose identity has not even been resolved when these screens render.
  */
 :root {
-  /* --- Surfaces --------------------------------------------------------- */
-  --auth-bg: #f7f8fc; /* the page */
-  --auth-bg-tint: #eef0fa; /* segmented controls, wells, skeleton bars */
-  --auth-card: #ffffff; /* the form card, and every card in the preview */
-  --auth-line: #e7e9f2; /* hairlines: card edges, field edges, dividers */
-  --auth-line-strong: #d7dbea; /* a hairline that has to be seen (hover) */
+  --auth-bg: #f7f8fc;
+  --auth-bg-tint: #eef0fa;
+  --auth-card: #ffffff;
+  --auth-line: #e7e9f2;
+  --auth-line-strong: #d7dbea;
 
-  /* --- Text ramp (deep navy, never pure black) --------------------------- */
-  --auth-ink: #171c30; /* headings                    14.9:1 on white */
-  --auth-ink-soft: #39415c; /* body copy on the panel       9.2:1 */
-  --auth-muted: #667192; /* labels, secondary copy       5.0:1 */
-  --auth-faint: #98a0ba; /* placeholders only            2.6:1 */
+  --auth-ink: #171c30;
+  --auth-ink-soft: #39415c;
+  --auth-muted: #667192;
+  --auth-faint: #98a0ba;
 
-  /* --- Indigo / violet primary ------------------------------------------ */
   --auth-primary: #5b4bff;
-  --auth-primary-bright: #6d5dfb; /* the second stop of the one gradient */
+  --auth-primary-bright: #6d5dfb;
   --auth-primary-hover: #4a39ec;
   --auth-primary-ink: #ffffff;
-  --auth-primary-soft: #eeecff; /* icon tiles, active segment tint */
-  --auth-primary-soft-ink: #4436cc; /* text ON --auth-primary-soft  7.4:1 */
+  --auth-primary-soft: #eeecff;
+  --auth-primary-soft-ink: #4436cc;
 
-  /* --- Status ----------------------------------------------------------- */
   --auth-ok-bg: #e8f8f0;
   --auth-ok-line: #c3ead8;
   --auth-ok-ink: #086c46;
@@ -263,17 +278,21 @@
 
 @theme inline {
   /* --- Surfaces --------------------------------------------------------- */
+  --color-app: var(--app);
   --color-canvas: var(--bg);
   --color-canvas-deep: var(--bg-deep);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
 
   /* --- Text ------------------------------------------------------------- */
   --color-ink: var(--text);
+  --color-ink-soft: var(--text-soft);
   --color-muted: var(--text-muted);
   --color-faint: var(--text-faint);
 
   /* --- Accent ----------------------------------------------------------- */
   --color-accent: var(--accent);
+  --color-accent-bright: var(--accent-bright);
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft-bg);
   --color-accent-soft-ink: var(--accent-soft-text);
@@ -282,14 +301,21 @@
 
   /* --- Status ----------------------------------------------------------- */
   --color-ok-bg: var(--ok-bg);
+  --color-ok-line: var(--ok-line);
   --color-ok-ink: var(--ok-ink);
   --color-ok-mark: var(--ok-mark);
   --color-warn-bg: var(--warn-bg);
+  --color-warn-line: var(--warn-line);
   --color-warn-ink: var(--warn-ink);
   --color-warn-mark: var(--warn-mark);
   --color-alert-bg: var(--alert-bg);
+  --color-alert-line: var(--alert-line);
   --color-alert-ink: var(--alert-ink);
   --color-alert-mark: var(--alert-mark);
+  --color-info-bg: var(--info-bg);
+  --color-info-line: var(--info-line);
+  --color-info-ink: var(--info-ink);
+  --color-info-mark: var(--info-mark);
   --color-pill: var(--pill-bg);
   --color-pill-ink: var(--pill-ink);
 
@@ -308,37 +334,29 @@
   --color-warn: var(--warn-ink);
   --color-alert: var(--alert-ink);
   --color-accent-solid: var(--accent);
-  --color-background: var(--bg);
+  --color-background: var(--app);
   --color-foreground: var(--text);
   --color-primary: var(--accent);
   --color-primary-hover: var(--accent-strong);
   --color-primary-light: var(--accent-soft-bg);
   --color-primary-foreground: var(--accent-ink);
 
-  /*
-   * --- Authentication tokens --------------------------------------------
-   * Utilities for the front-door palette above: bg-auth-card, text-auth-ink,
-   * border-auth-line, shadow-auth-card, and so on. They resolve from :root
-   * only, so they stay light in every theme.
-   */
+  /* --- Authentication --------------------------------------------------- */
   --color-auth-bg: var(--auth-bg);
   --color-auth-bg-tint: var(--auth-bg-tint);
   --color-auth-card: var(--auth-card);
   --color-auth-line: var(--auth-line);
   --color-auth-line-strong: var(--auth-line-strong);
-
   --color-auth-ink: var(--auth-ink);
   --color-auth-ink-soft: var(--auth-ink-soft);
   --color-auth-muted: var(--auth-muted);
   --color-auth-faint: var(--auth-faint);
-
   --color-auth-primary: var(--auth-primary);
   --color-auth-primary-bright: var(--auth-primary-bright);
   --color-auth-primary-hover: var(--auth-primary-hover);
   --color-auth-primary-ink: var(--auth-primary-ink);
   --color-auth-primary-soft: var(--auth-primary-soft);
   --color-auth-primary-soft-ink: var(--auth-primary-soft-ink);
-
   --color-auth-ok-bg: var(--auth-ok-bg);
   --color-auth-ok-line: var(--auth-ok-line);
   --color-auth-ok-ink: var(--auth-ok-ink);
@@ -353,108 +371,105 @@
   --color-auth-alert-mark: var(--auth-alert-mark);
 
   /*
-   * Elevation on the auth surface is a HAIRLINE PLUS A LOW SHADOW, never a
-   * heavy drop. -card lifts the form off the page, -cta gives the one primary
-   * button a coloured cast so the eye finds it, -sm is for the small white
-   * objects inside the brand panel's product preview.
+   * --- Elevation ---------------------------------------------------------
+   *
+   *   card    a surface resting on the page: card, panel, table, sidebar
+   *   raised  a card that has been picked up — hover on an interactive card
+   *   float   an overlay that must clear the page: menu, popover, drawer, toast
+   *   cta     the one primary action, casting its own colour
+   *   ring    a hairline drawn as a shadow, where a border would change layout
+   *
+   * Every one of these is LOW. The interface is meant to feel expensive through
+   * spacing, alignment and type — not through blur radius.
    */
-  --shadow-auth-sm: 0 1px 2px rgb(23 28 48 / 0.05), 0 2px 6px -2px rgb(23 28 48 / 0.06);
-  --shadow-auth-card: 0 1px 2px rgb(23 28 48 / 0.04), 0 14px 34px -18px rgb(23 28 48 / 0.22);
-  --shadow-auth-float: 0 2px 6px -2px rgb(23 28 48 / 0.08), 0 22px 44px -24px rgb(23 28 48 / 0.28);
-  --shadow-auth-cta: 0 1px 2px rgb(91 75 255 / 0.28), 0 10px 22px -10px rgb(91 75 255 / 0.55);
+  --shadow-ring: 0 0 0 1px var(--line);
+  --shadow-card: 0 1px 2px var(--shade-1), 0 1px 3px var(--shade-1);
+  --shadow-raised: 0 1px 2px var(--shade-1), 0 8px 20px -12px var(--shade-3);
+  --shadow-float: 0 2px 6px -2px var(--shade-2), 0 18px 36px -18px var(--shade-4);
+  --shadow-cta: 0 1px 2px var(--cta-edge), 0 8px 18px -10px var(--cta-cast);
+  --shadow-field: 0 1px 2px var(--shade-1);
 
   /*
-   * --- The depth vocabulary ---------------------------------------------
-   *
-   *   neu-raised     cards, panels, tables, popovers — the objects on a page
-   *   neu-raised-lg  where a raised object lifts on hover
-   *   neu-raised-sm  buttons, chips, icon tiles — small objects
-   *   neu-inset      inputs, search, selects, wells — things you fill
-   *   neu-pressed    the active nav item, a toggled-on control — state
-   *   neu-accent     a solid accent fill, which needs a cast rather than a
-   *                  highlight: a white top-left edge on saturated teal reads
-   *                  as a rendering artefact
-   *   neu-float      overlays that must clear the page entirely (toasts,
-   *                  dialogs). The only shadow here with real elevation.
+   * LEGACY NEUMORPHIC NAMES. Roughly forty files still ask for these; each one
+   * now resolves to the closest new recipe, and includes the hairline the old
+   * recipe did not need, so an untouched screen renders correctly in the new
+   * language. Migrate a call site to the semantic name above when you next
+   * touch it, and delete the alias when the grep comes back empty.
    */
-  --shadow-neu-raised: 10px 10px 20px var(--neu-d1), -10px -10px 20px var(--neu-l1);
-  --shadow-neu-raised-lg: 14px 14px 28px var(--neu-d1), -14px -14px 28px var(--neu-l1);
-  --shadow-neu-raised-sm: 5px 5px 12px var(--neu-d2), -5px -5px 12px var(--neu-l1);
-  --shadow-neu-inset: inset 4px 4px 8px var(--neu-d2), inset -4px -4px 8px var(--neu-l1);
-  --shadow-neu-pressed: inset 3px 3px 7px var(--neu-d3), inset -3px -3px 7px var(--neu-l1);
-  --shadow-neu-accent: 0 10px 20px var(--neu-accent-cast), inset 0 1px 0 rgb(255 255 255 / 0.25);
-  /* A solid accent fill cannot be pressed with the grey-blue shade — it turns
-     muddy. It presses with its own darkness instead. */
-  --shadow-neu-accent-pressed: inset 3px 3px 7px rgb(0 0 0 / 0.3), inset -2px -2px 6px rgb(255 255 255 / 0.18);
-  --shadow-neu-float: 0 18px 40px -12px var(--neu-d3), 10px 10px 20px var(--neu-d1), -10px -10px 20px var(--neu-l1);
-
-  /* Legacy shadow names, re-pointed rather than deleted. */
-  --shadow-card: var(--shadow-neu-raised-sm);
-  --shadow-raised: var(--shadow-neu-raised);
-  --shadow-pop: var(--shadow-neu-float);
+  --shadow-neu-raised: 0 0 0 1px var(--line), 0 1px 2px var(--shade-1), 0 8px 20px -14px var(--shade-3);
+  --shadow-neu-raised-lg: 0 0 0 1px var(--line), 0 2px 6px -2px var(--shade-2), 0 18px 36px -18px var(--shade-4);
+  --shadow-neu-raised-sm: 0 0 0 1px var(--line), 0 1px 2px var(--shade-1);
+  --shadow-neu-inset: inset 0 0 0 1px var(--line);
+  --shadow-neu-pressed: inset 0 0 0 1px var(--line-strong);
+  --shadow-neu-accent: 0 1px 2px var(--cta-edge), 0 8px 18px -10px var(--cta-cast);
+  --shadow-neu-accent-pressed: inset 0 1px 2px rgb(0 0 0 / 0.22);
+  --shadow-neu-float: 0 0 0 1px var(--line), 0 2px 6px -2px var(--shade-2), 0 18px 36px -18px var(--shade-4);
+  --shadow-pop: 0 0 0 1px var(--line), 0 2px 6px -2px var(--shade-2), 0 18px 36px -18px var(--shade-4);
 
   /*
    * --- Type -------------------------------------------------------------
    * Plus Jakarta Sans throughout — geometric, crisp at small sizes, and its
    * tabular figures keep a rupee column aligned down the page.
    *
-   * --font-display is kept as a name so headings can be re-split onto a second
-   * family later, but it points at the same stack: this design wants one voice,
-   * and the weight range (400–800) does the work a second family used to.
+   * The scale is named by JOB rather than by size, so a call site says what a
+   * piece of text is for and the size follows. --text-input stays 16px on
+   * purpose: anything smaller makes iOS Safari zoom on focus, which is
+   * intolerable on the shared tablet at a front desk.
    */
   --font-sans: var(--font-jakarta), "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-sans);
 
-  /*
-   * Scale named by job rather than size. --text-input stays 16px on purpose:
-   * anything smaller makes iOS Safari zoom on focus, which is intolerable on
-   * the shared tablet at a front desk.
-   */
-  --text-micro: 0.71875rem; /* 11.5px — table headers, section captions */
+  --text-micro: 0.6875rem; /* 11px — table headers, section captions */
   --text-micro--line-height: 1rem;
-  --text-micro--letter-spacing: 0.08em;
+  --text-micro--letter-spacing: 0.07em;
   /*
    * 12px. NOT named --text-pill: --color-pill also exists, and Tailwind v4
-   * resolves `text-*` against the colour namespace before the font-size one, so
-   * `text-pill` silently became `color: var(--pill-bg)` and every 12px label
-   * painted itself pale grey on a pale card. A font-size token must never share
+   * resolves `text-*` against the colour namespace first, so `text-pill`
+   * silently became `color: var(--pill-bg)`. A font-size token must never share
    * a name with a colour token.
    */
   --text-meta: 0.75rem; /* 12px — status pills, deltas, captions */
-  --text-meta--line-height: 1rem;
-  --text-label: 0.8125rem; /* 13px — KPI labels, field labels */
+  --text-meta--line-height: 1.125rem;
+  --text-label: 0.8125rem; /* 13px — field labels, KPI labels, table cells */
   --text-label--line-height: 1.125rem;
-  --text-body: 0.875rem; /* 14px — body copy, table cells */
+  --text-body: 0.875rem; /* 14px — body copy, table cells, buttons */
   --text-body--line-height: 1.375rem;
-  --text-input: 1rem; /* 16px — see note above */
+  --text-input: 0.9375rem; /* 15px — form controls */
   --text-input--line-height: 1.5rem;
-  --text-section: 1.0625rem; /* 17px — card titles */
+  --text-section: 1.0625rem; /* 17px — card and section titles */
   --text-section--line-height: 1.5rem;
-  --text-section--letter-spacing: -0.005em;
-  --text-title: 1.75rem; /* 28px — page greeting */
+  --text-section--letter-spacing: -0.01em;
+  --text-heading: 1.375rem; /* 22px — a major section heading */
+  --text-heading--line-height: 1.75rem;
+  --text-heading--letter-spacing: -0.015em;
+  --text-title: 1.75rem; /* 28px — page title */
   --text-title--line-height: 2.125rem;
-  --text-title--letter-spacing: -0.02em;
-  --text-metric: 1.9375rem; /* 31px — KPI number */
-  --text-metric--line-height: 2.25rem;
-  --text-metric--letter-spacing: -0.02em;
+  --text-title--letter-spacing: -0.022em;
+  --text-metric: 1.75rem; /* 28px — KPI number */
+  --text-metric--line-height: 2.125rem;
+  --text-metric--letter-spacing: -0.025em;
+  --text-metric-lg: 2.125rem; /* 34px — the hero figure on Reports */
+  --text-metric-lg--line-height: 2.5rem;
+  --text-metric-lg--letter-spacing: -0.03em;
 
   /*
-   * Radii. Neumorphism needs generous corners — a tight radius gives the dual
-   * shadow nowhere to turn and the surface stops reading as soft.
+   * Radii. Moderate on purpose — the previous system needed generous corners so
+   * its paired shadows had somewhere to turn; a bordered surface does not, and
+   * a 24px radius on a data table reads as a toy.
    *
-   *   2xl  16px  buttons, inputs, selects, nav items
-   *   3xl  24px  cards, panels, tables
-   *   4xl  28px  hero panels, the sidebar
-   *   full       pills, avatars, icon tiles
+   *   lg   10px  chips, small marks
+   *   xl   12px  fields inside dense rows, menu items
+   *   2xl  14px  buttons, inputs, nav items
+   *   3xl  18px  cards, panels, tables
+   *   4xl  22px  the sidebar shell and other large containers
    */
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
-  --radius-4xl: 1.75rem;
-  /* Legacy names from the previous system, nudged up to match. */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 1rem;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.125rem;
+  --radius-4xl: 1.375rem;
 }
 
 /*
@@ -462,16 +477,16 @@
  * conventions, not tokens, so they are written down rather than frozen into
  * names nobody remembers:
  *
- *   table row      py-3.5      (14px)
+ *   table row      py-3        (12px)
  *   form fields    gap-5       (20px between stacked fields)
- *   card padding   p-6         (24px)
- *   page gutter    p-4 / md:p-7
- *   grid gutter    gap-6
+ *   card padding   p-5 / p-6
+ *   page gutter    px-4 / md:px-6 / xl:px-8
+ *   grid gutter    gap-4 / gap-6
  *   tap target     min-h-11    (44px, non-negotiable on tablet)
  */
 
 body {
-  background: var(--bg);
+  background: var(--app);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--text-body);
@@ -480,14 +495,10 @@ body {
 }
 
 /*
- * THE RULE THAT KEEPS THIS STYLE USABLE.
- *
- * A neumorphic control is the same colour as its background; the shadow that
- * separates them contributes no contrast at all, and disappears entirely in a
- * forced-colours mode. So the focus ring is not a nicety here, it is the only
- * thing that says "you are on this control" — and unlike the previous system it
- * uses --accent rather than --ink, because --accent is now a fixed house colour
- * rather than something a tenant can set to anything.
+ * THE FOCUS RING IS LOAD-BEARING. Several controls here are the same colour as
+ * what surrounds them, and in a forced-colours mode the hairlines go too. The
+ * ring is the only thing that says "you are on this control", so nothing in
+ * this codebase may set `outline: none` without replacing it.
  */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);
@@ -512,7 +523,7 @@ body {
  */
 @utility serial {
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   font-weight: 500;
 }
 
@@ -522,18 +533,37 @@ body {
 }
 
 /*
- * A raised object that answers the pointer. Extracted because the lift has to
- * be paired with the shadow step to read as physical — either one alone looks
- * like a glitch — and because the translate must collapse under reduced-motion
- * while the shadow step survives.
+ * A surface that answers the pointer. The lift is one pixel and the shadow goes
+ * up one step — paired, because either alone reads as a glitch. Only for a
+ * surface that is itself a link or a drop target; motion under the pointer on a
+ * static container is noise.
  */
-@utility neu-lift {
+@utility lift {
   transition:
-    box-shadow 200ms ease,
-    transform 200ms ease;
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    border-color 180ms ease;
 
   &:hover {
-    box-shadow: var(--shadow-neu-raised-lg);
+    box-shadow: var(--shadow-raised);
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lift:hover {
+    transform: none;
+  }
+}
+
+/* The previous system's name for the same idea. Kept while call sites migrate. */
+@utility neu-lift {
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
+
+  &:hover {
+    box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-raised);
     transform: translateY(-1px);
   }
 }
@@ -545,14 +575,77 @@ body {
 }
 
 /*
+ * The skeleton shimmer. One animation for every loading placeholder in the app,
+ * so a loading screen reads as one thing happening rather than six.
+ */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@utility skeleton {
+  background: var(--bg-deep);
+  border-radius: var(--radius-lg);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* An overlay arriving: 160ms, opacity only. */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The panel inside it: the same fade plus 8px of travel. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@utility overlay-in {
+  animation: overlay-in 160ms ease-out both;
+}
+
+@utility panel-in {
+  animation: panel-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility drawer-in {
+  animation: drawer-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
  * Data-visualisation tokens — the revenue trend (PRD §6.6) and the dashboard
  * patient-overview area chart.
  *
  * One series, so one hue, and it is the accent: with a single line there is no
  * categorical distinction to encode, and borrowing a second colour would imply
- * one. Grid and axis sit one step off the canvas so they read as structure
- * rather than data. Labels are text tokens, never the series colour — a
- * saturated teal is illegible at 11px.
+ * one. Grid and axis sit one step off the surface so they read as structure
+ * rather than as data. Labels are text tokens, never the series colour — a
+ * saturated indigo is illegible at 11px.
  */
 .viz-root {
   --viz-series: var(--accent);
@@ -565,24 +658,22 @@ body {
 /*
  * --- The authentication scope -------------------------------------------
  *
- * `.auth-scope` wraps /login, /signup, /verify-email and the rest of the
- * (auth) route group. Three things happen here and nowhere else.
+ * `.auth-scope` wraps /login, /signup, /verify-email and the rest of the (auth)
+ * route group. Three things happen here and nowhere else.
  *
- * 1. LIGHT, FULL STOP. `color-scheme: light` keeps form controls, scrollbars
- *    and autofill light even when the visitor's OS or the app's theme cookie
- *    says dark. The tokens themselves are already un-themed; this covers what
- *    the browser draws for us.
+ * 1. LIGHT, FULL STOP. `color-scheme: light` keeps form controls, scrollbars and
+ *    autofill light even when the OS or the app's theme cookie says dark. The
+ *    tokens are already un-themed; this covers what the browser draws for us.
  *
- * 2. THE FOCUS RING CHANGES COLOUR. The global rule above paints it in the
- *    teal --accent, which is not a colour that appears anywhere on these
- *    screens. Same 2px ring, same offset, indigo instead — this overrides the
- *    colour and nothing else, so the ring is never lost.
+ * 2. THE FOCUS RING KEEPS ITS OWN COLOUR. The global rule paints it in
+ *    --accent, which a tenant can change and a dark theme brightens. The front
+ *    door is not themeable, so it pins its own indigo.
  *
- * 3. AUTOFILL IS STYLED, NOT DISABLED. Chrome paints its own pale-yellow fill
- *    over an autofilled input, which on a white card reads as an error state.
- *    The inset shadow repaints the surface and -webkit-text-fill-color keeps
- *    the text legible; the field is still autofilled, and password managers
- *    are unaffected. Do not replace this with autocomplete="off".
+ * 3. AUTOFILL IS STYLED, NOT DISABLED. Chrome paints a pale-yellow fill over an
+ *    autofilled input, which on a white card reads as an error state. The inset
+ *    shadow repaints the surface and -webkit-text-fill-color keeps the text
+ *    legible; the field is still autofilled and password managers are
+ *    unaffected. Do not replace this with autocomplete="off".
  */
 .auth-scope {
   color-scheme: light;
@@ -604,9 +695,9 @@ body {
 }
 
 /*
- * The one moving thing on these screens: the "live" dot in the brand panel's
- * product preview. Two seconds, opacity only, and it stops entirely under
- * prefers-reduced-motion via the global rule above.
+ * The one moving thing on the auth screens: the "live" dot in the brand panel's
+ * product preview. Two and a half seconds, opacity only, and it stops entirely
+ * under prefers-reduced-motion via the global rule above.
  */
 @keyframes auth-breathe {
   0%,
@@ -642,7 +733,7 @@ body {
  * The brand panel's product preview is the first thing to go on a short
  * viewport. On a 1280x720 laptop the headline, the supporting copy and the
  * preview together overflow the sticky column, and a decoration clipped by the
- * fold reads as a bug - the panel is complete without it.
+ * fold reads as a bug — the panel is complete without it.
  *
  * A height media query rather than a Tailwind variant: the utility framework
  * has no viewport-height variant, and the arbitrary-variant spelling of one is

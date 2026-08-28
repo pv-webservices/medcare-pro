@@ -2,16 +2,16 @@ import type { ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
 
 /**
- * A titled container: a `Card` whose contents need announcing — an add form, a
- * filter block, a report section.
+ * A titled surface: a `Card` whose contents need announcing — an add form, a
+ * filter block, a report section, a settings group.
  *
- * The header is separated by SPACE, not by a rule. A border drawn across a soft
- * surface cuts it in half and the panel stops reading as one raised object, so
- * the title block simply sits above the content with room around it.
+ * The header is separated from the body by SPACE by default. `hasDivider` draws
+ * a hairline instead, which is right when the body is a table or a list that
+ * starts hard against the header and would otherwise float.
  *
- * The title is 17px/700 against a 13px/500 muted subtitle. That pairing is the
- * section-header signature used on every screen; keeping it in the primitive is
- * what stops eleven modules from each inventing their own.
+ * The title is 17px/600 over a 13px muted line. That pairing is the section
+ * signature used on every screen; keeping it in the primitive is what stops
+ * eleven modules from each inventing their own.
  */
 
 interface PanelProps {
@@ -22,6 +22,10 @@ interface PanelProps {
   actions?: ReactNode;
   /** Renders the title as an `h2` by default; pass 3 inside a nested section. */
   headingLevel?: 2 | 3;
+  /** Drops the body padding — for a panel whose child is a full-bleed table. */
+  isFlush?: boolean;
+  /** A hairline between header and body. Use with `isFlush` for tables. */
+  hasDivider?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -31,6 +35,8 @@ export default function Panel({
   description,
   actions,
   headingLevel = 2,
+  isFlush = false,
+  hasDivider = false,
   className,
   children,
 }: PanelProps) {
@@ -39,21 +45,33 @@ export default function Panel({
   return (
     <section
       aria-label={title}
-      className={cx("rounded-3xl bg-canvas p-6 shadow-neu-raised", className)}
+      className={cx(
+        "rounded-3xl border border-line bg-canvas shadow-card",
+        className,
+      )}
     >
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div
+        className={cx(
+          "flex flex-wrap items-start justify-between gap-3 px-5 pt-5",
+          hasDivider ? "border-b border-line pb-4" : "pb-4",
+        )}
+      >
         <div className="min-w-0 flex-1">
-          <Heading className="text-section font-bold text-ink">{title}</Heading>
+          <Heading className="text-section font-semibold text-ink">
+            {title}
+          </Heading>
           {description && (
-            <p className="mt-1 text-label font-medium text-muted">{description}</p>
+            <p className="mt-1 text-label text-muted">{description}</p>
           )}
         </div>
         {actions && (
-          <div className="flex shrink-0 items-center gap-3">{actions}</div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {actions}
+          </div>
         )}
       </div>
 
-      {children}
+      <div className={cx(isFlush ? "" : "px-5 pb-5")}>{children}</div>
     </section>
   );
 }

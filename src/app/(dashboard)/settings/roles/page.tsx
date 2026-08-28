@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import RoleList from "@/components/settings/RoleList";
 import UserRoleAssignments from "@/components/settings/UserRoleAssignments";
 import PageHeader from "@/components/ui/PageHeader";
@@ -40,16 +38,9 @@ export default async function RolesSettingsPage() {
 
   if (!overview) {
     return (
-      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-        Settings
-      </Link>
+      <section className="space-y-4">
         <PageHeader title="Roles & permissions" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view roles and permissions. Ask the account owner if
           you need access.
         </div>
@@ -58,22 +49,17 @@ export default async function RolesSettingsPage() {
   }
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-8">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-        Settings
-      </Link>
+    <section className="space-y-5">
       <PageHeader
         title="Roles & permissions"
+        description="Define what each role can see and change."
+        breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Roles & permissions" }]}
         meta={overview.canManage
             ? "Create roles, choose what each one can do, and assign them to users."
             : "You can see roles and who holds them, but not change them."}
       />
 
-      <div className="mb-8">
+      <div className="mb-5">
         <RoleList
           roles={overview.roles}
           grantablePermissions={overview.grantablePermissions}

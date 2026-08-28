@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import Input, { Select } from "@/components/ui/Input";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { ALL_CLINICS_LABEL } from "@/components/appointments/appointmentTypeView";
 import { createAppointmentTypeSchema } from "@/lib/appointmentInput";
@@ -202,7 +203,7 @@ export default function AppointmentTypeForm({
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {formError}
         </p>
@@ -283,11 +284,11 @@ export default function AppointmentTypeForm({
       <div className="mt-6 flex flex-wrap gap-3">
         <Button
           type="submit"
-          variant="commit"
+          variant="primary"
           isBusy={isSaving}
           busyLabel={isEdit ? "Saving…" : "Adding…"}
         >
-          {isEdit ? "Save Changes" : "Add Service"}
+          {isEdit ? "Save changes" : "Add service"}
         </Button>
 
         {onCancel && (

@@ -132,7 +132,7 @@ export default function AppointmentTypesTable({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {editing && (
         <Panel
           title={`Edit ${editing.name}`}
@@ -230,12 +230,12 @@ export default function AppointmentTypesTable({
                 <StatusPill tone={status.tone}>{status.label}</StatusPill>
               </div>
 
-              <p className="mt-3 text-sm text-muted">
-                <span className="tabular-nums font-semibold text-ink">
+              <p className="mt-3 text-body text-muted">
+                <span className="tnum font-semibold text-ink">
                   {formatDuration(service.durationMinutes)}
                 </span>{""}
                 ·{""}
-                <span className="tabular-nums font-semibold text-ink">
+                <span className="tnum font-semibold text-ink">
                   {formatRupees(service.defaultAmount)}
                 </span>
               </p>

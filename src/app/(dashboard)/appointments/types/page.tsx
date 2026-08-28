@@ -79,12 +79,15 @@ export default async function AppointmentServicesPage({
       throw error;
     }
     return (
-      <section className="mx-auto w-full max-w-[1400px] animate-in fade-in duration-500">
+      <section className="w-full">
         <PageHeader
           title="Services"
-          back={{ href: "/appointments", label: "Back to appointments" }}
+          breadcrumbs={[
+          { label: "Appointments", href: "/appointments" },
+          { label: "Services" },
+        ]}
         />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view the services this organisation offers. Ask the
           account owner if you need access.
         </div>
@@ -133,10 +136,14 @@ export default async function AppointmentServicesPage({
     : undefined;
 
   return (
-    <section className="mx-auto w-full max-w-[1400px] animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
         title="Services"
-        back={{ href: "/appointments", label: "Back to appointments" }}
+        description="The visit types this account offers, with their duration and price."
+        breadcrumbs={[
+          { label: "Appointments", href: "/appointments" },
+          { label: "Services" },
+        ]}
         meta={
           <>
             <Count>{bookable}</Count>{""}
@@ -145,26 +152,30 @@ export default async function AppointmentServicesPage({
             . Each one sets how long an appointment runs and what it costs.
           </>
         }
+        scope={selectedClinic ? selectedClinic.name : "All clinics"}
         actions={
-          canSeeRetired && (
-            <Link
-              href={
-                showRetired ? "/appointments/types" : "/appointments/types?retired=true"
-              }
-              className={buttonClasses("secondary", "md")}
-            >
-              {showRetired ? "Hide retired" : "Show retired"}
-            </Link>
-          )
+          <>
+            {canSeeRetired && (
+              <Link
+                href={
+                  showRetired
+                    ? "/appointments/types"
+                    : "/appointments/types?retired=true"
+                }
+                className={buttonClasses("secondary", "md")}
+              >
+                {showRetired ? "Hide retired" : "Show retired"}
+              </Link>
+            )}
+            {canAdd && (
+              <AddServicePanel
+                clinics={manageableClinics}
+                canScopeTenantWide={canScopeTenantWide}
+              />
+            )}
+          </>
         }
       />
-
-      {canAdd && (
-        <AddServicePanel
-          clinics={manageableClinics}
-          canScopeTenantWide={canScopeTenantWide}
-        />
-      )}
 
       <AppointmentTypesTable
         services={rows}

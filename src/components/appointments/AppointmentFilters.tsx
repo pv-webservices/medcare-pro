@@ -1,25 +1,33 @@
 "use client";
 
-import { CalendarDays, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_ORDER,
+  formatAppointmentDate,
 } from "@/components/appointments/status";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import Panel from "@/components/ui/Panel";
+import FilterBar from "@/components/ui/FilterBar";
+import IconButton from "@/components/ui/IconButton";
 import Select from "@/components/ui/Select";
+import { cx } from "@/components/ui/cx";
 
 /**
  * The board's controls — AP-6.
  *
+ * TWO SURFACES, TWO JOBS. The day strip is the control a front desk touches
+ * every few minutes — yesterday, today, tomorrow — so it sits above the board,
+ * always visible, one tap per move. The narrowing filters (doctor, state,
+ * history) are opened occasionally, so they live in the shared FilterBar, which
+ * collapses to a sheet on a phone.
+ *
  * The clinic filter is deliberately absent, exactly as on the registration
- * list: the sidebar switcher already chooses the clinic for every module, and a
+ * list: the header switcher already chooses the clinic for every module, and a
  * second clinic control here would let the two disagree.
  *
- * Applying a filter NAVIGATES rather than fetching, so the resulting board is
+ * APPLYING A FILTER NAVIGATES rather than fetching, so the resulting board is
  * shareable and survives a refresh — a receptionist can leave "today, Dr Rao"
  * open all morning and it is still right after a reload.
  *
@@ -60,6 +68,21 @@ function toQueryString(values: AppointmentFilterValues): string {
   return params.toString();
 }
 
+/**
+ * Shifts a YYYY-MM-DD string by whole days.
+ *
+ * UTC MATH ON PURPOSE. `new Date("2026-08-24")` is parsed as midnight UTC, and
+ * doing the arithmetic in local time would land on the previous day for any
+ * clinic west of Greenwich. The value here is a calendar date, not an instant.
+ */
+function shiftDate(date: string, days: number): string {
+  const parsed = Date.parse(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed)) {
+    return date;
+  }
+  return new Date(parsed + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 export default function AppointmentFilters({
   doctors,
   initial,
@@ -68,13 +91,13 @@ export default function AppointmentFilters({
   const router = useRouter();
   const [values, setValues] = useState<AppointmentFilterValues>(initial);
 
-  // The board defaults to today, so "filtered" means anything other than that
+  // The board defaults to today, so "narrowed" means anything other than that
   // plain day view — otherwise a Clear button would sit there from first load.
-  const isNarrowed =
-    initial.doctorId !== "" ||
-    initial.status !== "" ||
-    initial.includeHistory ||
-    initial.date !== today;
+  const activeCount =
+    (initial.doctorId !== "" ? 1 : 0) +
+    (initial.status !== "" ? 1 : 0) +
+    (initial.includeHistory ? 1 : 0);
+  const isNarrowed = activeCount > 0 || initial.date !== today;
 
   const go = (next: AppointmentFilterValues) => {
     const query = toQueryString(next);
@@ -87,8 +110,9 @@ export default function AppointmentFilters({
     go(values);
   }
 
-  function handleToday() {
-    const next = { ...values, date: today };
+  /** The day strip navigates immediately — it is a view change, not a filter. */
+  function goToDate(date: string) {
+    const next = { ...values, date };
     setValues(next);
     go(next);
   }
@@ -104,32 +128,102 @@ export default function AppointmentFilters({
     go(next);
   }
 
+  const isToday = values.date === today;
+  const hasDate = values.date !== "";
+
   return (
-    <Panel
-      title="Find an appointment"
-      description="Pick a day, then narrow by doctor or state. Clear the date to see every upcoming slot."
-      className="mb-5"
-      actions={
-        <Button size="sm" variant="secondary" onClick={handleToday}>
-          <CalendarDays aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-          Today
-        </Button>
-      }
-    >
-      <form onSubmit={handleSubmit}>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input
+    <div className="space-y-3">
+      {/* The day strip. */}
+      <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-canvas p-2 shadow-card">
+        <IconButton
+          label="Previous day"
+          size="sm"
+          disabled={!hasDate}
+          onClick={() => goToDate(shiftDate(values.date, -1))}
+        >
+          <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+        </IconButton>
+
+        <div className="min-w-0 flex-1 px-1 text-center sm:text-left">
+          <p className="truncate text-body font-semibold text-ink">
+            {hasDate ? formatAppointmentDate(values.date) : "All upcoming days"}
+          </p>
+          <p className="truncate text-meta text-muted">
+            {hasDate
+              ? isToday
+                ? "Today"
+                : "Selected day"
+              : "Every scheduled appointment"}
+          </p>
+        </div>
+
+        <IconButton
+          label="Next day"
+          size="sm"
+          disabled={!hasDate}
+          onClick={() => goToDate(shiftDate(values.date, 1))}
+        >
+          <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+        </IconButton>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={isToday ? "primary" : "secondary"}
+            onClick={() => goToDate(today)}
+          >
+            Today
+          </Button>
+
+          {/*
+            The native date input is the picker. On the front-desk tablet the OS
+            wheel beats anything built here, and it is one tab stop rather than
+            a grid of forty buttons.
+          */}
+          <label htmlFor="appointment-filter-date" className="sr-only">
+            Jump to date
+          </label>
+          <input
             id="appointment-filter-date"
             type="date"
-            label="Date"
-            hint="Leave blank to see every day."
             value={values.date}
-            onChange={(e) => setValues({ ...values, date: e.target.value })}
+            onChange={(event) => goToDate(event.target.value)}
+            className={cx(
+              "h-9 rounded-xl border border-line bg-canvas px-3 text-body text-ink",
+              "transition-colors duration-150 hover:border-line-strong",
+            )}
           />
 
+          {hasDate && (
+            <Button size="sm" variant="ghost" onClick={() => goToDate("")}>
+              All days
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <FilterBar
+          activeCount={activeCount}
+          clearAction={
+            isNarrowed ? (
+              <Button type="button" size="sm" variant="ghost" onClick={handleClear}>
+                <X aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+                Clear filters
+              </Button>
+            ) : null
+          }
+          actions={
+            <Button type="submit" size="sm" variant="primary">
+              <Search aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Apply
+            </Button>
+          }
+        >
           <Select
             id="appointment-filter-doctor"
             label="Doctor"
+            fieldClassName="md:w-56"
             value={values.doctorId}
             onChange={(e) => setValues({ ...values, doctorId: e.target.value })}
           >
@@ -144,6 +238,7 @@ export default function AppointmentFilters({
           <Select
             id="appointment-filter-status"
             label="State"
+            fieldClassName="md:w-48"
             value={values.status}
             onChange={(e) => setValues({ ...values, status: e.target.value })}
           >
@@ -154,38 +249,24 @@ export default function AppointmentFilters({
               </option>
             ))}
           </Select>
-        </div>
 
-        <label
-          htmlFor="appointment-filter-history"
-          className="mt-4 flex min-h-11 w-fit cursor-pointer items-center gap-2.5 text-sm font-medium text-ink"
-        >
-          <input
-            id="appointment-filter-history"
-            type="checkbox"
-            checked={values.includeHistory}
-            onChange={(e) =>
-              setValues({ ...values, includeHistory: e.target.checked })
-            }
-            className="h-4 w-4 rounded border-line text-primary focus:ring-primary"
-          />
-          Show cancelled, missed and moved appointments
-        </label>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="submit" variant="commit">
-            <Search aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-            Apply Filters
-          </Button>
-
-          {isNarrowed && (
-            <Button variant="quiet" onClick={handleClear}>
-              <X aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-              Clear Filters
-            </Button>
-          )}
-        </div>
+          <label
+            htmlFor="appointment-filter-history"
+            className="flex min-h-11 cursor-pointer items-center gap-2.5 text-body text-ink-soft"
+          >
+            <input
+              id="appointment-filter-history"
+              type="checkbox"
+              checked={values.includeHistory}
+              onChange={(e) =>
+                setValues({ ...values, includeHistory: e.target.checked })
+              }
+              className="h-4 w-4 rounded-[5px] border-line-strong accent-accent"
+            />
+            Include cancelled, missed and moved
+          </label>
+        </FilterBar>
       </form>
-    </Panel>
+    </div>
   );
 }

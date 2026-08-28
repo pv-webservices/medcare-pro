@@ -1,7 +1,9 @@
+import { MessageSquare } from "lucide-react";
 import { redirect } from "next/navigation";
 import MessageComposer from "@/components/messages/MessageComposer";
 import MessageHistory from "@/components/messages/MessageHistory";
 import TemplateManager from "@/components/messages/TemplateManager";
+import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { can, PermissionError } from "@/lib/rbac";
@@ -65,9 +67,9 @@ export default async function MessagesPage() {
 
   if (!templates) {
     return (
-      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <section className="space-y-4">
         <PageHeader title="Messages" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot send WhatsApp messages. Ask an admin or the account
           owner if you need access.
         </div>
@@ -98,16 +100,17 @@ export default async function MessagesPage() {
   const clinicName = clinics.find((clinic) => clinic.id === clinicId)?.name ?? null;
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-8">
+    <section className="space-y-5">
       <PageHeader
         title="Messages"
-        meta="Send an approved template to patients on WhatsApp."
+        description="Send approved WhatsApp templates to patients. Free-text messages are not supported by the provider."
+        scope={clinicName ?? "All clinics"}
       />
 
       {device && !device.connected && (
         <p
           role="alert"
-          className="rounded-xl bg-warn-bg px-4 py-3 text-sm text-warn-ink font-medium"
+          className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-body text-warn-ink"
         >
           The WhatsApp device is {device.status.toLowerCase()}. Scan its QR code
           in the provider panel to reconnect — sends will fail until you do.
@@ -115,17 +118,19 @@ export default async function MessagesPage() {
       )}
 
       <section aria-labelledby="send-heading" className="space-y-4">
-        <h2 id="send-heading" className="text-lg font-bold text-ink">
+        <h2 id="send-heading" className="text-heading font-semibold text-ink">
           Send a message
         </h2>
         {templates.length === 0 ? (
-          <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-            <p className="text-sm font-medium text-muted">
-              {canManageTemplates
+          <EmptyState
+            icon={<MessageSquare className="h-5 w-5" strokeWidth={2} />}
+            title="No approved templates yet"
+            guidance={
+              canManageTemplates
                 ? "Add a template below before you can message patients."
-                : "No templates yet. Ask an admin to add one before you can message patients."}
-            </p>
-          </div>
+                : "Ask an admin to add one before you can message patients."
+            }
+          />
         ) : (
           <MessageComposer
             templates={templates}
@@ -141,7 +146,7 @@ export default async function MessagesPage() {
       </div>
 
       <section aria-labelledby="history-heading" className="space-y-4 pt-2">
-        <h2 id="history-heading" className="text-lg font-bold text-ink">
+        <h2 id="history-heading" className="text-heading font-semibold text-ink">
           Message history
         </h2>
         <MessageHistory messages={messages} />

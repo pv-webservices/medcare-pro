@@ -51,11 +51,11 @@ export default async function NewRegistrationPage() {
         : [];
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
         title="New registration"
-        meta="A Patient ID is assigned when you save."
-        back={{ href: "/registration", label: "All registrations" }}
+        description="Record a patient visit. A Patient ID is assigned when you save."
+        breadcrumbs={[{ label: "Registrations", href: "/registration" }, { label: "New registration" }]}
       />
 
       {clinics.length === 0 ? (

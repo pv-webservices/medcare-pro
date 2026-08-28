@@ -21,24 +21,25 @@ import {
  * Primary navigation — the modules named in docs/PROJECT_STRUCTURE.md.
  *
  * Both the links and the unread count are resolved in the layout, not here:
- * each needs the session, and this component is a client one. The layout has
- * already dropped every tab the user's roles cannot reach, and gives 0 unread
- * to a user without `notification:read`, so the badge never appears for them.
+ * each needs the session, and this is a client component. The layout has
+ * already dropped every tab the user's roles cannot reach and gives 0 unread to
+ * a user without `notification:read`, so the badge never appears for them.
  *
- * Which permission each tab needs lives in src/lib/navigation.ts, along with
- * the reminder that hiding a tab is a courtesy, not access control — the page
- * behind it checks for itself.
+ * Which permission each tab needs lives in src/lib/navigation.ts, along with the
+ * reminder that hiding a tab is a courtesy, not access control — the page behind
+ * it checks for itself.
  *
- * THE ACTIVE ITEM IS PRESSED IN, not filled. Ten identical raised pills with
- * one tinted differently is a weak signal; a single item sunk into the sidebar
- * is unmistakable at a glance from across a front desk, and it is the same
- * physical metaphor the buttons use. The accent on the icon and label is the
- * second, redundant signal for anyone who cannot read the shadow.
+ * THE ACTIVE ITEM IS A TINTED ROW WITH A RAIL. One filled row against nine plain
+ * ones is unmistakable from across a front desk, and the 3px rail on its leading
+ * edge survives both a colour-blind reader and a forced-colours mode. The label
+ * also goes to the accent, so the state is carried three ways over.
  */
 
 interface DashboardNavProps {
   links: readonly NavLink[];
   unreadNotifications: number;
+  /** Closes the mobile drawer when a link is followed. */
+  onNavigate?: () => void;
 }
 
 const ICONS: Record<string, typeof LayoutDashboard> = {
@@ -59,10 +60,10 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
  * runs — bookings arrive, patients register, messages go out. MANAGE is the
  * setup behind it, opened weekly rather than hourly.
  *
- * The grouping is derived here rather than added to lib/navigation.ts because
- * it is a presentation decision: the permission and feature gates that module
- * owns are unchanged, and a link that appears in neither list still renders
- * (under Workspace) rather than vanishing.
+ * The grouping is a presentation decision made here rather than in
+ * lib/navigation.ts: the permission and feature gates that module owns are
+ * unchanged, and a link in neither list still renders (under Workspace) rather
+ * than vanishing.
  */
 const MANAGE = new Set(["/doctors", "/clinics", "/team", "/settings"]);
 
@@ -72,8 +73,8 @@ interface NavGroup {
 }
 
 function groupLinks(links: readonly NavLink[]): NavGroup[] {
-  const workspace = links.filter((link) => !MANAGE.has(link.href));
   const manage = links.filter((link) => MANAGE.has(link.href));
+  const workspace = links.filter((link) => !MANAGE.has(link.href));
 
   return [
     { caption: "Workspace", links: workspace },
@@ -84,6 +85,7 @@ function groupLinks(links: readonly NavLink[]): NavGroup[] {
 export default function DashboardNav({
   links,
   unreadNotifications,
+  onNavigate,
 }: DashboardNavProps) {
   const pathname = usePathname();
 
@@ -92,14 +94,14 @@ export default function DashboardNav({
   }
 
   return (
-    <nav aria-label="Main" className="flex flex-col gap-6">
+    <nav aria-label="Main" className="flex flex-col gap-5">
       {groupLinks(links).map((group) => (
         <div key={group.caption}>
-          <p className="mb-2 px-4 text-micro font-semibold uppercase text-muted">
+          <p className="mb-1.5 px-3 text-micro font-semibold uppercase text-faint">
             {group.caption}
           </p>
 
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-0.5">
             {group.links.map((link) => {
               const active = isActive(link.href);
               const Icon = ICONS[link.href] ?? FileText;
@@ -108,20 +110,28 @@ export default function DashboardNav({
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                    onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cx(
-                      "group flex h-11 items-center gap-3 rounded-2xl px-4",
-                      "text-body font-semibold transition-shadow duration-200",
+                      "group relative flex h-10 items-center gap-2.5 rounded-2xl px-3",
+                      "text-body font-medium transition-colors duration-150",
                       active
-                        ? "text-accent shadow-neu-pressed"
-                        : "text-muted hover:text-ink hover:shadow-neu-raised-sm",
+                        ? "bg-accent-soft text-accent-soft-ink"
+                        : "text-muted hover:bg-canvas-deep hover:text-ink",
                     )}
                   >
+                    {active && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-accent"
+                      />
+                    )}
+
                     <Icon
                       aria-hidden="true"
                       strokeWidth={2}
                       className={cx(
-                        "h-5 w-5 shrink-0",
+                        "h-[18px] w-[18px] shrink-0",
                         active ? "text-accent" : "text-faint group-hover:text-muted",
                       )}
                     />
@@ -130,7 +140,7 @@ export default function DashboardNav({
                     {link.href === "/notifications" && unreadNotifications > 0 && (
                       <span
                         className={cx(
-                          "tnum rounded-full px-2 py-0.5 text-meta font-bold",
+                          "tnum rounded-full px-1.5 py-0.5 text-meta font-semibold",
                           active
                             ? "bg-accent text-accent-ink"
                             : "bg-accent-soft text-accent-soft-ink",

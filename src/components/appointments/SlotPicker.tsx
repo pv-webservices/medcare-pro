@@ -73,7 +73,7 @@ export default function SlotPicker({
   if (error) {
     return (
       <Frame>
-        <p role="alert" className="text-sm font-semibold text-alert-ink">
+        <p role="alert" className="text-body font-semibold text-alert-ink">
           {error}
         </p>
       </Frame>
@@ -88,7 +88,7 @@ export default function SlotPicker({
           strokeWidth={1.75}
           className="mx-auto h-5 w-5 animate-spin text-faint"
         />
-        <p className="mt-2 text-sm text-muted">Checking what is free…</p>
+        <p className="mt-2 text-body text-muted">Checking what is free…</p>
       </Frame>
     );
   }
@@ -96,7 +96,7 @@ export default function SlotPicker({
   if (!result) {
     return (
       <Frame>
-        <p className="text-sm text-muted">
+        <p className="text-body text-muted">
           Choose a doctor, a service and a date to see what is free.
         </p>
       </Frame>
@@ -120,7 +120,7 @@ export default function SlotPicker({
           className="mx-auto h-5 w-5 text-faint"
         />
         <p className="mt-2 font-semibold text-ink">{message.title}</p>
-        <p className="mt-1 text-sm text-muted">{message.guidance}</p>
+        <p className="mt-1 text-body text-muted">{message.guidance}</p>
       </Frame>
     );
   }
@@ -129,11 +129,11 @@ export default function SlotPicker({
 
   return (
     <div>
-      <p className="mb-3 text-sm text-muted">
-        <span className="font-bold tabular-nums text-ink">{free}</span>{""}
+      <p className="mb-3 text-body text-muted">
+        <span className="font-semibold tnum text-ink">{free}</span>{""}
         {free === 1 ? "slot" : "slots"} free of{""}
-        <span className="tabular-nums">{result.slots.length}</span>, at{""}
-        <span className="tabular-nums">{result.durationMinutes}</span> minutes
+        <span className="tnum">{result.slots.length}</span>, at{""}
+        <span className="tnum">{result.durationMinutes}</span> minutes
         each.
       </p>
 
@@ -155,14 +155,14 @@ export default function SlotPicker({
               disabled={isTaken}
               onClick={() => onSelect(slot)}
               className={cx(
-                "min-h-11 rounded-xl border px-2 text-sm font-semibold tabular-nums transition-colors",
+                "min-h-11 rounded-xl border px-2 text-body font-semibold tnum transition-colors",
                 isTaken &&
                   "cursor-not-allowed border-line bg-canvas-deep text-faint line-through",
                 !isTaken &&
                   !isChosen &&
-                  "border-line bg-canvas text-ink shadow-neu-raised-sm hover:border-primary hover:text-primary",
+                  "border border-line bg-canvas text-ink shadow-card hover:border-accent hover:text-accent",
                 isChosen &&
-                  "border-primary bg-primary text-primary-foreground shadow-neu-raised-sm",
+                  "border border-accent bg-accent text-accent-ink shadow-cta",
               )}
             >
               {slot.start}

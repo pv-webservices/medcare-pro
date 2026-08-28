@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Panel from "@/components/ui/Panel";
 import StatusPill, { type StatusTone } from "@/components/ui/StatusPill";
 import Table, { TBody, TD, TH, THead, TR } from "@/components/ui/Table";
+import { ConfirmDialog } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import type { InvitationSummary } from "@/lib/invitations";
 
@@ -52,19 +53,21 @@ export default function InvitationsTable({
   const router = useRouter();
   const showToast = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * Revoking kills a link that is already in somebody's inbox, so it asks
+   * first — in a dialog rather than a browser confirm(), which cannot be styled,
+   * cannot be read in the page's own voice, and on a shared tablet looks like
+   * the browser talking rather than the product.
+   */
+  const [pendingRevoke, setPendingRevoke] = useState<InvitationSummary | null>(
+    null,
+  );
 
   if (invitations.length === 0) {
     return null;
   }
 
   async function revoke(invitation: InvitationSummary) {
-    if (
-      !window.confirm(
-        `Revoke the invitation to ${invitation.email}? Their link will stop working immediately.`,
-      )
-    ) {
-      return;
-    }
     if (busyId) {
       return;
     }
@@ -125,13 +128,13 @@ export default function InvitationsTable({
               <TD>
                 {invitation.roleName}
                 {invitation.clinicName && (
-                  <span className="block text-xs text-muted">
+                  <span className="block text-meta text-muted">
                     {invitation.clinicName}
                   </span>
                 )}
               </TD>
               <TD>{invitation.invitedByName ?? "—"}</TD>
-              <TD className="tabular-nums">{formatDate(invitation.expiresAt)}</TD>
+              <TD className="tnum">{formatDate(invitation.expiresAt)}</TD>
               <TD>
                 <StatusPill tone={STATUS_TONE[invitation.displayStatus]}>
                   {invitation.displayStatus}
@@ -143,18 +146,40 @@ export default function InvitationsTable({
                     size="sm"
                     variant="danger"
                     disabled={busyId === invitation.id}
-                    onClick={() => revoke(invitation)}
+                    onClick={() => setPendingRevoke(invitation)}
                   >
                     Revoke
                   </Button>
                 ) : (
-                  <span className="text-xs text-faint">—</span>
+                  <span className="text-meta text-faint">—</span>
                 )}
               </TD>
             </TR>
           ))}
         </TBody>
       </Table>
+
+      <ConfirmDialog
+        isOpen={pendingRevoke !== null}
+        onCancel={() => setPendingRevoke(null)}
+        onConfirm={() => {
+          const invitation = pendingRevoke;
+          setPendingRevoke(null);
+          if (invitation) {
+            void revoke(invitation);
+          }
+        }}
+        title="Revoke this invitation?"
+        body={
+          pendingRevoke
+            ? `The link sent to ${pendingRevoke.email} stops working immediately. You can invite the same address again afterwards.`
+            : ""
+        }
+        confirmLabel="Revoke invitation"
+        cancelLabel="Keep it"
+        isBusy={busyId !== null}
+        busyLabel="Revoking..."
+      />
     </Panel>
   );
 }

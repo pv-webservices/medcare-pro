@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import BrandingForm from "@/components/settings/BrandingForm";
 import PageHeader from "@/components/ui/PageHeader";
 import { getClinicForActor, listClinicsForActor } from "@/lib/clinics";
@@ -47,14 +45,7 @@ const BRANDING = SETTINGS_SECTIONS.find(
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-        Settings
-      </Link>
+    <section className="space-y-4">
       {children}
     </section>
   );
@@ -80,7 +71,7 @@ export default async function BrandingSettingsPage() {
     return (
       <Shell>
         <PageHeader title="Clinic details" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view this clinic&apos;s details. Ask the account
           owner if you need access.
         </div>
@@ -97,8 +88,8 @@ export default async function BrandingSettingsPage() {
     return (
       <Shell>
         <PageHeader title="Clinic details" />
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-          <p className="text-sm font-medium text-muted">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center border border-line shadow-card">
+          <p className="text-body font-medium text-muted">
             {holds("clinic:read")
               ? "This account has no clinic on record. An account is normally given one when it is created — contact support so it can be restored."
               : "Your role does not reach any clinic. Ask the account owner if you need access."}
@@ -117,8 +108,8 @@ export default async function BrandingSettingsPage() {
     return (
       <Shell>
         <PageHeader title="Clinic details" />
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-          <p className="text-sm font-medium text-muted">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center border border-line shadow-card">
+          <p className="text-body font-medium text-muted">
             Pick a clinic in the sidebar to edit its details. Each clinic keeps
             its own name, address and logo.
           </p>
@@ -147,6 +138,8 @@ export default async function BrandingSettingsPage() {
     <Shell>
       <PageHeader
         title="Clinic details"
+        description="Name, address and branding for this clinic."
+        breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Clinic details" }]}
         meta={
           <span>
             {clinic.name}

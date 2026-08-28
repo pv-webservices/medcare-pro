@@ -9,7 +9,7 @@ import Card from "@/components/ui/Card";
  * Stat tiles, not a chart: four single values have no shape to plot, and a
  * four-bar bar chart of unrelated units would be worse than the numbers.
  *
- * Values use proportional figures on purpose. `tabular-nums` gives every digit
+ * Values use proportional figures on purpose. `tnum` gives every digit
  * the width of a zero, which makes a large standalone number look gappy; it is
  * kept for columns that have to align vertically, which these do not.
  */
@@ -28,12 +28,12 @@ interface TileProps {
 
 function Tile({ label, value, hint, children }: TileProps) {
   return (
-    <Card className="p-5">
-      <p className="text-sm font-medium text-muted">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
+    <Card>
+      <p className="text-label font-medium text-muted">{label}</p>
+      <p className="mt-2 text-metric-lg font-semibold text-ink">{value}</p>
       {children}
       {hint && (
-        <p className="mt-2 text-xs text-faint">{hint}</p>
+        <p className="mt-2 text-meta text-faint">{hint}</p>
       )}
     </Card>
   );
@@ -58,7 +58,7 @@ function RevenueDelta({
 
   if (changePercent === null) {
     return (
-      <p className="mt-2 text-xs font-medium text-muted">
+      <p className="mt-2 text-meta font-medium text-muted">
         {/* Growth from zero is not a percentage — say what happened instead. */}
         {Number(previousRevenue) === 0
           ? `No revenue ${against}`
@@ -71,7 +71,7 @@ function RevenueDelta({
   const rounded = Math.abs(changePercent).toFixed(1);
 
   return (
-    <p className="mt-2 text-xs font-medium">
+    <p className="mt-2 text-meta font-medium">
       <span
         className={
           isUp

@@ -23,7 +23,7 @@ const OPTIONS: readonly { status: NotificationStatus; label: string }[] = [
 export default function StatusFilter({ selected, unreadCount }: StatusFilterProps) {
   return (
     <nav aria-label="Notification status">
-      <ul className="flex flex-wrap gap-2">
+      <ul className="flex flex-wrap items-center gap-1 rounded-2xl border border-line bg-canvas p-1 shadow-card">
         {OPTIONS.map(({ status, label }) => {
           const isSelected = status === selected;
 
@@ -32,15 +32,15 @@ export default function StatusFilter({ selected, unreadCount }: StatusFilterProp
               <Link
                 href={status === "all" ? "/notifications" : "/notifications?status=unread"}
                 aria-current={isSelected ? "page" : undefined}
-                className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors ${
+                className={`inline-flex min-h-10 items-center justify-center rounded-xl px-3.5 text-body font-medium transition-colors duration-150 ${
                   isSelected
-                    ? "bg-primary text-primary-foreground shadow-neu-raised-sm"
-                    : "bg-canvas text-ink hover:bg-canvas-deep"
+                    ? "border border-accent bg-accent text-accent-ink shadow-cta"
+                    : "border border-transparent text-muted hover:bg-canvas-deep hover:text-ink"
                 }`}
               >
                 {label}
                 {status === "unread" && unreadCount > 0 && (
-                  <span className="ml-2 tabular-nums">({unreadCount})</span>
+                  <span className="tnum ml-1.5">({unreadCount})</span>
                 )}
               </Link>
             </li>

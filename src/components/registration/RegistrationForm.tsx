@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { UserRoundCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import PatientLookup from "@/components/registration/PatientLookup";
 import Button from "@/components/ui/Button";
@@ -368,7 +369,7 @@ export default function RegistrationForm({
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="mb-4 rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {formError}
         </p>
@@ -377,7 +378,7 @@ export default function RegistrationForm({
       <Panel
         title="Patient"
         description="Check for an existing record first — a returning patient keeps their Patient ID."
-        className="mb-5"
+        className="mb-4"
       >
         {/* Above the lookup, because the lookup searches within a clinic. */}
         {!isEdit && clinics.length > 1 && (
@@ -403,13 +404,20 @@ export default function RegistrationForm({
           (values.patientId ? (
             <Card
               isFlush
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-canvas-deep p-4 rounded-xl"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-accent-soft bg-accent-soft p-4"
             >
-              <p className="text-sm text-ink">
-                Adding a visit to{""}
-                <span className="font-semibold">{values.name}</span>{""}
-                <span className="serial text-muted">({values.patientCode})</span>
-                . Their existing Patient ID is kept.
+              <p className="flex items-center gap-2 text-body text-ink">
+                <UserRoundCheck
+                  aria-hidden="true"
+                  strokeWidth={2}
+                  className="h-4 w-4 shrink-0 text-accent"
+                />
+                <span>
+                  Follow-up visit for{" "}
+                  <span className="font-semibold">{values.name}</span>{" "}
+                  <span className="serial text-muted">({values.patientCode})</span>
+                  . Their existing Patient ID is kept.
+                </span>
               </p>
               <Button
                 variant="secondary"
@@ -589,7 +597,7 @@ export default function RegistrationForm({
       </Panel>
 
       {!isEdit && values.patientId === "" && (
-        <p className="mb-4 text-xs text-muted">
+        <p className="mb-4 text-meta text-muted">
           A Patient ID is assigned automatically when you save.
         </p>
       )}
@@ -597,11 +605,11 @@ export default function RegistrationForm({
       <div className="flex flex-wrap gap-3">
         <Button
           type="submit"
-          variant="commit"
+          variant="primary"
           isBusy={isSaving}
           busyLabel={isEdit ? "Saving…" : "Registering…"}
         >
-          {isEdit ? "Save Changes" : "Register Patient"}
+          {isEdit ? "Save changes" : "Register patient"}
         </Button>
 
         {onCancel && (

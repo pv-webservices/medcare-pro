@@ -131,7 +131,7 @@ export default function PatientLookup({
                   <p className="font-medium text-ink">{patient.name}</p>
                   <p className="mt-0.5 text-label text-muted">
                     <span className="serial text-ink">{patient.patientCode}</span>
-                    <span className="tabular-nums">
+                    <span className="tnum">
                       {"·"}
                       {patient.mobileNumber}
                     </span>

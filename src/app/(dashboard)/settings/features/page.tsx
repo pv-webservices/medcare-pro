@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import FeatureMatrix from "@/components/settings/FeatureMatrix";
 import PageHeader from "@/components/ui/PageHeader";
 import { getFeatureOverview, type FeatureOverview } from "@/lib/features";
@@ -44,16 +42,9 @@ export default async function FeatureSettingsPage() {
 
   if (!overview) {
     return (
-      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-        Settings
-      </Link>
+      <section className="space-y-4">
         <PageHeader title="Features" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view feature access. Ask the account owner if you need
           access.
         </div>
@@ -64,16 +55,11 @@ export default async function FeatureSettingsPage() {
   const included = overview.features.filter((feature) => feature.isEntitled).length;
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-        Settings
-      </Link>
+    <section className="space-y-4">
       <PageHeader
         title="Features"
+        description="Turn modules on or off for this account."
+        breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Features" }]}
         meta={
           overview.canManage
             ? `${overview.planName ?? "No plan"} · ${included} of ${overview.features.length} features included. Choose which roles may use each one.`

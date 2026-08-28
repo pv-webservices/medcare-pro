@@ -159,11 +159,11 @@ export default function BrandingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <p
           role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
@@ -172,7 +172,7 @@ export default function BrandingForm({
       {saved && (
         <p
           role="status"
-          className="rounded-xl bg-ok-bg px-4 py-3 text-sm font-medium text-ok-ink"
+          className="rounded-xl bg-ok-bg px-4 py-3 text-body font-medium text-ok-ink"
         >
           Saved.
         </p>
@@ -223,7 +223,7 @@ export default function BrandingForm({
           />
 
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-ink">
+            <label className="mb-1.5 block text-body font-semibold text-ink">
               Logo
             </label>
 
@@ -247,8 +247,8 @@ export default function BrandingForm({
                   className="h-12 w-auto max-w-[120px] rounded object-contain"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink">Logo uploaded</p>
-                  <p className="text-xs text-muted">Image loaded from your device</p>
+                  <p className="text-body font-medium text-ink">Logo uploaded</p>
+                  <p className="text-meta text-muted">Image loaded from your device</p>
                 </div>
                 {canEdit && (
                   <button
@@ -258,7 +258,7 @@ export default function BrandingForm({
                       setSaved(false);
                       if (fileInputRef.current) fileInputRef.current.value = "";
                     }}
-                    className="rounded-md px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-canvas-deep hover:text-ink transition-colors"
+                    className="rounded-md px-2.5 py-1.5 text-meta font-medium text-muted hover:bg-canvas-deep hover:text-ink transition-colors"
                   >
                     Remove
                   </button>
@@ -274,7 +274,7 @@ export default function BrandingForm({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 rounded-xl bg-canvas px-4 py-2.5 text-sm font-medium text-ink shadow-neu-raised-sm hover:bg-canvas-deep hover:border-line transition-colors"
+                      className="inline-flex items-center gap-2 rounded-xl bg-canvas px-4 py-2.5 text-body font-medium text-ink border border-line shadow-card hover:bg-canvas-deep hover:border-line transition-colors"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 text-muted">
                         <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
@@ -282,7 +282,7 @@ export default function BrandingForm({
                       </svg>
                       Upload from device
                     </button>
-                    <span className="self-center text-xs text-faint">or</span>
+                    <span className="self-center text-meta text-faint">or</span>
                   </div>
                 )}
                 <Input
@@ -314,7 +314,7 @@ export default function BrandingForm({
           <Button
             type="submit"
             disabled={isSaving || hasErrors}
-            variant="commit"
+            variant="primary"
             isBusy={isSaving}
             busyLabel="Saving…"
           >
@@ -322,7 +322,7 @@ export default function BrandingForm({
           </Button>
         </div>
       ) : (
-        <p className="mt-4 rounded-xl bg-canvas-deep px-4 py-3 text-sm text-muted">
+        <p className="mt-4 rounded-xl bg-canvas-deep px-4 py-3 text-body text-muted">
           Your role cannot edit this clinic&apos;s details. Ask an admin or the
           account owner if you need access.
         </p>

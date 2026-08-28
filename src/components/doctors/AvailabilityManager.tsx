@@ -132,7 +132,7 @@ export default function AvailabilityManager({
           isPast ? "opacity-60" : ""
         }`}
       >
-        <p className="text-sm font-semibold text-ink">{formatDayLabel(group.date)}</p>
+        <p className="text-body font-semibold text-ink">{formatDayLabel(group.date)}</p>
         <ul className="mt-2 flex flex-wrap items-center gap-2">
           {group.slots
             .slice()
@@ -142,7 +142,7 @@ export default function AvailabilityManager({
                 key={slot.id}
                 className="flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-1.5 bg-canvas-deep"
               >
-                <span className="text-sm tabular-nums text-ink font-medium">
+                <span className="text-body tnum text-ink font-medium">
                   {slot.startTime}–{slot.endTime}
                 </span>
                 {canEdit && (
@@ -151,7 +151,7 @@ export default function AvailabilityManager({
                     onClick={() => handleRemove(slot.id)}
                     disabled={removingId === slot.id}
                     aria-label={`Remove ${slot.startTime} to ${slot.endTime} on ${formatDayLabel(group.date)}`}
-                    className="min-h-8 rounded-md px-2 text-xs font-medium text-muted hover:bg-canvas-deep disabled:opacity-50 transition-colors"
+                    className="min-h-8 rounded-md px-2 text-meta font-medium text-muted hover:bg-canvas-deep disabled:opacity-50 transition-colors"
                   >
                     {removingId === slot.id ? "…" : "Remove"}
                   </button>
@@ -165,14 +165,14 @@ export default function AvailabilityManager({
 
   return (
     <section aria-labelledby="availability-heading" className="space-y-4">
-      <h2 id="availability-heading" className="text-lg font-bold text-ink">
+      <h2 id="availability-heading" className="text-heading font-semibold text-ink">
         Availability
       </h2>
 
       {error && (
         <p
           role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
@@ -210,7 +210,7 @@ export default function AvailabilityManager({
             />
             <Button
               type="submit"
-              variant="commit"
+              variant="primary"
               isBusy={isSaving}
               busyLabel="Adding…"
             >
@@ -221,8 +221,8 @@ export default function AvailabilityManager({
       )}
 
       {entries.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-          <p className="text-sm font-medium text-muted">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center border border-line shadow-card">
+          <p className="text-body font-medium text-muted">
             No availability set. Add the dates and hours this doctor is in.
           </p>
         </div>
@@ -232,7 +232,7 @@ export default function AvailabilityManager({
 
           {past.length > 0 && (
             <details className="mt-4 border-t border-line pt-4 group">
-              <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
+              <summary className="cursor-pointer text-body font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
                 <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
                 Past dates ({past.length})
               </summary>

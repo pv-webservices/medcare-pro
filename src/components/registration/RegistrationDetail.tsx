@@ -67,7 +67,7 @@ export default function RegistrationDetail({
 
   if (isEditing) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <PageHeader
           title={`Edit ${registration.patientName}`}
           meta="Every change is recorded in this registration's edit history."
@@ -111,17 +111,21 @@ export default function RegistrationDetail({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        back={{ href: "/registration", label: "All registrations" }}
+        breadcrumbs={[
+          { label: "Registrations", href: "/registration" },
+          { label: registration.patientCode },
+        ]}
         title={registration.patientName}
+        scope={registration.clinicName}
         meta={
-          <div className="flex flex-col gap-1.5 mt-2">
-            <span className="text-sm font-medium tabular-nums text-muted">
+          <div className="flex flex-col gap-1.5">
+            <span className="serial text-body text-muted">
               {registration.patientCode}
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted">
+              <span className="text-body text-muted">
                 {registration.department}
                 {registration.doctorName ? ` · ${registration.doctorName}` : ""} ·{""}
                 {registration.clinicName}
@@ -133,7 +137,7 @@ export default function RegistrationDetail({
                 {VISIT_TYPE_LABELS[registration.visitType]}
               </StatusPill>
               {visits.length > 1 && (
-                <span className="text-sm text-muted">
+                <span className="text-body text-muted">
                   · {visits.length} visits on this record
                 </span>
               )}
@@ -147,12 +151,12 @@ export default function RegistrationDetail({
                 href={`/registration/${registration.id}/history`}
                 className={buttonClasses("secondary", "md")}
               >
-                Edit History
+                Edit history
               </Link>
             )}
             {canEdit && (
-              <Button variant="commit" onClick={() => setIsEditing(true)}>
-                Edit Registration
+              <Button variant="primary" onClick={() => setIsEditing(true)}>
+                Edit registration
               </Button>
             )}
           </>
@@ -160,53 +164,49 @@ export default function RegistrationDetail({
       />
 
       <Card>
-        <dl className="grid gap-6 sm:grid-cols-3">
+        <dl className="grid gap-5 sm:grid-cols-3">
           <div>
-            <dt className="text-sm font-semibold text-muted">Amount</dt>
-            <dd className="mt-1 text-2xl font-bold tabular-nums text-ink">
+            <dt className="text-label font-medium text-muted">Amount</dt>
+            <dd className="tnum mt-1 text-metric font-semibold text-ink">
               {formatRupees(registration.amount)}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-muted">Visit date &amp; time</dt>
-            <dd className="mt-1 text-base tabular-nums text-ink">
+            <dt className="text-label font-medium text-muted">Visit date &amp; time</dt>
+            <dd className="mt-1 text-body font-medium tnum text-ink">
               {formatVisitDate(registration.visitDate)} at {registration.visitTime}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-muted">Mobile number</dt>
-            <dd className="mt-1 text-base tabular-nums text-ink">{registration.mobileNumber}</dd>
+            <dt className="text-label font-medium text-muted">Mobile number</dt>
+            <dd className="mt-1 text-body font-medium tnum text-ink">{registration.mobileNumber}</dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-muted">Age</dt>
-            <dd className="mt-1 text-base tabular-nums text-ink">
+            <dt className="text-label font-medium text-muted">Age</dt>
+            <dd className="mt-1 text-body font-medium tnum text-ink">
               {registration.age === null ? <NotSet /> : registration.age}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-muted">Gender</dt>
-            <dd className="mt-1 text-base text-ink">{registration.gender ?? <NotSet />}</dd>
+            <dt className="text-label font-medium text-muted">Gender</dt>
+            <dd className="mt-1 text-body font-medium text-ink">{registration.gender ?? <NotSet />}</dd>
           </div>
           <div>
-            <dt className="text-sm font-semibold text-muted">City</dt>
-            <dd className="mt-1 text-base text-ink">{registration.city ?? <NotSet />}</dd>
+            <dt className="text-label font-medium text-muted">City</dt>
+            <dd className="mt-1 text-body font-medium text-ink">{registration.city ?? <NotSet />}</dd>
           </div>
           <div className="sm:col-span-3">
-            <dt className="text-sm font-semibold text-muted">Address</dt>
-            <dd className="mt-1 text-base text-ink">{registration.address ?? <NotSet />}</dd>
+            <dt className="text-label font-medium text-muted">Address</dt>
+            <dd className="mt-1 text-body font-medium text-ink">{registration.address ?? <NotSet />}</dd>
           </div>
         </dl>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">
-          Registered by {registration.createdByName ?? registration.createdByEmail}
-        </p>
-      </div>
+      <p className="text-label text-muted">
+        Registered by {registration.createdByName ?? registration.createdByEmail}
+      </p>
 
-      <div className="mt-8">
-        <PatientVisits visits={visits} currentId={registration.id} />
-      </div>
+      <PatientVisits visits={visits} currentId={registration.id} />
     </div>
   );
 }

@@ -1,10 +1,10 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import RegistrationFilters from "@/components/registration/RegistrationFilters";
 import RegistrationsTable from "@/components/registration/RegistrationsTable";
 import { buttonClasses } from "@/components/ui/Button";
 import PageHeader, { Count } from "@/components/ui/PageHeader";
+import Pagination from "@/components/ui/Pagination";
 import { listClinicsForActor } from "@/lib/clinics";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { can } from "@/lib/rbac";
@@ -102,9 +102,11 @@ export default async function RegistrationListPage({
   const lastOnPage = Math.min(result.page * result.pageSize, result.total);
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
         title="Registrations"
+        description="Manage patient registrations and visit records."
+        scope={selectedClinic ? selectedClinic.name : "All clinics"}
         meta={
           <>
             <Count>{result.total}</Count>{""}
@@ -117,9 +119,9 @@ export default async function RegistrationListPage({
           canCreate && (
             <Link
               href="/registration/new"
-              className={buttonClasses("commit", "md")}
+              className={buttonClasses("primary", "md")}
             >
-              New Registration
+              New registration
             </Link>
           )
         }
@@ -145,46 +147,15 @@ export default async function RegistrationListPage({
         canCreate={canCreate}
       />
 
-      {lastPage > 1 && (
-        <nav
-          aria-label="Registration pages"
-          className="mt-4 flex flex-wrap items-center justify-between gap-3"
-        >
-          <p className="text-label text-muted">
-            Showing <Count>{firstOnPage}</Count>–<Count>{lastOnPage}</Count> of{""}
-            <Count>{result.total}</Count>
-          </p>
-
-          <div className="flex gap-2">
-            {result.page > 1 && (
-              <Link
-                href={pageHref(params, result.page - 1)}
-                className={buttonClasses("secondary", "md")}
-              >
-                <ChevronLeft
-                  aria-hidden="true"
-                  strokeWidth={1.75}
-                  className="h-4 w-4"
-                />
-                Previous
-              </Link>
-            )}
-            {result.page < lastPage && (
-              <Link
-                href={pageHref(params, result.page + 1)}
-                className={buttonClasses("secondary", "md")}
-              >
-                Next
-                <ChevronRight
-                  aria-hidden="true"
-                  strokeWidth={1.75}
-                  className="h-4 w-4"
-                />
-              </Link>
-            )}
-          </div>
-        </nav>
-      )}
+      <Pagination
+        page={result.page}
+        lastPage={lastPage}
+        total={result.total}
+        firstOnPage={firstOnPage}
+        lastOnPage={lastOnPage}
+        hrefFor={(page) => pageHref(params, page)}
+        label="Registration pages"
+      />
     </section>
   );
 }

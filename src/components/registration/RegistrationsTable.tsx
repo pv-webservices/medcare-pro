@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/Button";
@@ -72,7 +72,8 @@ export default function RegistrationsTable({
   if (registrations.length === 0) {
     return (
       <EmptyState
-        title={isFiltered ? "No registrations match" : "No registrations yet"}
+        icon={<Users className="h-5 w-5" strokeWidth={2} />}
+        title={isFiltered ? "No registrations match these filters" : "No registrations yet"}
         guidance={
           isFiltered
             ? "Try a different name or phone number, or widen the date range."
@@ -84,9 +85,9 @@ export default function RegistrationsTable({
           !isFiltered && canCreate ? (
             <Link
               href="/registration/new"
-              className={buttonClasses("commit", "md")}
+              className={buttonClasses("primary", "md")}
             >
-              New Registration
+              New registration
             </Link>
           ) : undefined
         }
@@ -117,7 +118,7 @@ export default function RegistrationsTable({
                 <TD>
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                    className="rounded transition-colors duration-150 hover:text-accent"
                   >
                     <PatientCode>{registration.patientCode}</PatientCode>
                   </Link>
@@ -125,12 +126,12 @@ export default function RegistrationsTable({
 
                 <TD>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-ink">
+                    <span className="font-medium text-ink">
                       {registration.patientName}
                     </span>
                     {registration.visitType === "FOLLOW_UP" && <FollowUpPill />}
                   </div>
-                  <p className="mt-0.5 text-xs tabular-nums text-muted">
+                  <p className="tnum mt-0.5 text-meta text-muted">
                     {registration.mobileNumber}
                   </p>
                 </TD>
@@ -142,22 +143,22 @@ export default function RegistrationsTable({
                 {showClinic && <TD>{registration.clinicName}</TD>}
 
                 <TD>
-                  <span className="tabular-nums">
+                  <span className="tnum whitespace-nowrap">
                     {formatVisitDate(registration.visitDate)}
                   </span>
-                  <p className="mt-0.5 text-xs tabular-nums text-muted">
+                  <p className="tnum mt-0.5 text-meta text-muted">
                     {registration.visitTime}
                   </p>
                 </TD>
 
-                <TD isNumeric className="font-bold text-ink">
+                <TD isNumeric>
                   {formatRupees(registration.amount)}
                 </TD>
 
                 <TD align="end" className="py-0 pl-0">
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-md text-faint hover:text-ink transition-colors"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-faint transition-colors duration-150 hover:bg-canvas-deep hover:text-ink"
                   >
                     <span className="sr-only">
                       Open registration {registration.patientCode}
@@ -185,31 +186,31 @@ export default function RegistrationsTable({
                 <div className="min-w-0">
                   <Link
                     href={`/registration/${registration.id}`}
-                    className="font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                    className="rounded font-medium text-ink transition-colors duration-150 hover:text-accent"
                   >
                     {registration.patientName}
                   </Link>
-                  <p className="mt-0.5 text-xs text-muted">
+                  <p className="mt-0.5 text-meta text-muted">
                     <PatientCode>{registration.patientCode}</PatientCode>
-                    <span className="tabular-nums">
+                    <span className="tnum">
                       {"·"}
                       {registration.mobileNumber}
                     </span>
                   </p>
                 </div>
-                <p className="shrink-0 font-bold tabular-nums text-ink">
+                <p className="tnum shrink-0 font-semibold text-ink">
                   {formatRupees(registration.amount)}
                 </p>
               </div>
 
-              <p className="mt-2 text-xs text-muted">
+              <p className="mt-2 text-meta text-muted">
                 {registration.department}
                 {registration.doctorName ? ` · ${registration.doctorName}` : ""}
                 {showClinic ? ` · ${registration.clinicName}` : ""}
               </p>
 
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <p className="text-xs tabular-nums text-muted">
+                <p className="tnum text-meta text-muted">
                   {formatVisitDate(registration.visitDate)}{""}
                   {registration.visitTime}
                 </p>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import EditHistory from "@/components/registration/EditHistory";
 import PageHeader from "@/components/ui/PageHeader";
@@ -68,15 +67,22 @@ export default async function RegistrationHistoryPage({
   }
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
-        back={{ href: `/registration/${registration.id}`, label: "Back to registration" }}
+        breadcrumbs={[
+          { label: "Registrations", href: "/registration" },
+          {
+            label: registration.patientCode,
+            href: `/registration/${registration.id}`,
+          },
+          { label: "Edit history" },
+        ]}
         title="Edit history"
-        meta={`${registration.patientCode} · ${registration.patientName}`}
+        description={`Every recorded change to ${registration.patientName}. Nothing here can be edited or removed.`}
       />
 
       {entries === null ? (
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view edit history. Ask an admin or the account owner
           if you need to see who changed this registration.
         </div>

@@ -84,9 +84,9 @@ export default function Avatar({
         background: `color-mix(in srgb, ${colour} var(--avatar-tint), transparent)`,
       }}
       className={cx(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-bold",
+        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold",
         SIZES[size],
-        isRaised && "shadow-neu-raised-sm",
+        isRaised && "border border-line shadow-card",
         className,
       )}
     >

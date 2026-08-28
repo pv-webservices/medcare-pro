@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import { Select } from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import type { AccountUser, RoleSummary } from "@/lib/roles";
 
 /**
@@ -72,10 +72,10 @@ export default function UserRoleAssignments({
 
   return (
     <section aria-labelledby="assignments-heading" className="mt-12 border-t border-line pt-8">
-      <h2 id="assignments-heading" className="mb-1 text-lg font-bold text-ink">
+      <h2 id="assignments-heading" className="mb-1 text-heading font-semibold text-ink">
         Users
       </h2>
-      <p className="mb-6 text-sm text-muted">
+      <p className="mb-6 text-body text-muted">
         A role with no clinic applies across the whole account. Naming a clinic
         limits it to that clinic only.
       </p>
@@ -83,7 +83,7 @@ export default function UserRoleAssignments({
       {error && (
         <p
           role="alert"
-          className="mb-6 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="mb-6 rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
@@ -93,7 +93,7 @@ export default function UserRoleAssignments({
         {users.map((user) => (
           <li
             key={user.id}
-            className={`rounded-xl border p-5 shadow-neu-raised-sm transition-colors ${
+            className={`rounded-xl border p-5 border border-line shadow-card transition-colors ${
               openUserId === user.id ? "border-line bg-accent-soft/30" : "border-line bg-canvas"
             }`}
           >
@@ -101,16 +101,16 @@ export default function UserRoleAssignments({
               <p className="font-semibold text-ink">
                 {user.name ?? user.email}
                 {user.isSelf && (
-                  <span className="ml-3 rounded-md bg-canvas-deep px-2 py-0.5 text-xs font-medium text-muted">
+                  <span className="ml-3 rounded-lg bg-canvas-deep px-2 py-0.5 text-meta font-medium text-muted">
                     You
                   </span>
                 )}
               </p>
-              <p className="text-sm font-medium text-muted">{user.email}</p>
+              <p className="text-body font-medium text-muted">{user.email}</p>
             </div>
 
             {user.assignments.length === 0 ? (
-              <p className="text-sm text-muted italic">
+              <p className="text-body text-muted italic">
                 No roles. This user can sign in but cannot reach any module.
               </p>
             ) : (
@@ -118,9 +118,9 @@ export default function UserRoleAssignments({
                 {user.assignments.map((assignment) => (
                   <li
                     key={assignment.id}
-                    className="flex items-center gap-3 rounded-md bg-canvas-deep py-1.5 pl-3 pr-1.5"
+                    className="flex items-center gap-3 rounded-lg bg-canvas-deep py-1.5 pl-3 pr-1.5"
                   >
-                    <span className="text-sm font-medium text-ink">
+                    <span className="text-body font-medium text-ink">
                       {assignment.roleName}
                       <span className="text-muted font-normal">
                         {"·"}
@@ -140,7 +140,7 @@ export default function UserRoleAssignments({
                         aria-label={`Remove ${assignment.roleName} in ${
                           assignment.clinicName ?? "all clinics"
                         } from ${user.name ?? user.email}`}
-                        className="min-h-8 rounded-md px-2.5 text-xs font-medium text-muted hover:bg-canvas-deep hover:text-ink transition-colors disabled:opacity-50 ml-2"
+                        className="min-h-8 rounded-lg px-2.5 text-meta font-medium text-muted hover:bg-canvas-deep hover:text-ink transition-colors disabled:opacity-50 ml-2"
                       >
                         {pending === assignment.id ? "…" : "Remove"}
                       </button>
@@ -200,7 +200,7 @@ export default function UserRoleAssignments({
                           user.id,
                         )
                       }
-                      variant="commit"
+                      variant="primary"
                       isBusy={pending === user.id}
                       busyLabel="Assigning…"
                     >

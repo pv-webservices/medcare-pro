@@ -4,6 +4,7 @@ import { CalendarX2, CheckCheck, CheckCircle2, LogIn, UserPlus } from "lucide-re
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button, { type ButtonSize } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import type { AppointmentStatus } from "@/lib/appointmentRules";
 
@@ -33,7 +34,7 @@ import type { AppointmentStatus } from "@/lib/appointmentRules";
  * to it directly. The `can*` props exist so nobody is offered a control that
  * will only refuse them — the courtesy layer on top of the enforcement.
  *
- * "Register Patient" is the only `commit` variant here. Commit colour marks a
+ * "Register patient" is the only `commit` variant here. Commit colour marks a
  * write into a clinic's records, and converting is the one action on this strip
  * that creates one — a Patient, a Patient ID and a Registration. Checking
  * somebody in moves a status; it does not put anything on the register.
@@ -84,6 +85,12 @@ export default function AppointmentActions({
   const router = useRouter();
   const showToast = useToast();
   const [busy, setBusy] = useState<Action | null>(null);
+  /**
+   * Cancelling frees the slot and cannot be undone from this screen, so it is
+   * the one action here that asks first. Everything else on this row moves the
+   * appointment forward and is recoverable by moving it again.
+   */
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false);
 
   const isArrived = status === "CHECKED_IN";
   const isBooked = status === "SCHEDULED";
@@ -139,7 +146,7 @@ export default function AppointmentActions({
             size={size}
             variant="secondary"
             isBusy={busy === "confirm"}
-            busyLabel="Confirming…"
+            busyLabel="Confirming..."
             disabled={busy !== null}
             onClick={() => run("confirm")}
           >
@@ -153,26 +160,26 @@ export default function AppointmentActions({
             size={size}
             variant="secondary"
             isBusy={busy === "check-in"}
-            busyLabel="Checking in…"
+            busyLabel="Checking in..."
             disabled={busy !== null}
             onClick={() => run("check-in")}
           >
             <LogIn aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-            Check In
+            Check in
           </Button>
         )}
 
         {isArrived && canConvert && (
           <Button
             size={size}
-            variant="commit"
+            variant="primary"
             isBusy={busy === "convert"}
-            busyLabel="Registering…"
+            busyLabel="Registering..."
             disabled={busy !== null}
             onClick={() => run("convert")}
           >
             <UserPlus aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-            Register Patient
+            Register patient
           </Button>
         )}
 
@@ -180,32 +187,47 @@ export default function AppointmentActions({
           <>
             <Button
               size={size}
-              variant="quiet"
+              variant="ghost"
               isBusy={busy === "no-show"}
-              busyLabel="Saving…"
+              busyLabel="Saving..."
               disabled={busy !== null}
               onClick={() => run("no-show")}
             >
               <CalendarX2 aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-              Did Not Attend
+              Did not attend
             </Button>
 
             <Button
               size={size}
               variant="danger"
               isBusy={busy === "cancel"}
-              busyLabel="Cancelling…"
+              busyLabel="Cancelling..."
               disabled={busy !== null}
-              onClick={() => run("cancel")}
+              onClick={() => setIsConfirmingCancel(true)}
             >
-              Cancel
+              Cancel appointment
             </Button>
           </>
         )}
       </div>
 
+      <ConfirmDialog
+        isOpen={isConfirmingCancel}
+        onCancel={() => setIsConfirmingCancel(false)}
+        onConfirm={() => {
+          setIsConfirmingCancel(false);
+          void run("cancel");
+        }}
+        title="Cancel this appointment?"
+        body="The slot is released and becomes bookable again. The appointment stays on the record as cancelled."
+        confirmLabel="Cancel appointment"
+        cancelLabel="Keep it"
+        isBusy={busy === "cancel"}
+        busyLabel="Cancelling..."
+      />
+
       {isArrived && canConvert && (
-        <p className="mt-2 text-xs text-muted">
+        <p className="mt-2 text-meta text-muted">
           <CheckCircle2
             aria-hidden="true"
             strokeWidth={1.75}

@@ -3,6 +3,7 @@
 import { CalendarCheck, UserRoundCheck, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { formatAppointmentDate } from "@/components/appointments/status";
 import SlotPicker from "@/components/appointments/SlotPicker";
 import PatientLookup from "@/components/registration/PatientLookup";
 import Button from "@/components/ui/Button";
@@ -130,6 +131,16 @@ function toInstant(date: string, time: string): string {
   return `${date}T${time}:00.000Z`;
 }
 
+/** One labelled fact in the pre-booking summary. */
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-meta font-medium text-muted">{label}</dt>
+      <dd className="mt-0.5 truncate text-body font-medium text-ink">{value}</dd>
+    </div>
+  );
+}
+
 export default function BookingForm({
   clinics,
   doctors,
@@ -175,6 +186,11 @@ export default function BookingForm({
     (service) => service.clinicId === null || service.clinicId === values.clinicId,
   );
   const service = clinicServices.find((s) => s.id === values.appointmentTypeId);
+  /** Named for the pre-booking summary, which reads back what was chosen. */
+  const selectedDoctor = clinicDoctors.find(
+    (doctor) => doctor.id === values.doctorId,
+  );
+  const selectedService = service;
 
   const canAskForSlots = Boolean(
     values.clinicId && values.doctorId && values.appointmentTypeId && values.date,
@@ -372,11 +388,11 @@ export default function BookingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       {formError && (
         <p
           role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-sm font-medium text-alert-ink"
+          className="rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {formError}
         </p>
@@ -447,13 +463,13 @@ export default function BookingForm({
         </div>
 
         {service && (
-          <p className="mt-4 rounded-xl bg-primary-light px-4 py-3 text-sm text-ink">
+          <p className="mt-4 rounded-xl bg-accent-soft px-4 py-3 text-body text-ink">
             <span className="font-semibold">{service.name}</span> runs{""}
-            <span className="font-semibold tabular-nums">
+            <span className="font-semibold tnum">
               {service.durationMinutes}
             </span>{""}
             minutes and is quoted at{""}
-            <span className="font-bold tabular-nums">
+            <span className="font-semibold tnum">
               {formatRupees(service.defaultAmount)}
             </span>
             .
@@ -461,7 +477,7 @@ export default function BookingForm({
         )}
 
         <div className="mt-5">
-          <p className="mb-2 text-sm font-semibold text-ink">Slot</p>
+          <p className="mb-2 text-body font-semibold text-ink">Slot</p>
           <SlotPicker
             result={slots}
             isLoading={isLoadingSlots}
@@ -470,7 +486,7 @@ export default function BookingForm({
             onSelect={handleSlot}
           />
           {errors.slotStart && (
-            <p role="alert" className="mt-2 text-sm font-medium text-alert-ink">
+            <p role="alert" className="mt-2 text-body font-medium text-alert-ink">
               {errors.slotStart}
             </p>
           )}
@@ -491,20 +507,20 @@ export default function BookingForm({
         )}
 
         {values.patientId !== null && (
-          <Card isFlush className="mb-5 border-primary/30 bg-primary-light p-4">
+          <Card isFlush className="mb-5 border-accent/30 bg-accent-soft p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-sm text-ink">
+              <p className="flex items-center gap-2 text-body text-ink">
                 <UserRoundCheck
                   aria-hidden="true"
                   strokeWidth={1.75}
-                  className="h-4 w-4 text-primary"
+                  className="h-4 w-4 text-accent"
                 />
                 Linked to an existing patient record. No new Patient ID will be
                 created.
               </p>
-              <Button size="sm" variant="quiet" onClick={clearPatient}>
+              <Button size="sm" variant="ghost" onClick={clearPatient}>
                 <X aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-                Book for Someone Else
+                Book for someone else
               </Button>
             </div>
           </Card>
@@ -579,18 +595,65 @@ export default function BookingForm({
         </div>
       </Panel>
 
+      {/*
+        THE LAST THING BEFORE COMMITTING. A booking is read back to the desk in
+        one block — day, time, doctor, service, patient — because the fields
+        that produce it are spread over two panels and a slot grid, and the
+        commonest booking error is the right patient in the wrong slot. It
+        renders only once there is something to confirm.
+      */}
+      {(values.slotStart || selectedDoctor || selectedService) && (
+        <Panel
+          title="Check before booking"
+          description="Confirm the slot and the patient, then book."
+        >
+          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <SummaryItem
+              label="Date"
+              value={values.date ? formatAppointmentDate(values.date) : "Not chosen"}
+            />
+            <SummaryItem
+              label="Time"
+              value={
+                values.slotStart
+                  ? `${values.slotStart} to ${values.slotEnd}`
+                  : "No slot chosen"
+              }
+            />
+            <SummaryItem label="Doctor" value={selectedDoctor?.name ?? "Not chosen"} />
+            <SummaryItem
+              label="Service"
+              value={selectedService?.name ?? "Not chosen"}
+            />
+            <SummaryItem label="Patient" value={values.name.trim() || "Not entered"} />
+            <SummaryItem
+              label="Mobile"
+              value={values.mobileNumber.trim() || "Not entered"}
+            />
+            <SummaryItem
+              label="Record"
+              value={
+                values.patientId
+                  ? "Existing patient"
+                  : "New patient - an ID is created on arrival"
+              }
+            />
+          </dl>
+        </Panel>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="submit"
-          variant="commit"
+          variant="primary"
           isBusy={isSaving}
           busyLabel="Booking…"
         >
           <CalendarCheck aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-          Book Appointment
+          Book appointment
         </Button>
 
-        <Button variant="quiet" onClick={() => router.push("/appointments")}>
+        <Button variant="ghost" onClick={() => router.push("/appointments")}>
           Cancel
         </Button>
       </div>

@@ -1,4 +1,3 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AppointmentFilters from "@/components/appointments/AppointmentFilters";
@@ -6,6 +5,7 @@ import AppointmentsTable from "@/components/appointments/AppointmentsTable";
 import { buttonClasses } from "@/components/ui/Button";
 import ModuleLocked from "@/components/ui/ModuleLocked";
 import PageHeader, { Count } from "@/components/ui/PageHeader";
+import Pagination from "@/components/ui/Pagination";
 import {
   appointmentFilterSchema,
   listAppointments,
@@ -142,9 +142,11 @@ export default async function AppointmentBoardPage({
   const lastOnPage = Math.min(result.page * result.pageSize, result.total);
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
         title="Appointments"
+        description="Plan, schedule and manage clinic visits."
+        scope={selectedClinic ? selectedClinic.name : "All clinics"}
         meta={
           <>
             <Count>{result.total}</Count>{""}
@@ -173,9 +175,9 @@ export default async function AppointmentBoardPage({
             {canCreate && (
               <Link
                 href="/appointments/new"
-                className={buttonClasses("commit", "md")}
+                className={buttonClasses("primary", "md")}
               >
-                Book Appointment
+                Book appointment
               </Link>
             )}
           </>
@@ -201,46 +203,15 @@ export default async function AppointmentBoardPage({
         permissions={{ canCheckIn, canConvert, canCancel, canConfirm, canCreate }}
       />
 
-      {lastPage > 1 && (
-        <nav
-          aria-label="Appointment pages"
-          className="mt-4 flex flex-wrap items-center justify-between gap-3"
-        >
-          <p className="text-label text-muted">
-            Showing <Count>{firstOnPage}</Count>–<Count>{lastOnPage}</Count> of{""}
-            <Count>{result.total}</Count>
-          </p>
-
-          <div className="flex gap-2">
-            {result.page > 1 && (
-              <Link
-                href={pageHref(params, result.page - 1)}
-                className={buttonClasses("secondary", "md")}
-              >
-                <ChevronLeft
-                  aria-hidden="true"
-                  strokeWidth={1.75}
-                  className="h-4 w-4"
-                />
-                Previous
-              </Link>
-            )}
-            {result.page < lastPage && (
-              <Link
-                href={pageHref(params, result.page + 1)}
-                className={buttonClasses("secondary", "md")}
-              >
-                Next
-                <ChevronRight
-                  aria-hidden="true"
-                  strokeWidth={1.75}
-                  className="h-4 w-4"
-                />
-              </Link>
-            )}
-          </div>
-        </nav>
-      )}
+      <Pagination
+        page={result.page}
+        lastPage={lastPage}
+        total={result.total}
+        firstOnPage={firstOnPage}
+        lastOnPage={lastOnPage}
+        hrefFor={(page) => pageHref(params, page)}
+        label="Appointment pages"
+      />
     </section>
   );
 }

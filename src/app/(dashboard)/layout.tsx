@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Bell, Plus, Search, Settings } from "lucide-react";
+import { Bell, CalendarPlus, UserPlus } from "lucide-react";
+import BrandMark from "@/components/dashboard/BrandMark";
+import ClinicSwitcher from "@/components/dashboard/ClinicSwitcher";
+import CommandPalette, {
+  type PaletteAction,
+} from "@/components/dashboard/CommandPalette";
 import DashboardNav from "@/components/dashboard/DashboardNav";
 import MobileNav from "@/components/dashboard/MobileNav";
-import ClinicSwitcher from "@/components/dashboard/ClinicSwitcher";
-import SignOutButton from "@/components/dashboard/SignOutButton";
-import ThemeSwitcher from "@/components/ThemeSwitcher";
-import { Avatar, ToastProvider, buttonClasses } from "@/components/ui";
+import UserMenu from "@/components/dashboard/UserMenu";
+import { ToastProvider } from "@/components/ui";
 import { listClinicsForActor } from "@/lib/clinics";
 import { resolveModulesForActor } from "@/lib/features";
 import { visibleNavLinks } from "@/lib/navigation";
@@ -18,18 +21,22 @@ import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
 /**
- * Shared shell for all signed-in pages — sidebar nav plus the FR-2.3 clinic
- * switcher.
+ * The shell every signed-in page renders inside.
+ *
+ * THREE PARTS, EACH WITH ONE JOB. The sidebar answers "what is in this
+ * product"; the header answers "whose data am I looking at, and who am I"; the
+ * canvas is the page. Nothing is duplicated between them — the clinic switcher
+ * lives in the header only, navigation in the sidebar only — because a control
+ * that appears twice is a control the reader has to check twice.
+ *
+ * THE SIDEBAR IS A FIXED COLUMN, NOT A SCROLLING ONE. It stays put while the
+ * page scrolls, and its own list scrolls independently when a role sees every
+ * module. On a long registrations table, navigation that scrolls away is
+ * navigation the user has to scroll back up to reach.
  *
  * Route protection itself lives in src/middleware.ts (FR-1.2); the
  * `requireActor` call here is the backstop for a session that expires between
  * the middleware check and the render.
- *
- * THE SIDEBAR FLOATS. It is a raised panel inset from the window on all four
- * sides rather than a full-bleed column with a dividing border, because a
- * border is exactly the thing this design language does not have. The canvas
- * runs behind it, which is what makes the panel read as an object resting on
- * the page.
  */
 
 interface DashboardLayoutProps {
@@ -60,7 +67,7 @@ function signedOutDestination(error: UnauthenticatedError): string {
  * all it can do — it cannot write a Set-Cookie header. The refused JWT therefore
  * survived every refusal and kept telling src/middleware.ts, which can only
  * decode the token, that the visitor was signed in. A user in that state who
- * clicked "Sign up" on the login screen went /signup → /dashboard → refused →
+ * clicked "Sign up" on the login screen went /signup -> /dashboard -> refused ->
  * /login?ended=1, three redirects that read as the page simply not navigating.
  *
  * /api/auth/session-ended is a Route Handler, which CAN write cookies. It clears
@@ -72,22 +79,6 @@ function signedOutDestination(error: UnauthenticatedError): string {
 function signedOutRedirect(error: UnauthenticatedError): string {
   const destination = signedOutDestination(error);
   return `/api/auth/session-ended?to=${encodeURIComponent(destination)}`;
-}
-
-/**
- * The greeting is cosmetic, so it is derived from the SERVER's clock and may be
- * an hour or two off for a clinic in another timezone. That is an acceptable
- * trade for not shipping a client component purely to say "good afternoon";
- * nothing downstream depends on it.
- */
-function greetingFor(hour: number): string {
-  if (hour < 12) {
-    return "Good morning";
-  }
-  if (hour < 17) {
-    return "Good afternoon";
-  }
-  return "Good evening";
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -102,15 +93,6 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       // is the database check behind it. The middleware only sees the token, so
       // it bounces a "signed in" user off /login and straight back here: plain
       // `redirect("/login")` is an infinite loop for exactly these cases.
-      //
-      //   platform-tenant  an Owner, who has their own surface (Stage 2)
-      //   tenant           their organisation is pending, suspended or rejected
-      //                    — /pending-approval explains which, and the
-      //                    middleware does not bounce anyone off it
-      //   anything else    the session itself is gone, revoked or expired, or
-      //                    the refusal is personal. `ended=1` tells the
-      //                    middleware to let the login screen render even
-      //                    though a token is present.
       redirect(signedOutRedirect(error));
     }
     throw error;
@@ -120,17 +102,18 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   // `countUnreadForActor` returns 0 rather than throwing for a Staff user, so
   // the shell renders the same for everyone — only the badge differs.
   const selectedClinicId = await resolveSelectedClinicId(actor);
-  const [clinics, unreadNotifications, held, modules, currentUser, roleName] = await Promise.all([
-    listClinicsForActor(actor),
-    countUnreadForActor(actor),
-    permissionsHeldAnywhere(actor),
-    resolveModulesForActor(actor),
-    prisma.user.findFirst({
-      where: { id: actor.userId, tenantId: actor.tenantId },
-      select: { name: true },
-    }),
-    resolveRoleNameAtTime(actor, selectedClinicId ?? undefined),
-  ]);
+  const [clinics, unreadNotifications, held, modules, currentUser, roleName] =
+    await Promise.all([
+      listClinicsForActor(actor),
+      countUnreadForActor(actor),
+      permissionsHeldAnywhere(actor),
+      resolveModulesForActor(actor),
+      prisma.user.findFirst({
+        where: { id: actor.userId, tenantId: actor.tenantId },
+        select: { name: true },
+      }),
+      resolveRoleNameAtTime(actor, selectedClinicId ?? undefined),
+    ]);
 
   const userName = currentUser?.name ?? "Admin User";
 
@@ -138,178 +121,147 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   // and refused, and Stage 8 adds the same courtesy for a module the
   // organisation or the role does not have. The pages behind them still enforce
   // both checks — see the note in src/lib/navigation.ts.
+  const holdsPermission = (permission: string) => holdsAnywhere(held, permission);
   const links = visibleNavLinks(
-    (permission) => holdsAnywhere(held, permission),
+    holdsPermission,
     // A key missing from the map means the catalogue row is missing, which
     // lib/features.ts already treats as a denial and logs. Hiding the tab keeps
     // the shell consistent with the page behind it.
     (feature) => modules.get(feature)?.allowed === true,
   );
 
-  // No extra query: the switcher's own list already carries every clinic's
-  // branding. "All clinics" leaves themeColor undefined, which resolveAccent
-  // answers with the house teal.
-  const activeClinic = clinics.find((clinic) => clinic.id === selectedClinicId) ?? (clinics.length === 1 ? clinics[0] : null);
-  const displayName = activeClinic?.name ?? userName;
+  /**
+   * The palette's quick actions, gated by the same permission AND the same
+   * module switch as the pages they lead to. An action offered here that the
+   * destination would refuse is a worse experience than no action at all.
+   */
+  const quickActions: PaletteAction[] = [
+    {
+      href: "/appointments/new",
+      label: "Book an appointment",
+      hint: "Schedule a visit",
+      permission: "appointment:create",
+      feature: "appointments",
+    },
+    {
+      href: "/registration/new",
+      label: "New registration",
+      hint: "Register a patient visit",
+      permission: "registration:create",
+      feature: "registrations",
+    },
+  ]
+    .filter(
+      (action) =>
+        holdsPermission(action.permission) &&
+        modules.get(action.feature)?.allowed === true,
+    )
+    .map(({ href, label, hint }) => ({ href, label, hint }));
 
-  const greeting = greetingFor(new Date().getHours());
+  const activeClinic =
+    clinics.find((clinic) => clinic.id === selectedClinicId) ?? null;
+  const scopeLabel = activeClinic?.name ?? "All clinics";
+
+  const switcherClinics = clinics.map(({ id, name, city, logoUrl }) => ({
+    id,
+    name,
+    city,
+    logoUrl,
+  }));
 
   return (
-    <div className="flex min-h-screen gap-0 bg-canvas p-4">
-      {/*
-        Sticky rather than fixed, so the panel scrolls with a short page but
-        stays put on a long one without the content needing a left margin.
-      */}
-      <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-[270px] shrink-0 flex-col rounded-4xl bg-canvas p-5 shadow-neu-raised lg:flex">
-        <div className="mb-6 flex items-center gap-3 px-1">
-          <span
-            aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-ink shadow-neu-accent"
-          >
-            <Plus strokeWidth={3} className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <div className="truncate text-section font-extrabold leading-none text-ink">
-              MedCare Pro
-            </div>
-            <div className="mt-1 text-micro font-semibold uppercase text-muted">
-              Clinic CRM
-            </div>
-          </div>
+    <div className="flex min-h-screen bg-app">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[268px] shrink-0 flex-col border-r border-line bg-canvas lg:flex">
+        <div className="px-4 py-4">
+          <BrandMark />
         </div>
 
-        <div className="-mx-1 flex-1 space-y-6 overflow-y-auto px-1 pb-2">
-          {clinics.length > 1 && (
-            <ClinicSwitcher
-              clinics={clinics.map(({ id, name }) => ({ id, name }))}
-              selectedClinicId={selectedClinicId}
-            />
-          )}
-
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
           <DashboardNav links={links} unreadNotifications={unreadNotifications} />
         </div>
 
         {/*
-          The support card is the one piece of chrome that is allowed to be
-          warm. Everything above it is a tool; this is the reminder that a
-          person is behind it.
+          A quiet reminder of the scope the sidebar's links will open into. The
+          switcher itself is in the header; repeating the control here would give
+          the reader two places to change one thing.
         */}
-        <div className="mt-4 space-y-4">
-          <div className="rounded-3xl bg-canvas p-4 shadow-neu-raised-sm">
-            <p className="text-label font-bold text-ink">Need a hand?</p>
-            <p className="mt-1 text-meta font-medium leading-relaxed text-muted">
-              Our team can walk you through any screen.
-            </p>
-            <Link
-              href="/settings"
-              className={buttonClasses("commit", "sm", "mt-3 w-full")}
-            >
-              Get support
-            </Link>
-          </div>
-
-          <ThemeSwitcher />
-          <SignOutButton />
+        <div className="border-t border-line px-4 py-3">
+          <p className="text-micro font-semibold uppercase text-faint">Viewing</p>
+          <p className="mt-1 truncate text-label font-medium text-ink">
+            {scopeLabel}
+          </p>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/*
-          The sidebar beside this column is `hidden lg:flex`, so below that
-          breakpoint it is the ONLY navigation and it is not on screen. This is
-          the replacement for those widths — see the note in MobileNav.tsx for
-          what its absence did. It takes the same already-filtered `links`, so
-          the two surfaces cannot offer different tabs.
-        */}
-        <MobileNav links={links} unreadNotifications={unreadNotifications} />
-
-        <header className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-7 md:py-6">
-          <div className="min-w-0">
-            <h2 className="truncate text-title font-extrabold text-ink">
-              {greeting}, {userName}
-            </h2>
-            <p className="mt-1 text-label font-medium text-muted">
-              Here&apos;s what&apos;s happening across your clinic today.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-[268px]">
+        <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
+          <div className="mx-auto flex w-full max-w-[1500px] items-center gap-3 px-4 py-3 md:px-6 xl:px-8">
             {/*
-              PRESENTATIONAL FOR NOW. There is no search endpoint behind this —
-              it is the reference design's chrome, and it stays inert until a
-              search route exists to point it at. It is a real input rather than
-              a picture of one so that wiring it up later is a one-line change.
+              Below `lg` the sidebar is not on screen, so the drawer and the
+              wordmark stand in for it. They take the same already-filtered
+              `links`, so the two surfaces cannot offer different tabs.
             */}
-            <div className="relative hidden xl:block">
-              <Search
-                aria-hidden="true"
-                strokeWidth={2}
-                className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
-              />
-              <input
-                type="search"
-                aria-label="Search"
-                placeholder="Search anything…"
-                className="h-11 w-72 rounded-2xl border-0 bg-canvas pl-11 pr-4 text-body text-ink shadow-neu-inset placeholder:text-faint"
+            <MobileNav
+              links={links}
+              unreadNotifications={unreadNotifications}
+              clinics={switcherClinics}
+              selectedClinicId={selectedClinicId}
+              userName={userName}
+              roleName={roleName}
+            />
+
+            <div className="min-w-0 flex-1 lg:max-w-[17rem]">
+              <ClinicSwitcher
+                clinics={switcherClinics}
+                selectedClinicId={selectedClinicId}
               />
             </div>
 
-            <Link
-              href="/notifications"
-              aria-label={
-                unreadNotifications > 0
-                  ? `Notifications, ${unreadNotifications} unread`
-                  : "Notifications"
-              }
-              className="relative flex h-11 w-11 items-center justify-center rounded-full bg-canvas text-muted shadow-neu-raised-sm transition-shadow duration-200 hover:text-ink hover:shadow-neu-raised active:shadow-neu-pressed"
-            >
-              <Bell aria-hidden="true" strokeWidth={2} className="h-5 w-5" />
-              {unreadNotifications > 0 && (
-                <span
-                  aria-hidden="true"
-                  className="absolute right-3 top-3 h-2 w-2 rounded-full bg-accent ring-2 ring-canvas"
-                />
-              )}
-            </Link>
+            <div className="ml-auto hidden flex-1 justify-center md:flex">
+              <CommandPalette links={links} actions={quickActions} />
+            </div>
 
-            <Link
-              href="/settings"
-              aria-label="Settings"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-canvas text-muted shadow-neu-raised-sm transition-shadow duration-200 hover:text-ink hover:shadow-neu-raised active:shadow-neu-pressed"
-            >
-              <Settings aria-hidden="true" strokeWidth={2} className="h-5 w-5" />
-            </Link>
-
-            {/*
-              The clinic's own logo wins over initials when it is set — that is
-              FR-8.4 branding, and it is the fastest way for someone covering
-              two clinics to see which one they are looking at.
-            */}
-            <div className="flex items-center gap-3">
-              {activeClinic?.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={activeClinic.logoUrl}
-                  alt={`${displayName} logo`}
-                  className="h-10 w-10 shrink-0 rounded-full object-cover shadow-neu-raised-sm"
-                />
-              ) : (
-                <Avatar name={displayName} isRaised />
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 md:ml-0">
+              {quickActions.length > 0 && (
+                <Link
+                  href={quickActions[0]!.href}
+                  aria-label={quickActions[0]!.label}
+                  title={quickActions[0]!.label}
+                  className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink sm:flex"
+                >
+                  {quickActions[0]!.href === "/appointments/new" ? (
+                    <CalendarPlus aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
+                  ) : (
+                    <UserPlus aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
+                  )}
+                </Link>
               )}
-              <div className="hidden min-w-0 md:block">
-                <p className="truncate text-label font-bold text-ink">
-                  {displayName}
-                </p>
-                <p className="truncate text-meta font-medium capitalize text-muted">
-                  {roleName}
-                </p>
-              </div>
+
+              <Link
+                href="/notifications"
+                aria-label={
+                  unreadNotifications > 0
+                    ? `Notifications, ${unreadNotifications} unread`
+                    : "Notifications"
+                }
+                className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
+              >
+                <Bell aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
+                {unreadNotifications > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent ring-2 ring-canvas"
+                  />
+                )}
+              </Link>
+
+              <UserMenu name={userName} role={roleName} scopeLabel={scopeLabel} />
             </div>
           </div>
         </header>
 
-        <main className="flex-1 px-4 pb-8 md:px-7">
-          <div className="mx-auto w-full max-w-[1440px]">
+        <main className="flex-1 px-4 pb-10 pt-5 md:px-6 md:pt-6 xl:px-8">
+          <div className="mx-auto w-full max-w-[1500px]">
             <ToastProvider>{children}</ToastProvider>
           </div>
         </main>

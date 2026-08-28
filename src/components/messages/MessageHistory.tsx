@@ -32,9 +32,9 @@ function formatTimestamp(value: Date): string {
 export default function MessageHistory({ messages }: MessageHistoryProps) {
   if (messages.length === 0) {
     return (
-      <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+      <div className="rounded-3xl border border-line bg-canvas px-6 py-10 text-center shadow-card">
         <p className="mb-1 font-semibold text-ink">No messages sent yet</p>
-        <p className="text-sm text-muted">
+        <p className="text-body text-muted">
           Messages you send to patients appear here with their result.
         </p>
       </div>
@@ -44,7 +44,7 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
   return (
     <div>
       <Card isFlush>
-        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[640px] border-collapse text-left text-body">
           <thead>
             <tr className="border-b border-line bg-canvas-deep/50">
               <th scope="col" className="py-3 pl-4 pr-3 font-semibold text-ink">
@@ -75,7 +75,7 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
                   <span className="text-muted">
                     {message.patientCode}
                   </span>
-                  <span className="block tabular-nums text-muted">
+                  <span className="block tnum text-muted">
                     {message.mobileNumber}
                   </span>
                 </td>
@@ -83,12 +83,12 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
                 <td className="py-3 pr-3 text-ink">{message.clinicName}</td>
                 <td className="py-3 pr-3">
                   {message.status === "sent" ? (
-                    <span className="inline-flex items-center rounded-md bg-ok-bg px-2 py-1 text-xs font-medium text-ok-ink ring-1 ring-inset ring-ok-mark/30">Accepted</span>
+                    <span className="inline-flex items-center rounded-lg bg-ok-bg px-2 py-1 text-meta font-medium text-ok-ink ring-1 ring-inset ring-ok-mark/30">Accepted</span>
                   ) : (
                     <>
                       {/* Red is reserved for things needing action — a failed
                           send is exactly that. */}
-                      <span className="inline-flex items-center rounded-md bg-alert-bg px-2 py-1 text-xs font-medium text-alert-ink ring-1 ring-inset ring-alert-mark/30">
+                      <span className="inline-flex items-center rounded-lg bg-alert-bg px-2 py-1 text-meta font-medium text-alert-ink ring-1 ring-inset ring-alert-mark/30">
                         Failed
                       </span>
                       {message.failureReason && (
@@ -99,7 +99,7 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
                     </>
                   )}
                 </td>
-                <td className="py-3 pr-4 tabular-nums text-muted">
+                <td className="py-3 pr-4 tnum text-muted">
                   {formatTimestamp(message.sentAt)}
                 </td>
               </tr>
@@ -108,7 +108,7 @@ export default function MessageHistory({ messages }: MessageHistoryProps) {
         </table>
       </Card>
 
-      <p className="mt-4 text-xs text-muted max-w-3xl">
+      <p className="mt-4 text-meta text-muted max-w-3xl">
         &ldquo;Accepted&rdquo; means the WhatsApp gateway took the message. This
         provider does not report back delivered or read receipts, so no further
         status is available.

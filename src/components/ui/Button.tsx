@@ -1,67 +1,71 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { cx } from "@/components/ui/cx";
 
 /**
- * The unified button for the application.
+ * The one button in this application.
  *
- * DEPTH CARRIES THE HIERARCHY, not colour weight. `commit` is a solid accent
- * fill that casts a coloured shadow — it is the only thing on a screen that
- * floats above the surface, so the eye finds the affirmative action without
- * reading a word. `secondary` is the same colour as the page and merely raised,
- * which is what "an object you may press" looks like here. `quiet` is flush
- * with the surface until you point at it.
+ * COLOUR CARRIES THE HIERARCHY, and only one thing per screen gets it. `primary`
+ * is a solid accent fill casting a coloured shadow — the single most findable
+ * object on a page. Everything else is `secondary` (a white surface with a
+ * hairline) or `ghost` (nothing until you point at it). If a screen has two
+ * primaries, one of them is wrong.
  *
- * Every variant presses IN on :active. That is the whole promise of the style:
- * a control that looks physical has to behave physically, and a button that
- * stays raised while held reads as broken.
+ * `danger` is NOT a red fill. On screens where Delete sits beside Save, a solid
+ * red button is the loudest thing in the room and draws the eye to the action
+ * nobody should take by accident. The red lives in the label and in the border,
+ * where it is read at the moment of deciding. `dangerSolid` exists for the
+ * confirm button inside a confirmation dialog, where the destructive action IS
+ * the primary action of that surface.
  *
- * `commit` is the variant that writes a record. `buttonClasses` is exported so
- * a `<Link>` that behaves like a button can wear the same clothes without a
- * second implementation.
+ * BUSY IS A STATE, NOT A RELABELLED DISABLED BUTTON. `isBusy` disables the
+ * control, sets `aria-busy`, spins a mark and swaps the label, so a screen
+ * reader hears "Saving" rather than watching a silent button do nothing.
+ *
+ * `buttonClasses` is exported so a `<Link>` that is genuinely the primary action
+ * of a screen can wear the same clothes without a second implementation.
  */
 
-export type ButtonVariant = "commit" | "primary" | "secondary" | "quiet" | "danger";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "dangerSolid"
+  /** @deprecated aliases of `primary` / `ghost`, kept while call sites migrate. */
+  | "commit"
+  | "quiet";
+
 export type ButtonSize = "md" | "sm";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-2xl font-semibold" +
-  "transition-[box-shadow,background-color,color] duration-200" +
-  "disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none";
+  "inline-flex items-center justify-center gap-2 rounded-2xl font-semibold whitespace-nowrap " +
+  "transition-[background-color,box-shadow,color,border-color,transform] duration-[180ms] " +
+  "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55 disabled:active:translate-y-0";
 
-/** 44px minimum — this is used on a shared tablet at a front desk. */
+/** 44px is the front-desk tablet minimum; `sm` is for dense table rows only. */
 const SIZES: Record<ButtonSize, string> = {
-  md: "min-h-11 px-5 text-body",
-  sm: "min-h-9 px-4 text-meta",
+  md: "min-h-11 px-4 text-body",
+  sm: "min-h-9 px-3 text-label",
 };
 
-/*
- * `primary` is an alias of `commit` rather than a second look. The two were
- * distinct in the old flat system (violet against near-black); with one accent
- * there is nothing left to distinguish them, and inventing a difference would
- * give two names to one meaning. Nothing in the app passes `primary` today.
- */
-const AFFIRMATIVE =
-  "bg-accent text-accent-ink shadow-neu-accent hover:bg-accent-strong" +
-  "active:shadow-neu-accent-pressed";
+const PRIMARY =
+  "border border-transparent bg-accent text-accent-ink shadow-cta hover:bg-accent-strong disabled:shadow-none";
+
+const GHOST =
+  "border border-transparent bg-transparent text-muted hover:bg-canvas-deep hover:text-ink";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  commit: AFFIRMATIVE,
-  primary: AFFIRMATIVE,
+  primary: PRIMARY,
+  commit: PRIMARY,
   secondary:
-    "bg-canvas text-ink shadow-neu-raised-sm hover:shadow-neu-raised" +
-    "active:shadow-neu-pressed",
-  quiet:
-    "bg-transparent text-muted hover:text-ink hover:shadow-neu-raised-sm" +
-    "active:shadow-neu-pressed",
-  /*
-   * Destructive stays a raised surface rather than a red fill. A solid red
-   * button is the loudest object on the page, and on screens where Delete sits
-   * beside Save that is the wrong thing to draw the eye. The red lives in the
-   * label, where it is read at the moment of deciding.
-   */
+    "border border-line bg-canvas text-ink shadow-card hover:border-line-strong hover:bg-canvas-deep",
+  ghost: GHOST,
+  quiet: GHOST,
   danger:
-    "bg-canvas text-alert-ink shadow-neu-raised-sm hover:shadow-neu-raised" +
-    "hover:text-alert-mark active:shadow-neu-pressed",
+    "border border-line bg-canvas text-alert-ink shadow-card hover:border-alert-line hover:bg-alert-bg",
+  dangerSolid:
+    "border border-transparent bg-alert-mark text-white shadow-card hover:bg-alert-ink",
 };
 
 export function buttonClasses(
@@ -100,6 +104,13 @@ export default function Button({
       className={buttonClasses(variant, size, className)}
       {...rest}
     >
+      {isBusy && (
+        <Loader2
+          aria-hidden="true"
+          strokeWidth={2.5}
+          className={cx("animate-spin", size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4")}
+        />
+      )}
       {isBusy && busyLabel ? busyLabel : children}
     </button>
   );

@@ -2,14 +2,17 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
 
 /**
- * A raised surface on the page canvas. No header, no padding opinions — this is
- * the box. `Panel` is the version with a title bar; use that when the container
- * needs to announce itself.
+ * A white surface on the page canvas: hairline, 18px radius, low shadow.
  *
- * THE CARD IS THE SAME COLOUR AS THE PAGE. It has no border and no fill of its
- * own; the paired shadow is the entire separation. Adding `bg-white` or a
- * border at a call site does not make the card clearer, it drops a different
- * design language into the middle of this one.
+ * `Panel` is the version with a title bar; use that when the container has to
+ * announce itself. This is the plain box.
+ *
+ * CARDS ARE NOT FOR EVERYTHING. They are for KPIs, summaries, analytics, grouped
+ * settings and contextual information — things that are genuinely one object. A
+ * long data list is not one object: it goes in a `Table`, which is its own
+ * surface. Nesting a card inside a card inside a card is the failure mode this
+ * note exists to prevent; if the inner thing needs separating, use space or a
+ * hairline, not a third surface.
  */
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
@@ -33,9 +36,9 @@ export default function Card({
   return (
     <div
       className={cx(
-        "rounded-3xl bg-canvas shadow-neu-raised",
-        isInteractive && "neu-lift",
-        !isFlush && "p-6",
+        "rounded-3xl border border-line bg-canvas shadow-card",
+        isInteractive && "lift hover:border-line-strong",
+        !isFlush && "p-5",
         className,
       )}
       {...rest}

@@ -4,15 +4,16 @@ import { useState } from "react";
 import AppointmentTypeForm, {
   type ClinicOption,
 } from "@/components/appointments/AppointmentTypeForm";
+import { Plus } from "lucide-react";
 import Button from "@/components/ui/Button";
-import Panel from "@/components/ui/Panel";
+import Drawer from "@/components/ui/Drawer";
 
 /**
- * The "Add Service" control on the price list — AP-7.
+ * The "Add service" control on the price list — AP-7.
  *
- * Collapsed by default, the same shape as AddDoctorPanel: the list is what the
- * reader came for, and a form standing open above it pushes the thing they are
- * checking off the screen.
+ * A DRAWER, the same shape as AddDoctorPanel. The price list is what the reader
+ * came for, and a form standing open above it pushes the row they are checking
+ * off the screen. The drawer leaves the list in place and takes focus.
  */
 
 interface AddServicePanelProps {
@@ -31,34 +32,32 @@ export default function AddServicePanel({
   // this only bites someone who is scoped to clinics and has none.
   if (clinics.length === 0 && !canScopeTenantWide) {
     return (
-      <p className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+      <p className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
         Add a clinic before adding services — every service is offered at one,
         or at all of them.
       </p>
     );
   }
 
-  if (!isOpen) {
-    return (
-      <div className="flex">
-        <Button variant="commit" onClick={() => setIsOpen(true)}>
-          Add Service
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <Panel
-      title="Add a service"
-      description="Its length divides the doctor's day into slots, and its price is what the desk quotes at booking."
-      className="max-w-3xl"
-    >
-      <AppointmentTypeForm
-        clinics={clinics}
-        canScopeTenantWide={canScopeTenantWide}
-        onCancel={() => setIsOpen(false)}
-      />
-    </Panel>
+    <>
+      <Button variant="primary" onClick={() => setIsOpen(true)}>
+        <Plus aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
+        Add service
+      </Button>
+
+      <Drawer
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title="Add a service"
+        description="Its length divides the doctor's day into slots, and its price is what the desk quotes at booking."
+      >
+        <AppointmentTypeForm
+          clinics={clinics}
+          canScopeTenantWide={canScopeTenantWide}
+          onCancel={() => setIsOpen(false)}
+        />
+      </Drawer>
+    </>
   );
 }

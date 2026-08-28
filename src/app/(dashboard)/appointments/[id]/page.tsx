@@ -61,7 +61,7 @@ function Fact({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+      <p className="text-meta font-semibold uppercase tracking-wider text-muted">
         {label}
       </p>
       <div className="mt-1 text-ink">{children}</div>
@@ -160,18 +160,21 @@ export default async function AppointmentDetailPage({
   const doctors = await listDoctorsForActor(actor, { clinicId });
 
   return (
-    <section className="mx-auto w-full max-w-[1100px] animate-in fade-in duration-500 space-y-5">
+    <section className="mx-auto w-full max-w-4xl space-y-5">
       <PageHeader
         title={appointment.name}
-        back={{ href: "/appointments", label: "Back to appointments" }}
+        breadcrumbs={[
+          { label: "Appointments", href: "/appointments" },
+          { label: appointment.name },
+        ]}
         meta={
           <>
             {formatAppointmentDate(appointment.date)} at{""}
-            <span className="font-bold tabular-nums text-ink">
+            <span className="tnum font-semibold text-ink">
               {appointment.startTime}
             </span>
             {"–"}
-            <span className="tabular-nums">{appointment.endTime}</span>
+            <span className="tnum">{appointment.endTime}</span>
             {"·"}
             {appointment.clinicName}
           </>
@@ -186,9 +189,9 @@ export default async function AppointmentDetailPage({
       {/* The visit this became. First, because on a converted appointment it is
           the thing the desk came here to find. */}
       {appointment.registration && (
-        <Card isFlush className="border-line bg-ok-bg p-4">
+        <Card isFlush className="border-ok-line bg-ok-bg p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="flex items-center gap-2 text-sm text-ok-ink">
+            <p className="flex items-center gap-2 text-body text-ok-ink">
               <ClipboardList
                 aria-hidden="true"
                 strokeWidth={1.75}
@@ -204,7 +207,7 @@ export default async function AppointmentDetailPage({
                 href={`/registration/${appointment.registration.id}`}
                 className={buttonClasses("secondary", "sm")}
               >
-                Open Registration
+                Open registration
                 <ArrowRight
                   aria-hidden="true"
                   strokeWidth={1.75}
@@ -220,14 +223,14 @@ export default async function AppointmentDetailPage({
       {appointment.rescheduledToId && (
         <Card isFlush className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted">
+            <p className="text-body text-muted">
               This booking was moved. The live one is on another slot.
             </p>
             <Link
               href={`/appointments/${appointment.rescheduledToId}`}
               className={buttonClasses("secondary", "sm")}
             >
-              Open the New Appointment
+              Open the new appointment
               <ArrowRight
                 aria-hidden="true"
                 strokeWidth={1.75}
@@ -278,20 +281,20 @@ export default async function AppointmentDetailPage({
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <Fact label="Doctor">
             {appointment.doctorName}
-            <p className="mt-0.5 text-sm text-muted">
+            <p className="mt-0.5 text-body text-muted">
               {appointment.doctorDepartment}
             </p>
           </Fact>
 
           <Fact label="Service">
             {appointment.appointmentTypeName}
-            <p className="mt-0.5 text-sm tabular-nums text-muted">
+            <p className="mt-0.5 text-body tnum text-muted">
               {appointment.durationMinutes} minutes
             </p>
           </Fact>
 
           <Fact label="Amount quoted">
-            <span className="font-bold tabular-nums">
+            <span className="font-semibold tnum">
               {formatRupees(appointment.amount)}
             </span>
           </Fact>
@@ -304,7 +307,7 @@ export default async function AppointmentDetailPage({
 
           {appointment.checkedInAt && (
             <Fact label="Arrived">
-              <span className="tabular-nums">
+              <span className="tnum">
                 {new Date(appointment.checkedInAt).toLocaleString(undefined, {
                   day: "numeric",
                   month: "short",
@@ -313,7 +316,7 @@ export default async function AppointmentDetailPage({
                 })}
               </span>
               {appointment.checkedInByName && (
-                <p className="mt-0.5 text-sm text-muted">
+                <p className="mt-0.5 text-body text-muted">
                   Recorded by {appointment.checkedInByName}
                 </p>
               )}
@@ -322,7 +325,7 @@ export default async function AppointmentDetailPage({
 
           {appointment.cancelledAt && (
             <Fact label="Cancelled">
-              <span className="tabular-nums">
+              <span className="tnum">
                 {new Date(appointment.cancelledAt).toLocaleString(undefined, {
                   day: "numeric",
                   month: "short",
@@ -331,12 +334,12 @@ export default async function AppointmentDetailPage({
                 })}
               </span>
               {appointment.cancelledByName && (
-                <p className="mt-0.5 text-sm text-muted">
+                <p className="mt-0.5 text-body text-muted">
                   By {appointment.cancelledByName}
                 </p>
               )}
               {appointment.cancellationReason && (
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-body text-muted">
                   {appointment.cancellationReason}
                 </p>
               )}
@@ -357,7 +360,7 @@ export default async function AppointmentDetailPage({
           <Fact label="Name">{appointment.name}</Fact>
 
           <Fact label="Mobile number">
-            <span className="tabular-nums">{appointment.mobileNumber}</span>
+            <span className="tnum">{appointment.mobileNumber}</span>
           </Fact>
 
           <Fact label="Patient ID">
@@ -374,7 +377,7 @@ export default async function AppointmentDetailPage({
             {appointment.age === null ? (
               <NotSet />
             ) : (
-              <span className="tabular-nums">{appointment.age}</span>
+              <span className="tnum">{appointment.age}</span>
             )}
           </Fact>
 

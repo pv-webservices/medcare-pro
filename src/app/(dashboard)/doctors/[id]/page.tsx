@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import DoctorProfile from "@/components/doctors/DoctorProfile";
 import { todayDateOnly } from "@/lib/dates";
@@ -48,7 +47,7 @@ export default async function DoctorDetailPage({ params }: DoctorDetailPageProps
   const canEdit = await can(actor, "doctor:edit", doctor.clinicId);
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <DoctorProfile
         doctor={doctor}
         canEdit={canEdit}

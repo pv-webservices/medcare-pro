@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import ClinicDetail from "@/components/clinics/ClinicDetail";
 import { getClinicForActor } from "@/lib/clinics";
@@ -47,7 +46,7 @@ export default async function ClinicDetailPage({ params }: ClinicDetailPageProps
   const canEdit = await can(actor, "clinic:edit", clinic.id);
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <ClinicDetail clinic={clinic} canEdit={canEdit} />
     </section>
   );

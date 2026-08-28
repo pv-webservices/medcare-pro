@@ -18,9 +18,9 @@ import {
  *   global      — nobody. It is ours, and there is nothing for them to do.
  *
  * A single generic sentence would leave a receptionist filing a ticket about
- * something their own admin could fix in ten seconds. The messages stop short
- * of anything internal: no plan key, no feature key, no mention of other
- * tenants or of why a platform switch is down.
+ * something their own admin could fix in ten seconds. The messages stop short of
+ * anything internal: no plan key, no feature key, no mention of other tenants or
+ * of why a platform switch is down.
  *
  * This renders INSTEAD of the page, having already been refused server-side. It
  * is not what enforces anything — see requireModule in lib/features.ts.
@@ -34,28 +34,30 @@ interface ModuleLockedProps {
 
 export default function ModuleLocked({ title, reason }: ModuleLockedProps) {
   return (
-    <section className="mx-auto w-full max-w-[1440px]">
+    <section>
       <PageHeader title={title} />
 
-      <div className="rounded-3xl bg-canvas px-6 py-12 text-center shadow-neu-raised">
-        {/*
-          A sunken tile, not a raised one. The lock is the one thing on this
-          screen the reader definitively cannot act on, and every raised surface
-          in this design means the opposite.
-        */}
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-canvas shadow-neu-inset">
-          <Lock aria-hidden="true" strokeWidth={2} className="h-6 w-6 text-muted" />
+      <div className="rounded-3xl border border-line bg-canvas px-6 py-14 text-center shadow-card">
+        <div
+          aria-hidden="true"
+          className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-line bg-canvas-deep"
+        >
+          <Lock strokeWidth={2} className="h-5 w-5 text-muted" />
         </div>
 
-        <p className="text-section font-bold text-ink">{title} is not available</p>
-        <p className="mx-auto mt-2 max-w-md text-body font-medium text-muted">
+        <p className="text-section font-semibold text-ink">
+          {title} is not available
+        </p>
+        <p className="mx-auto mt-1.5 max-w-md text-body text-muted">
           {describeFeatureDenial(reason)}
         </p>
 
-        {/* Only for the one refusal the reader's own organisation can undo. The
-            link is offered to everybody: the Features screen does its own
-            permission check, and someone who cannot open it learns who to ask
-            by trying, which beats guessing. */}
+        {/*
+          Only for the one refusal the reader's own organisation can undo. The
+          link is offered to everybody: the Features screen does its own
+          permission check, and someone who cannot open it learns who to ask by
+          trying, which beats guessing.
+        */}
         {reason === "role" && (
           <div className="mt-6 flex justify-center">
             <Link href="/settings/features" className={buttonClasses("secondary")}>

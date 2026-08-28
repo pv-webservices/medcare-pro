@@ -37,7 +37,7 @@ export default function PatientVisits({
 
   return (
     <section aria-labelledby="patient-visits-heading">
-      <h2 id="patient-visits-heading" className="mb-3 text-lg font-semibold">
+      <h2 id="patient-visits-heading" className="mb-3 text-heading font-semibold">
         Visit history
       </h2>
 
@@ -50,11 +50,11 @@ export default function PatientVisits({
               key={visit.id}
               aria-current={isCurrent ? "true" : undefined}
               className={`flex flex-wrap items-baseline justify-between gap-3 rounded-2xl px-3 py-2 ${
-                isCurrent ? "shadow-neu-pressed" : "shadow-neu-raised-sm"
+                isCurrent ? "bg-canvas-deep" : "border border-line shadow-card"
               }`}
             >
               <div className="min-w-0">
-                <p className="text-sm tabular-nums">
+                <p className="text-body tnum">
                   {isCurrent ? (
                     <span className="font-medium">
                       {formatVisitDate(visit.visitDate)} at {visit.visitTime}
@@ -73,12 +73,12 @@ export default function PatientVisits({
                     </span>
                   )}
                 </p>
-                <p className="text-sm text-muted">
+                <p className="text-body text-muted">
                   {VISIT_TYPE_LABELS[visit.visitType]} · {visit.department}
                   {visit.doctorName ? ` · ${visit.doctorName}` : ""}
                 </p>
               </div>
-              <p className="shrink-0 text-sm font-medium tabular-nums">
+              <p className="shrink-0 text-body font-medium tnum">
                 {formatRupees(visit.amount)}
               </p>
             </li>

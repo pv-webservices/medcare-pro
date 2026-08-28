@@ -9,6 +9,7 @@ import type { DoctorDetail } from "@/lib/doctors";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import StatusPill from "@/components/ui/StatusPill";
 
 /**
  * Doctor profile — PRD §6.4 (FR-4.2 … FR-4.4).
@@ -24,7 +25,7 @@ interface DoctorProfileProps {
   today: string;
 }
 
-const FIELD_LABEL_CLASS = "text-sm font-semibold text-muted";
+const FIELD_LABEL_CLASS = "text-body font-semibold text-muted";
 
 function NotSet() {
   return <span className="text-faint">Not set</span>;
@@ -36,8 +37,15 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
   return (
     <div>
       {isEditing ? (
-        <div className="mb-8 space-y-6">
-          <PageHeader title={`Edit ${doctor.name}`} />
+        <div className="mb-5 space-y-4">
+          <PageHeader
+            title={`Edit ${doctor.name}`}
+            breadcrumbs={[
+              { label: "Doctors", href: "/doctors" },
+              { label: doctor.name, href: `/doctors/${doctor.id}` },
+              { label: "Edit" },
+            ]}
+          />
           <Card>
             <DoctorForm
               // Clinic cannot be changed after creation, so the picker is not
@@ -57,43 +65,42 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
           </Card>
         </div>
       ) : (
-        <div className="mb-8 space-y-6">
+        <div className="mb-5 space-y-4">
           <PageHeader
             title={doctor.name}
+            breadcrumbs={[
+              { label: "Doctors", href: "/doctors" },
+              { label: doctor.name },
+            ]}
+            description={`${doctor.department} at ${doctor.clinicName}`}
+            scope={doctor.clinicName}
             meta={
-              <div className="flex flex-col gap-2 mt-1">
-                <span>{doctor.department} · {doctor.clinicName}</span>
-                {doctor.isOnLeaveToday && (
-                  <div>
-                    <span className="rounded-md bg-warn-bg px-2.5 py-1 text-xs font-semibold text-warn-ink">
-                      On leave today
-                    </span>
-                  </div>
-                )}
-              </div>
+              doctor.isOnLeaveToday ? (
+                <StatusPill tone="warn">On leave today</StatusPill>
+              ) : undefined
             }
             actions={
               canEdit && (
                 <Button variant="secondary" onClick={() => setIsEditing(true)}>
-                  Edit Doctor
+                  Edit doctor
                 </Button>
               )
             }
           />
 
           <Card>
-            <dl className="grid gap-6 sm:grid-cols-3">
+            <dl className="grid gap-5 sm:grid-cols-3">
               <div>
                 <dt className={FIELD_LABEL_CLASS}>Phone</dt>
-                <dd className="mt-1 tabular-nums text-base text-ink">{doctor.phone ?? <NotSet />}</dd>
+                <dd className="tnum mt-1 text-body font-medium text-ink">{doctor.phone ?? <NotSet />}</dd>
               </div>
               <div>
                 <dt className={FIELD_LABEL_CLASS}>Gender</dt>
-                <dd className="mt-1 text-base text-ink">{doctor.gender ?? <NotSet />}</dd>
+                <dd className="mt-1 text-body font-medium text-ink">{doctor.gender ?? <NotSet />}</dd>
               </div>
               <div>
                 <dt className={FIELD_LABEL_CLASS}>Age</dt>
-                <dd className="mt-1 tabular-nums text-base text-ink">
+                <dd className="tnum mt-1 text-body font-medium text-ink">
                   {doctor.age === null ? <NotSet /> : doctor.age}
                 </dd>
               </div>
@@ -102,7 +109,7 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <AvailabilityManager
           doctorId={doctor.id}
           entries={doctor.availability}

@@ -2,54 +2,61 @@ import type {
   InputHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
-  SelectHTMLAttributes,
 } from "react";
 import { cx } from "@/components/ui/cx";
 
 /**
  * Text fields, with their label, hint and error attached.
  *
- * A FIELD IS A WELL. Every control here is the same colour as the page and
- * carries `shadow-neu-inset`, so it reads as a recess you put something into
- * rather than an object sitting on top of one. That is the counterpart to the
- * raised button, and the pair is what makes the surface legible: raised means
- * press me, sunken means fill me.
+ * A FIELD IS A BORDERED WHITE SURFACE. Hairline, 14px radius, 44px tall, 15px
+ * text. It is the same object everywhere in the product, which is what lets
+ * someone fill a registration form they have never seen without reading it
+ * first.
  *
- * No borders. The inset shadow is the entire boundary, which means the FOCUS
- * RING IS LOAD-BEARING — a recess with no outline gives a keyboard user nothing
- * to locate. The global :focus-visible rule in globals.css draws it in the
- * accent; nothing here may set `outline-none`.
+ * THE LABEL IS ALWAYS VISIBLE. No placeholder-as-label: the moment a
+ * receptionist starts typing, a placeholder label is gone and so is the only
+ * clue about what the field was for. Placeholders here are examples, and are
+ * allowed to be absent entirely.
  *
- * The label/hint/error wiring lives in the primitive rather than at each call
- * site so `aria-describedby` and `aria-invalid` cannot be forgotten — inline
- * validation is a ground rule here, and a validation message the screen reader
- * never announces is not validation.
+ * THE WIRING LIVES IN THE PRIMITIVE. `aria-describedby`, `aria-invalid` and the
+ * one message slot are assembled here so no call site can forget them — a
+ * validation message a screen reader never announces is not validation. Error
+ * wins over hint; the two never show at once.
  *
- * Fields are 16px (`text-input`) on purpose: anything smaller makes iOS Safari
- * zoom on focus, which is intolerable on a shared front-desk tablet.
+ * Fields are 15px on desktop and step to 16px below `sm`, because anything
+ * under 16px makes iOS Safari zoom the page on focus — intolerable on the
+ * shared tablet at a front desk.
  */
 
 const CONTROL_BASE =
-  "block w-full rounded-2xl border-0 bg-canvas text-input text-ink" +
-  "shadow-neu-inset placeholder:text-faint" +
-  "transition-shadow duration-200 disabled:opacity-55";
+  "block w-full rounded-2xl border bg-canvas text-input text-ink max-sm:text-[16px] " +
+  "shadow-field placeholder:text-faint " +
+  "transition-[border-color,box-shadow] duration-150 " +
+  "disabled:cursor-not-allowed disabled:bg-canvas-deep disabled:text-muted";
 
-/*
- * An invalid field cannot signal with a border, because it has none. A ring
- * composes with the inset shadow rather than replacing it, so the control stays
- * a well and gains a red edge — and the message below still carries the reason,
- * because a colour is not an explanation.
+/**
+ * An invalid field signals with its own border rather than an extra ring, so
+ * the control does not change size when it fails — and the message below still
+ * carries the reason, because a colour is not an explanation.
  */
 export const controlClasses = (isInvalid: boolean, extra?: string) =>
-  cx(CONTROL_BASE, isInvalid && "ring-2 ring-alert-mark/60", extra);
+  cx(
+    CONTROL_BASE,
+    isInvalid
+      ? "border-alert-mark/70 hover:border-alert-mark"
+      : "border-line hover:border-line-strong",
+    extra,
+  );
 
 interface FieldShellProps {
   id: string;
   label: string;
-  hint?: string;
+  hint?: ReactNode;
   error?: string;
   /** Sits to the right of the control — e.g. the brand-colour swatch. */
   adornment?: ReactNode;
+  /** Sits on the label row, right-aligned — "Forgot password?", "Optional". */
+  labelAction?: ReactNode;
   children: ReactNode;
   className?: string;
 }
@@ -61,17 +68,18 @@ export function FieldShell({
   hint,
   error,
   adornment,
+  labelAction,
   children,
   className,
 }: FieldShellProps) {
   return (
     <div className={className}>
-      <label
-        htmlFor={id}
-        className="mb-2 block text-label font-semibold text-ink"
-      >
-        {label}
-      </label>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <label htmlFor={id} className="text-label font-medium text-ink-soft">
+          {label}
+        </label>
+        {labelAction}
+      </div>
 
       {adornment ? (
         <div className="flex items-center gap-2">
@@ -83,11 +91,11 @@ export function FieldShell({
       )}
 
       {error ? (
-        <p id={`${id}-message`} className="mt-2 text-meta font-medium text-alert-ink">
+        <p id={`${id}-message`} className="mt-1.5 text-meta font-medium text-alert-ink">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-message`} className="mt-2 text-meta font-medium text-muted">
+        <p id={`${id}-message`} className="mt-1.5 text-meta text-muted">
           {hint}
         </p>
       ) : null}
@@ -98,13 +106,15 @@ export function FieldShell({
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
   id: string;
   label: string;
-  hint?: string;
+  hint?: ReactNode;
   error?: string;
   adornment?: ReactNode;
+  labelAction?: ReactNode;
+  /** A Lucide node inside the left edge of the control. Hidden from AT. */
+  icon?: ReactNode;
   /**
    * Sits inside the control's left edge — the rupee sign on an amount. Named
-   * `unit` rather than `prefix` because `prefix` is already an HTML attribute,
-   * and because that is what it is for.
+   * `unit` rather than `prefix` because `prefix` is already an HTML attribute.
    *
    * It is `aria-hidden`, so the unit must also appear in the label: a screen
    * reader user should not have to infer the currency from a decoration.
@@ -120,22 +130,36 @@ export default function Input({
   hint,
   error,
   adornment,
+  labelAction,
+  icon,
   unit,
   fieldClassName,
   className,
   ...rest
 }: InputProps) {
+  const leading = icon ?? unit;
+
   const control = (
-    <input
-      id={id}
-      aria-invalid={error ? true : undefined}
-      aria-describedby={error || hint ? `${id}-message` : undefined}
-      className={controlClasses(
-        Boolean(error),
-        cx("min-h-11 pr-4", unit ? "pl-9" : "pl-4", className),
+    <div className={leading ? "relative" : undefined}>
+      {leading && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3.5 top-1/2 flex -translate-y-1/2 items-center text-muted"
+        >
+          {leading}
+        </span>
       )}
-      {...rest}
-    />
+      <input
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error || hint ? `${id}-message` : undefined}
+        className={controlClasses(
+          Boolean(error),
+          cx("min-h-11 pr-3.5", leading ? "pl-10" : "pl-3.5", className),
+        )}
+        {...rest}
+      />
+    </div>
   );
 
   return (
@@ -145,21 +169,10 @@ export default function Input({
       hint={hint}
       error={error}
       adornment={adornment}
+      labelAction={labelAction}
       className={fieldClassName}
     >
-      {unit ? (
-        <div className="relative">
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-input text-muted"
-          >
-            {unit}
-          </span>
-          {control}
-        </div>
-      ) : (
-        control
-      )}
+      {control}
     </FieldShell>
   );
 }
@@ -168,7 +181,7 @@ interface TextareaProps
   extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id"> {
   id: string;
   label: string;
-  hint?: string;
+  hint?: ReactNode;
   error?: string;
   fieldClassName?: string;
 }
@@ -180,7 +193,7 @@ export function Textarea({
   error,
   fieldClassName,
   className,
-  rows = 2,
+  rows = 3,
   ...rest
 }: TextareaProps) {
   return (
@@ -196,69 +209,12 @@ export function Textarea({
         rows={rows}
         aria-invalid={error ? true : undefined}
         aria-describedby={error || hint ? `${id}-message` : undefined}
-        className={controlClasses(Boolean(error), cx("px-4 py-3", className))}
-      {...rest}
+        className={controlClasses(
+          Boolean(error),
+          cx("resize-y px-3.5 py-2.5", className),
+        )}
+        {...rest}
       />
-    </FieldShell>
-  );
-}
-
-interface SelectProps
-  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "id"> {
-  id: string;
-  label: string;
-  hint?: string;
-  error?: string;
-  fieldClassName?: string;
-}
-
-export function Select({
-  id,
-  label,
-  hint,
-  error,
-  fieldClassName,
-  className,
-  children,
-  ...rest
-}: SelectProps) {
-  return (
-    <FieldShell
-      id={id}
-      label={label}
-      hint={hint}
-      error={error}
-      className={fieldClassName}
-    >
-      <div className="relative">
-        <select
-          id={id}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error || hint ? `${id}-message` : undefined}
-          className={controlClasses(
-            Boolean(error),
-            cx("h-11 cursor-pointer appearance-none pl-4 pr-11", className),
-          )}
-          {...rest}
-        >
-          {children}
-        </select>
-        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </div>
-      </div>
     </FieldShell>
   );
 }

@@ -2,33 +2,38 @@ import type { ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
 
 /**
- * The one badge in this app. Tones map to meaning, never to taste — see the
- * status vocabulary table in .claude/skills/admin-dashboard-ui.
+ * The one badge in this app. Tones map to MEANING, never to taste:
  *
  *   ok       delivered, active, verified, paid, completed
- *   warn     queued, pending, unread, waiting
+ *   warn     queued, pending, unread, waiting, no-show risk
  *   alert    failed, blocked, rejected, cancelled
- *   neutral  a fact with no action attached (visit type, role name, "updated")
- *   accent   the current selection, and "confirmed" — the one tone tied to the
- *            house accent rather than to a status hue
+ *   info     scheduled, informational state with no action attached
+ *   neutral  a fact (visit type, role name, "updated")
+ *   accent   the current selection, and "confirmed"
  *
- * THE PILL IS FLAT. Everything raised on this canvas is something you can press,
- * and a pill is a label. Giving it depth would promise an interaction that is
- * not there — which on a soft surface is a genuinely misleading signal, not a
- * stylistic quibble.
+ * THE DOT IS NOT DECORATION. It carries the state for anyone who cannot
+ * separate the tones by hue, so the pill never relies on colour alone — and the
+ * word inside it is always the state in full, never an abbreviation.
  *
- * The dot is not decoration: it carries the state for anyone who cannot
- * separate the tones by hue, so the pill never relies on colour alone.
+ * The pill is flat and bordered. Nothing in a table row should look pressable
+ * unless it is; a status is a label.
  */
 
-export type StatusTone = "ok" | "warn" | "alert" | "neutral" | "accent";
+export type StatusTone = "ok" | "warn" | "alert" | "info" | "neutral" | "accent";
 
 const TONES: Record<StatusTone, { pill: string; dot: string }> = {
-  ok: { pill: "bg-ok-bg text-ok-ink", dot: "bg-ok-mark" },
-  warn: { pill: "bg-warn-bg text-warn-ink", dot: "bg-warn-mark" },
-  alert: { pill: "bg-alert-bg text-alert-ink", dot: "bg-alert-mark" },
-  neutral: { pill: "bg-pill text-pill-ink", dot: "bg-pill-ink" },
-  accent: { pill: "bg-accent-soft text-accent-soft-ink", dot: "bg-accent" },
+  ok: { pill: "border-ok-line bg-ok-bg text-ok-ink", dot: "bg-ok-mark" },
+  warn: { pill: "border-warn-line bg-warn-bg text-warn-ink", dot: "bg-warn-mark" },
+  alert: {
+    pill: "border-alert-line bg-alert-bg text-alert-ink",
+    dot: "bg-alert-mark",
+  },
+  info: { pill: "border-info-line bg-info-bg text-info-ink", dot: "bg-info-mark" },
+  neutral: { pill: "border-line bg-pill text-pill-ink", dot: "bg-pill-ink" },
+  accent: {
+    pill: "border-accent-soft bg-accent-soft text-accent-soft-ink",
+    dot: "bg-accent",
+  },
 };
 
 interface StatusPillProps {
@@ -50,8 +55,8 @@ export default function StatusPill({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1",
-        "text-meta font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5",
+        "text-meta font-medium whitespace-nowrap",
         pill,
         className,
       )}

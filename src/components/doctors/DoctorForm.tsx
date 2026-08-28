@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import Input, { Select } from "@/components/ui/Input";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 
 /**
  * Add/edit a doctor — PRD §6.4 (FR-4.2).
@@ -158,7 +159,7 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {formError}
         </p>
@@ -260,11 +261,11 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
       <div className="mt-6 flex flex-wrap gap-3">
         <Button
           type="submit"
-          variant="commit"
+          variant="primary"
           isBusy={isSaving}
           busyLabel={isEdit ? "Saving…" : "Adding Doctor…"}
         >
-          {isEdit ? "Save Changes" : "Add Doctor"}
+          {isEdit ? "Save changes" : "Add doctor"}
         </Button>
 
         {onCancel && (

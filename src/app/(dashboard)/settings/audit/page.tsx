@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Building2, Search, ShieldCheck } from "lucide-react";
+import { Building2, Search, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusPill from "@/components/ui/StatusPill";
 import { PermissionError } from "@/lib/rbac";
@@ -38,14 +38,7 @@ function one(value: string | string[] | undefined): string | undefined {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1.5 text-label font-medium text-muted transition hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-        Settings
-      </Link>
+    <section className="space-y-4">
       {children}
     </section>
   );
@@ -82,7 +75,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
     return (
       <Shell>
         <PageHeader title="Activity log" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view the activity log. Ask the account owner if you
           need access.
         </div>
@@ -108,6 +101,8 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
     <Shell>
       <PageHeader
         title="Activity log"
+        description="Every recorded change, oldest untouched."
+        breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Activity log" }]}
         meta={`${trail.total} record${trail.total === 1 ? "" : "s"} · nothing here can be edited or removed`}
       />
 
@@ -123,7 +118,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
             name="search"
             defaultValue={trail.search}
             placeholder="Search by who — name or email"
-            className="min-h-11 w-full rounded-2xl bg-canvas py-2 pl-9 pr-3 text-input text-ink placeholder:text-faint shadow-neu-inset"
+            className="min-h-11 w-full rounded-2xl bg-canvas py-2 pl-9 pr-3 text-input text-ink placeholder:text-faint border border-line"
           />
         </div>
 
@@ -131,7 +126,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
           name="category"
           defaultValue={trail.category ?? ""}
           aria-label="Category"
-          className="min-h-11 rounded-2xl bg-canvas px-3 text-input text-ink shadow-neu-inset"
+          className="min-h-11 rounded-2xl bg-canvas px-3 text-input text-ink border border-line"
         >
           <option value="">Decisions (default)</option>
           {trail.categories.map((category) => (
@@ -143,15 +138,15 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
 
         <button
           type="submit"
-          className="min-h-11 rounded-md bg-primary px-5 text-label font-semibold text-primary-foreground transition hover:bg-primary-hover"
+          className="min-h-11 rounded-md bg-accent px-5 text-label font-semibold text-accent-ink transition hover:bg-accent-strong"
         >
           Apply
         </button>
       </form>
 
       {trail.entries.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-10 text-center shadow-neu-raised-sm">
-          <p className="text-sm font-medium text-muted">
+        <div className="rounded-2xl bg-canvas px-6 py-10 text-center border border-line shadow-card">
+          <p className="text-body font-medium text-muted">
             {trail.search || trail.category
               ? "Nothing matches those filters."
               : "Nothing has been recorded yet. Team changes, role changes and account decisions will appear here."}
@@ -162,7 +157,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
           {trail.entries.map((entry) => (
             <li
               key={entry.id}
-              className="rounded-xl bg-canvas px-5 py-4 shadow-neu-raised-sm"
+              className="rounded-xl bg-canvas px-5 py-4 border border-line shadow-card"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -204,7 +199,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
 
                 <time
                   dateTime={entry.createdAt.toISOString()}
-                  className="shrink-0 text-label tabular-nums text-faint"
+                  className="shrink-0 text-label tnum text-faint"
                 >
                   {entry.createdAt.toISOString().slice(0, 16).replace("T", "")}
                 </time>
@@ -217,14 +212,14 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
       {lastPage > 1 && (
         <div className="flex items-center justify-between text-label text-muted">
           <span>
-            Page <span className="tabular-nums">{trail.page}</span> of{""}
-            <span className="tabular-nums">{lastPage}</span>
+            Page <span className="tnum">{trail.page}</span> of{""}
+            <span className="tnum">{lastPage}</span>
           </span>
           <div className="flex gap-2">
             {trail.page > 1 && (
               <Link
                 href={withPage(trail.page - 1)}
-                className="rounded-md border border-line px-4 py-2 font-medium transition hover:border-primary hover:text-primary"
+                className="rounded-md border border-line px-4 py-2 font-medium transition hover:border-accent hover:text-accent"
               >
                 Previous
               </Link>
@@ -232,7 +227,7 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
             {trail.page < lastPage && (
               <Link
                 href={withPage(trail.page + 1)}
-                className="rounded-md border border-line px-4 py-2 font-medium transition hover:border-primary hover:text-primary"
+                className="rounded-md border border-line px-4 py-2 font-medium transition hover:border-accent hover:text-accent"
               >
                 Next
               </Link>

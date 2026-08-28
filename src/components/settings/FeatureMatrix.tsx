@@ -107,13 +107,13 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {features.map((feature) => (
         <Card key={feature.key}>
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-bold text-ink">{feature.name}</h3>
+                <h3 className="text-section font-semibold text-ink">{feature.name}</h3>
                 <StatusPill tone={TIER_TONE[feature.tier]}>
                   {feature.tier.toLowerCase()}
                 </StatusPill>
@@ -124,9 +124,9 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                 )}
               </div>
               {feature.description && (
-                <p className="mt-1 text-sm text-muted">{feature.description}</p>
+                <p className="mt-1 text-body text-muted">{feature.description}</p>
               )}
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1 text-body text-muted">
                 {featureNote(feature)}
               </p>
             </div>
@@ -144,11 +144,11 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                     className="flex flex-wrap items-center justify-between gap-3 py-3"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="text-sm font-medium text-ink">
+                      <span className="text-body font-medium text-ink">
                         {role.roleName}
                       </span>
                       {role.isAccountOwner && (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-muted">
+                        <span className="inline-flex items-center gap-1 text-meta font-medium text-muted">
                           <ShieldCheck
                             aria-hidden="true"
                             strokeWidth={1.75}
@@ -174,7 +174,7 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                         onChange={(event) =>
                           handleChange(feature, role, event.target.value as AccessValue)
                         }
-                        className="min-h-9 rounded-2xl bg-canvas px-3 text-sm text-ink disabled:bg-canvas-deep disabled:text-faint shadow-neu-inset"
+                        className="min-h-9 rounded-xl border border-line bg-canvas px-3 text-body text-ink disabled:bg-canvas-deep disabled:text-faint"
                       >
                         {/* Named for what it does, not for the null it stores. */}
                         <option value="inherit">
@@ -190,7 +190,7 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
               })}
             </ul>
           ) : (
-            <p className="flex items-start gap-2 rounded-xl bg-canvas-deep px-4 py-3 text-sm text-muted">
+            <p className="flex items-start gap-2 rounded-2xl border border-line bg-canvas-deep px-4 py-3 text-body text-muted">
               <Lock
                 aria-hidden="true"
                 strokeWidth={1.75}
@@ -205,7 +205,7 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
           )}
 
           {!canManage && feature.isEntitled && !feature.isUngated && (
-            <p className="mt-3 text-sm text-muted">
+            <p className="mt-3 text-body text-muted">
               You can see these settings but not change them.
             </p>
           )}

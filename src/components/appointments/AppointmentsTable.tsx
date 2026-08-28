@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import AppointmentActions from "@/components/appointments/AppointmentActions";
 import {
@@ -58,16 +58,16 @@ function Dash() {
 function SlotTime({ start, end }: { start: string; end: string }) {
   return (
     <>
-      <span className="font-bold tabular-nums text-ink">{start}</span>
-      <p className="mt-0.5 text-xs tabular-nums text-muted">to {end}</p>
+      <span className="tnum text-body font-semibold text-ink">{start}</span>
+      <p className="tnum mt-0.5 text-meta text-muted">to {end}</p>
     </>
   );
 }
 
 function BookAction() {
   return (
-    <Link href="/appointments/new" className={buttonClasses("commit", "md")}>
-      Book Appointment
+    <Link href="/appointments/new" className={buttonClasses("primary", "md")}>
+      Book appointment
     </Link>
   );
 }
@@ -82,7 +82,8 @@ export default function AppointmentsTable({
   if (appointments.length === 0) {
     return (
       <EmptyState
-        title={isFiltered ? "No appointments match" : "Nothing booked"}
+        icon={<CalendarDays className="h-5 w-5" strokeWidth={2} />}
+        title={isFiltered ? "No appointments match these filters" : "Nothing booked for this day"}
         guidance={
           isFiltered
             ? "Try another day, a different doctor, or show past outcomes as well."
@@ -127,7 +128,7 @@ export default function AppointmentsTable({
 
                 {showDate && (
                   <TD>
-                    <span className="tabular-nums">
+                    <span className="tnum whitespace-nowrap">
                       {formatAppointmentDate(appointment.date)}
                     </span>
                   </TD>
@@ -136,11 +137,11 @@ export default function AppointmentsTable({
                 <TD>
                   <Link
                     href={`/appointments/${appointment.id}`}
-                    className="font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                    className="rounded font-medium text-ink transition-colors duration-150 hover:text-accent"
                   >
                     {appointment.name}
                   </Link>
-                  <p className="mt-0.5 text-xs tabular-nums text-muted">
+                  <p className="tnum mt-0.5 text-meta text-muted">
                     {appointment.mobileNumber}
                   </p>
                 </TD>
@@ -151,7 +152,7 @@ export default function AppointmentsTable({
 
                 {showClinic && <TD>{appointment.clinicName}</TD>}
 
-                <TD isNumeric className="font-bold text-ink">
+                <TD isNumeric>
                   {formatRupees(appointment.amount)}
                 </TD>
 
@@ -173,7 +174,7 @@ export default function AppointmentsTable({
                     />
                     <Link
                       href={`/appointments/${appointment.id}`}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-faint transition-colors hover:text-ink"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-faint transition-colors duration-150 hover:bg-canvas-deep hover:text-ink"
                     >
                       <span className="sr-only">
                         Open {appointment.name}&apos;s appointment
@@ -200,25 +201,25 @@ export default function AppointmentsTable({
             <Card isFlush className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-lg font-bold tabular-nums text-ink">
+                  <p className="tnum text-heading font-semibold text-ink">
                     {appointment.startTime}
-                    <span className="ml-2 text-xs font-normal text-muted">
+                    <span className="ml-2 text-meta font-normal text-muted">
                       to {appointment.endTime}
                     </span>
                   </p>
                   <Link
                     href={`/appointments/${appointment.id}`}
-                    className="mt-1 block font-semibold text-ink underline decoration-slate-200 underline-offset-4 hover:decoration-slate-900"
+                    className="mt-1 block rounded font-medium text-ink transition-colors duration-150 hover:text-accent"
                   >
                     {appointment.name}
                   </Link>
-                  <p className="mt-0.5 text-xs tabular-nums text-muted">
+                  <p className="tnum mt-0.5 text-meta text-muted">
                     {appointment.mobileNumber}
                   </p>
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="font-bold tabular-nums text-ink">
+                  <p className="tnum text-body font-semibold text-ink">
                     {formatRupees(appointment.amount)}
                   </p>
                   <div className="mt-1.5">
@@ -231,7 +232,7 @@ export default function AppointmentsTable({
                 </div>
               </div>
 
-              <p className="mt-2 text-xs text-muted">
+              <p className="mt-2 text-meta text-muted">
                 {appointment.appointmentTypeName}
                 {appointment.doctorName ? ` · ${appointment.doctorName}` : ""}
                 {showClinic ? ` · ${appointment.clinicName}` : ""}

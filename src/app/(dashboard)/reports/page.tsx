@@ -1,9 +1,11 @@
+import { TrendingUp } from "lucide-react";
 import { redirect } from "next/navigation";
 import BreakdownTable from "@/components/reports/BreakdownTable";
 import ExportCsvLink from "@/components/reports/ExportCsvLink";
 import GrowthChart from "@/components/reports/GrowthChart";
 import KpiTiles from "@/components/reports/KpiTiles";
 import PeriodSelector from "@/components/reports/PeriodSelector";
+import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import {
   holdsAnywhere,
@@ -84,9 +86,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   if (!report) {
     return (
-      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <section className="space-y-4">
         <PageHeader title="Revenue report" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view revenue reports. Ask an admin or the account
           owner if you need access.
         </div>
@@ -105,34 +107,35 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   );
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+    <section className="space-y-4">
       <PageHeader
         title="Revenue report"
-        meta={`${report.rangeLabel} · ${scopeLabel}`}
+        description="Understand clinic performance and revenue over time."
+        meta={report.rangeLabel}
+        scope={report.clinicName ?? "All clinics"}
         actions={<PeriodSelector selected={report.period} />}
       />
 
       {!report.hasClinics ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-          <p className="text-sm font-medium text-muted">
-            No clinics to report on yet. Add a clinic and start registering
-            patients — revenue appears here as visits are recorded.
-          </p>
-        </div>
+        <EmptyState
+          icon={<TrendingUp className="h-5 w-5" strokeWidth={2} />}
+          title="Nothing to report on yet"
+          guidance="Revenue appears here as visits are recorded against a clinic."
+        />
       ) : (
         <>
           <KpiTiles kpis={report.kpis} period={report.period} />
 
-          <section aria-labelledby="growth-heading" className="pt-4">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <section aria-labelledby="growth-heading">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2
                   id="growth-heading"
-                  className="mb-1 text-lg font-semibold text-ink"
+                  className="text-heading font-semibold text-ink"
                 >
                   Revenue trend
                 </h2>
-                <p className="text-sm text-muted">
+                <p className="mt-1 text-body text-muted">
                   {/* Names the single series, which is why the chart has no legend. */}
                   Revenue per {periodLabel.replace(/ly$/, "")} period across{""}
                   {scopeLabel}, ending with the current one.
@@ -153,7 +156,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             />
           </section>
 
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <BreakdownTable
               title="By clinic"
               entityLabel="Clinic"

@@ -46,9 +46,9 @@ export default async function TeamPage() {
 
   if (!overview) {
     return (
-      <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-6">
+      <section className="space-y-4">
         <PageHeader title="Team" />
-        <div className="rounded-xl bg-canvas-deep px-5 py-4 text-sm font-medium text-muted">
+        <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role cannot view the team. Ask the account owner if you need
           access.
         </div>
@@ -64,7 +64,7 @@ export default async function TeamPage() {
   ).length;
 
   return (
-    <section className="max-w-[1400px] mx-auto w-full animate-in fade-in duration-500 space-y-8">
+    <section className="space-y-5">
       <InvitePanel
         canInvite={overview.canInvite}
         roles={overview.roles}

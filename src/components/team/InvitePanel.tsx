@@ -131,9 +131,9 @@ export default function InvitePanel({
         actions={
           canInvite &&
           !isOpen && (
-            <Button variant="commit" onClick={() => setIsOpen(true)}>
+            <Button variant="primary" onClick={() => setIsOpen(true)}>
               <UserPlus aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
-              Invite Member
+              Invite member
             </Button>
           )
         }
@@ -148,7 +148,7 @@ export default function InvitePanel({
             {formError && (
               <p
                 role="alert"
-                className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+                className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
               >
                 {formError}
               </p>
@@ -205,13 +205,13 @@ export default function InvitePanel({
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <Button
                 type="submit"
-                variant="commit"
+                variant="primary"
                 isBusy={isSending}
                 busyLabel="Sending..."
               >
                 Send Invitation
               </Button>
-              <Button variant="quiet" onClick={close} disabled={isSending}>
+              <Button variant="ghost" onClick={close} disabled={isSending}>
                 Cancel
               </Button>
             </div>

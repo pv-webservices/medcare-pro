@@ -3,20 +3,26 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowRight, BellOff, Check, Undo2 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import { cx } from "@/components/ui/cx";
 
 /**
  * The notifications feed — PRD §6.7 (FR-7.1, FR-7.2).
  *
- * Unread first, newest first within each half: an Admin opening this page is
- * asking "what happened that I have not seen?", so what needs attention sits at
- * the top rather than at the chronological tail.
+ * AN ACTIVITY CENTRE, READ IN DAYS. Items are grouped Today / Yesterday /
+ * Earlier, newest first, because "when did that happen?" is the question this
+ * screen is opened with. Unread items are not hoisted above read ones any more:
+ * a feed that reorders itself as you read it loses your place. They are marked
+ * instead.
  *
- * Amber marks unread — the same "needs a look" colour the doctor-on-leave badge
- * uses elsewhere. Everything already read stays in the neutral palette, so the
- * colour on screen always means something.
+ * UNREAD IS MARKED, NOT SHOUTED. An accent rail, a dot and a heavier message —
+ * enough to find at a glance, restrained enough that a page of twenty unread
+ * items is still readable. The previous full amber card meant a normal Monday
+ * morning arrived as a wall of warning colour, which trains people to ignore it.
  *
- * Read state is per ACCOUNT, not per user: the PRD's `notifications` table has
+ * READ STATE IS PER ACCOUNT, NOT PER USER: the PRD's `notifications` table has
  * one `read` flag and no user column, so one Admin clearing an item clears it
  * for their colleagues too. The page says so in as many words rather than
  * letting it surprise someone.
@@ -41,14 +47,45 @@ interface NotificationListProps {
   canMark: boolean;
 }
 
-function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/**
+ * Which bucket a timestamp belongs to, decided in the READER's timezone —
+ * "today" on this screen has to mean the day the person at the desk is having,
+ * not the server's.
+ */
+function bucketFor(iso: string): string {
+  const then = new Date(iso);
+  const now = new Date();
+
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const startOfYesterday = startOfToday - 86_400_000;
+  const stamp = then.getTime();
+
+  if (stamp >= startOfToday) {
+    return "Today";
+  }
+  if (stamp >= startOfYesterday) {
+    return "Yesterday";
+  }
+  return "Earlier";
 }
 
 export default function NotificationList({
@@ -98,112 +135,169 @@ export default function NotificationList({
     setIsMarkingAll(false);
   }
 
+  if (items.length === 0) {
+    return (
+      <>
+        {error && (
+          <p
+            role="alert"
+            className="mb-4 rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
+          >
+            {error}
+          </p>
+        )}
+        <EmptyState
+          icon={<BellOff className="h-5 w-5" strokeWidth={2} />}
+          title="You are all caught up"
+          guidance="Changes to patients, doctors and clinics appear here as your team makes them."
+        />
+      </>
+    );
+  }
+
+  // One pass, in the order the server sent: the groups come out newest-first
+  // without a second sort.
+  const groups: { label: string; items: NotificationItem[] }[] = [];
+  for (const item of items) {
+    const label = bucketFor(item.createdAt);
+    const current = groups[groups.length - 1];
+    if (current && current.label === label) {
+      current.items.push(item);
+    } else {
+      groups.push({ label, items: [item] });
+    }
+  }
+
   return (
-    <div>
+    <div className="space-y-4">
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
       )}
 
       {canMark && unreadCount > 0 && (
-        <div className="mb-6">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3 shadow-card">
+          <p className="text-body text-muted">
+            <span className="tnum font-semibold text-ink">{unreadCount}</span>{" "}
+            unread {unreadCount === 1 ? "item" : "items"}. Marking one read marks
+            it for everyone in this account.
+          </p>
           <Button
             type="button"
+            size="sm"
+            variant="secondary"
             onClick={handleMarkAll}
             disabled={isMarkingAll}
             isBusy={isMarkingAll}
-            busyLabel="Marking…"
-            variant="secondary"
+            busyLabel="Marking..."
           >
-            Mark All {unreadCount} as Read
+            Mark all read
           </Button>
         </div>
       )}
 
-      {items.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-          <p className="mb-1 font-semibold text-ink">Nothing to review</p>
-          <p className="text-sm text-muted">
-            Changes to patients, doctors and clinics appear here as staff make
-            them.
-          </p>
-        </div>
-      ) : (
-        <ol className="grid gap-4">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              className={`rounded-xl border p-5 shadow-neu-raised-sm transition-colors ${
-                item.read
-                  ? "border-line bg-canvas"
-                  : "border-line bg-warn-bg"
-              }`}
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
-                <p className="flex items-center gap-2">
-                  {!item.read && (
-                    <span
-                      aria-hidden="true"
-                      className="inline-block size-2 shrink-0 rounded-full bg-warn-mark"
-                    />
-                  )}
-                  <span className={`text-xs font-bold uppercase tracking-wider ${item.read ? "text-muted" : "text-warn-ink"}`}>
-                    {item.typeLabel}
-                  </span>
-                  {!item.read && <span className="sr-only">Unread</span>}
-                </p>
-                <p className={`text-sm tabular-nums ${item.read ? "text-faint" : "text-warn-ink"}`}>
-                  {formatTimestamp(item.createdAt)}
-                </p>
-              </div>
+      {groups.map((group) => (
+        <section key={group.label} aria-label={group.label}>
+          <h2 className="mb-2 px-1 text-micro font-semibold uppercase text-faint">
+            {group.label}
+          </h2>
 
-              <p className={`text-ink ${item.read ? "font-normal" : "font-semibold"}`}>
-                {item.message}
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-center gap-4">
-                {item.clinicName && (
-                  <span className={`text-sm font-medium ${item.read ? "text-muted" : "text-warn-ink"}`}>
-                    {item.clinicName}
-                  </span>
+          <ol className="overflow-hidden rounded-3xl border border-line bg-canvas shadow-card">
+            {group.items.map((item) => (
+              <li
+                key={item.id}
+                className={cx(
+                  "relative border-b border-line px-4 py-3.5 transition-colors duration-150 last:border-b-0",
+                  item.read ? "hover:bg-canvas-deep" : "bg-accent-soft/35",
+                )}
+              >
+                {!item.read && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-accent"
+                  />
                 )}
 
-                {item.href && (
-                  <Link
-                    href={item.href}
-                    className={`text-sm font-semibold hover:underline underline-offset-4 ${item.read ? "text-primary hover:text-primary-hover" : "text-warn-ink hover:text-warn-ink"}`}
-                  >
-                    Open Record
-                  </Link>
-                )}
+                <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-line bg-canvas-deep px-2 py-0.5 text-meta font-medium text-muted">
+                        {item.typeLabel}
+                      </span>
+                      {item.clinicName && (
+                        <span className="text-meta text-muted">
+                          {item.clinicName}
+                        </span>
+                      )}
+                      {!item.read && <span className="sr-only">Unread</span>}
+                    </p>
 
-                {canMark && (
-                  <button
-                    type="button"
-                    onClick={() => handleToggle(item)}
-                    disabled={pendingId === item.id}
-                    className={`min-h-9 rounded-md px-3 text-sm font-medium transition-colors disabled:opacity-50 ml-auto ${
-                      item.read 
-                        ? "text-muted hover:bg-canvas-deep" 
-                        : "text-warn-ink hover:bg-warn-bg"
-                    }`}
-                  >
-                    {pendingId === item.id
-                      ? "…"
-                      : item.read
-                        ? "Mark as Unread"
-                        : "Mark as Read"}
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
+                    <p
+                      className={cx(
+                        "mt-1.5 text-body",
+                        item.read ? "text-ink-soft" : "font-medium text-ink",
+                      )}
+                    >
+                      {item.message}
+                    </p>
+
+                    {item.href && (
+                      <Link
+                        href={item.href}
+                        className="mt-1.5 inline-flex items-center gap-1 rounded text-label font-medium text-accent transition-colors duration-150 hover:text-accent-strong"
+                      >
+                        Open record
+                        <ArrowRight
+                          aria-hidden="true"
+                          strokeWidth={2}
+                          className="h-3.5 w-3.5"
+                        />
+                      </Link>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <time
+                      dateTime={item.createdAt}
+                      title={formatDate(item.createdAt)}
+                      className="tnum text-meta text-muted"
+                    >
+                      {group.label === "Earlier"
+                        ? formatDate(item.createdAt)
+                        : formatTime(item.createdAt)}
+                    </time>
+
+                    {canMark && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(item)}
+                        disabled={pendingId === item.id}
+                        aria-label={
+                          item.read
+                            ? `Mark as unread: ${item.message}`
+                            : `Mark as read: ${item.message}`
+                        }
+                        title={item.read ? "Mark as unread" : "Mark as read"}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-canvas hover:text-ink disabled:opacity-50"
+                      >
+                        {item.read ? (
+                          <Undo2 aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+                        ) : (
+                          <Check aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
     </div>
   );
 }

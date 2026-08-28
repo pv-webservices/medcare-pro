@@ -58,15 +58,15 @@ export default function RootError({ error }: RootErrorProps) {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-      <section className="flex w-full max-w-xl flex-col items-center rounded-4xl bg-canvas p-8 text-center shadow-neu-raised">
+      <section className="flex w-full max-w-xl flex-col items-center rounded-4xl bg-canvas p-8 text-center border border-line shadow-card">
         <span
           aria-hidden="true"
-          className="flex h-14 w-14 items-center justify-center rounded-3xl bg-canvas text-alert-ink shadow-neu-inset"
+          className="flex h-14 w-14 items-center justify-center rounded-2xl border border-alert-line bg-alert-bg text-alert-ink"
         >
           <AlertTriangle strokeWidth={2} className="h-7 w-7" />
         </span>
 
-        <h1 className="mt-5 text-title font-extrabold text-ink">
+        <h1 className="mt-5 text-title font-semibold text-ink">
           MedCare Pro is temporarily unavailable
         </h1>
 
@@ -77,8 +77,8 @@ export default function RootError({ error }: RootErrorProps) {
         </p>
 
         {error.digest && (
-          <p className="mt-4 rounded-2xl bg-canvas px-4 py-2 text-meta font-medium text-faint shadow-neu-inset">
-            Reference: <span className="tnum font-bold">{error.digest}</span>
+          <p className="mt-4 rounded-2xl bg-canvas px-4 py-2 text-meta font-medium text-faint border border-line">
+            Reference: <span className="tnum font-semibold">{error.digest}</span>
           </p>
         )}
 
@@ -86,7 +86,7 @@ export default function RootError({ error }: RootErrorProps) {
           <button
             type="button"
             onClick={handleRetry}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-body font-semibold text-accent-ink shadow-neu-raised-sm transition-colors duration-200 hover:bg-primary-hover"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-accent px-5 text-body font-semibold text-accent-ink border border-line shadow-card transition-colors duration-200 hover:bg-accent-strong"
           >
             <RefreshCw aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
             Try again
@@ -98,7 +98,7 @@ export default function RootError({ error }: RootErrorProps) {
           */}
           <a
             href="/login"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-canvas px-5 text-body font-semibold text-ink shadow-neu-raised-sm transition-shadow duration-200 hover:shadow-neu-raised"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-canvas px-5 text-body font-semibold text-ink border border-line shadow-card transition-shadow duration-200 hover:border border-line shadow-card"
           >
             Sign in again
           </a>

@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import Input, { Select, Textarea } from "@/components/ui/Input";
+import Input, { Textarea } from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { updateAppointmentSchema } from "@/lib/appointmentInput";
 
@@ -264,7 +265,7 @@ export default function EditBookingForm({
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <Button
           type="submit"
-          variant="commit"
+          variant="primary"
           disabled={!isDirty}
           isBusy={isSaving}
           busyLabel="Saving…"
@@ -275,7 +276,7 @@ export default function EditBookingForm({
         {isDirty ? (
           <Button
             type="button"
-            variant="quiet"
+            variant="ghost"
             disabled={isSaving}
             onClick={() => {
               setValues(initial);
@@ -285,7 +286,7 @@ export default function EditBookingForm({
             Discard Changes
           </Button>
         ) : (
-          <p className="text-xs text-muted">
+          <p className="text-meta text-muted">
             Nothing has been changed yet.
           </p>
         )}

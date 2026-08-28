@@ -10,7 +10,8 @@ import {
 } from "@/lib/whatsappTemplateText";
 import type { TemplateRecord } from "@/lib/whatsappTemplates";
 import Button from "@/components/ui/Button";
-import Input, { Select } from "@/components/ui/Input";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import Card from "@/components/ui/Card";
 
 /**
@@ -135,16 +136,16 @@ export default function TemplateManager({
     <section aria-labelledby="templates-heading">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-4">
         <div>
-          <h2 id="templates-heading" className="text-lg font-bold text-ink">
+          <h2 id="templates-heading" className="text-heading font-semibold text-ink">
             Message templates
           </h2>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-body text-muted">
             Only these can be sent. Nothing else goes out from this account.
           </p>
         </div>
         {canManage && draft === null && (
-          <Button onClick={() => setDraft({ ...EMPTY_DRAFT })} variant="commit">
-            Add Template
+          <Button onClick={() => setDraft({ ...EMPTY_DRAFT })} variant="primary">
+            Add template
           </Button>
         )}
       </div>
@@ -152,7 +153,7 @@ export default function TemplateManager({
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
@@ -180,7 +181,7 @@ export default function TemplateManager({
           </div>
 
           <div>
-            <label htmlFor="template-body" className="mb-1.5 block text-sm font-medium text-ink">
+            <label htmlFor="template-body" className="mb-1.5 block text-body font-medium text-ink">
               Message
             </label>
             <textarea
@@ -194,11 +195,11 @@ export default function TemplateManager({
               maxLength={4000}
               aria-invalid={badTokens.length > 0}
               aria-describedby="template-body-help"
-              className={`block w-full rounded-md border bg-canvas px-3 py-2 text-sm outline-none transition-colors   ${badTokens.length > 0 ? "border-line focus:border-line" : "border-line"}`}
+              className={`block w-full rounded-lg border bg-canvas px-3 py-2 text-body outline-none transition-colors   ${badTokens.length > 0 ? "border-line focus:border-line" : "border-line"}`}
             />
             <p
               id="template-body-help"
-              className={`mt-2 text-xs ${
+              className={`mt-2 text-meta ${
                 badTokens.length > 0
                   ? "text-alert-ink"
                   : "text-muted"
@@ -215,7 +216,7 @@ export default function TemplateManager({
                   <button
                     type="button"
                     onClick={() => insertPlaceholder(token)}
-                    className="min-h-8 rounded-md bg-canvas px-2.5 text-xs font-medium text-ink hover:bg-canvas-deep hover:border-line transition-colors shadow-neu-raised-sm"
+                    className="min-h-8 rounded-lg bg-canvas px-2.5 text-meta font-medium text-ink hover:bg-canvas-deep hover:border-line transition-colors border border-line shadow-card"
                   >
                     {PLACEHOLDER_LABELS[token]}
                   </button>
@@ -280,7 +281,7 @@ export default function TemplateManager({
             <Button
               type="submit"
               disabled={!canSave || isSaving}
-              variant="commit"
+              variant="primary"
               isBusy={isSaving}
               busyLabel="Saving…"
             >
@@ -299,9 +300,9 @@ export default function TemplateManager({
       )}
 
       {templates.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
+        <div className="rounded-3xl border border-line bg-canvas px-6 py-10 text-center shadow-card">
           <p className="mb-1 font-semibold text-ink">No templates yet</p>
-          <p className="text-sm text-muted">
+          <p className="text-body text-muted">
             {canManage
               ? "Add one before anything can be sent to patients."
               : "Ask an admin to add one before you can message patients."}
@@ -312,23 +313,23 @@ export default function TemplateManager({
           {templates.map((template) => (
             <li
               key={template.id}
-              className="rounded-xl bg-canvas p-5 shadow-neu-raised-sm"
+              className="rounded-2xl border border-line bg-canvas p-5 shadow-card"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
                 <p className="font-semibold text-ink">{template.name}</p>
                 {template.mediaType && (
-                  <span className="rounded-md bg-canvas-deep px-2 py-1 text-xs font-medium text-muted">
+                  <span className="rounded-lg bg-canvas-deep px-2 py-1 text-meta font-medium text-muted">
                     {template.mediaType}
                   </span>
                 )}
               </div>
 
-              <p className="whitespace-pre-wrap text-sm text-ink">
+              <p className="whitespace-pre-wrap text-body text-ink">
                 {template.body}
               </p>
 
               {template.footer && (
-                <p className="mt-3 text-xs text-faint">
+                <p className="mt-3 text-meta text-faint">
                   {template.footer}
                 </p>
               )}
@@ -355,7 +356,7 @@ export default function TemplateManager({
                     type="button"
                     onClick={() => handleDelete(template.id)}
                     disabled={removingId === template.id}
-                    className="min-h-10 rounded-md px-3 text-sm font-medium text-muted hover:bg-canvas-deep hover:text-ink disabled:opacity-50 transition-colors"
+                    className="min-h-10 rounded-lg px-3 text-body font-medium text-muted hover:bg-canvas-deep hover:text-ink disabled:opacity-50 transition-colors"
                   >
                     {removingId === template.id ? "Removing…" : "Remove"}
                   </button>

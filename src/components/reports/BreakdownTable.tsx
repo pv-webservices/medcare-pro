@@ -35,11 +35,11 @@ export default function BreakdownTable({
   actions,
 }: BreakdownTableProps) {
   return (
-    <section aria-labelledby={`breakdown-${entityLabel.toLowerCase()}`} className="viz-root pt-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section aria-labelledby={`breakdown-${entityLabel.toLowerCase()}`} className="viz-root">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2
           id={`breakdown-${entityLabel.toLowerCase()}`}
-          className="text-lg font-bold text-ink"
+          className="text-heading font-semibold text-ink"
         >
           {title}
         </h2>
@@ -47,27 +47,25 @@ export default function BreakdownTable({
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-          <p className="text-sm font-medium text-muted">
-            {emptyMessage}
-          </p>
+        <div className="rounded-3xl border border-line bg-canvas px-6 py-10 text-center shadow-card">
+          <p className="text-body text-muted">{emptyMessage}</p>
         </div>
       ) : (
         <Card isFlush>
           <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-line bg-canvas-deep/50">
-                <th scope="col" className="py-3 pl-4 pr-4 text-sm font-semibold text-ink">
+              <tr className="border-b border-line bg-canvas-deep">
+                <th scope="col" className="px-4 py-2.5 text-micro font-semibold uppercase text-muted">
                   {entityLabel}
                 </th>
-                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-ink">
+                <th scope="col" className="px-4 py-2.5 text-right text-micro font-semibold uppercase text-muted">
                   Registrations
                 </th>
-                <th scope="col" className="py-3 pr-4 text-right text-sm font-semibold text-ink">
+                <th scope="col" className="px-4 py-2.5 text-right text-micro font-semibold uppercase text-muted">
                   Revenue
                 </th>
-                <th scope="col" className="w-32 py-3 pr-4 text-sm font-semibold text-ink">
+                <th scope="col" className="w-36 px-4 py-2.5 text-micro font-semibold uppercase text-muted">
                   Share
                 </th>
               </tr>
@@ -76,20 +74,20 @@ export default function BreakdownTable({
               {rows.map((row) => (
                 <tr
                   key={row.id ?? "unassigned"}
-                  className="border-b border-line last:border-0 hover:bg-canvas-deep/50 transition-colors"
+                  className="border-b border-line transition-colors duration-150 last:border-0 hover:bg-canvas-deep"
                 >
-                  <td className="py-3 pl-4 pr-4 text-sm font-medium text-ink">{row.name}</td>
-                  <td className="py-3 pr-4 text-right text-sm tabular-nums text-muted">
+                  <td className="px-4 py-3 text-body font-medium text-ink">{row.name}</td>
+                  <td className="tnum px-4 py-3 text-right text-body text-muted">
                     {row.registrations}
                   </td>
-                  <td className="py-3 pr-4 text-right text-sm font-medium tabular-nums text-ink">
+                  <td className="tnum px-4 py-3 text-right text-body font-medium text-ink">
                     {formatRupees(row.revenue)}
                   </td>
-                  <td className="py-3 pr-4">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div
                         aria-hidden="true"
-                        className="h-2 flex-1 overflow-hidden rounded-full bg-canvas-deep"
+                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-canvas-deep"
                       >
                         <div
                           className="h-full rounded-full"
@@ -99,7 +97,7 @@ export default function BreakdownTable({
                           }}
                         />
                       </div>
-                      <span className="w-11 shrink-0 text-right text-xs font-medium tabular-nums text-muted">
+                      <span className="w-11 shrink-0 text-right text-meta font-medium tnum text-muted">
                         {row.sharePercent.toFixed(1)}%
                       </span>
                     </div>

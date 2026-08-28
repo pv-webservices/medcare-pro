@@ -24,10 +24,10 @@ import { cx } from "@/components/ui/cx";
  * front desk has to act on, and a message that disappears before it is read is
  * the same as no message. That asymmetry is the whole point of the component.
  *
- * It is the only surface in the app that uses `shadow-neu-float`. A toast has
- * to read as being in front of the page rather than part of it, and the raised
- * shadow every card already wears cannot say that — so this one gets real
- * elevation on top of the neumorphic pair.
+ * It is one of the few surfaces that uses `shadow-float`. A toast has
+ * to read as being in front of the page rather than part of it, and the card
+ * shadow every surface already wears cannot say that — so this one gets real
+ * elevation and a hairline.
  */
 
 export type ToastTone = "ok" | "alert";
@@ -121,7 +121,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
  * shapes before they are different hues.
  */
 const TILES: Record<ToastTone, string> = {
-  ok: "bg-accent text-accent-ink",
+  ok: "bg-ok-bg text-ok-ink",
   alert: "bg-alert-bg text-alert-ink",
 };
 
@@ -143,7 +143,7 @@ function ToastCard({
     <div
       role={toast.tone === "alert" ? "alert" : "status"}
       aria-live={toast.tone === "alert" ? "assertive" : "polite"}
-      className="pointer-events-auto flex items-start gap-3 rounded-3xl bg-canvas px-4 py-4 shadow-neu-float"
+      className="pointer-events-auto flex items-start gap-3 rounded-3xl border border-line bg-canvas px-4 py-3.5 shadow-float"
     >
       <span
         aria-hidden="true"
@@ -165,7 +165,7 @@ function ToastCard({
       <button
         type="button"
         onClick={() => onDismiss(toast.id)}
-        className="-mr-1 rounded-full p-2 text-muted transition-shadow duration-200 hover:text-ink hover:shadow-neu-raised-sm active:shadow-neu-pressed"
+        className="-mr-1 rounded-xl p-2 text-muted transition-colors duration-150 hover:bg-canvas-deep hover:text-ink"
       >
         <span className="sr-only">Dismiss</span>
         <X aria-hidden="true" strokeWidth={2} className="h-4 w-4" />

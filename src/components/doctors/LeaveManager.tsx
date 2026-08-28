@@ -123,16 +123,16 @@ export default function LeaveManager({
         }`}
       >
         <div>
-          <p className="text-sm font-semibold text-ink">
+          <p className="text-body font-semibold text-ink">
             {formatRange(entry)}
             {isActiveNow && (
-              <span className="ml-3 rounded-md bg-warn-bg px-2.5 py-1 text-xs font-semibold text-warn-ink">
+              <span className="ml-3 rounded-md bg-warn-bg px-2.5 py-1 text-meta font-semibold text-warn-ink">
                 Away now
               </span>
             )}
           </p>
           {entry.reason && (
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-body text-muted">
               {entry.reason}
             </p>
           )}
@@ -143,7 +143,7 @@ export default function LeaveManager({
             onClick={() => handleRemove(entry.id)}
             disabled={removingId === entry.id}
             aria-label={`Remove leave ${formatRange(entry)}`}
-            className="min-h-9 rounded-md px-3 text-xs font-medium text-muted hover:bg-canvas-deep hover:text-ink disabled:opacity-50 transition-colors"
+            className="min-h-9 rounded-md px-3 text-meta font-medium text-muted hover:bg-canvas-deep hover:text-ink disabled:opacity-50 transition-colors"
           >
             {removingId === entry.id ? "Removing…" : "Remove"}
           </button>
@@ -154,14 +154,14 @@ export default function LeaveManager({
 
   return (
     <section aria-labelledby="leave-heading" className="space-y-4">
-      <h2 id="leave-heading" className="text-lg font-bold text-ink">
+      <h2 id="leave-heading" className="text-heading font-semibold text-ink">
         Leave
       </h2>
 
       {error && (
         <p
           role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-sm text-alert-ink"
+          className="rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
@@ -206,7 +206,7 @@ export default function LeaveManager({
             <div className="sm:col-span-2">
               <Button
                 type="submit"
-                variant="commit"
+                variant="primary"
                 isBusy={isSaving}
                 busyLabel="Recording…"
               >
@@ -218,8 +218,8 @@ export default function LeaveManager({
       )}
 
       {entries.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center shadow-neu-raised-sm">
-          <p className="text-sm font-medium text-muted">
+        <div className="rounded-2xl bg-canvas px-6 py-8 text-center border border-line shadow-card">
+          <p className="text-body font-medium text-muted">
             No leave recorded.
           </p>
         </div>
@@ -229,7 +229,7 @@ export default function LeaveManager({
 
           {ended.length > 0 && (
             <details className="mt-4 border-t border-line pt-4 group">
-              <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
+              <summary className="cursor-pointer text-body font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
                 <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
                 Past leave ({ended.length})
               </summary>
