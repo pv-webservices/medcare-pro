@@ -111,6 +111,12 @@ export interface RevenueReport {
   hasClinics: boolean;
 }
 
+export interface DailyRevenueSnapshot {
+  /** Exact decimal string, using the same definition as the Reports module. */
+  totalRevenue: string;
+  hasClinics: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Value coercion
 //
@@ -506,6 +512,41 @@ export async function getRevenueReport(
     byClinic,
     byDoctor,
     clinicName,
+    hasClinics: true,
+  };
+}
+
+/**
+ * The dashboard's deliberately small financial view.
+ *
+ * This follows the exact same scope resolver, date window, registration filter
+ * and Decimal normalisation as `getRevenueReport`. Keeping this focused avoids
+ * building clinic/doctor breakdowns and a historical series merely to render
+ * one operational KPI, while guaranteeing that Reports and Dashboard cannot
+ * disagree about what a rupee of revenue means.
+ */
+export async function getDailyRevenueSnapshot(
+  actor: ActorContext,
+  selectedClinicId: string | null | undefined,
+  date: Date,
+): Promise<DailyRevenueSnapshot> {
+  const clinics = await resolveReportClinics(actor, selectedClinicId, [
+    REPORT_VIEW_PERMISSION,
+  ]);
+  const clinicIds = clinics.map((clinic) => clinic.id);
+
+  if (clinicIds.length === 0) {
+    return { totalRevenue: "0.00", hasClinics: false };
+  }
+
+  const range = currentRange("daily", date);
+  const aggregate = await prisma.registration.aggregate({
+    where: registrationsIn(clinicIds, range),
+    _sum: { amount: true },
+  });
+
+  return {
+    totalRevenue: toDecimalString(aggregate._sum.amount),
     hasClinics: true,
   };
 }

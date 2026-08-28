@@ -12,33 +12,33 @@ export default function Loading() {
       {/* KPIs */}
       <MetricSkeleton />
 
-      {/* Trend + today */}
+      {/* Primary schedule + operational summary */}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card xl:col-span-2">
-          <Skeleton className="h-3 w-40" />
-          <Skeleton className="mt-5 h-56 w-full" />
+          <Skeleton className="h-3 w-36" />
+          <SkeletonText className="mt-5" lines={6} />
         </div>
         <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
-          <Skeleton className="h-3 w-20" />
-          <SkeletonText className="mt-5" lines={4} />
+          <Skeleton className="h-3 w-40" />
+          <SkeletonText className="mt-5" lines={6} />
         </div>
       </div>
 
-      {/* Clinic performance */}
-      <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
-        <Skeleton className="h-3 w-44" />
-        <SkeletonText className="mt-5" lines={4} />
+      {/* Registrations + doctor availability */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
+          <Skeleton className="h-3 w-44" />
+          <SkeletonText className="mt-5" lines={5} />
+        </div>
+        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
+          <Skeleton className="h-3 w-40" />
+          <SkeletonText className="mt-5" lines={5} />
+        </div>
       </div>
 
-      {/* Doctor performance */}
-      <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
-        <Skeleton className="h-3 w-32" />
-        <SkeletonText className="mt-5" lines={4} />
-      </div>
-
-      {/* Activity + attention */}
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card xl:col-span-2">
+      {/* Activity + notifications */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
           <Skeleton className="h-3 w-36" />
           <SkeletonText className="mt-5" lines={5} />
         </div>

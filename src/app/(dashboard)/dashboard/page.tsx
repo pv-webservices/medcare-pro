@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
+import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import {
   Avatar,
@@ -30,10 +31,13 @@ import {
   presetRange,
   trendInterval,
 } from "@/lib/dashboardDateRange";
+import { getAdminDashboardData } from "@/lib/adminDashboard";
+import { isDateOnly, todayDateOnly } from "@/lib/dates";
 import { getAccountDashboardData, type DashboardData } from "@/lib/dashboard";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
+import { permissionsHeldAnywhere } from "@/lib/rbac";
 import { requireActor } from "@/lib/session";
 
 // ---------------------------------------------------------------------------
@@ -103,14 +107,26 @@ export default async function DashboardPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await props.searchParams;
+  const actor = await requireActor();
+  const held = await permissionsHeldAnywhere(actor);
+  const selectedClinicId = await resolveSelectedClinicId(actor);
+  const now = new Date();
+
+  // The wildcard is the account-owner boundary already enforced throughout
+  // the RBAC layer. Everyone else gets the operational dashboard, whose data
+  // service adapts widget-by-widget to granular permissions and module access.
+  if (!held.all) {
+    const today = todayDateOnly(now);
+    const requestedDate = Array.isArray(params.date) ? params.date[0] : params.date;
+    const date = requestedDate && isDateOnly(requestedDate) ? requestedDate : today;
+    const data = await getAdminDashboardData(actor, selectedClinicId, date);
+
+    return <AdminDashboard data={data} today={today} now={now} />;
+  }
+
   const preset = parsePreset(
     typeof params.range === "string" ? params.range : undefined,
   );
-
-  const actor = await requireActor();
-  const selectedClinicId = await resolveSelectedClinicId(actor);
-
-  const now = new Date();
   const range = presetRange(preset, now);
   const interval = trendInterval(preset);
   const deltaCaption = comparisonLabel(preset);

@@ -138,34 +138,63 @@ export type ClinicScope =
   | { scope: "clinics"; clinicIds: readonly string[] }
   | { scope: "none" };
 
-export async function accessibleClinicScope(
+/**
+ * Resolves several permission scopes with one assignment query.
+ *
+ * Dashboards need to decide which widgets may run before they issue any data
+ * queries. Calling `accessibleClinicScope` once per widget would re-read the
+ * same role assignments for every card, so this batched form keeps the RBAC
+ * rule in one place without turning a dashboard render into an N+1 permission
+ * check. Every requested key is present in the returned map; an unknown or
+ * ungranted key resolves to `none`.
+ */
+export async function accessibleClinicScopes(
   actor: ActorContext,
-  permission: string,
-): Promise<ClinicScope> {
+  permissions: readonly string[],
+): Promise<ReadonlyMap<string, ClinicScope>> {
+  const requested = [...new Set(permissions)];
   const assignments = await prisma.userRole.findMany({
     where: { userId: actor.userId, role: { tenantId: actor.tenantId } },
     select: { clinicId: true, role: { select: { permissions: true } } },
   });
 
-  const granting = assignments.filter((assignment) => {
-    const permissions = toPermissionList(assignment.role.permissions);
-    return permissions.includes(WILDCARD) || permissions.includes(permission);
-  });
+  return new Map<string, ClinicScope>(
+    requested.map((permission) => {
+      const granting = assignments.filter((assignment) => {
+        const granted = toPermissionList(assignment.role.permissions);
+        return granted.includes(WILDCARD) || granted.includes(permission);
+      });
 
-  if (granting.length === 0) {
-    return { scope: "none" };
-  }
+      if (granting.length === 0) {
+        return [permission, { scope: "none" } satisfies ClinicScope] as const;
+      }
 
-  // A single tenant-wide grant outranks every clinic-scoped one.
-  if (granting.some((assignment) => assignment.clinicId === null)) {
-    return { scope: "all" };
-  }
+      if (granting.some((assignment) => assignment.clinicId === null)) {
+        return [permission, { scope: "all" } satisfies ClinicScope] as const;
+      }
 
-  const clinicIds = granting
-    .map((assignment) => assignment.clinicId)
-    .filter((id): id is string => id !== null);
+      const clinicIds = [
+        ...new Set(
+          granting
+            .map((assignment) => assignment.clinicId)
+            .filter((id): id is string => id !== null),
+        ),
+      ];
 
-  return { scope: "clinics", clinicIds };
+      return [
+        permission,
+        { scope: "clinics", clinicIds } satisfies ClinicScope,
+      ] as const;
+    }),
+  );
+}
+
+export async function accessibleClinicScope(
+  actor: ActorContext,
+  permission: string,
+): Promise<ClinicScope> {
+  const scopes = await accessibleClinicScopes(actor, [permission]);
+  return scopes.get(permission) ?? { scope: "none" };
 }
 
 /**
