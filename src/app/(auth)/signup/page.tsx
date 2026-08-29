@@ -386,8 +386,11 @@ function SignupContent() {
                         label="Phone"
                         autoComplete="tel"
                         required
+                        maxLength={32}
+                        pattern="^[0-9+()\-.\s]+$"
+                        title="Enter a valid phone number (7-15 digits)"
                         value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
+                        onChange={(event) => setPhone(event.target.value.replace(/[^0-9+()\-\.\s]/g, ''))}
                         icon={<Phone className="h-[18px] w-[18px]" strokeWidth={2} />}
                         className={inputClass}
                       />
