@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DASHBOARD_LAYOUT_VERSION,
+  DASHBOARD_SIZE_SPANS,
   DASHBOARD_WIDGET_LIST,
+  DASHBOARD_WIDGET_SIZES,
+  DASHBOARD_WIDGETS,
   dashboardDataGroupsForWidgetIds,
   dashboardLayoutInputSchema,
   filterDashboardLayout,
@@ -44,7 +47,7 @@ describe("dashboard widget registry", () => {
 
     expect(layout.version).toBe(DASHBOARD_LAYOUT_VERSION);
     expect(layout.widgets[0]).toMatchObject({ widgetId: "task-overview", visible: false, size: "large", order: 0 });
-    expect(layout.widgets.find((widget) => widget.widgetId === "total-patients")?.size).toBe("small");
+    expect(layout.widgets.find((widget) => widget.widgetId === "total-patients")?.size).toBe("full");
     expect(layout.widgets.map((widget) => widget.widgetId)).not.toContain("removed-widget");
     expect(layout.widgets).toHaveLength(DASHBOARD_WIDGET_LIST.length);
   });
@@ -55,7 +58,7 @@ describe("dashboard widget registry", () => {
       { widgetId: "total-patients", order: 0, visible: true, size: "small" },
       { widgetId: "total-patients", order: 1, visible: false, size: "small" },
     ] }).success).toBe(false);
-    expect(dashboardLayoutInputSchema.safeParse({ version: 1, widgets: [{ widgetId: "total-patients", order: 0, visible: true, size: "full" }] }).success).toBe(false);
+    expect(dashboardLayoutInputSchema.safeParse({ version: 1, widgets: [{ widgetId: "patient-overview", order: 0, visible: true, size: "small" }] }).success).toBe(false);
     expect(dashboardLayoutInputSchema.safeParse({ version: 1, userId: "someone-else", widgets: [] }).success).toBe(false);
   });
 
@@ -90,13 +93,68 @@ describe("dashboard widget registry", () => {
     expect(groups).toEqual(new Set(["doctors", "revenue"]));
   });
 
-  it("uses logical order at every breakpoint and only changes desktop spans", () => {
-    const compactClasses = widgetGridClass("total-patients", "small").split(" ");
+  it("maps each semantic size to one global responsive width", () => {
+    expect(DASHBOARD_SIZE_SPANS).toEqual({ small: 3, medium: 6, large: 9, full: 12 });
+    const compactClasses = widgetGridClass("small").split(" ");
     expect(compactClasses).toContain("xl:col-span-3");
-    expect(compactClasses.every((className) => className.startsWith("lg:") || className.startsWith("xl:"))).toBe(true);
-    expect(widgetGridClass("patient-overview", "medium")).toContain("xl:col-span-6");
-    expect(widgetGridClass("revenue-trend", "large")).toContain("xl:col-span-8");
-    expect(widgetGridClass("doctor-overview", "full")).toContain("xl:col-span-12");
+    expect(widgetGridClass("medium")).toContain("xl:col-span-6");
+    expect(widgetGridClass("large")).toContain("xl:col-span-9");
+    expect(widgetGridClass("full")).toContain("xl:col-span-12");
     expect(all.size).toBe(DASHBOARD_WIDGET_LIST.length);
+  });
+
+  it("keeps size options in the shared semantic order", () => {
+    const rank = new Map(DASHBOARD_WIDGET_SIZES.map((size, index) => [size, index]));
+    for (const widget of DASHBOARD_WIDGET_LIST) {
+      expect(widget.allowedSizes).toEqual(
+        [...widget.allowedSizes].sort((a, b) => rank.get(a)! - rank.get(b)!),
+      );
+    }
+  });
+
+  it("allows KPI expansion while keeping complex widgets at medium or larger", () => {
+    const kpiIds = [
+      "total-patients",
+      "todays-appointments",
+      "todays-collection",
+      "month-revenue",
+      "active-doctors",
+      "pending-tasks",
+      "message-acceptance",
+      "revenue-summary",
+    ] as const;
+    for (const widgetId of kpiIds) {
+      expect(DASHBOARD_WIDGETS.get(widgetId)?.allowedSizes).toEqual(DASHBOARD_WIDGET_SIZES);
+    }
+
+    const complexIds = [
+      "patient-overview",
+      "appointment-overview",
+      "revenue-trend",
+      "revenue-by-doctor",
+      "today-schedule",
+      "recent-patient-activity",
+      "doctor-overview",
+      "message-health",
+      "task-overview",
+      "clinic-performance",
+    ] as const;
+    for (const widgetId of complexIds) {
+      const sizes = DASHBOARD_WIDGETS.get(widgetId)?.allowedSizes;
+      expect(sizes).toEqual(["medium", "large", "full"]);
+      expect(sizes).not.toContain("small");
+    }
+  });
+
+  it("normalizes a historical size that a complex widget no longer supports", () => {
+    const layout = normalizeDashboardLayout({
+      version: 1,
+      widgets: [{ widgetId: "recent-patient-activity", order: 0, visible: true, size: "small" }],
+    });
+    expect(layout.widgets[0]).toMatchObject({
+      widgetId: "recent-patient-activity",
+      size: "medium",
+      order: 0,
+    });
   });
 });

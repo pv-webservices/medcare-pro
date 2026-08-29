@@ -6,6 +6,14 @@ export const DASHBOARD_LAYOUT_VERSION = 1 as const;
 export const DASHBOARD_WIDGET_SIZES = ["small", "medium", "large", "full"] as const;
 export type DashboardWidgetSize = (typeof DASHBOARD_WIDGET_SIZES)[number];
 
+/** Semantic size is the only source of dashboard width. */
+export const DASHBOARD_SIZE_SPANS: Readonly<Record<DashboardWidgetSize, number>> = {
+  small: 3,
+  medium: 6,
+  large: 9,
+  full: 12,
+};
+
 export const DASHBOARD_WIDGET_CATEGORIES = [
   "summary",
   "patients",
@@ -64,8 +72,6 @@ export interface DashboardWidgetDefinition {
   defaultSize: DashboardWidgetSize;
   allowedSizes: readonly DashboardWidgetSize[];
   category: DashboardWidgetCategory;
-  /** Desktop grid columns out of twelve. Sizes remain semantic per widget. */
-  spans: Readonly<Partial<Record<DashboardWidgetSize, number>>>;
 }
 
 const kpi = (
@@ -85,9 +91,8 @@ const kpi = (
   dataGroup,
   defaultVisible: true,
   defaultSize: "small",
-  allowedSizes: ["small"],
+  allowedSizes: DASHBOARD_WIDGET_SIZES,
   category,
-  spans: { small: 3 },
 });
 
 export const DASHBOARD_WIDGET_LIST = [
@@ -97,7 +102,7 @@ export const DASHBOARD_WIDGET_LIST = [
   kpi("month-revenue", "Month-to-date revenue", "Collections recorded this month.", "dashboard:revenue:view", MODULE_FEATURES.reports, "revenue", "summary"),
   kpi("active-doctors", "Active doctors", "Current doctor coverage and availability.", "dashboard:doctors:view", MODULE_FEATURES.doctors, "doctors", "summary"),
   kpi("pending-tasks", "Pending tasks", "Personal pending and overdue work.", "dashboard:tasks:view", MODULE_FEATURES.tasks, "tasks", "summary"),
-  { ...kpi("message-acceptance", "Message acceptance", "Today's stored messaging outcomes.", "dashboard:messages:view", MODULE_FEATURES.whatsapp, "messages", "summary"), spans: { small: 6 } },
+  kpi("message-acceptance", "Message acceptance", "Today's stored messaging outcomes.", "dashboard:messages:view", MODULE_FEATURES.whatsapp, "messages", "summary"),
   {
     id: "patient-overview",
     title: "Patient overview",
@@ -109,7 +114,6 @@ export const DASHBOARD_WIDGET_LIST = [
     defaultSize: "medium",
     allowedSizes: ["medium", "large", "full"],
     category: "patients",
-    spans: { medium: 6, large: 8, full: 12 },
   },
   {
     id: "appointment-overview",
@@ -122,7 +126,6 @@ export const DASHBOARD_WIDGET_LIST = [
     defaultSize: "medium",
     allowedSizes: ["medium", "large", "full"],
     category: "appointments",
-    spans: { medium: 6, large: 8, full: 12 },
   },
   {
     id: "revenue-trend",
@@ -135,7 +138,6 @@ export const DASHBOARD_WIDGET_LIST = [
     defaultSize: "large",
     allowedSizes: ["medium", "large", "full"],
     category: "revenue",
-    spans: { medium: 6, large: 8, full: 12 },
   },
   {
     id: "revenue-summary",
@@ -146,9 +148,8 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "revenue",
     defaultVisible: true,
     defaultSize: "small",
-    allowedSizes: ["small", "medium"],
+    allowedSizes: DASHBOARD_WIDGET_SIZES,
     category: "revenue",
-    spans: { small: 4, medium: 6 },
   },
   {
     id: "revenue-by-doctor",
@@ -159,9 +160,8 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "revenue",
     defaultVisible: true,
     defaultSize: "full",
-    allowedSizes: ["large", "full"],
+    allowedSizes: ["medium", "large", "full"],
     category: "revenue",
-    spans: { large: 8, full: 12 },
   },
   {
     id: "today-schedule",
@@ -174,7 +174,6 @@ export const DASHBOARD_WIDGET_LIST = [
     defaultSize: "large",
     allowedSizes: ["medium", "large", "full"],
     category: "appointments",
-    spans: { medium: 6, large: 8, full: 12 },
   },
   {
     id: "recent-patient-activity",
@@ -185,9 +184,8 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "activity",
     defaultVisible: true,
     defaultSize: "medium",
-    allowedSizes: ["small", "medium", "large"],
+    allowedSizes: ["medium", "large", "full"],
     category: "activity",
-    spans: { small: 4, medium: 4, large: 8 },
   },
   {
     id: "doctor-overview",
@@ -199,9 +197,8 @@ export const DASHBOARD_WIDGET_LIST = [
     additionalDataGroups: ["revenue"],
     defaultVisible: true,
     defaultSize: "full",
-    allowedSizes: ["large", "full"],
+    allowedSizes: ["medium", "large", "full"],
     category: "doctors",
-    spans: { large: 8, full: 12 },
   },
   {
     id: "message-health",
@@ -214,7 +211,6 @@ export const DASHBOARD_WIDGET_LIST = [
     defaultSize: "medium",
     allowedSizes: ["medium", "large", "full"],
     category: "messages",
-    spans: { medium: 6, large: 8, full: 12 },
   },
   {
     id: "task-overview",
@@ -227,7 +223,6 @@ export const DASHBOARD_WIDGET_LIST = [
     defaultSize: "medium",
     allowedSizes: ["medium", "large", "full"],
     category: "tasks",
-    spans: { medium: 6, large: 8, full: 12 },
   },
   {
     id: "clinic-performance",
@@ -238,9 +233,8 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "clinics",
     defaultVisible: true,
     defaultSize: "full",
-    allowedSizes: ["large", "full"],
+    allowedSizes: ["medium", "large", "full"],
     category: "summary",
-    spans: { large: 8, full: 12 },
   },
 ] as const satisfies readonly DashboardWidgetDefinition[];
 
@@ -386,15 +380,18 @@ export function visibleDashboardWidgetIds(layout: DashboardLayoutConfig): Set<Da
   return new Set(layout.widgets.filter((widget) => widget.visible).map((widget) => widget.widgetId));
 }
 
-export function widgetGridClass(widgetId: DashboardWidgetId, size: DashboardWidgetSize): string {
-  const span = DASHBOARD_WIDGETS.get(widgetId)?.spans[size] ?? 12;
+export function widgetGridClass(size: DashboardWidgetSize): string {
+  const responsive = {
+    small: "sm:col-span-1 lg:col-span-6",
+    medium: "sm:col-span-2 lg:col-span-6",
+    large: "sm:col-span-2 lg:col-span-12",
+    full: "sm:col-span-2 lg:col-span-12",
+  }[size];
   const desktop = {
     3: "xl:col-span-3",
-    4: "xl:col-span-4",
     6: "xl:col-span-6",
-    8: "xl:col-span-8",
+    9: "xl:col-span-9",
     12: "xl:col-span-12",
-  }[span] ?? "xl:col-span-12";
-  const laptop = span <= 6 ? "lg:col-span-6" : "lg:col-span-12";
-  return `${laptop} ${desktop}`;
+  }[DASHBOARD_SIZE_SPANS[size]];
+  return `${responsive} ${desktop}`;
 }

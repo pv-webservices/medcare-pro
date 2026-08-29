@@ -4,16 +4,22 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
+  useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  arrayMove,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
@@ -44,6 +50,7 @@ import {
   type DashboardWidgetId,
   type DashboardWidgetPreference,
 } from "@/lib/dashboardWidgets";
+import { reorderVisibleDashboardWidgets } from "@/lib/dashboardWidgetOrder";
 import type { ApiResponse } from "@/lib/utils";
 
 export interface DashboardWidgetSlot {
@@ -73,6 +80,24 @@ const CATEGORY_LABELS: Record<DashboardWidgetCategory, string> = {
   messages: "Messages",
   activity: "Activity",
 };
+
+const END_DROP_ID = "dashboard-layout-end";
+
+const dashboardCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+
+  const intersectingCollisions = rectIntersection(args);
+  if (intersectingCollisions.length > 0) return intersectingCollisions;
+
+  return closestCenter(args);
+};
+
+function dashboardWidgetId(value: UniqueIdentifier | null | undefined): DashboardWidgetId | null {
+  if (value === null || value === undefined) return null;
+  const candidate = String(value) as DashboardWidgetId;
+  return DASHBOARD_WIDGETS.has(candidate) ? candidate : null;
+}
 
 function ordered(items: readonly DashboardWidgetPreference[]): DashboardWidgetPreference[] {
   return [...items]
@@ -105,7 +130,7 @@ function SortableWidget({
   onMove: (to: number) => void;
 }) {
   const definition = DASHBOARD_WIDGETS.get(item.widgetId)!;
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.widgetId });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({ id: item.widgetId });
 
   return (
     <div
@@ -113,8 +138,9 @@ function SortableWidget({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cx(
         "min-w-0 rounded-2xl border border-dashed border-accent/35 bg-accent-soft/20 p-1.5 motion-reduce:transition-none",
-        widgetGridClass(item.widgetId, item.size),
-        isDragging && "relative z-30 border-accent bg-canvas shadow-float",
+        widgetGridClass(item.size),
+        isOver && !isDragging && "border-accent bg-accent-soft/35 shadow-raised",
+        isDragging && "relative z-30 border-accent/70 bg-accent-soft/30 opacity-35 shadow-none",
       )}
     >
       <div className="mb-1.5 flex min-h-10 flex-wrap items-center gap-1 px-1">
@@ -157,6 +183,39 @@ function SortableWidget({
   );
 }
 
+function EndDropZone() {
+  const { isOver, setNodeRef } = useDroppable({ id: END_DROP_ID });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cx(
+        "flex min-h-12 items-center justify-center rounded-2xl border border-dashed text-meta font-semibold transition-colors sm:col-span-2 lg:col-span-12",
+        "border-line bg-canvas-deep/50 text-muted",
+        isOver && "border-accent bg-accent-soft text-accent-soft-ink",
+      )}
+    >
+      Drop here to move to the end
+    </div>
+  );
+}
+
+function WidgetDragOverlay({ item }: { item: DashboardWidgetPreference | null }) {
+  if (!item) return null;
+  const definition = DASHBOARD_WIDGETS.get(item.widgetId);
+  if (!definition) return null;
+  return (
+    <div className="flex w-72 max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-accent bg-canvas px-4 py-3 shadow-float">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink">
+        <GripVertical className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-label font-semibold text-ink">{definition.title}</span>
+        <span className="block text-meta capitalize text-muted">{item.size}</span>
+      </span>
+    </div>
+  );
+}
+
 export default function DashboardLayoutEditor({
   initialLayout,
   widgets,
@@ -174,13 +233,15 @@ export default function DashboardLayoutEditor({
   const [isEditing, setIsEditing] = useState(startInEditMode);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<DashboardWidgetId | null>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const slots = useMemo(() => new Map(widgets.map((widget) => [widget.id, widget.content])), [widgets]);
   const changed = JSON.stringify(items) !== JSON.stringify(persisted);
   const visible = items.filter((item) => item.visible);
+  const activeItem = activeId ? items.find((item) => item.widgetId === activeId) ?? null : null;
 
   useEffect(() => {
     if (!changed) return;
@@ -194,19 +255,29 @@ export default function DashboardLayoutEditor({
     setMessage(null);
   }
 
-  function move(widgetId: DashboardWidgetId, to: number) {
-    setItems((current) => {
-      const from = current.findIndex((item) => item.widgetId === widgetId);
-      return from < 0 ? current : ordered(arrayMove(current, from, Math.max(0, Math.min(to, current.length - 1))));
-    });
+  function move(widgetId: DashboardWidgetId, targetId: DashboardWidgetId) {
+    setItems((current) => reorderVisibleDashboardWidgets(current, widgetId, targetId));
     setMessage(null);
   }
 
+  function onDragStart(event: DragStartEvent) {
+    setActiveId(dashboardWidgetId(event.active.id));
+  }
+
   function onDragEnd(event: DragEndEvent) {
-    if (!event.over || event.active.id === event.over.id) return;
-    const from = items.findIndex((item) => item.widgetId === event.active.id);
-    const to = items.findIndex((item) => item.widgetId === event.over!.id);
-    if (from >= 0 && to >= 0) setItems(ordered(arrayMove(items, from, to)));
+    setActiveId(null);
+    const activeWidgetId = dashboardWidgetId(event.active.id);
+    if (!activeWidgetId || !event.over) return;
+
+    setItems((current) => {
+      const visibleCurrent = current.filter((item) => item.visible);
+      const overWidgetId = event.over?.id === END_DROP_ID
+        ? visibleCurrent.at(-1)?.widgetId ?? null
+        : dashboardWidgetId(event.over?.id);
+      if (!overWidgetId) return current;
+      return reorderVisibleDashboardWidgets(current, activeWidgetId, overWidgetId);
+    });
+    setMessage(null);
   }
 
   async function save() {
@@ -274,8 +345,8 @@ export default function DashboardLayoutEditor({
             <p className="mt-1 text-body text-muted">Customize dashboard to add authorized widgets.</p>
           </div>
         ) : (
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-12">
-            {visible.map((item) => <div key={item.widgetId} className={cx("min-w-0", widgetGridClass(item.widgetId, item.size))}>{slots.get(item.widgetId)}</div>)}
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+            {visible.map((item) => <div key={item.widgetId} className={cx("min-w-0", widgetGridClass(item.size))}>{slots.get(item.widgetId)}</div>)}
           </div>
         )}
       </div>
@@ -321,9 +392,15 @@ export default function DashboardLayoutEditor({
         </div>
       </aside>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={dashboardCollisionDetection}
+        onDragStart={onDragStart}
+        onDragCancel={() => setActiveId(null)}
+        onDragEnd={onDragEnd}
+      >
         <SortableContext items={visible.map((item) => item.widgetId)} strategy={rectSortingStrategy}>
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-12">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
             {visible.map((item, index) => (
               <SortableWidget
                 key={item.widgetId}
@@ -335,13 +412,14 @@ export default function DashboardLayoutEditor({
                 onHide={() => update(item.widgetId, { visible: false })}
                 onMove={(toVisible) => {
                   const targetId = visible[toVisible]?.widgetId;
-                  const to = targetId ? items.findIndex((candidate) => candidate.widgetId === targetId) : items.length - 1;
-                  move(item.widgetId, to);
+                  if (targetId) move(item.widgetId, targetId);
                 }}
               />
             ))}
+            {activeId !== null && visible.length > 1 && <EndDropZone />}
           </div>
         </SortableContext>
+        <DragOverlay><WidgetDragOverlay item={activeItem} /></DragOverlay>
       </DndContext>
     </section>
   );
