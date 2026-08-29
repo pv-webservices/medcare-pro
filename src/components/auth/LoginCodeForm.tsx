@@ -272,13 +272,14 @@ export default function LoginCodeForm({
           describedBy={error ? "login-code-error" : undefined}
           hint="We will email you a six-digit code instead of asking for your password."
           placeholder="you@clinic.com"
+          className="h-[52px] rounded-[14px] bg-white/80 border-[#DDE4F0] focus:border-[#6758FF] focus:ring-1 focus:ring-[#6758FF]"
         />
 
         <AuthButton
           type="submit"
           isBusy={isSubmitting}
           busyLabel="Sending..."
-          className="mt-1 h-[54px] rounded-2xl bg-gradient-to-r from-[#4F91FF] to-[#6557FF] shadow-md hover:shadow-lg hover:from-[#4480EF] hover:to-[#5A4CE6] text-[16px] border-none"
+          className="mt-1 h-[54px] rounded-[14px] bg-gradient-to-r from-[#4C91FF] via-[#615EFF] to-[#7353FF] shadow-[0_4px_14px_rgba(97,94,255,0.25)] hover:shadow-[0_6px_20px_rgba(97,94,255,0.35)] text-[16px] border-none"
         >
           Email me a code <ArrowRight className="ml-1 h-[18px] w-[18px]" />
         </AuthButton>
@@ -318,7 +319,7 @@ export default function LoginCodeForm({
         describedBy={error ? "login-code-error" : undefined}
         hint="The code expires in 10 minutes. It never arrives as a link — do not share it."
         placeholder="123456"
-        className="text-center text-[19px] font-semibold tracking-[0.4em]"
+        className="text-center text-[19px] font-semibold tracking-[0.4em] h-[52px] rounded-[14px] bg-white/80 border-[#DDE4F0] focus:border-[#6758FF] focus:ring-1 focus:ring-[#6758FF]"
         labelAction={
           <button
             type="button"
@@ -349,7 +350,7 @@ export default function LoginCodeForm({
         type="submit"
         isBusy={isSubmitting}
         busyLabel="Checking..."
-        className="mt-1 h-[54px] rounded-2xl bg-gradient-to-r from-[#4F91FF] to-[#6557FF] shadow-md hover:shadow-lg hover:from-[#4480EF] hover:to-[#5A4CE6] text-[16px] border-none"
+        className="mt-1 h-[54px] rounded-[14px] bg-gradient-to-r from-[#4C91FF] via-[#615EFF] to-[#7353FF] shadow-[0_4px_14px_rgba(97,94,255,0.25)] hover:shadow-[0_6px_20px_rgba(97,94,255,0.35)] text-[16px] border-none"
       >
         Sign in <ArrowRight className="ml-1 h-[18px] w-[18px]" />
       </AuthButton>

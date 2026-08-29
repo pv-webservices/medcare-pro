@@ -51,7 +51,7 @@ type LoginMode = (typeof MODES)[number]["id"];
 
 function DashboardPreviewMockup() {
   return (
-    <div className="mt-12 select-none w-full max-w-[500px] rounded-[22px] border border-white/40 bg-white/60 p-5 shadow-[0_8px_32px_rgb(0,0,0,0.04)] backdrop-blur-xl relative hidden md:block">
+    <div className="mt-8 select-none w-full max-w-[520px] rounded-[22px] border border-white/60 bg-white/80 p-5 shadow-[0_20px_60px_rgba(70,82,135,0.10)] backdrop-blur-[10px] relative hidden md:block">
       <div className="flex items-center justify-between border-b border-gray-200/50 pb-4 mb-4">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#4F91FF] to-[#6557FF] text-white shadow-sm">
@@ -222,280 +222,311 @@ function LoginContent() {
   }
 
   return (
-    <div className="auth-scope flex min-h-screen w-full bg-[#FAFCFF] overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 z-0">
-        <div className="absolute top-[-10%] left-[-10%] h-[700px] w-[700px] rounded-full bg-[#E5EDFF] opacity-70 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-5%] h-[600px] w-[600px] rounded-full bg-[#F3E8FF] opacity-60 blur-[140px]" />
-      </div>
+    <div className="auth-scope relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#F6F9FF]">
+      {/* Background Image Layer */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
+        style={{
+          backgroundImage: "url('/login-bg.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(12px)",
+          transform: "scale(1.04)",
+          opacity: 0.45,
+        }}
+      />
+      {/* Background Overlays */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(248, 251, 255, 0.92) 0%, rgba(248, 251, 255, 0.85) 45%, rgba(239, 246, 255, 0.65) 100%)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
+        style={{
+          background:
+            "radial-gradient(circle at 70% 65%, rgba(112, 88, 255, 0.12), transparent 45%), radial-gradient(circle at 20% 25%, rgba(75, 160, 255, 0.10), transparent 40%)",
+        }}
+      />
 
-      <div className="relative z-10 hidden lg:flex lg:w-[52%] xl:w-[55%] flex-col justify-center px-12 xl:px-20 2xl:px-28 py-10">
-        <div className="w-full max-w-[560px]">
-          <AuthBrandMark showTagline className="mb-14" />
+      {/* Main Content Container */}
+      <div className="relative z-10 w-full max-w-[1440px] mx-auto px-6 lg:px-8 xl:px-12 py-10 lg:py-0">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:gap-[clamp(32px,4vw,72px)] lg:items-center w-full min-h-screen lg:min-h-0">
+          
+          {/* LEFT COLUMN */}
+          <div className="hidden lg:flex flex-col justify-center max-w-[560px] xl:max-w-[580px] w-full pt-12 lg:pt-0">
+            <AuthBrandMark showTagline className="mb-12" />
 
-          <h1 className="mb-6 text-[42px] xl:text-[48px] font-bold leading-[1.12] tracking-tight text-[#17203D]">
-            Smart clinic management, <br />
-            <span className="bg-gradient-to-r from-[#4D9FFF] to-[#6557FF] bg-clip-text text-transparent">
-              elevated care.
-            </span>
-          </h1>
+            <h1 className="mb-5 text-[40px] xl:text-[44px] font-bold leading-[1.12] tracking-tight text-[#17203D]">
+              Smart clinic management,<br />
+              <span className="bg-gradient-to-r from-[#4898FF] to-[#6758FF] bg-clip-text text-transparent">
+                elevated care.
+              </span>
+            </h1>
 
-          <p className="mb-12 max-w-[460px] text-[17px] leading-relaxed text-[#687392]">
-            Everything you need to manage patients, streamline operations, and grow your practice—securely and effortlessly.
-          </p>
+            <p className="mb-8 max-w-[440px] text-[17px] leading-relaxed text-[#687392]">
+              Everything you need to manage patients, streamline operations, and grow your practice—securely and effortlessly.
+            </p>
 
-          <div className="mb-4 space-y-7">
-            <BenefitRow
-              icon={<Users className="h-[22px] w-[22px] text-[#4D9FFF]" />}
-              title="Unified patient & clinic management"
-              description="All your data, organized and accessible."
-              iconBg="bg-[#EBF3FF]"
-            />
-            <BenefitRow
-              icon={<TrendingUp className="h-[22px] w-[22px] text-[#6557FF]" />}
-              title="Real-time insights & analytics"
-              description="Make smarter decisions with live dashboards."
-              iconBg="bg-[#F0EEFF]"
-            />
-            <BenefitRow
-              icon={<ShieldCheck className="h-[22px] w-[22px] text-[#3ED6D0]" />}
-              title="Secure, compliant & reliable"
-              description="Your data is protected with enterprise-grade security."
-              iconBg="bg-[#E6F9F8]"
-            />
-          </div>
-
-          <DashboardPreviewMockup />
-        </div>
-      </div>
-
-      <div className="relative z-10 flex w-full flex-col items-center justify-center p-5 sm:p-8 lg:w-[48%] xl:w-[45%]">
-        <div className="mb-8 w-full max-w-[460px] lg:hidden flex justify-center">
-           <AuthBrandMark size="sm" />
-        </div>
-
-        <div className="w-full max-w-[460px] 2xl:max-w-[480px]">
-          <div className="mb-[-22px] flex justify-center relative z-20">
-            <div className="flex h-[44px] w-[44px] items-center justify-center rounded-xl bg-white shadow-[0_8px_24px_rgb(0,0,0,0.06)] border border-[#EBF3FF] bg-gradient-to-b from-white to-[#F8FBFF]">
-              <Shield className="h-5 w-5 fill-[#EAF6F6] text-[#3ED6D0]" />
-              <Lock className="absolute h-2.5 w-2.5 text-[#3ED6D0] stroke-[3]" />
+            <div className="mb-8 space-y-4">
+              <BenefitRow
+                icon={<Users className="h-[20px] w-[20px] text-[#4D9FFF]" />}
+                title="Unified patient & clinic management"
+                description="All your data, organized and accessible."
+                iconBg="bg-[#EBF3FF]"
+              />
+              <BenefitRow
+                icon={<TrendingUp className="h-[20px] w-[20px] text-[#6557FF]" />}
+                title="Real-time insights & analytics"
+                description="Make smarter decisions with live dashboards."
+                iconBg="bg-[#F0EEFF]"
+              />
+              <BenefitRow
+                icon={<ShieldCheck className="h-[20px] w-[20px] text-[#3ED6D0]" />}
+                title="Secure, compliant & reliable"
+                description="Your data is protected with enterprise-grade security."
+                iconBg="bg-[#E6F9F8]"
+              />
             </div>
+
+            <DashboardPreviewMockup />
           </div>
 
-          <div className="relative z-10 rounded-[24px] border border-white/60 bg-white/85 p-7 sm:p-10 shadow-[0_16px_64px_-16px_rgb(23,32,61,0.1)] backdrop-blur-md">
+          {/* RIGHT COLUMN */}
+          <div className="flex w-full flex-col items-center lg:items-start justify-center max-w-[480px] mx-auto lg:mx-0">
             
-            <div className="mb-6 flex justify-center lg:mb-8">
-               <AuthBrandMark size="md" />
+            <div className="mb-8 w-full lg:hidden flex justify-center">
+               <AuthBrandMark size="sm" />
             </div>
 
-            <div className="mb-8 text-center">
-              <h2 className="text-[28px] sm:text-[32px] font-bold leading-tight tracking-[-0.01em] text-[#17203D]">
-                Welcome back
-              </h2>
-              <p className="mt-2 text-[14.5px] text-[#687392]">
-                Sign in to continue to your MedCare Pro workspace.
-              </p>
-            </div>
-
-            <div className="mb-6 space-y-3 empty:hidden">
-              {sessionEndedMessage && !error && (
-                <AuthAlert tone="info">{sessionEndedMessage}</AuthAlert>
-              )}
-              {justReset && !error && (
-                <AuthAlert tone="success">
-                  Your password has been changed. Sign in with it to continue.
-                </AuthAlert>
-              )}
-              {justVerified && !error && !isUnverified && (
-                <AuthAlert tone="success">
-                  Your email is verified. Sign in to continue.
-                </AuthAlert>
-              )}
-            </div>
-
-            <div
-              role="tablist"
-              aria-label="Sign-in method"
-              className="mb-8 grid grid-cols-2 gap-1 rounded-2xl bg-[#F3F5F9] p-1.5"
-            >
-              {MODES.map((entry) => {
-                const isActive = entry.id === mode;
-                const Icon = entry.icon;
-                return (
-                  <button
-                    key={entry.id}
-                    ref={(node) => {
-                      tabRefs.current[entry.id] = node;
-                    }}
-                    id={`login-tab-${entry.id}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-controls={`login-panel-${entry.id}`}
-                    tabIndex={isActive ? 0 : -1}
-                    onClick={() => selectMode(entry.id)}
-                    onKeyDown={handleTabKeyDown}
-                    className={cx(
-                      "flex min-h-[44px] items-center justify-center gap-2 rounded-[12px] text-[14px] font-semibold transition-all duration-200",
-                      isActive
-                        ? "bg-gradient-to-r from-[#5B8EFF] to-[#695AFB] text-white shadow-md"
-                        : "text-[#687392] hover:text-[#17203D]",
-                    )}
-                  >
-                    {!isActive && <Icon className="h-4 w-4 opacity-70" />}
-                    {entry.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div
-              role="tabpanel"
-              id="login-panel-password"
-              aria-labelledby="login-tab-password"
-              hidden={mode !== "password"}
-            >
-              <form method="post" onSubmit={handleSubmit} className="space-y-5">
-                {isUnverified && (
-                  <AuthAlert
-                    tone="warning"
-                    title="Your email address has not been verified yet."
-                    action={
-                      <Link
-                        href={`/verify-email?email=${encodeURIComponent(email)}`}
-                        className={authLinkClasses}
-                      >
-                        Resend verification email
-                      </Link>
-                    }
-                  >
-                    Open the link we sent you, then sign in again.
-                  </AuthAlert>
-                )}
-
-                {error && (
-                  <AuthAlert
-                    id="login-password-error"
-                    tone="error"
-                    action={
-                      isUnknownAccount ? (
-                        <Link
-                          href={`/signup?email=${encodeURIComponent(email)}`}
-                          className={authLinkClasses}
-                        >
-                          Create an account
-                        </Link>
-                      ) : undefined
-                    }
-                  >
-                    {error}
-                  </AuthAlert>
-                )}
-
-                <AuthField
-                  id="email"
-                  name="email"
-                  type="email"
-                  label="Email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  icon={<Mail className="h-[18px] w-[18px]" strokeWidth={2} />}
-                  aria-invalid={error ? true : undefined}
-                  describedBy={error ? "login-password-error" : undefined}
-                  placeholder="you@clinic.com"
-                  className="bg-white/80 border-gray-200"
-                />
-
-                <PasswordField
-                  id="password"
-                  name="password"
-                  label="Password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  icon={<Lock className="h-[18px] w-[18px]" strokeWidth={2} />}
-                  aria-invalid={error ? true : undefined}
-                  describedBy={error ? "login-password-error" : undefined}
-                  placeholder="Enter your password"
-                  className="bg-white/80 border-gray-200"
-                  labelAction={
-                    <Link
-                      href={
-                        email
-                          ? `/forgot-password?email=${encodeURIComponent(email)}`
-                          : "/forgot-password"
-                      }
-                      className="rounded text-[13px] font-medium text-[#6557FF] transition-colors hover:text-[#4A39EC]"
-                    >
-                      Forgot password?
-                    </Link>
-                  }
-                />
-
-                <label className="flex w-fit items-center gap-2.5 pt-1 text-[13.5px] font-medium text-[#39415C]">
-                  <input
-                    id="remember-me"
-                    name="rememberMe"
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(event) => setRememberMe(event.target.checked)}
-                    className="h-4 w-4 rounded-[5px] border-[#D7DBEA] accent-[#6557FF]"
-                  />
-                  Keep me signed in
-                </label>
-
-                <div className="pt-2">
-                  <AuthButton
-                    type="submit"
-                    isBusy={isSubmitting}
-                    busyLabel="Signing in..."
-                    className="h-[54px] rounded-2xl bg-gradient-to-r from-[#4F91FF] to-[#6557FF] shadow-md hover:shadow-lg hover:from-[#4480EF] hover:to-[#5A4CE6] text-[16px] border-none"
-                  >
-                    Sign in <ArrowRight className="ml-1 h-[18px] w-[18px]" />
-                  </AuthButton>
+            <div className="w-full">
+              {/* Security floating badge */}
+              <div className="mb-[-25px] flex justify-center relative z-20">
+                <div className="flex h-[50px] w-[50px] items-center justify-center rounded-[14px] bg-white shadow-[0_8px_24px_rgb(0,0,0,0.06)] border border-[#EBF3FF] bg-gradient-to-b from-white to-[#F8FBFF]">
+                  <Shield className="h-6 w-6 fill-[#EAF6F6] text-[#3ED6D0]" />
+                  <Lock className="absolute h-3 w-3 text-[#3ED6D0] stroke-[3]" />
                 </div>
-                
-                <div className="mt-6 text-center text-[14px] text-[#687392]">
-                  Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="font-semibold text-[#6557FF] hover:underline underline-offset-4">
-                    Create one
-                  </Link>
-                </div>
-              </form>
-            </div>
-
-            <div
-              role="tabpanel"
-              id="login-panel-code"
-              aria-labelledby="login-tab-code"
-              hidden={mode !== "code"}
-            >
-              <LoginCodeForm email={email} onEmailChange={setEmail} />
-              
-              <div className="mt-6 text-center text-[14px] text-[#687392]">
-                  Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="font-semibold text-[#6557FF] hover:underline underline-offset-4">
-                    Create one
-                  </Link>
               </div>
+
+              {/* Login Card */}
+              <div className="relative z-10 rounded-[24px] border border-white/75 bg-white/80 p-8 sm:p-10 shadow-[0_28px_80px_rgba(80,95,150,0.12),0_4px_18px_rgba(80,95,150,0.05)] backdrop-blur-[20px]">
+                
+                <div className="mb-8 flex justify-center">
+                   <AuthBrandMark size="md" />
+                </div>
+
+                <div className="mb-8 text-center">
+                  <h2 className="text-[30px] sm:text-[32px] font-bold leading-tight tracking-[-0.01em] text-[#17203D]">
+                    Welcome back
+                  </h2>
+                  <p className="mt-2.5 text-[14.5px] text-[#687392]">
+                    Sign in to continue to your MedCare Pro workspace.
+                  </p>
+                </div>
+
+                <div className="mb-6 space-y-3 empty:hidden">
+                  {sessionEndedMessage && !error && (
+                    <AuthAlert tone="info">{sessionEndedMessage}</AuthAlert>
+                  )}
+                  {justReset && !error && (
+                    <AuthAlert tone="success">
+                      Your password has been changed. Sign in with it to continue.
+                    </AuthAlert>
+                  )}
+                  {justVerified && !error && !isUnverified && (
+                    <AuthAlert tone="success">
+                      Your email is verified. Sign in to continue.
+                    </AuthAlert>
+                  )}
+                </div>
+
+                <div
+                  role="tablist"
+                  aria-label="Sign-in method"
+                  className="mb-8 grid grid-cols-2 gap-1 rounded-2xl bg-[#F3F5F9] p-1.5"
+                >
+                  {MODES.map((entry) => {
+                    const isActive = entry.id === mode;
+                    const Icon = entry.icon;
+                    return (
+                      <button
+                        key={entry.id}
+                        ref={(node) => {
+                          tabRefs.current[entry.id] = node;
+                        }}
+                        id={`login-tab-${entry.id}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        aria-controls={`login-panel-${entry.id}`}
+                        tabIndex={isActive ? 0 : -1}
+                        onClick={() => selectMode(entry.id)}
+                        onKeyDown={handleTabKeyDown}
+                        className={cx(
+                          "flex min-h-[44px] items-center justify-center gap-2 rounded-[12px] text-[14px] font-semibold transition-all duration-200",
+                          isActive
+                            ? "bg-gradient-to-r from-[#4D8FFF] to-[#6757FF] text-white shadow-[0_2px_10px_rgba(103,87,255,0.25)]"
+                            : "text-[#687392] hover:text-[#17203D]",
+                        )}
+                      >
+                        {!isActive && <Icon className="h-4 w-4 opacity-70" />}
+                        {entry.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  role="tabpanel"
+                  id="login-panel-password"
+                  aria-labelledby="login-tab-password"
+                  hidden={mode !== "password"}
+                >
+                  <form method="post" onSubmit={handleSubmit} className="space-y-5">
+                    {isUnverified && (
+                      <AuthAlert
+                        tone="warning"
+                        title="Your email address has not been verified yet."
+                        action={
+                          <Link
+                            href={`/verify-email?email=${encodeURIComponent(email)}`}
+                            className={authLinkClasses}
+                          >
+                            Resend verification email
+                          </Link>
+                        }
+                      >
+                        Open the link we sent you, then sign in again.
+                      </AuthAlert>
+                    )}
+
+                    {error && (
+                      <AuthAlert
+                        id="login-password-error"
+                        tone="error"
+                        action={
+                          isUnknownAccount ? (
+                            <Link
+                              href={`/signup?email=${encodeURIComponent(email)}`}
+                              className={authLinkClasses}
+                            >
+                              Create an account
+                            </Link>
+                          ) : undefined
+                        }
+                      >
+                        {error}
+                      </AuthAlert>
+                    )}
+
+                    <AuthField
+                      id="email"
+                      name="email"
+                      type="email"
+                      label="Email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      icon={<Mail className="h-[18px] w-[18px]" strokeWidth={2} />}
+                      aria-invalid={error ? true : undefined}
+                      describedBy={error ? "login-password-error" : undefined}
+                      placeholder="you@clinic.com"
+                      className="h-[52px] rounded-[14px] bg-white/80 border-[#DDE4F0] focus:border-[#6758FF] focus:ring-1 focus:ring-[#6758FF]"
+                    />
+
+                    <PasswordField
+                      id="password"
+                      name="password"
+                      label="Password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      icon={<Lock className="h-[18px] w-[18px]" strokeWidth={2} />}
+                      aria-invalid={error ? true : undefined}
+                      describedBy={error ? "login-password-error" : undefined}
+                      placeholder="Enter your password"
+                      className="h-[52px] rounded-[14px] bg-white/80 border-[#DDE4F0] focus:border-[#6758FF] focus:ring-1 focus:ring-[#6758FF]"
+                      labelAction={
+                        <Link
+                          href={
+                            email
+                              ? `/forgot-password?email=${encodeURIComponent(email)}`
+                              : "/forgot-password"
+                          }
+                          className="rounded text-[13px] font-medium text-[#6557FF] transition-colors hover:text-[#4A39EC]"
+                        >
+                          Forgot password?
+                        </Link>
+                      }
+                    />
+
+                    <label className="flex w-fit items-center gap-2.5 pt-1 text-[13.5px] font-medium text-[#39415C]">
+                      <input
+                        id="remember-me"
+                        name="rememberMe"
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(event) => setRememberMe(event.target.checked)}
+                        className="h-4 w-4 rounded-[5px] border-[#D7DBEA] accent-[#6557FF]"
+                      />
+                      Keep me signed in
+                    </label>
+
+                    <div className="pt-2">
+                      <AuthButton
+                        type="submit"
+                        isBusy={isSubmitting}
+                        busyLabel="Signing in..."
+                        className="h-[54px] rounded-[14px] bg-gradient-to-r from-[#4C91FF] via-[#615EFF] to-[#7353FF] shadow-[0_4px_14px_rgba(97,94,255,0.25)] hover:shadow-[0_6px_20px_rgba(97,94,255,0.35)] text-[16px] border-none"
+                      >
+                        Sign in <ArrowRight className="ml-1 h-[18px] w-[18px]" />
+                      </AuthButton>
+                    </div>
+                    
+                    <div className="mt-6 text-center text-[14px] text-[#687392]">
+                      Don&apos;t have an account?{" "}
+                      <Link href="/signup" className="font-semibold text-[#6557FF] hover:underline underline-offset-4">
+                        Create one
+                      </Link>
+                    </div>
+                  </form>
+                </div>
+
+                <div
+                  role="tabpanel"
+                  id="login-panel-code"
+                  aria-labelledby="login-tab-code"
+                  hidden={mode !== "code"}
+                >
+                  <LoginCodeForm email={email} onEmailChange={setEmail} />
+                  
+                  <div className="mt-6 text-center text-[14px] text-[#687392]">
+                      Don&apos;t have an account?{" "}
+                      <Link href="/signup" className="font-semibold text-[#6557FF] hover:underline underline-offset-4">
+                        Create one
+                      </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-3 text-[12.5px] font-medium text-[#687392]">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 opacity-70" /> Secure platform
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Lock className="h-4 w-4 opacity-70" /> Encrypted sign-in
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Cloud className="h-4 w-4 opacity-70" /> Reliable infrastructure
+                </span>
+              </div>
+
             </div>
-
           </div>
-
-          <div className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[12.5px] font-medium text-[#687392]">
-            <span className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 opacity-70" /> Secure platform
-            </span>
-            <span className="flex items-center gap-2">
-              <Lock className="h-4 w-4 opacity-70" /> Encrypted sign-in
-            </span>
-            <span className="flex items-center gap-2">
-              <Cloud className="h-4 w-4 opacity-70" /> Reliable infrastructure
-            </span>
-          </div>
-
         </div>
       </div>
     </div>
