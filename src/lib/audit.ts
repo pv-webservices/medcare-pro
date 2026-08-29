@@ -234,6 +234,15 @@ export const AUDIT_ACTIONS = {
    * one is a new table.
    */
   APPOINTMENT_UPDATED: "APPOINTMENT_UPDATED",
+
+  // --- Tasks ---------------------------------------------------------------
+  // Task titles and descriptions may contain sensitive clinic context, so the
+  // audit metadata records only ids, state, priority and timestamps.
+  TASK_CREATED: "TASK_CREATED",
+  TASK_ASSIGNED: "TASK_ASSIGNED",
+  TASK_UPDATED: "TASK_UPDATED",
+  TASK_COMPLETED: "TASK_COMPLETED",
+  TASK_ARCHIVED: "TASK_ARCHIVED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

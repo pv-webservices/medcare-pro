@@ -57,6 +57,12 @@ export const NAV_LINKS: readonly NavLink[] = [
   // registration. An Appointment and a Registration are different records —
   // see the vocabulary rule in .claude/skills/admin-dashboard-ui.
   { href: "/appointments", label: "Appointments", permission: "appointment:read", feature: "appointments" },
+  {
+    href: "/tasks",
+    label: "Tasks",
+    permission: ["task:view", "task:manage"],
+    feature: "tasks",
+  },
   { href: "/registration", label: "Registrations", permission: "registration:read", feature: "registrations" },
   { href: "/doctors", label: "Doctors", permission: "doctor:read", feature: "doctors" },
   // NO CLINICS TAB. An account is created WITH its clinic — signup collects the

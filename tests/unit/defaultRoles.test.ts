@@ -18,7 +18,7 @@ describe("DEFAULT_ROLES", () => {
     ]);
   });
 
-  it("preserves Staff action rights and adds registration dashboard data only", () => {
+  it("preserves Staff rights and adds only safe personal task access", () => {
     const staff = DEFAULT_ROLES.find((role) => role.name === "Staff");
     expect([...(staff?.permissions ?? [])]).toEqual([
       "clinic:read",
@@ -31,6 +31,9 @@ describe("DEFAULT_ROLES", () => {
       "registration:edit",
       "dashboard:view",
       "dashboard:registrations:view",
+      "dashboard:tasks:view",
+      "task:view",
+      "task:complete",
     ]);
   });
 

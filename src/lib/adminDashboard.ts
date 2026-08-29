@@ -46,6 +46,7 @@ export interface AdminDashboardCapabilities {
     notifications: boolean;
     team: boolean;
     clinics: boolean;
+    tasks: boolean;
   };
   actions: {
     canBookAppointment: boolean;
@@ -137,6 +138,36 @@ export interface AdminDashboardData {
     unreadCount: number;
     items: NotificationRecord[];
   } | null;
+  tasks: {
+    myOpen: number;
+    dueToday: number;
+    overdue: number;
+    completedToday: number;
+  } | null;
+}
+
+async function loadTaskSummary(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+  now: Date,
+) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  const base: Prisma.TaskWhereInput = {
+    tenantId: actor.tenantId,
+    clinicId: { in: [...clinicIds] },
+    assignedToId: actor.userId,
+    archivedAt: null,
+  };
+  const [myOpen, dueToday, overdue, completedToday] = await Promise.all([
+    prisma.task.count({ where: { ...base, status: { in: ["OPEN", "IN_PROGRESS"] } } }),
+    prisma.task.count({ where: { ...base, status: { in: ["OPEN", "IN_PROGRESS"] }, dueAt: { gte: start, lt: end } } }),
+    prisma.task.count({ where: { ...base, status: { in: ["OPEN", "IN_PROGRESS"] }, dueAt: { lt: now } } }),
+    prisma.task.count({ where: { ...base, status: "COMPLETED", completedAt: { gte: start, lt: end } } }),
+  ]);
+  return { myOpen, dueToday, overdue, completedToday };
 }
 
 function moduleAllowed(
@@ -459,6 +490,7 @@ export async function getAdminDashboardData(
   const doctorIds = dashboardIdsFor("dashboard:doctors:view");
   const activityIds = dashboardIdsFor("dashboard:activity:view");
   const notificationIds = dashboardIdsFor("dashboard:notifications:view");
+  const taskIds = dashboardIdsFor("dashboard:tasks:view");
 
   const appointmentsEnabled =
     moduleAllowed(modules, MODULE_FEATURES.appointments) &&
@@ -478,11 +510,13 @@ export async function getAdminDashboardData(
   const activityEnabled =
     moduleAllowed(modules, MODULE_FEATURES.registrations) &&
     activityIds.length > 0;
+  const tasksEnabled =
+    moduleAllowed(modules, MODULE_FEATURES.tasks) && taskIds.length > 0;
 
   const dayStart = parseDateOnly(dateValue);
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  const [appointmentData, registrationData, revenue, doctors, activity, notifications] =
+  const [appointmentData, registrationData, revenue, doctors, activity, notifications, tasks] =
     await Promise.all([
       appointmentsEnabled
         ? loadAppointments(actor, appointmentIds, dayStart, dayEnd)
@@ -513,6 +547,7 @@ export async function getAdminDashboardData(
             limit: 5,
           })
         : Promise.resolve(null),
+      tasksEnabled ? loadTaskSummary(actor, taskIds, new Date()) : Promise.resolve(null),
     ]);
 
   const visibleIds = new Set(dashboardIdsFor("dashboard:view"));
@@ -540,6 +575,7 @@ export async function getAdminDashboardData(
       clinics:
         moduleAllowed(modules, MODULE_FEATURES.clinics) &&
         dashboardIdsFor("dashboard:clinics:view").length > 0,
+      tasks: tasksEnabled,
     },
     actions: {
       canBookAppointment:
@@ -578,5 +614,6 @@ export async function getAdminDashboardData(
     notifications: notifications
       ? { unreadCount: notifications.unreadCount, items: notifications.items }
       : null,
+    tasks,
   };
 }

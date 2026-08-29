@@ -9,6 +9,7 @@ import {
   STAGE_1_PERMISSIONS,
   STAGE_11_PERMISSIONS,
   STAGE_AP1_PERMISSIONS,
+  TASK_PERMISSIONS,
   WILDCARD,
   findPermission,
   isKnownPermission,
@@ -195,6 +196,9 @@ describe("the stage sets stay disjoint", () => {
       (permission) =>
         !STAGE_11_PERMISSIONS.includes(permission) &&
         !STAGE_AP1_PERMISSIONS.includes(permission) &&
+        !TASK_PERMISSIONS.includes(
+          permission as (typeof TASK_PERMISSIONS)[number],
+        ) &&
         !DASHBOARD_DATA_PERMISSIONS.includes(
           permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
         ),
@@ -208,6 +212,7 @@ describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
     expect(PRE_APPOINTMENTS_PERMISSIONS.length).toBe(
       ALL_PERMISSIONS.length -
         STAGE_AP1_PERMISSIONS.length -
+        TASK_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length,
     );
     for (const permission of STAGE_AP1_PERMISSIONS) {
@@ -326,7 +331,11 @@ describe("what each seeded role holds after AP-1", () => {
     const held = permissionsFor(ROLE_KEYS.STAFF);
     expect(
       held.filter((permission) => !permission.startsWith("dashboard:")),
-    ).toEqual([...PRE_APPOINTMENTS_ROLE_PERMISSIONS[ROLE_KEYS.STAFF]]);
+    ).toEqual([
+      ...PRE_APPOINTMENTS_ROLE_PERMISSIONS[ROLE_KEYS.STAFF],
+      "task:view",
+      "task:complete",
+    ]);
   });
 });
 
@@ -448,7 +457,17 @@ describe("what the backfill would append", () => {
         ...(APPOINTMENT_ROLE_TOP_UPS[role.key] ?? []),
       ]);
       expect([...after].sort()).toEqual(
-        [...new Set(role.permissions.filter((permission) => !permission.startsWith("dashboard:")))].sort(),
+        [
+          ...new Set(
+            role.permissions.filter(
+              (permission) =>
+                !permission.startsWith("dashboard:") &&
+                !TASK_PERMISSIONS.includes(
+                  permission as (typeof TASK_PERMISSIONS)[number],
+                ),
+            ),
+          ),
+        ].sort(),
       );
     }
   });

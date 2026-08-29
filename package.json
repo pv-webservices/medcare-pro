@@ -37,6 +37,8 @@
     "whatsapp:doctor": "tsx scripts/whatsapp-doctor.mts",
     "ap1:backfill": "tsx scripts/backfill-ap1-appointments.mts",
     "dashboard-permissions:backfill": "tsx scripts/backfill-dashboard-permissions.mts",
+    "tasks:backfill": "tsx scripts/backfill-tasks.mts",
+    "verify:tasks": "tsx scripts/verify-tasks.mts",
     "verify:ap1-appointments-schema": "tsx scripts/verify-ap1-appointments-schema.mts",
     "verify:ap2-appointment-slots": "tsx scripts/verify-ap2-appointment-slots.mts",
     "verify:ap3-appointment-booking": "tsx scripts/verify-ap3-appointment-booking.mts",

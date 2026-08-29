@@ -40,6 +40,7 @@ export type AuditCategory =
   | "roles"
   | "entitlements"
   | "appointments"
+  | "tasks"
   | "platform";
 
 export interface AuditDescription {
@@ -402,6 +403,36 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "appointments",
   },
+  [AUDIT_ACTIONS.TASK_CREATED]: {
+    label: "Task created",
+    detail: "A work item was created for the clinic team.",
+    side: "tenant",
+    category: "tasks",
+  },
+  [AUDIT_ACTIONS.TASK_ASSIGNED]: {
+    label: "Task assigned",
+    detail: "A work item was assigned or reassigned to a team member.",
+    side: "tenant",
+    category: "tasks",
+  },
+  [AUDIT_ACTIONS.TASK_UPDATED]: {
+    label: "Task updated",
+    detail: "A work item's details or status were changed.",
+    side: "tenant",
+    category: "tasks",
+  },
+  [AUDIT_ACTIONS.TASK_COMPLETED]: {
+    label: "Task completed",
+    detail: "A team member marked a work item as complete.",
+    side: "tenant",
+    category: "tasks",
+  },
+  [AUDIT_ACTIONS.TASK_ARCHIVED]: {
+    label: "Task archived",
+    detail: "A work item was removed from active task lists.",
+    side: "tenant",
+    category: "tasks",
+  },
 };
 
 /**
@@ -433,6 +464,7 @@ export const AUDIT_CATEGORIES: readonly {
   { key: "roles", label: "Roles" },
   { key: "entitlements", label: "Features and plan" },
   { key: "appointments", label: "Appointments" },
+  { key: "tasks", label: "Tasks" },
   { key: "platform", label: "Platform" },
 ];
 

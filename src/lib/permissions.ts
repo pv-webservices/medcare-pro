@@ -58,7 +58,21 @@ export const DASHBOARD_DATA_PERMISSIONS = [
   "dashboard:notifications:view",
   "dashboard:team:view",
   "dashboard:clinics:view",
+  "dashboard:tasks:view",
 ] as const;
+
+/** Task page/action permissions, kept separate from dashboard summaries. */
+export const TASK_PERMISSIONS = [
+  "task:view",
+  "task:create",
+  "task:assign",
+  "task:update",
+  "task:complete",
+  "task:delete",
+  "task:manage",
+] as const;
+
+export type TaskPermission = (typeof TASK_PERMISSIONS)[number];
 
 export type DashboardDataPermission =
   (typeof DASHBOARD_DATA_PERMISSIONS)[number];
@@ -110,6 +124,11 @@ export const DASHBOARD_PERMISSION_GROUP: PermissionGroup = {
       key: "dashboard:clinics:view",
       label: "View clinic data",
       description: "See clinic-wide summaries and comparisons on the dashboard when available.",
+    },
+    {
+      key: "dashboard:tasks:view",
+      label: "View task data",
+      description: "See personal task counts and due-date summaries on the dashboard.",
     },
   ],
 };
@@ -507,6 +526,46 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     ],
   },
   {
+    module: "Tasks",
+    permissions: [
+      {
+        key: "task:view",
+        label: "View tasks",
+        description: "Open Tasks and see work assigned to or created by this person.",
+      },
+      {
+        key: "task:create",
+        label: "Create tasks",
+        description: "Create tasks within this person's permitted clinic scope.",
+      },
+      {
+        key: "task:assign",
+        label: "Assign tasks",
+        description: "Assign work only to lower-authority users within permitted clinic scope.",
+      },
+      {
+        key: "task:update",
+        label: "Edit tasks",
+        description: "Edit task details and assignment when otherwise permitted.",
+      },
+      {
+        key: "task:complete",
+        label: "Complete tasks",
+        description: "Change the status of assigned work, including marking it complete.",
+      },
+      {
+        key: "task:delete",
+        label: "Archive tasks",
+        description: "Archive tasks within permitted clinic scope.",
+      },
+      {
+        key: "task:manage",
+        label: "Manage tasks",
+        description: "View and administer all tasks within permitted clinic scope.",
+      },
+    ],
+  },
+  {
     module: "Marketing",
     permissions: [
       {
@@ -649,6 +708,7 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
     !DASHBOARD_DATA_PERMISSIONS.includes(
       permission as DashboardDataPermission,
     ),
@@ -697,6 +757,7 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
   (permission) =>
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
     !DASHBOARD_DATA_PERMISSIONS.includes(
       permission as DashboardDataPermission,
     ),
@@ -737,6 +798,7 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
   ALL_PERMISSIONS.filter(
     (permission) =>
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
+      !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
       !DASHBOARD_DATA_PERMISSIONS.includes(
         permission as DashboardDataPermission,
       ),

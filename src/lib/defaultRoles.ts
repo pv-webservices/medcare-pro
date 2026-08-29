@@ -4,6 +4,7 @@ import {
   DASHBOARD_DATA_PERMISSIONS,
   PRE_APPOINTMENTS_PERMISSIONS,
   STAGE_AP1_PERMISSIONS,
+  TASK_PERMISSIONS,
   WILDCARD,
 } from "@/lib/permissions";
 
@@ -98,6 +99,9 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "registration:edit",
       "dashboard:view",
       "dashboard:registrations:view",
+      "dashboard:tasks:view",
+      "task:view",
+      "task:complete",
     ],
   },
   // --- Stage 1 additions ---------------------------------------------------
@@ -124,6 +128,10 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "dashboard:appointments:view",
       "dashboard:registrations:view",
       "dashboard:notifications:view",
+      "dashboard:tasks:view",
+      "task:view",
+      "task:create",
+      "task:complete",
     ],
   },
   {
@@ -161,6 +169,10 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "dashboard:appointments:view",
       "dashboard:registrations:view",
       "dashboard:notifications:view",
+      "dashboard:tasks:view",
+      "task:view",
+      "task:create",
+      "task:complete",
     ],
   },
 ];
@@ -176,6 +188,9 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.OWNER]: [WILDCARD],
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
+      !TASK_PERMISSIONS.includes(
+        permission as (typeof TASK_PERMISSIONS)[number],
+      ) &&
       !DASHBOARD_DATA_PERMISSIONS.includes(
         permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
       ),
@@ -219,6 +234,11 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
   ],
 };
 
+/** Dashboard keys that existed before the Tasks module was introduced. */
+const PRE_TASK_DASHBOARD_PERMISSIONS = DASHBOARD_DATA_PERMISSIONS.filter(
+  (permission) => permission !== "dashboard:tasks:view",
+);
+
 export const DASHBOARD_ROLE_TOP_UPS: Readonly<
   Partial<Record<RoleKey, readonly string[]>>
 > = Object.fromEntries(
@@ -229,8 +249,8 @@ export const DASHBOARD_ROLE_TOP_UPS: Readonly<
       role.permissions.filter(
         (permission) =>
           !before.has(permission) &&
-          DASHBOARD_DATA_PERMISSIONS.includes(
-            permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
+          PRE_TASK_DASHBOARD_PERMISSIONS.includes(
+            permission as (typeof PRE_TASK_DASHBOARD_PERMISSIONS)[number],
           ),
       ),
     ] as const;
@@ -242,6 +262,101 @@ export function isUntouchedPreDashboardRole(
   permissions: readonly string[],
 ): boolean {
   const before = PRE_DASHBOARD_ROLE_PERMISSIONS[key];
+  const held = new Set(permissions);
+  return (
+    held.size === before.length &&
+    before.every((permission) => held.has(permission))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tasks — frozen pre-task snapshots and safe, additive top-ups.
+// ---------------------------------------------------------------------------
+
+export const PRE_TASK_ROLE_PERMISSIONS: Readonly<
+  Record<RoleKey, readonly string[]>
+> = {
+  [ROLE_KEYS.OWNER]: [WILDCARD],
+  [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
+    (permission) =>
+      permission !== "dashboard:tasks:view" &&
+      !TASK_PERMISSIONS.includes(
+        permission as (typeof TASK_PERMISSIONS)[number],
+      ),
+  ),
+  [ROLE_KEYS.STAFF]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "patient:create",
+    "patient:edit",
+    "registration:read",
+    "registration:create",
+    "registration:edit",
+    "dashboard:view",
+    "dashboard:registrations:view",
+  ],
+  [ROLE_KEYS.DOCTOR]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "registration:read",
+    "notification:read",
+    "appointment:read",
+    "dashboard:view",
+    "dashboard:appointments:view",
+    "dashboard:registrations:view",
+    "dashboard:notifications:view",
+  ],
+  [ROLE_KEYS.RECEPTIONIST]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "patient:create",
+    "patient:edit",
+    "registration:read",
+    "registration:create",
+    "registration:edit",
+    "notification:read",
+    "message:send",
+    "appointment:read",
+    "appointment:create",
+    "appointment:update",
+    "appointment:reschedule",
+    "appointment:cancel",
+    "appointment:checkin",
+    "appointment:convert",
+    "dashboard:view",
+    "dashboard:appointments:view",
+    "dashboard:registrations:view",
+    "dashboard:notifications:view",
+  ],
+};
+
+export const TASK_ROLE_TOP_UPS: Readonly<
+  Partial<Record<RoleKey, readonly string[]>>
+> = Object.fromEntries(
+  DEFAULT_ROLES.filter((role) => role.key !== ROLE_KEYS.OWNER).map((role) => {
+    const before = new Set(PRE_TASK_ROLE_PERMISSIONS[role.key]);
+    return [
+      role.key,
+      role.permissions.filter(
+        (permission) =>
+          !before.has(permission) &&
+          (permission === "dashboard:tasks:view" ||
+            TASK_PERMISSIONS.includes(
+              permission as (typeof TASK_PERMISSIONS)[number],
+            )),
+      ),
+    ] as const;
+  }),
+);
+
+export function isUntouchedPreTaskRole(
+  key: RoleKey,
+  permissions: readonly string[],
+): boolean {
+  const before = PRE_TASK_ROLE_PERMISSIONS[key];
   const held = new Set(permissions);
   return (
     held.size === before.length &&

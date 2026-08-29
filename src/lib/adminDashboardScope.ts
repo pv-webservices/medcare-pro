@@ -23,6 +23,7 @@ export const ADMIN_DASHBOARD_DATA_PERMISSIONS = [
   "dashboard:notifications:view",
   "dashboard:team:view",
   "dashboard:clinics:view",
+  "dashboard:tasks:view",
 ] as const;
 
 export type AdminDashboardActionPermission =

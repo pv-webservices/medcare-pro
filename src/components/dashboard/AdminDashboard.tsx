@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ClipboardList,
   IndianRupee,
+  ListTodo,
   ShieldCheck,
   Stethoscope,
   UserRoundPlus,
@@ -172,6 +173,10 @@ export default function AdminDashboard({
             </div>
           )}
 
+          {data.capabilities.dashboard.tasks && data.tasks && (
+            <TaskSummaryPanel data={data} />
+          )}
+
           {(data.capabilities.dashboard.activity || data.capabilities.dashboard.notifications) && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {data.capabilities.dashboard.activity && (
@@ -185,6 +190,38 @@ export default function AdminDashboard({
         </>
       )}
     </div>
+  );
+}
+
+function TaskSummaryPanel({ data }: { data: AdminDashboardData }) {
+  const summary = data.tasks!;
+  const items = [
+    { label: "My open tasks", value: summary.myOpen },
+    { label: "Due today", value: summary.dueToday },
+    { label: "Overdue", value: summary.overdue },
+    { label: "Completed today", value: summary.completedToday },
+  ];
+
+  return (
+    <Panel
+      title="Tasks"
+      description="Your current workload and deadlines"
+      actions={<ViewAll href="/tasks" label="View tasks" />}
+    >
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-2xl border border-line bg-canvas-deep p-4">
+            <div className="flex items-center gap-2 text-muted">
+              <ListTodo className="h-4 w-4" strokeWidth={2} />
+              <span className="text-label">{item.label}</span>
+            </div>
+            <p className="tnum mt-2 text-section font-semibold text-ink">
+              {item.value.toLocaleString("en-IN")}
+            </p>
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
 

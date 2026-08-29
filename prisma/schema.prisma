@@ -118,6 +118,7 @@ model Tenant {
   invitations       Invitation[]
   sessions          AppSession[]
   auditLogs         AuditLog[]
+  tasks             Task[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments     Appointment[]
@@ -231,6 +232,10 @@ model User {
   /// the approvedBy/suspendedBy pairs above. AuditLog holds the real trail.
   appointmentsCheckedIn Appointment[] @relation("AppointmentCheckedInBy")
   appointmentsCancelled Appointment[] @relation("AppointmentCancelledBy")
+
+  tasksCreated   Task[] @relation("TaskCreatedBy")
+  tasksAssigned  Task[] @relation("TaskAssignedTo")
+  tasksCompleted Task[] @relation("TaskCompletedBy")
 
   @@index([tenantId])
   @@index([accountStatus])
@@ -380,6 +385,7 @@ model Clinic {
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments     Appointment[]
   appointmentTypes AppointmentType[]
+  tasks            Task[]
 
   @@index([tenantId])
   @@map("clinics")
@@ -1137,6 +1143,63 @@ model AuditLog {
   @@index([actorUserId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Tasks — permission-driven work assignment within tenant and clinic scope.
+// ---------------------------------------------------------------------------
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Task {
+  id       String  @id @default(cuid())
+  tenantId String  @map("tenant_id")
+  clinicId String? @map("clinic_id")
+
+  title       String       @db.VarChar(160)
+  description String?      @db.Text
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(OPEN)
+  dueAt       DateTime?    @map("due_at")
+
+  createdById  String  @map("created_by_id")
+  assignedToId String? @map("assigned_to_id")
+
+  completedAt   DateTime? @map("completed_at")
+  completedById String?   @map("completed_by_id")
+  archivedAt    DateTime? @map("archived_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  createdBy  User  @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignedTo User? @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  completedBy User? @relation("TaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([clinicId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([status])
+  @@index([dueAt])
+  @@index([tenantId, status])
+  @@index([clinicId, status])
+  @@map("tasks")
 }
 
 // ---------------------------------------------------------------------------

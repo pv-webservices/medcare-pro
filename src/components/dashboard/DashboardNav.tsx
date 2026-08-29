@@ -10,6 +10,7 @@ import {
   CalendarDays,
   FileText,
   LayoutDashboard,
+  ListTodo,
   MessageSquare,
   Settings,
   ShieldCheck,
@@ -45,6 +46,7 @@ interface DashboardNavProps {
 const ICONS: Record<string, typeof LayoutDashboard> = {
   "/dashboard": LayoutDashboard,
   "/appointments": CalendarDays,
+  "/tasks": ListTodo,
   "/registration": Users,
   "/doctors": Stethoscope,
   "/clinics": Building2,

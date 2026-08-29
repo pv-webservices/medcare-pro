@@ -94,6 +94,14 @@ export const DEFAULT_FEATURES: readonly DefaultFeatureDefinition[] = [
     inDefaultPlan: true,
   },
   {
+    key: "tasks",
+    name: "Tasks",
+    description: "Assign and track work across clinic teams.",
+    tier: "CORE",
+    globalEnabled: true,
+    inDefaultPlan: true,
+  },
+  {
     key: "settings",
     name: "Organisation settings",
     description: "Roles, permissions, branding and operational settings.",
