@@ -43,6 +43,7 @@ interface PasswordFieldProps
   minPasswordLength?: number;
   describedBy?: string;
   fieldClassName?: string;
+  icon?: ReactNode;
 }
 
 const METER_TONES = [
@@ -64,6 +65,7 @@ export default function PasswordField({
   describedBy,
   fieldClassName,
   className,
+  icon,
   ...rest
 }: PasswordFieldProps) {
   const [isVisible, setIsVisible] = useState(false);
@@ -85,6 +87,14 @@ export default function PasswordField({
       className={fieldClassName}
     >
       <div className="relative">
+        {icon && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-4 top-1/2 flex -translate-y-1/2 items-center text-auth-faint"
+          >
+            {icon}
+          </span>
+        )}
         <input
           id={id}
           type={isVisible ? "text" : "password"}
@@ -93,7 +103,7 @@ export default function PasswordField({
           aria-describedby={described}
           className={authControlClasses(
             Boolean(error),
-            cx("h-[52px] pl-4 pr-12", className),
+            cx("h-[52px] pr-12", icon ? "pl-11" : "pl-4", className),
           )}
           {...rest}
         />

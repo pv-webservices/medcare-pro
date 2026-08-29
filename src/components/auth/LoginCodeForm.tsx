@@ -11,7 +11,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Mail } from "lucide-react";
+import { Mail, ArrowRight } from "lucide-react";
 import AuthAlert from "@/components/auth/AuthAlert";
 import AuthButton, { authLinkClasses } from "@/components/auth/AuthButton";
 import AuthField from "@/components/auth/AuthField";
@@ -278,9 +278,9 @@ export default function LoginCodeForm({
           type="submit"
           isBusy={isSubmitting}
           busyLabel="Sending..."
-          className="mt-1"
+          className="mt-1 h-[54px] rounded-2xl bg-gradient-to-r from-[#4F91FF] to-[#6557FF] shadow-md hover:shadow-lg hover:from-[#4480EF] hover:to-[#5A4CE6] text-[16px] border-none"
         >
-          Email me a code
+          Email me a code <ArrowRight className="ml-1 h-[18px] w-[18px]" />
         </AuthButton>
       </form>
     );
@@ -349,9 +349,9 @@ export default function LoginCodeForm({
         type="submit"
         isBusy={isSubmitting}
         busyLabel="Checking..."
-        className="mt-1"
+        className="mt-1 h-[54px] rounded-2xl bg-gradient-to-r from-[#4F91FF] to-[#6557FF] shadow-md hover:shadow-lg hover:from-[#4480EF] hover:to-[#5A4CE6] text-[16px] border-none"
       >
-        Sign in
+        Sign in <ArrowRight className="ml-1 h-[18px] w-[18px]" />
       </AuthButton>
 
       <AuthButton
