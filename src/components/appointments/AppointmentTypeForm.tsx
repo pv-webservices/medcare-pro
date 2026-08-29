@@ -52,7 +52,6 @@ interface AppointmentTypeFormProps {
   initial?: AppointmentTypeFormValues;
   /** Whether this actor may put a service on EVERY clinic. */
   canScopeTenantWide: boolean;
-  hideActions?: boolean;
   onDone?: () => void;
   onCancel?: () => void;
 }
@@ -108,7 +107,6 @@ export default function AppointmentTypeForm({
   clinics,
   initial,
   canScopeTenantWide,
-  hideActions = false,
   onDone,
   onCancel,
 }: AppointmentTypeFormProps) {
@@ -201,7 +199,7 @@ export default function AppointmentTypeForm({
   }
 
   return (
-    <form id={initial?.id ? `edit-service-${initial.id}` : "add-service-form"} onSubmit={handleSubmit} noValidate>
+    <form onSubmit={handleSubmit} noValidate>
       {formError && (
         <p
           role="alert"
@@ -283,24 +281,22 @@ export default function AppointmentTypeForm({
         />
       </div>
 
-      {!hideActions && (
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button
-            type="submit"
-            variant="primary"
-            isBusy={isSaving}
-            busyLabel={isEdit ? "Saving…" : "Adding…"}
-          >
-            {isEdit ? "Save changes" : "Add service"}
-          </Button>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Button
+          type="submit"
+          variant="primary"
+          isBusy={isSaving}
+          busyLabel={isEdit ? "Saving…" : "Adding…"}
+        >
+          {isEdit ? "Save changes" : "Add service"}
+        </Button>
 
-          {onCancel && (
-            <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
-              Cancel
-            </Button>
-          )}
-        </div>
-      )}
+        {onCancel && (
+          <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

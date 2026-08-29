@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight, MoreHorizontal } from "lucide-react";
+import { CalendarDays, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import AppointmentActions from "@/components/appointments/AppointmentActions";
 import {
@@ -163,7 +163,7 @@ export default function AppointmentsTable({
                 </TD>
 
                 <TD align="end" className="py-2">
-                  <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1">
                     <AppointmentActions
                       appointmentId={appointment.id}
                       status={appointment.status}
@@ -174,14 +174,14 @@ export default function AppointmentsTable({
                     />
                     <Link
                       href={`/appointments/${appointment.id}`}
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-sm transition-colors duration-150 hover:border-line-strong hover:bg-canvas-deep hover:text-ink"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-faint transition-colors duration-150 hover:bg-canvas-deep hover:text-ink"
                     >
                       <span className="sr-only">
                         Open {appointment.name}&apos;s appointment
                       </span>
-                      <MoreHorizontal
+                      <ChevronRight
                         aria-hidden="true"
-                        strokeWidth={2}
+                        strokeWidth={1.75}
                         className="h-4 w-4"
                       />
                     </Link>
