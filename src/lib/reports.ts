@@ -535,13 +535,29 @@ export async function getDailyRevenueSnapshot(
   ]);
   const clinicIds = clinics.map((clinic) => clinic.id);
 
+  return getDailyRevenueSnapshotForClinicIds(actor, clinicIds, date);
+}
+
+/**
+ * Dashboard-only entry point after its own `dashboard:revenue:view` scope has
+ * already been resolved server-side. Keeping this separate prevents
+ * `report:read` from becoming the dashboard card's source of truth.
+ */
+export async function getDailyRevenueSnapshotForClinicIds(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+  date: Date,
+): Promise<DailyRevenueSnapshot> {
   if (clinicIds.length === 0) {
     return { totalRevenue: "0.00", hasClinics: false };
   }
 
   const range = currentRange("daily", date);
   const aggregate = await prisma.registration.aggregate({
-    where: registrationsIn(clinicIds, range),
+    where: {
+      ...registrationsIn(clinicIds, range),
+      clinic: { tenantId: actor.tenantId },
+    },
     _sum: { amount: true },
   });
 

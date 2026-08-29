@@ -1,7 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 import {
   ALL_PERMISSIONS,
+  DASHBOARD_DATA_PERMISSIONS,
   PRE_APPOINTMENTS_PERMISSIONS,
+  STAGE_AP1_PERMISSIONS,
   WILDCARD,
 } from "@/lib/permissions";
 
@@ -94,6 +96,8 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "registration:create",
       // Staff may edit (the edit is still logged) but cannot read the log back.
       "registration:edit",
+      "dashboard:view",
+      "dashboard:registrations:view",
     ],
   },
   // --- Stage 1 additions ---------------------------------------------------
@@ -116,6 +120,10 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       // day; they do not run the booking desk. Notably NOT appointment:cancel —
       // a doctor deciding a slot is free is a front-desk decision.
       "appointment:read",
+      "dashboard:view",
+      "dashboard:appointments:view",
+      "dashboard:registrations:view",
+      "dashboard:notifications:view",
     ],
   },
   {
@@ -149,9 +157,97 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "appointment:cancel",
       "appointment:checkin",
       "appointment:convert",
+      "dashboard:view",
+      "dashboard:appointments:view",
+      "dashboard:registrations:view",
+      "dashboard:notifications:view",
     ],
   },
 ];
+
+/**
+ * Frozen permission sets immediately before dashboard data rights were added.
+ * A backfill may top up only roles that still match these sets exactly, so a
+ * tenant's deliberate role customisation is never overwritten.
+ */
+export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
+  Record<RoleKey, readonly string[]>
+> = {
+  [ROLE_KEYS.OWNER]: [WILDCARD],
+  [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
+    (permission) =>
+      !DASHBOARD_DATA_PERMISSIONS.includes(
+        permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
+      ),
+  ),
+  [ROLE_KEYS.STAFF]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "patient:create",
+    "patient:edit",
+    "registration:read",
+    "registration:create",
+    "registration:edit",
+  ],
+  [ROLE_KEYS.DOCTOR]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "registration:read",
+    "notification:read",
+    "appointment:read",
+  ],
+  [ROLE_KEYS.RECEPTIONIST]: [
+    "clinic:read",
+    "doctor:read",
+    "patient:read",
+    "patient:create",
+    "patient:edit",
+    "registration:read",
+    "registration:create",
+    "registration:edit",
+    "notification:read",
+    "message:send",
+    "appointment:read",
+    "appointment:create",
+    "appointment:update",
+    "appointment:reschedule",
+    "appointment:cancel",
+    "appointment:checkin",
+    "appointment:convert",
+  ],
+};
+
+export const DASHBOARD_ROLE_TOP_UPS: Readonly<
+  Partial<Record<RoleKey, readonly string[]>>
+> = Object.fromEntries(
+  DEFAULT_ROLES.filter((role) => role.key !== ROLE_KEYS.OWNER).map((role) => {
+    const before = new Set(PRE_DASHBOARD_ROLE_PERMISSIONS[role.key]);
+    return [
+      role.key,
+      role.permissions.filter(
+        (permission) =>
+          !before.has(permission) &&
+          DASHBOARD_DATA_PERMISSIONS.includes(
+            permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
+          ),
+      ),
+    ] as const;
+  }),
+);
+
+export function isUntouchedPreDashboardRole(
+  key: RoleKey,
+  permissions: readonly string[],
+): boolean {
+  const before = PRE_DASHBOARD_ROLE_PERMISSIONS[key];
+  const held = new Set(permissions);
+  return (
+    held.size === before.length &&
+    before.every((permission) => held.has(permission))
+  );
+}
 
 // ---------------------------------------------------------------------------
 // AP-1 — frozen pre-appointment snapshots, for the backfill's "untouched?" test
@@ -235,7 +331,11 @@ export const APPOINTMENT_ROLE_TOP_UPS: Readonly<
     const before = new Set(PRE_APPOINTMENTS_ROLE_PERMISSIONS[role.key]);
     return [
       role.key,
-      role.permissions.filter((permission) => !before.has(permission)),
+      role.permissions.filter(
+        (permission) =>
+          !before.has(permission) &&
+          STAGE_AP1_PERMISSIONS.includes(permission),
+      ),
     ] as const;
   }),
 );

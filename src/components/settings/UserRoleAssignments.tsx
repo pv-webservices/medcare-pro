@@ -24,6 +24,7 @@ interface UserRoleAssignmentsProps {
   roles: readonly RoleSummary[];
   clinics: readonly { id: string; name: string }[];
   canManage: boolean;
+  canAssignAccountWide: boolean;
 }
 
 export default function UserRoleAssignments({
@@ -31,6 +32,7 @@ export default function UserRoleAssignments({
   roles,
   clinics,
   canManage,
+  canAssignAccountWide,
 }: UserRoleAssignmentsProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +129,8 @@ export default function UserRoleAssignments({
                         {assignment.clinicName ?? "all clinics"}
                       </span>
                     </span>
-                    {canManage && (
+                    {canManage &&
+                      (assignment.clinicId !== null || canAssignAccountWide) && (
                       <button
                         type="button"
                         onClick={() =>
@@ -176,7 +179,9 @@ export default function UserRoleAssignments({
                       value={clinicId}
                       onChange={(event) => setClinicId(event.target.value)}
                     >
-                      <option value="">All clinics (account-wide)</option>
+                      {canAssignAccountWide && (
+                        <option value="">All clinics (account-wide)</option>
+                      )}
                       {clinics.map((clinic) => (
                         <option key={clinic.id} value={clinic.id}>
                           {clinic.name}
@@ -223,7 +228,9 @@ export default function UserRoleAssignments({
                     onClick={() => {
                       setOpenUserId(user.id);
                       setRoleId("");
-                      setClinicId("");
+                      setClinicId(
+                        canAssignAccountWide ? "" : (clinics[0]?.id ?? ""),
+                      );
                     }}
                   >
                     Add Role

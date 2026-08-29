@@ -69,6 +69,7 @@ export default async function TeamPage() {
         canInvite={overview.canInvite}
         roles={overview.roles}
         clinics={overview.clinics}
+        canAssignAccountWide={overview.canAssignAccountWide}
         meta={
           <>
             <Count>{activeCount}</Count> active

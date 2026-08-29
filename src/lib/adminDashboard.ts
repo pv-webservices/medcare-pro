@@ -1,6 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { clinicIdsForDashboardScope } from "@/lib/adminDashboardScope";
+import {
+  ADMIN_DASHBOARD_ACTION_PERMISSIONS as ACTION_PERMISSIONS,
+  ADMIN_DASHBOARD_DATA_PERMISSIONS as DASHBOARD_DATA_PERMISSIONS,
+  resolveAdminDashboardClinicAccess,
+  type AdminDashboardActionPermission as ActionPermission,
+  type AdminDashboardDataPermission as DashboardDataPermission,
+} from "@/lib/adminDashboardScope";
 import { resolveModulesForActor } from "@/lib/features";
 import { MODULE_FEATURES } from "@/lib/moduleFeatures";
 import { formatClockTime, parseDateOnly, parseDateTime } from "@/lib/dates";
@@ -12,12 +18,11 @@ import {
 import {
   accessibleClinicScopes,
   type ActorContext,
-  type ClinicScope,
 } from "@/lib/rbac";
 import { parseChangedFields } from "@/lib/registrationAudit";
-import { getDailyRevenueSnapshot } from "@/lib/reports";
+import { getDailyRevenueSnapshotForClinicIds } from "@/lib/reports";
 import {
-  listNotificationsForActor,
+  listNotificationsForDashboard,
   type NotificationRecord,
 } from "@/lib/notifications";
 
@@ -30,30 +35,25 @@ import {
  * that permission's own clinic scope. Tenant ids always come from `actor`.
  */
 
-const PERMISSIONS = [
-  "clinic:read",
-  "appointment:read",
-  "appointment:create",
-  "registration:read",
-  "registration:create",
-  "registration:history:read",
-  "report:read",
-  "doctor:read",
-  "doctor:create",
-  "notification:read",
-  "audit:read",
-] as const;
-
 export interface AdminDashboardCapabilities {
-  appointments: boolean;
-  registrations: boolean;
-  revenue: boolean;
-  doctors: boolean;
-  activity: boolean;
-  notifications: boolean;
-  canBookAppointment: boolean;
-  canCreateRegistration: boolean;
-  canAddDoctor: boolean;
+  dashboard: {
+    view: boolean;
+    appointments: boolean;
+    registrations: boolean;
+    revenue: boolean;
+    doctors: boolean;
+    activity: boolean;
+    notifications: boolean;
+    team: boolean;
+    clinics: boolean;
+  };
+  actions: {
+    canBookAppointment: boolean;
+    canCreateRegistration: boolean;
+    canAddDoctor: boolean;
+    canManageTeam: boolean;
+    canManageRoles: boolean;
+  };
 }
 
 export interface AdminAppointmentSummary {
@@ -146,15 +146,6 @@ function moduleAllowed(
   return modules.get(key)?.allowed === true;
 }
 
-function hasPermission(scope: ClinicScope | undefined): boolean {
-  return scope !== undefined && scope.scope !== "none";
-}
-
-function intersect(left: readonly string[], right: readonly string[]): string[] {
-  const rightIds = new Set(right);
-  return left.filter((id) => rightIds.has(id));
-}
-
 function emptyStatusCounts(): Record<AppointmentStatus, number> {
   return Object.fromEntries(
     APPOINTMENT_STATUSES.map((status) => [status, 0]),
@@ -236,6 +227,7 @@ async function loadAppointments(
 }
 
 async function loadRegistrations(
+  actor: ActorContext,
   clinicIds: readonly string[],
   start: Date,
   end: Date,
@@ -252,6 +244,7 @@ async function loadRegistrations(
 
   const where: Prisma.RegistrationWhereInput = {
     clinicId: { in: [...clinicIds] },
+    clinic: { tenantId: actor.tenantId },
     visitDate: { gte: start, lt: end },
   };
 
@@ -300,15 +293,20 @@ async function loadRegistrations(
 }
 
 async function loadDoctors(
+  actor: ActorContext,
   clinicIds: readonly string[],
   date: Date,
 ): Promise<AdminDoctorSummary> {
+  // TODO: the current schema has no User-to-Doctor identity link, so a
+  // doctor-specific subset cannot yet be derived safely. Until one exists,
+  // this remains strictly limited to the actor's assigned clinic scope.
   if (clinicIds.length === 0) {
     return { total: 0, available: 0, onLeave: 0, notScheduled: 0, rows: [] };
   }
 
   const doctorWhere: Prisma.DoctorWhereInput = {
     clinicId: { in: [...clinicIds] },
+    clinic: { tenantId: actor.tenantId },
   };
   const [total, availableRows, leaveRows, doctors] = await Promise.all([
     prisma.doctor.count({ where: doctorWhere }),
@@ -439,45 +437,50 @@ export async function getAdminDashboardData(
       select: { id: true, name: true },
     }),
     resolveModulesForActor(actor),
-    accessibleClinicScopes(actor, PERMISSIONS),
+    accessibleClinicScopes(actor, [
+      ...ACTION_PERMISSIONS,
+      ...DASHBOARD_DATA_PERMISSIONS,
+    ]),
   ]);
 
-  const scopeFor = (permission: (typeof PERMISSIONS)[number]) =>
-    scopes.get(permission);
-  const idsFor = (permission: (typeof PERMISSIONS)[number]) =>
-    clinicIdsForDashboardScope(scopeFor(permission), clinics, selectedClinicId);
+  const access = resolveAdminDashboardClinicAccess(
+    scopes,
+    clinics,
+    selectedClinicId,
+  );
+  const dashboardIdsFor = (permission: DashboardDataPermission) =>
+    access.dashboard[permission];
+  const actionIdsFor = (permission: ActionPermission) =>
+    access.actions[permission];
+
+  const appointmentIds = dashboardIdsFor("dashboard:appointments:view");
+  const registrationIds = dashboardIdsFor("dashboard:registrations:view");
+  const revenueIds = dashboardIdsFor("dashboard:revenue:view");
+  const doctorIds = dashboardIdsFor("dashboard:doctors:view");
+  const activityIds = dashboardIdsFor("dashboard:activity:view");
+  const notificationIds = dashboardIdsFor("dashboard:notifications:view");
 
   const appointmentsEnabled =
     moduleAllowed(modules, MODULE_FEATURES.appointments) &&
-    hasPermission(scopeFor("appointment:read"));
+    appointmentIds.length > 0;
   const registrationsEnabled =
     moduleAllowed(modules, MODULE_FEATURES.registrations) &&
-    hasPermission(scopeFor("registration:read"));
+    registrationIds.length > 0;
   const revenueEnabled =
     moduleAllowed(modules, MODULE_FEATURES.reports) &&
-    hasPermission(scopeFor("report:read"));
+    revenueIds.length > 0;
   const doctorsEnabled =
     moduleAllowed(modules, MODULE_FEATURES.doctors) &&
-    hasPermission(scopeFor("doctor:read"));
+    doctorIds.length > 0;
   const notificationsEnabled =
     moduleAllowed(modules, MODULE_FEATURES.notifications) &&
-    hasPermission(scopeFor("notification:read"));
+    notificationIds.length > 0;
   const activityEnabled =
     moduleAllowed(modules, MODULE_FEATURES.registrations) &&
-    hasPermission(scopeFor("registration:read")) &&
-    hasPermission(scopeFor("audit:read")) &&
-    hasPermission(scopeFor("registration:history:read"));
+    activityIds.length > 0;
 
   const dayStart = parseDateOnly(dateValue);
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  const appointmentIds = idsFor("appointment:read");
-  const registrationIds = idsFor("registration:read");
-  const doctorIds = idsFor("doctor:read");
-  const activityIds = intersect(
-    registrationIds,
-    intersect(idsFor("audit:read"), idsFor("registration:history:read")),
-  );
 
   const [appointmentData, registrationData, revenue, doctors, activity, notifications] =
     await Promise.all([
@@ -485,71 +488,74 @@ export async function getAdminDashboardData(
         ? loadAppointments(actor, appointmentIds, dayStart, dayEnd)
         : Promise.resolve(null),
       registrationsEnabled
-        ? loadRegistrations(registrationIds, dayStart, dayEnd)
+        ? loadRegistrations(actor, registrationIds, dayStart, dayEnd)
         : Promise.resolve(null),
       revenueEnabled
-        ? getDailyRevenueSnapshot(
+        ? getDailyRevenueSnapshotForClinicIds(
             actor,
-            selectedClinicId,
+            revenueIds,
             // Reports uses UTC date buckets. Midday keeps this exact selected
             // wall-clock day even if a host changes its local timezone.
             parseDateTime(dateValue, "12:00"),
           )
         : Promise.resolve(null),
-      doctorsEnabled ? loadDoctors(doctorIds, dayStart) : Promise.resolve(null),
+      doctorsEnabled ? loadDoctors(actor, doctorIds, dayStart) : Promise.resolve(null),
       activityEnabled
         ? loadRecentActivity(actor, activityIds)
         : Promise.resolve([]),
       notificationsEnabled
-        ? listNotificationsForActor(actor, {
-            clinicId: selectedClinicId ?? undefined,
+        ? listNotificationsForDashboard(actor, {
+            clinicIds: notificationIds,
+            includeAllTenantNotifications:
+              selectedClinicId === null &&
+              scopes.get("dashboard:view")?.scope === "all" &&
+              scopes.get("dashboard:notifications:view")?.scope === "all",
             limit: 5,
           })
         : Promise.resolve(null),
     ]);
 
-  const selectedClinic = selectedClinicId
-    ? clinics.find((clinic) => clinic.id === selectedClinicId) ?? null
-    : null;
-  const visibleIds = new Set(
-    [
-      idsFor("clinic:read"),
-      appointmentIds,
-      registrationIds,
-      doctorIds,
-      idsFor("report:read"),
-      idsFor("notification:read"),
-    ].flat(),
-  );
+  const visibleIds = new Set(dashboardIdsFor("dashboard:view"));
   const visibleClinics = clinics.filter((clinic) => visibleIds.has(clinic.id));
-  const hasAccountWideScope = [
-    scopeFor("clinic:read"),
-    scopeFor("appointment:read"),
-    scopeFor("registration:read"),
-    scopeFor("report:read"),
-    scopeFor("doctor:read"),
-    scopeFor("notification:read"),
-  ].some((scope) => scope?.scope === "all");
+  const selectedClinic = selectedClinicId
+    ? visibleClinics.find((clinic) => clinic.id === selectedClinicId) ?? null
+    : null;
+  const hasAccountWideScope = scopes.get("dashboard:view")?.scope === "all";
   const soleAssignedClinic =
     !hasAccountWideScope && visibleClinics.length === 1 ? visibleClinics[0] : null;
   const scopedClinic = selectedClinic ?? soleAssignedClinic;
 
   const capabilities: AdminDashboardCapabilities = {
-    appointments: appointmentsEnabled,
-    registrations: registrationsEnabled,
-    revenue: revenueEnabled,
-    doctors: doctorsEnabled,
-    activity: activityEnabled,
-    notifications: notificationsEnabled,
-    canBookAppointment:
-      moduleAllowed(modules, MODULE_FEATURES.appointments) &&
-      idsFor("appointment:create").length > 0,
-    canCreateRegistration:
-      moduleAllowed(modules, MODULE_FEATURES.registrations) &&
-      idsFor("registration:create").length > 0,
-    canAddDoctor:
-      moduleAllowed(modules, MODULE_FEATURES.doctors) &&
-      idsFor("doctor:create").length > 0,
+    dashboard: {
+      view: dashboardIdsFor("dashboard:view").length > 0,
+      appointments: appointmentsEnabled,
+      registrations: registrationsEnabled,
+      revenue: revenueEnabled,
+      doctors: doctorsEnabled,
+      activity: activityEnabled,
+      notifications: notificationsEnabled,
+      team:
+        moduleAllowed(modules, MODULE_FEATURES.team) &&
+        dashboardIdsFor("dashboard:team:view").length > 0,
+      clinics:
+        moduleAllowed(modules, MODULE_FEATURES.clinics) &&
+        dashboardIdsFor("dashboard:clinics:view").length > 0,
+    },
+    actions: {
+      canBookAppointment:
+        moduleAllowed(modules, MODULE_FEATURES.appointments) &&
+        actionIdsFor("appointment:create").length > 0,
+      canCreateRegistration:
+        moduleAllowed(modules, MODULE_FEATURES.registrations) &&
+        actionIdsFor("registration:create").length > 0,
+      canAddDoctor:
+        moduleAllowed(modules, MODULE_FEATURES.doctors) &&
+        actionIdsFor("doctor:create").length > 0,
+      canManageTeam:
+        moduleAllowed(modules, MODULE_FEATURES.team) &&
+        actionIdsFor("team:manage").length > 0,
+      canManageRoles: actionIdsFor("role:manage").length > 0,
+    },
   };
 
   return {

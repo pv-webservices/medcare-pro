@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
-import { PERMISSION_GROUPS } from "@/lib/permissions";
+import {
+  ACTION_PERMISSION_GROUPS,
+  DASHBOARD_PERMISSION_GROUP,
+  type PermissionGroup,
+} from "@/lib/permissions";
 import type { RoleSummary } from "@/lib/roles";
 
 /**
@@ -40,60 +44,90 @@ function PermissionCheckboxes({
   grantable: ReadonlySet<string>;
   onToggle: (key: string, checked: boolean) => void;
 }) {
-  return (
-    <div className="grid gap-6 sm:grid-cols-2">
-      {PERMISSION_GROUPS.map((group) => (
-        <fieldset key={group.module} className="min-w-0">
-          <legend className="mb-2 text-body font-semibold text-ink">{group.module}</legend>
-          <ul className="grid gap-2">
-            {group.permissions.map((permission) => {
-              const id = `${idPrefix}-${permission.key}`;
-              const isGrantable = grantable.has(permission.key);
+  const sections: readonly {
+    title: string;
+    description: string;
+    groups: readonly PermissionGroup[];
+  }[] = [
+    {
+      title: "Assigned Rights",
+      description: "Controls what operations this role can perform.",
+      groups: ACTION_PERMISSION_GROUPS,
+    },
+    {
+      title: "Dashboard Data",
+      description: "Controls which dashboard cards, summaries, and populated data this role can see.",
+      groups: [DASHBOARD_PERMISSION_GROUP],
+    },
+  ];
 
-              return (
-                <li key={permission.key}>
-                  <label
-                    htmlFor={id}
-                    className={`flex items-start gap-3 rounded-lg p-2 transition-colors ${
-                      isGrantable ? "hover:bg-canvas-deep cursor-pointer" : "opacity-60 cursor-not-allowed"
-                    }`}
-                  >
-                    <input
-                      id={id}
-                      type="checkbox"
-                      checked={selected.has(permission.key)}
-                      disabled={!isGrantable}
-                      onChange={(event) =>
-                        onToggle(permission.key, event.target.checked)
-                      }
-                      className="mt-1 size-4 shrink-0 rounded border-line text-accent"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-body font-semibold text-ink">
-                        {permission.label}
-                      </span>
-                      <span className="block text-meta text-muted">
-                        {permission.description}
-                      </span>
-                      {permission.pendingNote && (
-                        // Says so rather than implying protection that does not
-                        // exist yet — ticking this box changes nothing today.
-                        <span className="mt-1 block text-meta text-warn-ink font-medium">
-                          {permission.pendingNote}
-                        </span>
-                      )}
-                      {!isGrantable && (
-                        <span className="mt-1 block text-meta text-faint">
-                          You do not hold this permission, so you cannot grant it.
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </fieldset>
+  return (
+    <div className="grid gap-8">
+      {sections.map((section) => (
+        <section key={section.title} aria-labelledby={`${idPrefix}-${section.title.replaceAll(" ", "-").toLowerCase()}`}>
+          <h3
+            id={`${idPrefix}-${section.title.replaceAll(" ", "-").toLowerCase()}`}
+            className="text-title font-semibold text-ink"
+          >
+            {section.title}
+          </h3>
+          <p className="mt-1 text-body text-muted">{section.description}</p>
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            {section.groups.map((group) => (
+              <fieldset key={group.module} className="min-w-0">
+                <legend className="mb-2 text-body font-semibold text-ink">
+                  {section.title === "Dashboard Data" ? "Dashboard sections" : group.module}
+                </legend>
+                <ul className="grid gap-2">
+                  {group.permissions.map((permission) => {
+                    const id = `${idPrefix}-${permission.key}`;
+                    const isGrantable = grantable.has(permission.key);
+
+                    return (
+                      <li key={permission.key}>
+                        <label
+                          htmlFor={id}
+                          className={`flex items-start gap-3 rounded-lg p-2 transition-colors ${
+                            isGrantable ? "hover:bg-canvas-deep cursor-pointer" : "opacity-60 cursor-not-allowed"
+                          }`}
+                        >
+                          <input
+                            id={id}
+                            type="checkbox"
+                            checked={selected.has(permission.key)}
+                            disabled={!isGrantable}
+                            onChange={(event) =>
+                              onToggle(permission.key, event.target.checked)
+                            }
+                            className="mt-1 size-4 shrink-0 rounded border-line text-accent"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-body font-semibold text-ink">
+                              {permission.label}
+                            </span>
+                            <span className="block text-meta text-muted">
+                              {permission.description}
+                            </span>
+                            {permission.pendingNote && (
+                              <span className="mt-1 block text-meta text-warn-ink font-medium">
+                                {permission.pendingNote}
+                              </span>
+                            )}
+                            {!isGrantable && (
+                              <span className="mt-1 block text-meta text-faint">
+                                You do not hold this permission, so you cannot grant it.
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </fieldset>
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );

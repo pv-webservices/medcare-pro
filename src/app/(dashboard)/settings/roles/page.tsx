@@ -72,6 +72,7 @@ export default async function RolesSettingsPage() {
         roles={overview.roles}
         clinics={overview.clinics}
         canManage={overview.canManage}
+        canAssignAccountWide={overview.canAssignAccountWide}
       />
     </section>
   );

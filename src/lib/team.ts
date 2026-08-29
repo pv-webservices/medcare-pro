@@ -83,6 +83,7 @@ export interface TeamOverview {
   canInvite: boolean;
   canApprove: boolean;
   canManage: boolean;
+  canAssignAccountWide: boolean;
 }
 
 /** Everything the team screen renders, in one round trip. */
@@ -92,7 +93,7 @@ export async function getTeamOverview(
 ): Promise<TeamOverview> {
   await requirePermission(actor, VIEW);
 
-  const [users, invitations, roles, clinics, canInvite, canApprove, canManage] =
+  const [users, invitations, roles, clinics, canInvite, canApprove, canManage, canAssignAccountWide] =
     await Promise.all([
       prisma.user.findMany({
         where: { tenantId: actor.tenantId },
@@ -123,6 +124,7 @@ export async function getTeamOverview(
       can(actor, INVITE),
       can(actor, APPROVE),
       can(actor, MANAGE),
+      can(actor, WILDCARD),
     ]);
 
   return {
@@ -150,6 +152,7 @@ export async function getTeamOverview(
     canInvite,
     canApprove,
     canManage,
+    canAssignAccountWide,
   };
 }
 

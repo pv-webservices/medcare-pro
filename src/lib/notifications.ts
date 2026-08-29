@@ -531,6 +531,65 @@ export async function listNotificationsForActor(
 }
 
 /**
+ * Dashboard-only feed after `dashboard:notifications:view` has been resolved
+ * to explicit tenant-owned clinic ids. This intentionally does not check
+ * `notification:read`; dashboard data visibility is an independent right.
+ */
+export async function listNotificationsForDashboard(
+  actor: ActorContext,
+  options: {
+    clinicIds: readonly string[];
+    /** True only for an account-wide dashboard scope with no clinic selected. */
+    includeAllTenantNotifications?: boolean;
+    limit?: number;
+  },
+): Promise<NotificationFeed> {
+  if (
+    options.clinicIds.length === 0 &&
+    options.includeAllTenantNotifications !== true
+  ) {
+    return { items: [], unreadCount: 0 };
+  }
+
+  const scoped = {
+    tenantId: actor.tenantId,
+    ...(options.includeAllTenantNotifications
+      ? {}
+      : { clinicId: { in: [...options.clinicIds] } }),
+  };
+
+  const [rows, unreadCount] = await Promise.all([
+    prisma.notification.findMany({
+      where: scoped,
+      orderBy: [{ read: "asc" }, { createdAt: "desc" }],
+      take: options.limit ?? DEFAULT_LIMIT,
+      select: {
+        id: true,
+        type: true,
+        message: true,
+        clinicId: true,
+        relatedRecordId: true,
+        read: true,
+        createdAt: true,
+        clinic: { select: { name: true } },
+      },
+    }),
+    prisma.notification.count({ where: { ...scoped, read: false } }),
+  ]);
+
+  return {
+    items: rows.map(({ clinic, ...row }) => ({
+      ...row,
+      typeLabel:
+        NOTIFICATION_TYPE_LABELS[row.type as NotificationType] ?? row.type,
+      clinicName: clinic?.name ?? null,
+      href: hrefFor(row.type, row.relatedRecordId),
+    })),
+    unreadCount,
+  };
+}
+
+/**
  * Unread count on its own, for the nav badge.
  *
  * Returns 0 rather than throwing for an actor without the permission: the badge

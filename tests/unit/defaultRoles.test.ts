@@ -18,7 +18,7 @@ describe("DEFAULT_ROLES", () => {
     ]);
   });
 
-  it("leaves the Staff permission set exactly as it was", () => {
+  it("preserves Staff action rights and adds registration dashboard data only", () => {
     const staff = DEFAULT_ROLES.find((role) => role.name === "Staff");
     expect([...(staff?.permissions ?? [])]).toEqual([
       "clinic:read",
@@ -29,6 +29,8 @@ describe("DEFAULT_ROLES", () => {
       "registration:read",
       "registration:create",
       "registration:edit",
+      "dashboard:view",
+      "dashboard:registrations:view",
     ]);
   });
 
@@ -66,6 +68,10 @@ describe("DEFAULT_ROLES", () => {
     expect(doctor?.permissions).not.toContain("registration:create");
     expect(doctor?.permissions).not.toContain("registration:edit");
     expect(doctor?.permissions).toContain("registration:read");
+    expect(doctor?.permissions).toContain("dashboard:appointments:view");
+    expect(doctor?.permissions).toContain("dashboard:registrations:view");
+    expect(doctor?.permissions).not.toContain("dashboard:revenue:view");
+    expect(doctor?.permissions).not.toContain("dashboard:team:view");
   });
 
   it("gives Receptionist the front desk's duties", () => {
@@ -73,6 +79,10 @@ describe("DEFAULT_ROLES", () => {
     expect(receptionist?.permissions).toContain("registration:create");
     expect(receptionist?.permissions).toContain("message:send");
     expect(receptionist?.permissions).not.toContain("role:manage");
+    expect(receptionist?.permissions).toContain("dashboard:appointments:view");
+    expect(receptionist?.permissions).toContain("dashboard:registrations:view");
+    expect(receptionist?.permissions).not.toContain("dashboard:revenue:view");
+    expect(receptionist?.permissions).not.toContain("dashboard:team:view");
   });
 });
 

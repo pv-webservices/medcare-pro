@@ -315,6 +315,7 @@ export async function loadInvitationPreview(
 async function loadGrantableRole(
   actor: ActorContext,
   roleId: string,
+  clinicId: string | null,
 ): Promise<{ id: string; name: string }> {
   const role = await prisma.role.findFirst({
     where: { id: roleId, tenantId: actor.tenantId },
@@ -328,7 +329,11 @@ async function loadGrantableRole(
 
   // The same rule that governs assigning a role directly: an invitation is a
   // deferred assignment, so it cannot hand out reach the inviter lacks.
-  await assertRoleGrantableBy(actor, [...toPermissionList(role.permissions)]);
+  await assertRoleGrantableBy(
+    actor,
+    [...toPermissionList(role.permissions)],
+    clinicId,
+  );
 
   return { id: role.id, name: role.name };
 }
@@ -351,14 +356,15 @@ export async function createInvitation(
 ): Promise<CreatedInvitation> {
   const { mailer, limiter, now, ip, userAgent } = resolveDeps(deps);
 
-  await requirePermission(actor, INVITE);
-
-  const role = await loadGrantableRole(actor, input.roleId);
-
   const clinicId = input.clinicId === "" ? undefined : input.clinicId;
   if (clinicId) {
     await assertClinicInTenant(actor.tenantId, clinicId);
+    await requirePermission(actor, INVITE, clinicId);
+  } else {
+    await requirePermission(actor, INVITE);
   }
+
+  const role = await loadGrantableRole(actor, input.roleId, clinicId ?? null);
 
   // Checked AFTER authorisation, so an unauthorised caller cannot consume
   // another tenant's allowance, and BEFORE the write, so a refused request

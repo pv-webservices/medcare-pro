@@ -31,6 +31,7 @@ interface InvitePanelProps {
   canInvite: boolean;
   roles: GrantableRole[];
   clinics: { id: string; name: string }[];
+  canAssignAccountWide: boolean;
   meta: ReactNode;
 }
 
@@ -40,6 +41,7 @@ export default function InvitePanel({
   canInvite,
   roles,
   clinics,
+  canAssignAccountWide,
   meta,
 }: InvitePanelProps) {
   const router = useRouter();
@@ -48,7 +50,9 @@ export default function InvitePanel({
   const [isOpen, setIsOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [roleId, setRoleId] = useState("");
-  const [clinicId, setClinicId] = useState("");
+  const [clinicId, setClinicId] = useState(
+    canAssignAccountWide ? "" : (clinics[0]?.id ?? ""),
+  );
   const [touched, setTouched] = useState({ email: false, roleId: false });
   const [formError, setFormError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -65,7 +69,7 @@ export default function InvitePanel({
     setIsOpen(false);
     setEmail("");
     setRoleId("");
-    setClinicId("");
+    setClinicId(canAssignAccountWide ? "" : (clinics[0]?.id ?? ""));
     setTouched({ email: false, roleId: false });
     setFormError(null);
   }
@@ -189,11 +193,11 @@ export default function InvitePanel({
                 id="invite-clinic"
                 name="clinicId"
                 label="Clinic"
-                hint="Leave blank for the whole account."
+                hint={canAssignAccountWide ? "Leave blank for the whole account." : "Choose an assigned clinic."}
                 value={clinicId}
                 onChange={(event) => setClinicId(event.target.value)}
               >
-                <option value="">All clinics</option>
+                {canAssignAccountWide && <option value="">All clinics</option>}
                 {clinics.map((clinic) => (
                   <option key={clinic.id} value={clinic.id}>
                     {clinic.name}

@@ -6,6 +6,7 @@ import {
   WILDCARD,
 } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { evaluateRoleGrantAuthority } from "@/lib/roleAuthority";
 import {
   assertClinicInTenant,
   can,
@@ -125,6 +126,8 @@ export interface RolesOverview {
   grantablePermissions: string[];
   /** False for a `role:read`-only viewer — the UI hides every control. */
   canManage: boolean;
+  /** Tenant-wide assignment is reserved for an account-wide wildcard holder. */
+  canAssignAccountWide: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +147,30 @@ async function accountWidePermissions(actor: ActorContext): Promise<Set<string>>
       userId: actor.userId,
       clinicId: null,
       role: { tenantId: actor.tenantId },
+    },
+    select: { role: { select: { permissions: true } } },
+  });
+
+  const held = new Set<string>();
+  for (const assignment of assignments) {
+    for (const permission of toPermissionList(assignment.role.permissions)) {
+      held.add(permission);
+    }
+  }
+  return held;
+}
+
+/** Effective permissions at one clinic: tenant-wide grants plus assignments
+ * narrowed to that clinic. The tenant relation is always derived from actor. */
+async function clinicPermissions(
+  actor: ActorContext,
+  clinicId: string,
+): Promise<Set<string>> {
+  const assignments = await prisma.userRole.findMany({
+    where: {
+      userId: actor.userId,
+      role: { tenantId: actor.tenantId },
+      OR: [{ clinicId: null }, { clinicId }],
     },
     select: { role: { select: { permissions: true } } },
   });
@@ -258,14 +285,37 @@ async function assertOwnerRemains(
 export async function assertRoleGrantableBy(
   actor: ActorContext,
   rolePermissions: readonly string[],
+  clinicId: string | null = null,
 ): Promise<void> {
-  const held = await accountWidePermissions(actor);
+  const accountWideHeld = await accountWidePermissions(actor);
+  const isOwner = accountWideHeld.has(WILDCARD);
 
-  if (rolePermissions.includes(WILDCARD) && !held.has(WILDCARD)) {
+  const held = clinicId === null
+    ? accountWideHeld
+    : await clinicPermissions(actor, clinicId);
+
+  const refusal = evaluateRoleGrantAuthority({
+    actorPermissions: held,
+    targetPermissions: rolePermissions,
+    isAccountOwner: isOwner,
+    tenantWide: clinicId === null,
+  });
+  if (refusal === "tenant-wide-owner-only") {
+    throw new BadRequestError(
+      "Only an account owner can assign roles across all clinics.",
+    );
+  }
+  if (refusal === "owner-role-owner-only") {
     throw new BadRequestError("Only an account owner can assign the owner role.");
   }
-
-  assertHeld(held, rolePermissions);
+  if (refusal === "beyond-actor-permissions") {
+    throw new BadRequestError(
+      "You can only grant permissions you hold yourself. Ask the account owner to grant the rest.",
+    );
+  }
+  if (refusal === "not-below-actor-authority") {
+    throw new BadRequestError("You can only assign roles below your own authority.");
+  }
 }
 
 export interface GrantableRole {
@@ -307,7 +357,8 @@ export async function listGrantableRoles(
         canGrant:
           hasWildcard ||
           (!permissions.includes(WILDCARD) &&
-            permissions.every((permission) => held.has(permission))),
+            permissions.every((permission) => held.has(permission)) &&
+            [...held].some((permission) => !permissions.includes(permission))),
       };
     })
     .filter((role) => role.canGrant)
@@ -412,6 +463,7 @@ export async function getRolesOverview(actor: ActorContext): Promise<RolesOvervi
       ? [...ALL_PERMISSIONS]
       : ALL_PERMISSIONS.filter((permission) => held.has(permission)),
     canManage,
+    canAssignAccountWide: held.has(WILDCARD),
   };
 }
 
@@ -513,7 +565,13 @@ export async function assignRole(
   actor: ActorContext,
   input: Extract<RoleMutationInput, { action: "assign" }>,
 ): Promise<AssignmentSummary> {
-  await requirePermission(actor, MANAGE);
+  const clinicId = input.clinicId === "" ? undefined : input.clinicId;
+  if (clinicId) {
+    await assertClinicInTenant(actor.tenantId, clinicId);
+    await requirePermission(actor, MANAGE, clinicId);
+  } else {
+    await requirePermission(actor, MANAGE);
+  }
 
   const role = await loadRole(actor, input.roleId);
 
@@ -526,15 +584,14 @@ export async function assignRole(
     throw new ScopeError();
   }
 
-  const clinicId = input.clinicId === "" ? undefined : input.clinicId;
-  if (clinicId) {
-    await assertClinicInTenant(actor.tenantId, clinicId);
-  }
-
   // Rule 1. The role's permissions are NOT re-validated against the catalogue
   // here — assigning an existing role is not authoring it, and a legacy string
   // on a seeded role should not block a legitimate assignment.
-  await assertRoleGrantableBy(actor, [...toPermissionList(role.permissions)]);
+  await assertRoleGrantableBy(
+    actor,
+    [...toPermissionList(role.permissions)],
+    clinicId ?? null,
+  );
 
   // MySQL treats NULLs as distinct, so the @@unique on
   // (user_id, role_id, clinic_id) does NOT stop a duplicate account-wide row.
@@ -572,8 +629,6 @@ export async function unassignRole(
   actor: ActorContext,
   input: Extract<RoleMutationInput, { action: "unassign" }>,
 ): Promise<{ removed: true }> {
-  await requirePermission(actor, MANAGE);
-
   const assignment = await prisma.userRole.findFirst({
     where: {
       id: input.assignmentId,
@@ -592,6 +647,18 @@ export async function unassignRole(
   if (!assignment) {
     throw new ScopeError();
   }
+
+  if (assignment.clinicId) {
+    await requirePermission(actor, MANAGE, assignment.clinicId);
+  } else {
+    await requirePermission(actor, MANAGE);
+  }
+
+  await assertRoleGrantableBy(
+    actor,
+    [...toPermissionList(assignment.role.permissions)],
+    assignment.clinicId,
+  );
 
   const isAccountWideOwner =
     assignment.clinicId === null &&

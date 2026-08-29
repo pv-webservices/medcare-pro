@@ -126,8 +126,8 @@ export default function AdminDashboard({
       ? `Here's what happened at ${clinicName} on ${selectedDateLabel}.`
       : `Here's what happened across your assigned clinics on ${selectedDateLabel}.`;
 
-  const hasAnyWidget = Object.entries(data.capabilities).some(
-    ([key, allowed]) => !key.startsWith("can") && allowed,
+  const hasAnyWidget = Object.entries(data.capabilities.dashboard).some(
+    ([key, allowed]) => key !== "view" && allowed,
   );
 
   return (
@@ -154,30 +154,30 @@ export default function AdminDashboard({
         <>
           <KpiRow data={data} isToday={isToday} />
 
-          {data.capabilities.appointments && data.appointments && (
+          {data.capabilities.dashboard.appointments && data.appointments && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
               <SchedulePanel data={data} isToday={isToday} />
               <OperationalSummary data={data} />
             </div>
           )}
 
-          {(data.capabilities.registrations || data.capabilities.doctors) && (
+          {(data.capabilities.dashboard.registrations || data.capabilities.dashboard.doctors) && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {data.capabilities.registrations && data.registrations && (
+              {data.capabilities.dashboard.registrations && data.registrations && (
                 <RegistrationPanel data={data} isToday={isToday} />
               )}
-              {data.capabilities.doctors && data.doctors && (
+              {data.capabilities.dashboard.doctors && data.doctors && (
                 <DoctorAvailabilityPanel data={data} isToday={isToday} />
               )}
             </div>
           )}
 
-          {(data.capabilities.activity || data.capabilities.notifications) && (
+          {(data.capabilities.dashboard.activity || data.capabilities.dashboard.notifications) && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {data.capabilities.activity && (
+              {data.capabilities.dashboard.activity && (
                 <ActivityPanel data={data} now={now} />
               )}
-              {data.capabilities.notifications && data.notifications && (
+              {data.capabilities.dashboard.notifications && data.notifications && (
                 <NotificationsPanel data={data} now={now} />
               )}
             </div>
@@ -191,7 +191,7 @@ export default function AdminDashboard({
 function KpiRow({ data, isToday }: { data: AdminDashboardData; isToday: boolean }) {
   const cards = [];
 
-  if (data.capabilities.appointments && data.appointments) {
+  if (data.capabilities.dashboard.appointments && data.appointments) {
     cards.push(
       <MetricCard
         key="appointments"
@@ -203,7 +203,7 @@ function KpiRow({ data, isToday }: { data: AdminDashboardData; isToday: boolean 
     );
   }
 
-  if (data.capabilities.registrations && data.registrations) {
+  if (data.capabilities.dashboard.registrations && data.registrations) {
     cards.push(
       <MetricCard
         key="registrations"
@@ -215,7 +215,7 @@ function KpiRow({ data, isToday }: { data: AdminDashboardData; isToday: boolean 
     );
   }
 
-  if (data.capabilities.revenue && data.revenueToday !== null) {
+  if (data.capabilities.dashboard.revenue && data.revenueToday !== null) {
     cards.push(
       <MetricCard
         key="revenue"
@@ -227,7 +227,7 @@ function KpiRow({ data, isToday }: { data: AdminDashboardData; isToday: boolean 
     );
   }
 
-  if (data.capabilities.doctors && data.doctors) {
+  if (data.capabilities.dashboard.doctors && data.doctors) {
     cards.push(
       <MetricCard
         key="doctors"
@@ -261,7 +261,7 @@ function SchedulePanel({ data, isToday }: { data: AdminDashboardData; isToday: b
           title={isToday ? "No appointments scheduled for today" : "No appointments scheduled"}
           guidance="New bookings for this date will appear here."
           action={
-            data.capabilities.canBookAppointment ? (
+            data.capabilities.actions.canBookAppointment ? (
               <EmptyAction href="/appointments/new" label="Book appointment" />
             ) : undefined
           }
@@ -379,7 +379,7 @@ function RegistrationPanel({ data, isToday }: { data: AdminDashboardData; isToda
           icon={<UserRoundPlus className="h-5 w-5" strokeWidth={2} />}
           title={isToday ? "No registrations today" : "No registrations on this date"}
           guidance="New patient visits will appear here when they are recorded."
-          action={data.capabilities.canCreateRegistration ? <EmptyAction href="/registration/new" label="New registration" /> : undefined}
+          action={data.capabilities.actions.canCreateRegistration ? <EmptyAction href="/registration/new" label="New registration" /> : undefined}
         />
       ) : (
         <>
@@ -450,7 +450,7 @@ function DoctorAvailabilityPanel({ data, isToday }: { data: AdminDashboardData; 
           icon={<Stethoscope className="h-5 w-5" strokeWidth={2} />}
           title="No doctors are available"
           guidance="Doctor schedules and leave for this date will appear here."
-          action={data.capabilities.canAddDoctor ? <EmptyAction href="/doctors" label="Add doctor" /> : undefined}
+          action={data.capabilities.actions.canAddDoctor ? <EmptyAction href="/doctors" label="Add doctor" /> : undefined}
         />
       ) : (
         <ul className="divide-y divide-line">

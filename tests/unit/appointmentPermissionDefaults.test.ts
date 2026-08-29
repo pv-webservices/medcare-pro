@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALL_PERMISSIONS,
+  DASHBOARD_DATA_PERMISSIONS,
   HISTORICAL_ALL_PERMISSIONS,
   PERMISSION_GROUPS,
   PRE_APPOINTMENTS_PERMISSIONS,
@@ -193,18 +194,26 @@ describe("the stage sets stay disjoint", () => {
     const preStage11Admin = ALL_PERMISSIONS.filter(
       (permission) =>
         !STAGE_11_PERMISSIONS.includes(permission) &&
-        !STAGE_AP1_PERMISSIONS.includes(permission),
+        !STAGE_AP1_PERMISSIONS.includes(permission) &&
+        !DASHBOARD_DATA_PERMISSIONS.includes(
+          permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
+        ),
     );
     expect(isUntouchedPreStage11AdminSet(preStage11Admin)).toBe(true);
   });
 });
 
 describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
-  it("is the whole catalogue minus what AP-1 added", () => {
+  it("is the historical catalogue before AP-1 and later dashboard rights", () => {
     expect(PRE_APPOINTMENTS_PERMISSIONS.length).toBe(
-      ALL_PERMISSIONS.length - STAGE_AP1_PERMISSIONS.length,
+      ALL_PERMISSIONS.length -
+        STAGE_AP1_PERMISSIONS.length -
+        DASHBOARD_DATA_PERMISSIONS.length,
     );
     for (const permission of STAGE_AP1_PERMISSIONS) {
+      expect(PRE_APPOINTMENTS_PERMISSIONS).not.toContain(permission);
+    }
+    for (const permission of DASHBOARD_DATA_PERMISSIONS) {
       expect(PRE_APPOINTMENTS_PERMISSIONS).not.toContain(permission);
     }
   });
@@ -313,10 +322,11 @@ describe("what each seeded role holds after AP-1", () => {
     }
   });
 
-  it("leaves Staff byte-for-byte as it was before AP-1", () => {
-    expect([...permissionsFor(ROLE_KEYS.STAFF)]).toEqual([
-      ...PRE_APPOINTMENTS_ROLE_PERMISSIONS[ROLE_KEYS.STAFF],
-    ]);
+  it("does not add appointment rights to Staff in later permission stages", () => {
+    const held = permissionsFor(ROLE_KEYS.STAFF);
+    expect(
+      held.filter((permission) => !permission.startsWith("dashboard:")),
+    ).toEqual([...PRE_APPOINTMENTS_ROLE_PERMISSIONS[ROLE_KEYS.STAFF]]);
   });
 });
 
@@ -428,17 +438,18 @@ describe("what the backfill would append", () => {
     }
   });
 
-  it("lands a topped-up role exactly on what a new tenant is seeded with", () => {
-    // The guarantee that matters: an existing untouched tenant and a brand-new
-    // one end up holding the same thing, so there is only one state to reason
-    // about afterwards.
+  it("lands a topped-up role on the pre-dashboard default state", () => {
+    // Later permission stages have their own safe backfills. AP-1 must append
+    // only appointment keys and stop at the state that existed when it shipped.
     for (const role of DEFAULT_ROLES) {
       if (role.key === ROLE_KEYS.OWNER || role.key === ROLE_KEYS.STAFF) continue;
       const after = new Set([
         ...PRE_APPOINTMENTS_ROLE_PERMISSIONS[role.key],
         ...(APPOINTMENT_ROLE_TOP_UPS[role.key] ?? []),
       ]);
-      expect([...after].sort()).toEqual([...new Set(role.permissions)].sort());
+      expect([...after].sort()).toEqual(
+        [...new Set(role.permissions.filter((permission) => !permission.startsWith("dashboard:")))].sort(),
+      );
     }
   });
 });

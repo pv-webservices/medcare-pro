@@ -43,6 +43,77 @@ export interface PermissionGroup {
   permissions: readonly PermissionDefinition[];
 }
 
+/**
+ * Dashboard permissions deliberately live in their own namespace. They only
+ * control populated dashboard cards and summaries; operational permissions
+ * such as `appointment:create` continue to control actions and module pages.
+ */
+export const DASHBOARD_DATA_PERMISSIONS = [
+  "dashboard:view",
+  "dashboard:appointments:view",
+  "dashboard:registrations:view",
+  "dashboard:revenue:view",
+  "dashboard:doctors:view",
+  "dashboard:activity:view",
+  "dashboard:notifications:view",
+  "dashboard:team:view",
+  "dashboard:clinics:view",
+] as const;
+
+export type DashboardDataPermission =
+  (typeof DASHBOARD_DATA_PERMISSIONS)[number];
+
+export const DASHBOARD_PERMISSION_GROUP: PermissionGroup = {
+  module: "Dashboard Data",
+  permissions: [
+    {
+      key: "dashboard:view",
+      label: "View dashboard",
+      description: "Open the operational dashboard and see permitted sections.",
+    },
+    {
+      key: "dashboard:appointments:view",
+      label: "View appointment data",
+      description: "See appointment counts, status summaries, and schedules on the dashboard.",
+    },
+    {
+      key: "dashboard:registrations:view",
+      label: "View registration data",
+      description: "See registration counts and recent patient visits on the dashboard.",
+    },
+    {
+      key: "dashboard:revenue:view",
+      label: "View revenue data",
+      description: "See revenue totals on the dashboard.",
+    },
+    {
+      key: "dashboard:doctors:view",
+      label: "View doctor data",
+      description: "See doctor availability and coverage on the dashboard.",
+    },
+    {
+      key: "dashboard:activity:view",
+      label: "View activity data",
+      description: "See recent clinic activity on the dashboard.",
+    },
+    {
+      key: "dashboard:notifications:view",
+      label: "View notification data",
+      description: "See notification summaries and recent alerts on the dashboard.",
+    },
+    {
+      key: "dashboard:team:view",
+      label: "View team data",
+      description: "See team summaries on the dashboard when available.",
+    },
+    {
+      key: "dashboard:clinics:view",
+      label: "View clinic data",
+      description: "See clinic-wide summaries and comparisons on the dashboard when available.",
+    },
+  ],
+};
+
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
     module: "Clinics",
@@ -454,7 +525,12 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
       },
     ],
   },
+  DASHBOARD_PERMISSION_GROUP,
 ] as const;
+
+/** Operational/action permissions shown separately from Dashboard Data. */
+export const ACTION_PERMISSION_GROUPS: readonly PermissionGroup[] =
+  PERMISSION_GROUPS.filter((group) => group.module !== DASHBOARD_PERMISSION_GROUP.module);
 
 export const ALL_PERMISSIONS: readonly string[] = PERMISSION_GROUPS.flatMap(
   (group) => group.permissions.map((permission) => permission.key),
@@ -572,7 +648,10 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
   (permission) =>
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
     !STAGE_11_PERMISSIONS.includes(permission) &&
-    !STAGE_AP1_PERMISSIONS.includes(permission),
+    !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !DASHBOARD_DATA_PERMISSIONS.includes(
+      permission as DashboardDataPermission,
+    ),
 );
 
 /**
@@ -617,7 +696,10 @@ export function isUntouchedHistoricalAdminSet(
 export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
   (permission) =>
     !STAGE_11_PERMISSIONS.includes(permission) &&
-    !STAGE_AP1_PERMISSIONS.includes(permission),
+    !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !DASHBOARD_DATA_PERMISSIONS.includes(
+      permission as DashboardDataPermission,
+    ),
 );
 
 /**
@@ -653,7 +735,11 @@ export function isUntouchedPreStage11AdminSet(
  */
 export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
   ALL_PERMISSIONS.filter(
-    (permission) => !STAGE_AP1_PERMISSIONS.includes(permission),
+    (permission) =>
+      !STAGE_AP1_PERMISSIONS.includes(permission) &&
+      !DASHBOARD_DATA_PERMISSIONS.includes(
+        permission as DashboardDataPermission,
+      ),
   );
 
 /**
