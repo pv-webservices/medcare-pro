@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 /**
  * Route-group layout for the unauthenticated screens.
@@ -18,10 +19,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AuthRouteGroupLayout({
+export default async function AuthRouteGroupLayout({
   children,
 }: {
   children: ReactNode;
 }) {
+  // Authentication HTML must never outlive the hashed assets from its build.
+  // Waiting for the incoming request prevents the hosting CDN from retaining a
+  // statically generated page whose CSS and JavaScript may be removed later.
+  await connection();
+
   return children;
 }
