@@ -50,15 +50,16 @@ export interface PermissionGroup {
  */
 export const DASHBOARD_DATA_PERMISSIONS = [
   "dashboard:view",
+  "dashboard:patients:view",
   "dashboard:appointments:view",
-  "dashboard:registrations:view",
   "dashboard:revenue:view",
   "dashboard:doctors:view",
+  "dashboard:messages:view",
+  "dashboard:tasks:view",
+  "dashboard:schedule:view",
   "dashboard:activity:view",
-  "dashboard:notifications:view",
   "dashboard:team:view",
   "dashboard:clinics:view",
-  "dashboard:tasks:view",
 ] as const;
 
 /** Task page/action permissions, kept separate from dashboard summaries. */
@@ -77,6 +78,23 @@ export type TaskPermission = (typeof TASK_PERMISSIONS)[number];
 export type DashboardDataPermission =
   (typeof DASHBOARD_DATA_PERMISSIONS)[number];
 
+/**
+ * Read-only compatibility for roles saved before the dashboard vocabulary was
+ * expanded. These values stay valid when an existing custom role is edited,
+ * and resolve to the equivalent new data right, but are not offered for new
+ * grants in the Roles UI.
+ */
+const LEGACY_PERMISSION_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  "dashboard:patients:view": ["dashboard:registrations:view"],
+  "dashboard:messages:view": ["dashboard:notifications:view"],
+};
+
+const LEGACY_PERMISSION_KEYS = new Set(Object.values(LEGACY_PERMISSION_ALIASES).flat());
+
+export function permissionGrantKeys(permission: string): readonly string[] {
+  return [permission, ...(LEGACY_PERMISSION_ALIASES[permission] ?? [])];
+}
+
 export const DASHBOARD_PERMISSION_GROUP: PermissionGroup = {
   module: "Dashboard Data",
   permissions: [
@@ -86,49 +104,54 @@ export const DASHBOARD_PERMISSION_GROUP: PermissionGroup = {
       description: "Open the operational dashboard and see permitted sections.",
     },
     {
-      key: "dashboard:appointments:view",
-      label: "View appointment data",
-      description: "See appointment counts, status summaries, and schedules on the dashboard.",
+      key: "dashboard:patients:view",
+      label: "Patient statistics",
+      description: "See patient totals, growth, visit mix, and recent registrations.",
     },
     {
-      key: "dashboard:registrations:view",
-      label: "View registration data",
-      description: "See registration counts and recent patient visits on the dashboard.",
+      key: "dashboard:appointments:view",
+      label: "Appointment statistics",
+      description: "See appointment counts, status summaries, trends, and workload.",
     },
     {
       key: "dashboard:revenue:view",
-      label: "View revenue data",
-      description: "See revenue totals on the dashboard.",
+      label: "Revenue analytics",
+      description: "See registration-backed revenue totals, trends, and summaries.",
     },
     {
       key: "dashboard:doctors:view",
-      label: "View doctor data",
-      description: "See doctor availability and coverage on the dashboard.",
+      label: "Doctor analytics",
+      description: "See doctor availability, patient load, and appointment workload.",
     },
     {
-      key: "dashboard:activity:view",
-      label: "View activity data",
-      description: "See recent clinic activity on the dashboard.",
-    },
-    {
-      key: "dashboard:notifications:view",
-      label: "View notification data",
-      description: "See notification summaries and recent alerts on the dashboard.",
-    },
-    {
-      key: "dashboard:team:view",
-      label: "View team data",
-      description: "See team summaries on the dashboard when available.",
-    },
-    {
-      key: "dashboard:clinics:view",
-      label: "View clinic data",
-      description: "See clinic-wide summaries and comparisons on the dashboard when available.",
+      key: "dashboard:messages:view",
+      label: "Messages analytics",
+      description: "See real message send outcomes and delivery health.",
     },
     {
       key: "dashboard:tasks:view",
-      label: "View task data",
-      description: "See personal task counts and due-date summaries on the dashboard.",
+      label: "Task statistics",
+      description: "See personal and, when authorised, team task workload.",
+    },
+    {
+      key: "dashboard:schedule:view",
+      label: "Today's schedule",
+      description: "See the next appointments in chronological order.",
+    },
+    {
+      key: "dashboard:activity:view",
+      label: "Recent activity",
+      description: "See recent patient registrations and appointment events.",
+    },
+    {
+      key: "dashboard:team:view",
+      label: "Team overview",
+      description: "See team-level task information within assigned clinics.",
+    },
+    {
+      key: "dashboard:clinics:view",
+      label: "Clinic comparison",
+      description: "Compare only the clinics and metrics this role may access.",
     },
   ],
 };
@@ -609,7 +632,7 @@ const BY_KEY = new Map(
  * account owner". `lib/roles.ts` rejects it explicitly for the same reason.
  */
 export function isKnownPermission(value: string): boolean {
-  return BY_KEY.has(value);
+  return BY_KEY.has(value) || LEGACY_PERMISSION_KEYS.has(value);
 }
 
 export function findPermission(key: string): PermissionDefinition | undefined {

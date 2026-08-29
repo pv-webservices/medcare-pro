@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { WILDCARD } from "@/lib/permissions";
+import { permissionGrantKeys, WILDCARD } from "@/lib/permissions";
 
 /**
  * Server-side permission checks — PRD §9 (RBAC enforcement).
@@ -95,7 +95,7 @@ export async function can(
 
   return assignments.some((assignment) => {
     const granted = toPermissionList(assignment.role.permissions);
-    return granted.includes(WILDCARD) || granted.includes(permission);
+    return granted.includes(WILDCARD) || permissionGrantKeys(permission).some((key) => granted.includes(key));
   });
 }
 
@@ -162,7 +162,7 @@ export async function accessibleClinicScopes(
     requested.map((permission) => {
       const granting = assignments.filter((assignment) => {
         const granted = toPermissionList(assignment.role.permissions);
-        return granted.includes(WILDCARD) || granted.includes(permission);
+        return granted.includes(WILDCARD) || permissionGrantKeys(permission).some((key) => granted.includes(key));
       });
 
       if (granting.length === 0) {

@@ -45,4 +45,10 @@ describe("admin dashboard clinic scope", () => {
       clinicIdsForDashboardScope({ scope: "none" }, clinics, null),
     ).toEqual([]);
   });
+
+  it("returns no data for an empty permitted-clinic set", () => {
+    expect(
+      clinicIdsForDashboardScope({ scope: "clinics", clinicIds: [] }, clinics, null),
+    ).toEqual([]);
+  });
 });

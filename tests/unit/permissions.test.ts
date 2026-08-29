@@ -56,6 +56,13 @@ describe("the catalogue", () => {
     expect(isKnownPermission(WILDCARD)).toBe(false);
   });
 
+  it("recognises legacy dashboard values without offering them as new grants", () => {
+    expect(isKnownPermission("dashboard:registrations:view")).toBe(true);
+    expect(isKnownPermission("dashboard:notifications:view")).toBe(true);
+    expect(ALL_PERMISSIONS).not.toContain("dashboard:registrations:view");
+    expect(ALL_PERMISSIONS).not.toContain("dashboard:notifications:view");
+  });
+
   it("gives every permission a label and a description", () => {
     for (const group of PERMISSION_GROUPS) {
       for (const permission of group.permissions) {

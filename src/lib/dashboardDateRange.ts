@@ -31,6 +31,12 @@ export interface DateRange {
   end: Date;
 }
 
+/** Safe comparison for KPI deltas; never returns Infinity. */
+export function percentChange(current: number, previous: number): number | null {
+  if (previous === 0) return current === 0 ? 0 : null;
+  return ((current - previous) / previous) * 100;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function utcDate(year: number, month: number, day: number): Date {

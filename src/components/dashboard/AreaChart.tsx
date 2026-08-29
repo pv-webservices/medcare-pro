@@ -180,9 +180,9 @@ export default function AreaChart({
         size and correctly kerned at every breakpoint.
       */}
       <div className="mt-2 flex justify-between px-1">
-        {points.map((point) => (
+        {points.map((point, index) => (
           <span
-            key={point.label}
+            key={`${point.label}-${index}`}
             className="text-micro font-semibold uppercase text-muted"
           >
             {point.label}

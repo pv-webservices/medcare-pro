@@ -30,7 +30,7 @@ describe("DEFAULT_ROLES", () => {
       "registration:create",
       "registration:edit",
       "dashboard:view",
-      "dashboard:registrations:view",
+      "dashboard:patients:view",
       "dashboard:tasks:view",
       "task:view",
       "task:complete",
@@ -72,7 +72,9 @@ describe("DEFAULT_ROLES", () => {
     expect(doctor?.permissions).not.toContain("registration:edit");
     expect(doctor?.permissions).toContain("registration:read");
     expect(doctor?.permissions).toContain("dashboard:appointments:view");
-    expect(doctor?.permissions).toContain("dashboard:registrations:view");
+    expect(doctor?.permissions).toContain("dashboard:patients:view");
+    expect(doctor?.permissions).toContain("dashboard:schedule:view");
+    expect(doctor?.permissions).toContain("dashboard:messages:view");
     expect(doctor?.permissions).not.toContain("dashboard:revenue:view");
     expect(doctor?.permissions).not.toContain("dashboard:team:view");
   });
@@ -83,7 +85,9 @@ describe("DEFAULT_ROLES", () => {
     expect(receptionist?.permissions).toContain("message:send");
     expect(receptionist?.permissions).not.toContain("role:manage");
     expect(receptionist?.permissions).toContain("dashboard:appointments:view");
-    expect(receptionist?.permissions).toContain("dashboard:registrations:view");
+    expect(receptionist?.permissions).toContain("dashboard:patients:view");
+    expect(receptionist?.permissions).toContain("dashboard:schedule:view");
+    expect(receptionist?.permissions).toContain("dashboard:messages:view");
     expect(receptionist?.permissions).not.toContain("dashboard:revenue:view");
     expect(receptionist?.permissions).not.toContain("dashboard:team:view");
   });

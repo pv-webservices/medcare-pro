@@ -1,52 +1,42 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   ADMIN_DASHBOARD_ACTION_PERMISSIONS as ACTION_PERMISSIONS,
-  ADMIN_DASHBOARD_DATA_PERMISSIONS as DASHBOARD_DATA_PERMISSIONS,
+  ADMIN_DASHBOARD_DATA_PERMISSIONS as DATA_PERMISSIONS,
   resolveAdminDashboardClinicAccess,
-  type AdminDashboardActionPermission as ActionPermission,
-  type AdminDashboardDataPermission as DashboardDataPermission,
+  type AdminDashboardActionPermission,
+  type AdminDashboardDataPermission,
 } from "@/lib/adminDashboardScope";
+import {
+  bucketKeysInRange,
+  bucketLabel,
+  presetRange,
+  percentChange,
+  previousPeriod,
+  trendInterval,
+  type DashboardPreset,
+  type DateRange,
+  type TrendInterval,
+} from "@/lib/dashboardDateRange";
+import { formatClockTime } from "@/lib/dates";
 import { resolveModulesForActor } from "@/lib/features";
 import { MODULE_FEATURES } from "@/lib/moduleFeatures";
-import { formatClockTime, parseDateOnly, parseDateTime } from "@/lib/dates";
-import {
-  APPOINTMENT_STATUSES,
-  OCCUPYING_STATUSES,
-  type AppointmentStatus,
-} from "@/lib/appointmentRules";
-import {
-  accessibleClinicScopes,
-  type ActorContext,
-} from "@/lib/rbac";
-import { parseChangedFields } from "@/lib/registrationAudit";
-import { getDailyRevenueSnapshotForClinicIds } from "@/lib/reports";
-import {
-  listNotificationsForDashboard,
-  type NotificationRecord,
-} from "@/lib/notifications";
+import { APPOINTMENT_STATUSES, type AppointmentStatus } from "@/lib/appointmentRules";
+import { accessibleClinicScopes, type ActorContext } from "@/lib/rbac";
 
-/**
- * Real-data aggregation for the operational (non-owner) dashboard.
- *
- * Each module has three independent gates before it can issue a data query:
- * the actor must hold its read permission somewhere, the module must be enabled
- * for the tenant and role, and the selected clinic (when any) must intersect
- * that permission's own clinic scope. Tenant ids always come from `actor`.
- */
-
-export interface AdminDashboardCapabilities {
+export interface DashboardCapabilities {
   dashboard: {
     view: boolean;
+    patients: boolean;
     appointments: boolean;
-    registrations: boolean;
     revenue: boolean;
     doctors: boolean;
+    messages: boolean;
+    tasks: boolean;
+    schedule: boolean;
     activity: boolean;
-    notifications: boolean;
     team: boolean;
     clinics: boolean;
-    tasks: boolean;
   };
   actions: {
     canBookAppointment: boolean;
@@ -54,566 +44,663 @@ export interface AdminDashboardCapabilities {
     canAddDoctor: boolean;
     canManageTeam: boolean;
     canManageRoles: boolean;
+    canCreateTask: boolean;
   };
 }
 
-export interface AdminAppointmentSummary {
-  active: number;
-  total: number;
-  byStatus: Record<AppointmentStatus, number>;
-}
-
-export interface AdminScheduleRow {
-  id: string;
-  clinicName: string;
-  patientName: string;
-  doctorName: string;
-  serviceName: string;
-  startTime: string;
-  status: AppointmentStatus;
-}
-
-export interface AdminRegistrationSummary {
-  total: number;
-  newPatients: number;
-  followUps: number;
-}
-
-export interface AdminRegistrationRow {
-  id: string;
-  clinicName: string;
-  patientName: string;
-  doctorName: string | null;
-  visitType: string;
-  visitTime: string;
-  createdByName: string;
-}
-
-export type DoctorDayStatus = "AVAILABLE" | "ON_LEAVE" | "NOT_SCHEDULED";
-
-export interface AdminDoctorRow {
-  id: string;
-  clinicName: string;
-  name: string;
-  department: string;
-  status: DoctorDayStatus;
-  availability: string | null;
-}
-
-export interface AdminDoctorSummary {
-  total: number;
-  available: number;
-  onLeave: number;
-  notScheduled: number;
-  rows: AdminDoctorRow[];
-}
-
-export interface AdminActivityRow {
-  id: string;
-  actorName: string;
-  action: "created" | "updated";
-  patientName: string;
-  changedFields: string[];
-  timestamp: Date;
+export interface DashboardTrendPoint {
+  date: string;
+  label: string;
+  value: number;
 }
 
 export interface AdminDashboardData {
   userName: string;
-  date: string;
+  period: DashboardPreset;
+  rangeLabel: string;
+  comparisonLabel: string;
   scope: {
-    type: "ACCOUNT" | "CLINIC";
-    clinicId: string | null;
+    selectedClinicId: string | null;
+    clinicIds: string[];
     clinicName: string | null;
     clinicCount: number;
   };
-  capabilities: AdminDashboardCapabilities;
-  appointments: AdminAppointmentSummary | null;
-  schedule: AdminScheduleRow[];
-  registrations: AdminRegistrationSummary | null;
-  registrationActivity: AdminRegistrationRow[];
-  revenueToday: string | null;
-  doctors: AdminDoctorSummary | null;
-  recentActivity: AdminActivityRow[];
-  notifications: {
-    unreadCount: number;
-    items: NotificationRecord[];
-  } | null;
-  tasks: {
-    myOpen: number;
+  capabilities: DashboardCapabilities;
+  summary: {
+    totalPatients?: number;
+    todaysAppointments?: number;
+    todaysCollection?: number;
+    monthRevenue?: number;
+    activeDoctors?: number;
+    pendingTasks?: number;
+    overdueTasks?: number;
+    messageHealth?: number | null;
+    patientChange?: number | null;
+    appointmentChange?: number | null;
+    revenueChange?: number | null;
+  };
+  patients?: {
+    total: number;
+    new: number;
+    returning: number;
+    followUps: number;
+    change: number | null;
+    trend: DashboardTrendPoint[];
+    recent: Array<{
+      id: string;
+      patientName: string;
+      clinicName: string;
+      visitType: string;
+      occurredAt: Date;
+    }>;
+  };
+  appointments?: {
+    today: number;
+    upcoming: number;
+    total: number;
+    byStatus: Record<AppointmentStatus, number>;
+    change: number | null;
+    trend: DashboardTrendPoint[];
+  };
+  schedule?: Array<{
+    id: string;
+    time: string;
+    patientName: string;
+    doctorName: string;
+    appointmentType: string;
+    clinicName: string;
+    status: AppointmentStatus;
+  }>;
+  revenue?: {
+    current: number;
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    previousMonth: number;
+    averagePerVisit: number;
+    change: number | null;
+    trend: DashboardTrendPoint[];
+    byDoctor: Array<{
+      doctorId: string;
+      doctorName: string;
+      patients: number;
+      revenue: number;
+    }>;
+  };
+  doctors?: {
+    active: number;
+    availableToday: number;
+    onLeave: number;
+    performance: Array<{
+      doctorId: string;
+      doctorName: string;
+      clinicName: string;
+      appointments: number;
+      patients: number;
+      revenue?: number;
+    }>;
+  };
+  messages?: {
+    total: number;
+    accepted: number;
+    pending: number;
+    failed: number;
+    acceptanceRate: number | null;
+  };
+  tasks?: {
+    myPending: number;
+    teamPending?: number;
     dueToday: number;
     overdue: number;
     completedToday: number;
-  } | null;
+  };
+  clinicPerformance?: Array<{
+    clinicId: string;
+    clinicName: string;
+    patients?: number;
+    appointments?: number;
+    doctors?: number;
+    revenue?: number;
+  }>;
+  recentActivity?: Array<{
+    id: string;
+    type: "PATIENT_REGISTERED" | "APPOINTMENT_CREATED" | "APPOINTMENT_UPDATED";
+    patientName: string;
+    description: string;
+    clinicName: string;
+    occurredAt: Date;
+  }>;
 }
 
-async function loadTaskSummary(
-  actor: ActorContext,
-  clinicIds: readonly string[],
-  now: Date,
-) {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  const base: Prisma.TaskWhereInput = {
-    tenantId: actor.tenantId,
-    clinicId: { in: [...clinicIds] },
-    assignedToId: actor.userId,
-    archivedAt: null,
-  };
-  const [myOpen, dueToday, overdue, completedToday] = await Promise.all([
-    prisma.task.count({ where: { ...base, status: { in: ["OPEN", "IN_PROGRESS"] } } }),
-    prisma.task.count({ where: { ...base, status: { in: ["OPEN", "IN_PROGRESS"] }, dueAt: { gte: start, lt: end } } }),
-    prisma.task.count({ where: { ...base, status: { in: ["OPEN", "IN_PROGRESS"] }, dueAt: { lt: now } } }),
-    prisma.task.count({ where: { ...base, status: "COMPLETED", completedAt: { gte: start, lt: end } } }),
-  ]);
-  return { myOpen, dueToday, overdue, completedToday };
+const DAY_MS = 86_400_000;
+const OPEN_TASK_STATUSES = ["OPEN", "IN_PROGRESS"] as const;
+
+function toNumber(value: unknown): number {
+  if (value == null) return 0;
+  if (value instanceof Prisma.Decimal) return value.toNumber();
+  if (typeof value === "bigint") return Number(value);
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function startOfUtcDay(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+function startOfUtcWeek(now: Date): Date {
+  const day = startOfUtcDay(now);
+  return new Date(day.getTime() - ((day.getUTCDay() + 6) % 7) * DAY_MS);
+}
+
+function startOfUtcMonth(now: Date, offset = 0): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
 }
 
 function moduleAllowed(
   modules: Awaited<ReturnType<typeof resolveModulesForActor>>,
-  key: string,
+  feature: string,
 ): boolean {
-  return modules.get(key)?.allowed === true;
+  return modules.get(feature)?.allowed === true;
 }
 
 function emptyStatusCounts(): Record<AppointmentStatus, number> {
-  return Object.fromEntries(
-    APPOINTMENT_STATUSES.map((status) => [status, 0]),
-  ) as Record<AppointmentStatus, number>;
+  return Object.fromEntries(APPOINTMENT_STATUSES.map((status) => [status, 0])) as Record<AppointmentStatus, number>;
 }
 
-async function loadAppointments(
+function dateRangeLabel(range: DateRange): string {
+  const end = new Date(range.end.getTime() - DAY_MS);
+  const formatter = new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: range.start.getUTCFullYear() !== end.getUTCFullYear() ? "numeric" : undefined,
+    timeZone: "UTC",
+  });
+  const startLabel = formatter.format(range.start);
+  const endLabel = formatter.format(end);
+  return startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`;
+}
+
+interface RawTrendRow { bucket: string; value: unknown }
+const APPOINTMENT_BUCKET_SQL: Record<TrendInterval, Prisma.Sql> = {
+  daily: Prisma.sql`DATE_FORMAT(slot_start, '%Y-%m-%d')`,
+  monthly: Prisma.sql`DATE_FORMAT(slot_start, '%Y-%m-01')`,
+};
+const REGISTRATION_BUCKET_SQL: Record<TrendInterval, Prisma.Sql> = {
+  daily: Prisma.sql`DATE_FORMAT(visit_date, '%Y-%m-%d')`,
+  monthly: Prisma.sql`DATE_FORMAT(visit_date, '%Y-%m-01')`,
+};
+const PATIENT_BUCKET_SQL: Record<TrendInterval, Prisma.Sql> = {
+  daily: Prisma.sql`DATE_FORMAT(created_at, '%Y-%m-%d')`,
+  monthly: Prisma.sql`DATE_FORMAT(created_at, '%Y-%m-01')`,
+};
+
+function zeroFillTrend(
+  rows: readonly RawTrendRow[],
+  range: DateRange,
+  interval: TrendInterval,
+): DashboardTrendPoint[] {
+  const values = new Map(rows.map((row) => [row.bucket, toNumber(row.value)]));
+  return bucketKeysInRange(interval, range).map((date) => ({
+    date,
+    label: bucketLabel(interval, date),
+    value: values.get(date) ?? 0,
+  }));
+}
+
+async function loadPatientDashboardStats(
   actor: ActorContext,
   clinicIds: readonly string[],
-  start: Date,
-  end: Date,
-): Promise<{
-  summary: AdminAppointmentSummary;
-  schedule: AdminScheduleRow[];
-}> {
-  if (clinicIds.length === 0) {
-    return {
-      summary: { active: 0, total: 0, byStatus: emptyStatusCounts() },
-      schedule: [],
-    };
-  }
-
-  const where: Prisma.AppointmentWhereInput = {
+  range: DateRange,
+  previous: DateRange,
+  interval: TrendInterval,
+): Promise<NonNullable<AdminDashboardData["patients"]>> {
+  const ids = [...clinicIds];
+  const patientWhere: Prisma.PatientWhereInput = {
     tenantId: actor.tenantId,
-    clinicId: { in: [...clinicIds] },
-    slotStart: { gte: start, lt: end },
+    clinicId: { in: ids },
   };
-
-  const [grouped, rows] = await Promise.all([
-    prisma.appointment.groupBy({
-      by: ["status"],
-      where,
-      _count: { _all: true },
-    }),
-    prisma.appointment.findMany({
-      where: { ...where, status: { not: "RESCHEDULED" } },
-      orderBy: [{ slotStart: "asc" }, { id: "asc" }],
-      take: 12,
-      select: {
-        id: true,
-        name: true,
-        slotStart: true,
-        status: true,
-        clinic: { select: { name: true } },
-        doctor: { select: { name: true } },
-        appointmentType: { select: { name: true } },
-      },
-    }),
-  ]);
-
-  const byStatus = emptyStatusCounts();
-  for (const row of grouped) {
-    byStatus[row.status] = row._count._all;
-  }
-
-  return {
-    summary: {
-      active: OCCUPYING_STATUSES.reduce(
-        (total, status) => total + byStatus[status],
-        0,
-      ),
-      // A moved row is historical, not another appointment in today's board.
-      total: APPOINTMENT_STATUSES.filter((status) => status !== "RESCHEDULED").reduce(
-        (total, status) => total + byStatus[status],
-        0,
-      ),
-      byStatus,
-    },
-    schedule: rows.map((row) => ({
-      id: row.id,
-      clinicName: row.clinic.name,
-      patientName: row.name,
-      doctorName: row.doctor.name,
-      serviceName: row.appointmentType.name,
-      startTime: formatClockTime(row.slotStart),
-      status: row.status,
-    })),
-  };
-}
-
-async function loadRegistrations(
-  actor: ActorContext,
-  clinicIds: readonly string[],
-  start: Date,
-  end: Date,
-): Promise<{
-  summary: AdminRegistrationSummary;
-  rows: AdminRegistrationRow[];
-}> {
-  if (clinicIds.length === 0) {
-    return {
-      summary: { total: 0, newPatients: 0, followUps: 0 },
-      rows: [],
-    };
-  }
-
-  const where: Prisma.RegistrationWhereInput = {
-    clinicId: { in: [...clinicIds] },
+  const registrationWhere: Prisma.RegistrationWhereInput = {
+    clinicId: { in: ids },
     clinic: { tenantId: actor.tenantId },
-    visitDate: { gte: start, lt: end },
+    visitDate: { gte: range.start, lt: range.end },
   };
-
-  const [grouped, rows] = await Promise.all([
-    prisma.registration.groupBy({
-      by: ["visitType"],
-      where,
-      _count: { _all: true },
-    }),
+  const [total, currentNew, previousNew, visits, recent, trendRows] = await Promise.all([
+    prisma.patient.count({ where: patientWhere }),
+    prisma.patient.count({ where: { ...patientWhere, createdAt: { gte: range.start, lt: range.end } } }),
+    prisma.patient.count({ where: { ...patientWhere, createdAt: { gte: previous.start, lt: previous.end } } }),
+    prisma.registration.groupBy({ by: ["visitType"], where: registrationWhere, _count: { _all: true } }),
     prisma.registration.findMany({
-      where,
-      orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
+      where: registrationWhere,
+      orderBy: [{ visitDate: "desc" }, { id: "desc" }],
       take: 8,
-      select: {
-        id: true,
-        visitDate: true,
-        visitType: true,
-        clinic: { select: { name: true } },
-        patient: { select: { name: true } },
-        doctor: { select: { name: true } },
-        creator: { select: { name: true, email: true } },
-      },
+      select: { id: true, visitType: true, visitDate: true, patient: { select: { name: true } }, clinic: { select: { name: true } } },
     }),
+    prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
+      SELECT ${PATIENT_BUCKET_SQL[interval]} AS bucket, COUNT(*) AS value
+      FROM patients p
+      INNER JOIN clinics c ON c.id = p.clinic_id
+      WHERE p.clinic_id IN (${Prisma.join(ids)})
+        AND c.tenant_id = ${actor.tenantId}
+        AND p.created_at >= ${range.start} AND p.created_at < ${range.end}
+      GROUP BY bucket
+    `),
   ]);
-
-  const counts = new Map(grouped.map((row) => [row.visitType, row._count._all]));
-
-  return {
-    summary: {
-      total: grouped.reduce((total, row) => total + row._count._all, 0),
-      newPatients: counts.get("NEW") ?? 0,
-      followUps: counts.get("FOLLOW_UP") ?? 0,
-    },
-    rows: rows.map((row) => ({
-      id: row.id,
-      clinicName: row.clinic.name,
-      patientName: row.patient.name,
-      doctorName: row.doctor?.name ?? null,
-      // The column is intentionally extensible. Unknown values stay visible as
-      // stored instead of being silently reclassified as NEW.
-      visitType: row.visitType,
-      visitTime: formatClockTime(row.visitDate),
-      createdByName: row.creator.name ?? row.creator.email,
-    })),
-  };
-}
-
-async function loadDoctors(
-  actor: ActorContext,
-  clinicIds: readonly string[],
-  date: Date,
-): Promise<AdminDoctorSummary> {
-  // TODO: the current schema has no User-to-Doctor identity link, so a
-  // doctor-specific subset cannot yet be derived safely. Until one exists,
-  // this remains strictly limited to the actor's assigned clinic scope.
-  if (clinicIds.length === 0) {
-    return { total: 0, available: 0, onLeave: 0, notScheduled: 0, rows: [] };
-  }
-
-  const doctorWhere: Prisma.DoctorWhereInput = {
-    clinicId: { in: [...clinicIds] },
-    clinic: { tenantId: actor.tenantId },
-  };
-  const [total, availableRows, leaveRows, doctors] = await Promise.all([
-    prisma.doctor.count({ where: doctorWhere }),
-    prisma.doctorAvailability.findMany({
-      where: { date, doctor: doctorWhere },
-      distinct: ["doctorId"],
-      select: { doctorId: true },
-    }),
-    prisma.doctorLeave.findMany({
-      where: {
-        startDate: { lte: date },
-        endDate: { gte: date },
-        doctor: doctorWhere,
-      },
-      distinct: ["doctorId"],
-      select: { doctorId: true },
-    }),
-    prisma.doctor.findMany({
-      where: doctorWhere,
-      orderBy: [{ name: "asc" }, { id: "asc" }],
-      take: 8,
-      select: {
-        id: true,
-        name: true,
-        department: true,
-        clinic: { select: { name: true } },
-        availability: {
-          where: { date },
-          orderBy: { startTime: "asc" },
-          select: { startTime: true, endTime: true },
-        },
-        leave: {
-          where: { startDate: { lte: date }, endDate: { gte: date } },
-          take: 1,
-          select: { id: true },
-        },
-      },
-    }),
-  ]);
-
-  const scheduled = new Set(availableRows.map((row) => row.doctorId));
-  const onLeave = new Set(leaveRows.map((row) => row.doctorId));
-  const available = [...scheduled].filter((doctorId) => !onLeave.has(doctorId)).length;
-  const notScheduled = Math.max(0, total - onLeave.size - available);
-
+  const byType = new Map(visits.map((row) => [row.visitType, row._count._all]));
   return {
     total,
-    available,
-    onLeave: onLeave.size,
-    notScheduled,
-    rows: doctors.map((doctor) => {
-      const status: DoctorDayStatus =
-        doctor.leave.length > 0
-          ? "ON_LEAVE"
-          : doctor.availability.length > 0
-            ? "AVAILABLE"
-            : "NOT_SCHEDULED";
-
-      return {
-        id: doctor.id,
-        clinicName: doctor.clinic.name,
-        name: doctor.name,
-        department: doctor.department,
-        status,
-        availability:
-          doctor.availability.length > 0
-            ? doctor.availability
-                .map((slot) => `${slot.startTime}–${slot.endTime}`)
-                .join(", ")
-            : null,
-      };
-    }),
+    new: currentNew,
+    returning: byType.get("FOLLOW_UP") ?? 0,
+    followUps: byType.get("FOLLOW_UP") ?? 0,
+    change: percentChange(currentNew, previousNew),
+    trend: zeroFillTrend(trendRows, range, interval),
+    recent: recent.map((row) => ({
+      id: row.id,
+      patientName: row.patient.name,
+      clinicName: row.clinic.name,
+      visitType: row.visitType,
+      occurredAt: row.visitDate,
+    })),
   };
 }
 
-async function loadRecentActivity(
+async function loadAppointmentDashboardStats(
   actor: ActorContext,
   clinicIds: readonly string[],
-): Promise<AdminActivityRow[]> {
-  if (clinicIds.length === 0) return [];
+  range: DateRange,
+  previous: DateRange,
+  interval: TrendInterval,
+  now: Date,
+): Promise<NonNullable<AdminDashboardData["appointments"]>> {
+  const ids = [...clinicIds];
+  const today = startOfUtcDay(now);
+  const tomorrow = new Date(today.getTime() + DAY_MS);
+  const base: Prisma.AppointmentWhereInput = { tenantId: actor.tenantId, clinicId: { in: ids } };
+  const currentWhere: Prisma.AppointmentWhereInput = { ...base, slotStart: { gte: range.start, lt: range.end } };
+  const [grouped, previousTotal, todayCount, upcoming, trendRows] = await Promise.all([
+    prisma.appointment.groupBy({ by: ["status"], where: currentWhere, _count: { _all: true } }),
+    prisma.appointment.count({ where: { ...base, slotStart: { gte: previous.start, lt: previous.end }, status: { not: "RESCHEDULED" } } }),
+    prisma.appointment.count({ where: { ...base, slotStart: { gte: today, lt: tomorrow }, status: { not: "RESCHEDULED" } } }),
+    prisma.appointment.count({ where: { ...base, slotStart: { gte: now }, status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN"] } } }),
+    prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
+      SELECT ${APPOINTMENT_BUCKET_SQL[interval]} AS bucket, COUNT(*) AS value
+      FROM appointments
+      WHERE tenant_id = ${actor.tenantId}
+        AND clinic_id IN (${Prisma.join(ids)})
+        AND slot_start >= ${range.start} AND slot_start < ${range.end}
+        AND status <> 'RESCHEDULED'
+      GROUP BY bucket
+    `),
+  ]);
+  const byStatus = emptyStatusCounts();
+  for (const row of grouped) byStatus[row.status] = row._count._all;
+  const total = APPOINTMENT_STATUSES.filter((status) => status !== "RESCHEDULED").reduce((sum, status) => sum + byStatus[status], 0);
+  return {
+    today: todayCount,
+    upcoming,
+    total,
+    byStatus,
+    change: percentChange(total, previousTotal),
+    trend: zeroFillTrend(trendRows, range, interval),
+  };
+}
 
-  const rows = await prisma.registrationEditLog.findMany({
+async function loadTodaySchedule(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+  now: Date,
+): Promise<NonNullable<AdminDashboardData["schedule"]>> {
+  const today = startOfUtcDay(now);
+  const tomorrow = new Date(today.getTime() + DAY_MS);
+  const rows = await prisma.appointment.findMany({
     where: {
-      registration: {
-        clinicId: { in: [...clinicIds] },
-        clinic: { tenantId: actor.tenantId },
-      },
+      tenantId: actor.tenantId,
+      clinicId: { in: [...clinicIds] },
+      slotStart: { gte: now > today ? now : today, lt: tomorrow },
+      status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN"] },
     },
-    orderBy: [{ timestamp: "desc" }, { id: "desc" }],
-    take: 8,
+    orderBy: [{ slotStart: "asc" }, { id: "asc" }],
+    take: 10,
     select: {
-      id: true,
-      changedFields: true,
-      timestamp: true,
-      editedBy: { select: { name: true, email: true } },
-      registration: { select: { patient: { select: { name: true } } } },
+      id: true, name: true, slotStart: true, status: true,
+      doctor: { select: { name: true } },
+      clinic: { select: { name: true } },
+      appointmentType: { select: { name: true } },
     },
   });
+  return rows.map((row) => ({
+    id: row.id,
+    time: formatClockTime(row.slotStart),
+    patientName: row.name,
+    doctorName: row.doctor.name,
+    appointmentType: row.appointmentType.name,
+    clinicName: row.clinic.name,
+    status: row.status,
+  }));
+}
 
-  return rows.map((row) => {
-    const changes = parseChangedFields(row.changedFields);
-    const isCreation = changes.length > 0 && changes.every((change) => change.from === null);
-
-    return {
-      id: row.id,
-      actorName: row.editedBy.name ?? row.editedBy.email,
-      action: isCreation ? "created" : "updated",
-      patientName: row.registration.patient.name,
-      changedFields: changes.map((change) => change.label),
-      timestamp: row.timestamp,
-    };
+async function loadRevenueDashboardStats(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+  range: DateRange,
+  previous: DateRange,
+  interval: TrendInterval,
+  now: Date,
+): Promise<NonNullable<AdminDashboardData["revenue"]>> {
+  const ids = [...clinicIds];
+  const today = startOfUtcDay(now);
+  const tomorrow = new Date(today.getTime() + DAY_MS);
+  const week = startOfUtcWeek(now);
+  const month = startOfUtcMonth(now);
+  const nextMonth = startOfUtcMonth(now, 1);
+  const previousMonth = startOfUtcMonth(now, -1);
+  const whereFor = (start: Date, end: Date): Prisma.RegistrationWhereInput => ({
+    clinicId: { in: ids }, clinic: { tenantId: actor.tenantId }, visitDate: { gte: start, lt: end },
   });
+  const [current, prior, todayAgg, weekAgg, monthAgg, previousMonthAgg, trendRows, doctorGroups] = await Promise.all([
+    prisma.registration.aggregate({ where: whereFor(range.start, range.end), _sum: { amount: true }, _count: { _all: true } }),
+    prisma.registration.aggregate({ where: whereFor(previous.start, previous.end), _sum: { amount: true } }),
+    prisma.registration.aggregate({ where: whereFor(today, tomorrow), _sum: { amount: true } }),
+    prisma.registration.aggregate({ where: whereFor(week, tomorrow), _sum: { amount: true } }),
+    prisma.registration.aggregate({ where: whereFor(month, nextMonth), _sum: { amount: true } }),
+    prisma.registration.aggregate({ where: whereFor(previousMonth, month), _sum: { amount: true } }),
+    prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
+      SELECT ${REGISTRATION_BUCKET_SQL[interval]} AS bucket, SUM(r.amount) AS value
+      FROM registrations r
+      INNER JOIN clinics c ON c.id = r.clinic_id
+      WHERE r.clinic_id IN (${Prisma.join(ids)})
+        AND c.tenant_id = ${actor.tenantId}
+        AND r.visit_date >= ${range.start} AND r.visit_date < ${range.end}
+      GROUP BY bucket
+    `),
+    prisma.registration.groupBy({
+      by: ["doctorId"], where: { ...whereFor(range.start, range.end), doctorId: { not: null } },
+      _sum: { amount: true }, _count: { _all: true }, orderBy: { _sum: { amount: "desc" } }, take: 6,
+    }),
+  ]);
+  const doctorIds = doctorGroups.map((row) => row.doctorId).filter((id): id is string => id !== null);
+  const doctorNames = doctorIds.length === 0 ? [] : await prisma.doctor.findMany({
+    where: { id: { in: doctorIds }, clinic: { tenantId: actor.tenantId, id: { in: ids } } }, select: { id: true, name: true },
+  });
+  const names = new Map(doctorNames.map((doctor) => [doctor.id, doctor.name]));
+  const currentValue = toNumber(current._sum.amount);
+  return {
+    current: currentValue,
+    today: toNumber(todayAgg._sum.amount),
+    thisWeek: toNumber(weekAgg._sum.amount),
+    thisMonth: toNumber(monthAgg._sum.amount),
+    previousMonth: toNumber(previousMonthAgg._sum.amount),
+    averagePerVisit: current._count._all === 0 ? 0 : currentValue / current._count._all,
+    change: percentChange(currentValue, toNumber(prior._sum.amount)),
+    trend: zeroFillTrend(trendRows, range, interval),
+    byDoctor: doctorGroups.flatMap((row) => row.doctorId && names.has(row.doctorId) ? [{
+      doctorId: row.doctorId,
+      doctorName: names.get(row.doctorId)!,
+      patients: row._count._all,
+      revenue: toNumber(row._sum.amount),
+    }] : []),
+  };
+}
+
+async function loadDoctorDashboardStats(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+  range: DateRange,
+  now: Date,
+  revenueByDoctor: ReadonlyMap<string, number>,
+): Promise<NonNullable<AdminDashboardData["doctors"]>> {
+  const ids = [...clinicIds];
+  const today = startOfUtcDay(now);
+  const [doctors, availability, leave, appointments, patients] = await Promise.all([
+    prisma.doctor.findMany({ where: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } }, select: { id: true, name: true, clinic: { select: { name: true } } } }),
+    prisma.doctorAvailability.findMany({ where: { date: today, doctor: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } } }, distinct: ["doctorId"], select: { doctorId: true } }),
+    prisma.doctorLeave.findMany({ where: { startDate: { lte: today }, endDate: { gte: today }, doctor: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } } }, distinct: ["doctorId"], select: { doctorId: true } }),
+    prisma.appointment.groupBy({ by: ["doctorId"], where: { tenantId: actor.tenantId, clinicId: { in: ids }, slotStart: { gte: range.start, lt: range.end }, status: { not: "RESCHEDULED" } }, _count: { _all: true } }),
+    prisma.registration.groupBy({ by: ["doctorId"], where: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId }, visitDate: { gte: range.start, lt: range.end }, doctorId: { not: null } }, _count: { _all: true } }),
+  ]);
+  const availableIds = new Set(availability.map((row) => row.doctorId));
+  const leaveIds = new Set(leave.map((row) => row.doctorId));
+  const appointmentsByDoctor = new Map(appointments.map((row) => [row.doctorId, row._count._all]));
+  const patientsByDoctor = new Map(patients.flatMap((row) => row.doctorId ? [[row.doctorId, row._count._all] as const] : []));
+  const performance = doctors.map((doctor) => ({
+    doctorId: doctor.id,
+    doctorName: doctor.name,
+    clinicName: doctor.clinic.name,
+    appointments: appointmentsByDoctor.get(doctor.id) ?? 0,
+    patients: patientsByDoctor.get(doctor.id) ?? 0,
+    ...(revenueByDoctor.has(doctor.id) ? { revenue: revenueByDoctor.get(doctor.id) } : {}),
+  })).sort((a, b) => b.appointments - a.appointments || b.patients - a.patients).slice(0, 8);
+  return {
+    active: doctors.length,
+    availableToday: [...availableIds].filter((id) => !leaveIds.has(id)).length,
+    onLeave: leaveIds.size,
+    performance,
+  };
+}
+
+async function loadMessageDashboardStats(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+  now: Date,
+): Promise<NonNullable<AdminDashboardData["messages"]>> {
+  const today = startOfUtcDay(now);
+  const tomorrow = new Date(today.getTime() + DAY_MS);
+  const grouped = await prisma.whatsappMessage.groupBy({
+    by: ["status"],
+    where: { clinicId: { in: [...clinicIds] }, clinic: { tenantId: actor.tenantId }, sentAt: { gte: today, lt: tomorrow } },
+    _count: { _all: true },
+  });
+  let accepted = 0, failed = 0, pending = 0;
+  for (const row of grouped) {
+    const status = row.status.toLowerCase();
+    if (status === "sent" || status === "accepted") accepted += row._count._all;
+    else if (status === "failed") failed += row._count._all;
+    else pending += row._count._all;
+  }
+  const total = accepted + failed + pending;
+  return { total, accepted, failed, pending, acceptanceRate: total === 0 ? null : accepted / total * 100 };
+}
+
+async function loadTaskDashboardStats(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+  teamClinicIds: readonly string[],
+  now: Date,
+): Promise<NonNullable<AdminDashboardData["tasks"]>> {
+  const today = startOfUtcDay(now);
+  const tomorrow = new Date(today.getTime() + DAY_MS);
+  const base: Prisma.TaskWhereInput = { tenantId: actor.tenantId, clinicId: { in: [...clinicIds] }, archivedAt: null };
+  const mine: Prisma.TaskWhereInput = { ...base, assignedToId: actor.userId };
+  const [myPending, dueToday, overdue, completedToday, teamPending] = await Promise.all([
+    prisma.task.count({ where: { ...mine, status: { in: [...OPEN_TASK_STATUSES] } } }),
+    prisma.task.count({ where: { ...mine, status: { in: [...OPEN_TASK_STATUSES] }, dueAt: { gte: today, lt: tomorrow } } }),
+    prisma.task.count({ where: { ...mine, status: { in: [...OPEN_TASK_STATUSES] }, dueAt: { lt: now } } }),
+    prisma.task.count({ where: { ...mine, status: "COMPLETED", completedAt: { gte: today, lt: tomorrow } } }),
+    teamClinicIds.length > 0 ? prisma.task.count({ where: { tenantId: actor.tenantId, clinicId: { in: [...teamClinicIds] }, archivedAt: null, status: { in: [...OPEN_TASK_STATUSES] } } }) : Promise.resolve(undefined),
+  ]);
+  return { myPending, dueToday, overdue, completedToday, ...(teamPending === undefined ? {} : { teamPending }) };
+}
+
+async function loadRecentPatientActivity(
+  actor: ActorContext,
+  clinicIds: readonly string[],
+): Promise<NonNullable<AdminDashboardData["recentActivity"]>> {
+  const ids = [...clinicIds];
+  const [registrations, appointments] = await Promise.all([
+    prisma.registration.findMany({
+      where: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } }, orderBy: { createdAt: "desc" }, take: 8,
+      select: { id: true, createdAt: true, visitType: true, patient: { select: { name: true } }, clinic: { select: { name: true } } },
+    }),
+    prisma.appointment.findMany({
+      where: { tenantId: actor.tenantId, clinicId: { in: ids } }, orderBy: { updatedAt: "desc" }, take: 8,
+      select: { id: true, name: true, status: true, createdAt: true, updatedAt: true, clinic: { select: { name: true } } },
+    }),
+  ]);
+  return [
+    ...registrations.map((row) => ({
+      id: `registration-${row.id}`,
+      type: "PATIENT_REGISTERED" as const,
+      patientName: row.patient.name,
+      description: row.visitType === "FOLLOW_UP" ? "Follow-up registration recorded" : "Patient registered",
+      clinicName: row.clinic.name,
+      occurredAt: row.createdAt,
+    })),
+    ...appointments.map((row) => ({
+      id: `appointment-${row.id}`,
+      type: (row.updatedAt.getTime() > row.createdAt.getTime() ? "APPOINTMENT_UPDATED" : "APPOINTMENT_CREATED") as "APPOINTMENT_UPDATED" | "APPOINTMENT_CREATED",
+      patientName: row.name,
+      description: row.updatedAt.getTime() > row.createdAt.getTime() ? `Appointment ${row.status.toLowerCase().replaceAll("_", " ")}` : "Appointment created",
+      clinicName: row.clinic.name,
+      occurredAt: row.updatedAt,
+    })),
+  ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime()).slice(0, 10);
+}
+
+async function loadClinicPerformance(
+  actor: ActorContext,
+  clinics: readonly { id: string; name: string }[],
+  range: DateRange,
+  metricIds: {
+    patients: readonly string[];
+    appointments: readonly string[];
+    doctors: readonly string[];
+    revenue: readonly string[];
+  },
+): Promise<NonNullable<AdminDashboardData["clinicPerformance"]>> {
+  if (clinics.length <= 1) return [];
+  const allowed = new Set(clinics.map((clinic) => clinic.id));
+  const within = (ids: readonly string[]) => ids.filter((id) => allowed.has(id));
+  const patientIds = within(metricIds.patients), appointmentIds = within(metricIds.appointments);
+  const doctorIds = within(metricIds.doctors), revenueIds = within(metricIds.revenue);
+  const [patients, appointments, doctors, revenue] = await Promise.all([
+    patientIds.length ? prisma.patient.groupBy({ by: ["clinicId"], where: { tenantId: actor.tenantId, clinicId: { in: patientIds } }, _count: { _all: true } }) : Promise.resolve([]),
+    appointmentIds.length ? prisma.appointment.groupBy({ by: ["clinicId"], where: { tenantId: actor.tenantId, clinicId: { in: appointmentIds }, slotStart: { gte: range.start, lt: range.end }, status: { not: "RESCHEDULED" } }, _count: { _all: true } }) : Promise.resolve([]),
+    doctorIds.length ? prisma.doctor.groupBy({ by: ["clinicId"], where: { clinicId: { in: doctorIds }, clinic: { tenantId: actor.tenantId } }, _count: { _all: true } }) : Promise.resolve([]),
+    revenueIds.length ? prisma.registration.groupBy({ by: ["clinicId"], where: { clinicId: { in: revenueIds }, clinic: { tenantId: actor.tenantId }, visitDate: { gte: range.start, lt: range.end } }, _sum: { amount: true } }) : Promise.resolve([]),
+  ]);
+  const patientMap = new Map(patients.map((row) => [row.clinicId, row._count._all]));
+  const appointmentMap = new Map(appointments.map((row) => [row.clinicId, row._count._all]));
+  const doctorMap = new Map(doctors.map((row) => [row.clinicId, row._count._all]));
+  const revenueMap = new Map(revenue.map((row) => [row.clinicId, toNumber(row._sum.amount)]));
+  return clinics.map((clinic) => ({
+    clinicId: clinic.id,
+    clinicName: clinic.name,
+    ...(patientMap.has(clinic.id) ? { patients: patientMap.get(clinic.id) } : {}),
+    ...(appointmentMap.has(clinic.id) ? { appointments: appointmentMap.get(clinic.id) } : {}),
+    ...(doctorMap.has(clinic.id) ? { doctors: doctorMap.get(clinic.id) } : {}),
+    ...(revenueMap.has(clinic.id) ? { revenue: revenueMap.get(clinic.id) } : {}),
+  }));
 }
 
 export async function getAdminDashboardData(
   actor: ActorContext,
   selectedClinicId: string | null,
-  dateValue: string,
+  period: DashboardPreset,
+  now: Date = new Date(),
 ): Promise<AdminDashboardData> {
   const [user, clinics, modules, scopes] = await Promise.all([
-    prisma.user.findFirst({
-      where: { id: actor.userId, tenantId: actor.tenantId },
-      select: { name: true },
-    }),
-    prisma.clinic.findMany({
-      where: { tenantId: actor.tenantId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
+    prisma.user.findFirst({ where: { id: actor.userId, tenantId: actor.tenantId }, select: { name: true } }),
+    prisma.clinic.findMany({ where: { tenantId: actor.tenantId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     resolveModulesForActor(actor),
-    accessibleClinicScopes(actor, [
-      ...ACTION_PERMISSIONS,
-      ...DASHBOARD_DATA_PERMISSIONS,
-    ]),
+    accessibleClinicScopes(actor, [...ACTION_PERMISSIONS, ...DATA_PERMISSIONS]),
   ]);
+  const access = resolveAdminDashboardClinicAccess(scopes, clinics, selectedClinicId);
+  const dashboardIdsFor = (permission: AdminDashboardDataPermission) => access.dashboard[permission];
+  const actionIdsFor = (permission: AdminDashboardActionPermission) => access.actions[permission];
+  const enabled = (permission: AdminDashboardDataPermission, feature: string) => moduleAllowed(modules, feature) && dashboardIdsFor(permission).length > 0;
 
-  const access = resolveAdminDashboardClinicAccess(
-    scopes,
-    clinics,
-    selectedClinicId,
-  );
-  const dashboardIdsFor = (permission: DashboardDataPermission) =>
-    access.dashboard[permission];
-  const actionIdsFor = (permission: ActionPermission) =>
-    access.actions[permission];
-
-  const appointmentIds = dashboardIdsFor("dashboard:appointments:view");
-  const registrationIds = dashboardIdsFor("dashboard:registrations:view");
-  const revenueIds = dashboardIdsFor("dashboard:revenue:view");
-  const doctorIds = dashboardIdsFor("dashboard:doctors:view");
-  const activityIds = dashboardIdsFor("dashboard:activity:view");
-  const notificationIds = dashboardIdsFor("dashboard:notifications:view");
-  const taskIds = dashboardIdsFor("dashboard:tasks:view");
-
-  const appointmentsEnabled =
-    moduleAllowed(modules, MODULE_FEATURES.appointments) &&
-    appointmentIds.length > 0;
-  const registrationsEnabled =
-    moduleAllowed(modules, MODULE_FEATURES.registrations) &&
-    registrationIds.length > 0;
-  const revenueEnabled =
-    moduleAllowed(modules, MODULE_FEATURES.reports) &&
-    revenueIds.length > 0;
-  const doctorsEnabled =
-    moduleAllowed(modules, MODULE_FEATURES.doctors) &&
-    doctorIds.length > 0;
-  const notificationsEnabled =
-    moduleAllowed(modules, MODULE_FEATURES.notifications) &&
-    notificationIds.length > 0;
-  const activityEnabled =
-    moduleAllowed(modules, MODULE_FEATURES.registrations) &&
-    activityIds.length > 0;
-  const tasksEnabled =
-    moduleAllowed(modules, MODULE_FEATURES.tasks) && taskIds.length > 0;
-
-  const dayStart = parseDateOnly(dateValue);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  const [appointmentData, registrationData, revenue, doctors, activity, notifications, tasks] =
-    await Promise.all([
-      appointmentsEnabled
-        ? loadAppointments(actor, appointmentIds, dayStart, dayEnd)
-        : Promise.resolve(null),
-      registrationsEnabled
-        ? loadRegistrations(actor, registrationIds, dayStart, dayEnd)
-        : Promise.resolve(null),
-      revenueEnabled
-        ? getDailyRevenueSnapshotForClinicIds(
-            actor,
-            revenueIds,
-            // Reports uses UTC date buckets. Midday keeps this exact selected
-            // wall-clock day even if a host changes its local timezone.
-            parseDateTime(dateValue, "12:00"),
-          )
-        : Promise.resolve(null),
-      doctorsEnabled ? loadDoctors(actor, doctorIds, dayStart) : Promise.resolve(null),
-      activityEnabled
-        ? loadRecentActivity(actor, activityIds)
-        : Promise.resolve([]),
-      notificationsEnabled
-        ? listNotificationsForDashboard(actor, {
-            clinicIds: notificationIds,
-            includeAllTenantNotifications:
-              selectedClinicId === null &&
-              scopes.get("dashboard:view")?.scope === "all" &&
-              scopes.get("dashboard:notifications:view")?.scope === "all",
-            limit: 5,
-          })
-        : Promise.resolve(null),
-      tasksEnabled ? loadTaskSummary(actor, taskIds, new Date()) : Promise.resolve(null),
-    ]);
-
-  const visibleIds = new Set(dashboardIdsFor("dashboard:view"));
-  const visibleClinics = clinics.filter((clinic) => visibleIds.has(clinic.id));
-  const selectedClinic = selectedClinicId
-    ? visibleClinics.find((clinic) => clinic.id === selectedClinicId) ?? null
-    : null;
-  const hasAccountWideScope = scopes.get("dashboard:view")?.scope === "all";
-  const soleAssignedClinic =
-    !hasAccountWideScope && visibleClinics.length === 1 ? visibleClinics[0] : null;
-  const scopedClinic = selectedClinic ?? soleAssignedClinic;
-
-  const capabilities: AdminDashboardCapabilities = {
+  const capabilities: DashboardCapabilities = {
     dashboard: {
       view: dashboardIdsFor("dashboard:view").length > 0,
-      appointments: appointmentsEnabled,
-      registrations: registrationsEnabled,
-      revenue: revenueEnabled,
-      doctors: doctorsEnabled,
-      activity: activityEnabled,
-      notifications: notificationsEnabled,
-      team:
-        moduleAllowed(modules, MODULE_FEATURES.team) &&
-        dashboardIdsFor("dashboard:team:view").length > 0,
-      clinics:
-        moduleAllowed(modules, MODULE_FEATURES.clinics) &&
-        dashboardIdsFor("dashboard:clinics:view").length > 0,
-      tasks: tasksEnabled,
+      patients: enabled("dashboard:patients:view", MODULE_FEATURES.registrations),
+      appointments: enabled("dashboard:appointments:view", MODULE_FEATURES.appointments),
+      revenue: enabled("dashboard:revenue:view", MODULE_FEATURES.reports),
+      doctors: enabled("dashboard:doctors:view", MODULE_FEATURES.doctors),
+      messages: enabled("dashboard:messages:view", MODULE_FEATURES.whatsapp),
+      tasks: enabled("dashboard:tasks:view", MODULE_FEATURES.tasks),
+      schedule: enabled("dashboard:schedule:view", MODULE_FEATURES.appointments),
+      activity: enabled("dashboard:activity:view", MODULE_FEATURES.registrations),
+      team: enabled("dashboard:team:view", MODULE_FEATURES.team),
+      clinics: enabled("dashboard:clinics:view", MODULE_FEATURES.clinics),
     },
     actions: {
-      canBookAppointment:
-        moduleAllowed(modules, MODULE_FEATURES.appointments) &&
-        actionIdsFor("appointment:create").length > 0,
-      canCreateRegistration:
-        moduleAllowed(modules, MODULE_FEATURES.registrations) &&
-        actionIdsFor("registration:create").length > 0,
-      canAddDoctor:
-        moduleAllowed(modules, MODULE_FEATURES.doctors) &&
-        actionIdsFor("doctor:create").length > 0,
-      canManageTeam:
-        moduleAllowed(modules, MODULE_FEATURES.team) &&
-        actionIdsFor("team:manage").length > 0,
+      canBookAppointment: moduleAllowed(modules, MODULE_FEATURES.appointments) && actionIdsFor("appointment:create").length > 0,
+      canCreateRegistration: moduleAllowed(modules, MODULE_FEATURES.registrations) && actionIdsFor("registration:create").length > 0,
+      canAddDoctor: moduleAllowed(modules, MODULE_FEATURES.doctors) && actionIdsFor("doctor:create").length > 0,
+      canManageTeam: moduleAllowed(modules, MODULE_FEATURES.team) && actionIdsFor("team:manage").length > 0,
       canManageRoles: actionIdsFor("role:manage").length > 0,
+      canCreateTask: moduleAllowed(modules, MODULE_FEATURES.tasks) && actionIdsFor("task:create").length > 0,
     },
   };
 
+  const range = presetRange(period, now);
+  const previous = previousPeriod(range);
+  const interval = trendInterval(period);
+  const patientIds = dashboardIdsFor("dashboard:patients:view");
+  const appointmentIds = dashboardIdsFor("dashboard:appointments:view");
+  const revenueIds = dashboardIdsFor("dashboard:revenue:view");
+  const doctorIds = dashboardIdsFor("dashboard:doctors:view");
+  const messageIds = dashboardIdsFor("dashboard:messages:view");
+  const taskIds = dashboardIdsFor("dashboard:tasks:view");
+  const scheduleIds = dashboardIdsFor("dashboard:schedule:view");
+  const activityIds = dashboardIdsFor("dashboard:activity:view");
+  const clinicIds = dashboardIdsFor("dashboard:clinics:view");
+  const teamTaskIds = capabilities.dashboard.team
+    ? taskIds.filter((id) => actionIdsFor("task:manage").includes(id))
+    : [];
+
+  const [patients, appointments, schedule, revenue, messages, tasks, recentActivity] = await Promise.all([
+    capabilities.dashboard.patients ? loadPatientDashboardStats(actor, patientIds, range, previous, interval) : Promise.resolve(undefined),
+    capabilities.dashboard.appointments ? loadAppointmentDashboardStats(actor, appointmentIds, range, previous, interval, now) : Promise.resolve(undefined),
+    capabilities.dashboard.schedule ? loadTodaySchedule(actor, scheduleIds, now) : Promise.resolve(undefined),
+    capabilities.dashboard.revenue ? loadRevenueDashboardStats(actor, revenueIds, range, previous, interval, now) : Promise.resolve(undefined),
+    capabilities.dashboard.messages ? loadMessageDashboardStats(actor, messageIds, now) : Promise.resolve(undefined),
+    capabilities.dashboard.tasks ? loadTaskDashboardStats(actor, taskIds, teamTaskIds, now) : Promise.resolve(undefined),
+    capabilities.dashboard.activity ? loadRecentPatientActivity(actor, activityIds) : Promise.resolve(undefined),
+  ]);
+
+  const revenueByDoctor = new Map(revenue?.byDoctor.map((row) => [row.doctorId, row.revenue]) ?? []);
+  const [doctors, clinicPerformance] = await Promise.all([
+    capabilities.dashboard.doctors ? loadDoctorDashboardStats(actor, doctorIds, range, now, revenueByDoctor) : Promise.resolve(undefined),
+    capabilities.dashboard.clinics && clinicIds.length > 1 ? loadClinicPerformance(
+      actor,
+      clinics.filter((clinic) => clinicIds.includes(clinic.id)),
+      range,
+      { patients: patientIds, appointments: appointmentIds, doctors: doctorIds, revenue: revenueIds },
+    ) : Promise.resolve(undefined),
+  ]);
+
+  const visibleClinicIds = dashboardIdsFor("dashboard:view");
+  const visibleClinics = clinics.filter((clinic) => visibleClinicIds.includes(clinic.id));
+  const selectedClinic = selectedClinicId ? visibleClinics.find((clinic) => clinic.id === selectedClinicId) ?? null : null;
+
   return {
     userName: user?.name?.trim() || "there",
-    date: dateValue,
+    period,
+    rangeLabel: dateRangeLabel(range),
+    comparisonLabel: period === "today" ? "vs yesterday" : period === "last7" ? "vs previous 7 days" : period === "last30" ? "vs previous 30 days" : period === "thisMonth" ? "vs previous month" : period === "lastMonth" ? "vs month before" : "vs previous year",
     scope: {
-      type: scopedClinic ? "CLINIC" : "ACCOUNT",
-      clinicId: scopedClinic?.id ?? null,
-      clinicName: scopedClinic?.name ?? null,
+      selectedClinicId: selectedClinic?.id ?? null,
+      clinicIds: visibleClinicIds,
+      clinicName: selectedClinic?.name ?? (visibleClinics.length === 1 ? visibleClinics[0].name : null),
       clinicCount: visibleClinics.length,
     },
     capabilities,
-    appointments: appointmentData?.summary ?? null,
-    schedule: appointmentData?.schedule ?? [],
-    registrations: registrationData?.summary ?? null,
-    registrationActivity: registrationData?.rows ?? [],
-    revenueToday: revenue?.totalRevenue ?? null,
-    doctors,
-    recentActivity: activity,
-    notifications: notifications
-      ? { unreadCount: notifications.unreadCount, items: notifications.items }
-      : null,
-    tasks,
+    summary: {
+      ...(patients ? { totalPatients: patients.total, patientChange: patients.change } : {}),
+      ...(appointments ? { todaysAppointments: appointments.today, appointmentChange: appointments.change } : {}),
+      ...(revenue ? { todaysCollection: revenue.today, monthRevenue: revenue.thisMonth, revenueChange: revenue.change } : {}),
+      ...(doctors ? { activeDoctors: doctors.active } : {}),
+      ...(tasks ? { pendingTasks: tasks.myPending, overdueTasks: tasks.overdue } : {}),
+      ...(messages ? { messageHealth: messages.acceptanceRate } : {}),
+    },
+    ...(patients ? { patients } : {}),
+    ...(appointments ? { appointments } : {}),
+    ...(schedule ? { schedule } : {}),
+    ...(revenue ? { revenue } : {}),
+    ...(doctors ? { doctors } : {}),
+    ...(messages ? { messages } : {}),
+    ...(tasks ? { tasks } : {}),
+    ...(clinicPerformance ? { clinicPerformance } : {}),
+    ...(recentActivity ? { recentActivity } : {}),
   };
 }

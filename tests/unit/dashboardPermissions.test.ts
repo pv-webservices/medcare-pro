@@ -42,13 +42,15 @@ describe("dashboard permission catalogue", () => {
       expect.arrayContaining([
         "dashboard:view",
         "dashboard:appointments:view",
-        "dashboard:registrations:view",
-        "dashboard:notifications:view",
+        "dashboard:patients:view",
+        "dashboard:messages:view",
+        "dashboard:tasks:view",
+        "dashboard:schedule:view",
       ]),
     );
     expect(rolePermissions(ROLE_KEYS.DOCTOR)).not.toContain("dashboard:revenue:view");
     expect(rolePermissions(ROLE_KEYS.STAFF)).toEqual(
-      expect.arrayContaining(["dashboard:view", "dashboard:registrations:view"]),
+      expect.arrayContaining(["dashboard:view", "dashboard:patients:view"]),
     );
   });
 });
@@ -106,6 +108,34 @@ describe("dashboard and action scope separation", () => {
 
     expect(access.dashboard["dashboard:appointments:view"]).toEqual(["clinic-a"]);
     expect(access.actions["appointment:create"]).toEqual([]);
+  });
+
+  it("does not let an operational read permission expose dashboard data", () => {
+    const access = resolveAdminDashboardClinicAccess(
+      scopes({
+        "dashboard:view": { scope: "clinics", clinicIds: ["clinic-a"] },
+        "appointment:read": { scope: "clinics", clinicIds: ["clinic-a"] },
+      }),
+      clinics,
+      null,
+    );
+
+    expect(access.dashboard["dashboard:appointments:view"]).toEqual([]);
+  });
+
+  it("protects revenue independently from other dashboard analytics", () => {
+    const access = resolveAdminDashboardClinicAccess(
+      scopes({
+        "dashboard:view": { scope: "all" },
+        "dashboard:patients:view": { scope: "all" },
+        "report:read": { scope: "all" },
+      }),
+      clinics,
+      null,
+    );
+
+    expect(access.dashboard["dashboard:patients:view"]).toEqual(["clinic-a", "clinic-b"]);
+    expect(access.dashboard["dashboard:revenue:view"]).toEqual([]);
   });
 
   it("requires the dashboard master right in the same clinic", () => {

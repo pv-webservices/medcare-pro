@@ -11,19 +11,22 @@ export const ADMIN_DASHBOARD_ACTION_PERMISSIONS = [
   "doctor:create",
   "team:manage",
   "role:manage",
+  "task:create",
+  "task:manage",
 ] as const;
 
 export const ADMIN_DASHBOARD_DATA_PERMISSIONS = [
   "dashboard:view",
+  "dashboard:patients:view",
   "dashboard:appointments:view",
-  "dashboard:registrations:view",
   "dashboard:revenue:view",
   "dashboard:doctors:view",
+  "dashboard:messages:view",
+  "dashboard:tasks:view",
+  "dashboard:schedule:view",
   "dashboard:activity:view",
-  "dashboard:notifications:view",
   "dashboard:team:view",
   "dashboard:clinics:view",
-  "dashboard:tasks:view",
 ] as const;
 
 export type AdminDashboardActionPermission =

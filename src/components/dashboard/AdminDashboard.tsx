@@ -1,22 +1,23 @@
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import {
   Activity,
   ArrowRight,
-  Bell,
+  CalendarCheck,
   CalendarDays,
-  ClipboardList,
+  CheckCircle2,
+  CircleAlert,
   IndianRupee,
   ListTodo,
-  ShieldCheck,
+  MessageCircleMore,
+  Plus,
   Stethoscope,
   UserRoundPlus,
+  UsersRound,
 } from "lucide-react";
-import AdminDashboardDatePicker from "@/components/dashboard/AdminDashboardDatePicker";
-import {
-  APPOINTMENT_STATUS_LABELS,
-  APPOINTMENT_STATUS_TONES,
-} from "@/components/appointments/status";
+import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONES } from "@/components/appointments/status";
+import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
+import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import {
   EmptyState,
   MetricCard,
@@ -30,571 +31,323 @@ import {
   THead,
   TR,
   buttonClasses,
-  cx,
 } from "@/components/ui";
-import type {
-  AdminDashboardData,
-  AdminDoctorRow,
-} from "@/lib/adminDashboard";
-import { formatRupees } from "@/lib/money";
-import { VISIT_TYPE_LABELS, type VisitType } from "@/lib/registrations";
+import type { AdminDashboardData, DashboardTrendPoint } from "@/lib/adminDashboard";
+import { formatRupees, formatRupeesCompact } from "@/lib/money";
 
-interface AdminDashboardProps {
+interface Props {
   data: AdminDashboardData;
-  today: string;
   now?: Date;
 }
 
-function greetingFor(hour: number): string {
+function firstName(name: string): string {
+  return name.trim().split(/\s+/).find((part) => !["dr", "dr.", "mr", "mr.", "ms", "ms."].includes(part.toLowerCase())) ?? name;
+}
+
+function greeting(hour: number): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
 
-function firstNameOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const skip = new Set(["dr", "dr.", "mr", "mr.", "mrs", "mrs.", "ms", "ms."]);
-  return words.find((word) => !skip.has(word.toLowerCase())) ?? name;
+function roundedDelta(value: number | null | undefined): number | undefined {
+  return value == null ? undefined : Math.round(value * 10) / 10;
 }
 
-function formatSelectedDate(date: string): string {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T00:00:00.000Z`));
-}
-
-function formatEventTime(date: Date): string {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+function chartPoints(points: readonly DashboardTrendPoint[], maxLabels = 8): AreaPoint[] {
+  const step = Math.max(1, Math.ceil(points.length / maxLabels));
+  return points.map((point, index) => ({
+    label: index % step === 0 || index === points.length - 1 ? point.label : "",
+    value: point.value,
+  }));
 }
 
 function relativeTime(date: Date, now: Date): string {
   const minutes = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000));
   if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes} min${minutes === 1 ? "" : "s"} ago`;
+  if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  return formatEventTime(date);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
-function visitTypeLabel(value: string): string {
-  return value in VISIT_TYPE_LABELS
-    ? VISIT_TYPE_LABELS[value as VisitType]
-    : value.replaceAll("_", " ").toLowerCase();
-}
-
-function ViewAll({ href, label }: { href: string; label: string }) {
+function ViewAll({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex min-h-9 items-center gap-1 rounded-lg px-1 text-label font-medium text-accent transition-colors duration-150 hover:text-accent-strong"
-    >
-      {label}
-      <ArrowRight aria-hidden="true" strokeWidth={2} className="h-3.5 w-3.5" />
+    <Link href={href} className="inline-flex min-h-9 items-center gap-1 text-label font-semibold text-accent hover:text-accent-strong">
+      {children}<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
     </Link>
   );
 }
 
-function EmptyAction({ href, label }: { href: string; label: string }) {
+function MiniStat({ label, value, tone = "default" }: { label: string; value: string | number; tone?: "default" | "alert" | "ok" }) {
+  const color = tone === "alert" ? "text-alert-ink" : tone === "ok" ? "text-ok-ink" : "text-ink";
   return (
-    <Link href={href} className={buttonClasses("secondary", "sm")}>
-      {label}
-    </Link>
+    <div className="rounded-2xl border border-line bg-canvas-deep px-4 py-3">
+      <p className="text-meta font-medium text-muted">{label}</p>
+      <p className={`tnum mt-1 text-section font-semibold ${color}`}>{typeof value === "number" ? value.toLocaleString("en-IN") : value}</p>
+    </div>
   );
 }
 
-export default function AdminDashboard({
-  data,
-  today,
-  now = new Date(),
-}: AdminDashboardProps) {
-  const isToday = data.date === today;
-  const clinicName = data.scope.clinicName;
-  const scopeLabel = clinicName ?? "All assigned clinics";
-  const selectedDateLabel = formatSelectedDate(data.date);
-  const description = isToday
-    ? clinicName
-      ? `Here's what's happening at ${clinicName} today.`
-      : "Here's what's happening across your assigned clinics today."
-    : clinicName
-      ? `Here's what happened at ${clinicName} on ${selectedDateLabel}.`
-      : `Here's what happened across your assigned clinics on ${selectedDateLabel}.`;
+function NoData({ title, guidance, icon }: { title: string; guidance: string; icon: ReactNode }) {
+  return <EmptyState isBare icon={icon} title={title} guidance={guidance} />;
+}
 
-  const hasAnyWidget = Object.entries(data.capabilities.dashboard).some(
-    ([key, allowed]) => key !== "view" && allowed,
-  );
+export default function AdminDashboard({ data, now = new Date() }: Props) {
+  const hasWidgets = Object.entries(data.capabilities.dashboard).some(([key, value]) => key !== "view" && value);
+  const scopeLabel = data.scope.clinicName ?? (data.scope.clinicCount > 1 ? "All accessible clinics" : "Accessible clinic");
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title={`${greetingFor(now.getHours())}, ${firstNameOf(data.userName)}`}
-        description={description}
+        title={`${greeting(now.getHours())}, ${firstName(data.userName)}`}
+        description="A live operational view of patient care, appointments, collections, and team workload."
         scope={scopeLabel}
-        meta={!isToday ? selectedDateLabel : undefined}
+        meta={data.rangeLabel}
         actions={
-          <Suspense>
-            <AdminDashboardDatePicker current={data.date} today={today} />
-          </Suspense>
+          <>
+            {data.capabilities.actions.canCreateRegistration && (
+              <Link href="/registration/new" className={buttonClasses("primary", "sm")}><UserRoundPlus className="h-4 w-4" />New registration</Link>
+            )}
+            {data.capabilities.actions.canBookAppointment && (
+              <Link href="/appointments/new" className={buttonClasses("secondary", "sm")}><Plus className="h-4 w-4" />Appointment</Link>
+            )}
+            {data.capabilities.actions.canCreateTask && (
+              <Link href="/tasks" className={buttonClasses("secondary", "sm")}><ListTodo className="h-4 w-4" />New task</Link>
+            )}
+            <Suspense><DateRangePicker current={data.period} /></Suspense>
+          </>
         }
       />
 
-      {!hasAnyWidget ? (
+      {!hasWidgets ? (
         <EmptyState
-          icon={<ShieldCheck className="h-5 w-5" strokeWidth={2} />}
-          title="No dashboard modules are available"
-          guidance="Your role does not currently have access to operational dashboard data. Ask an account owner to review your permissions."
+          icon={<CircleAlert className="h-5 w-5" />}
+          title="No dashboard data is assigned"
+          guidance="This role can open the dashboard, but no dashboard data permissions are enabled for the selected clinic."
         />
       ) : (
         <>
-          <KpiRow data={data} isToday={isToday} />
+          <KpiGrid data={data} />
 
-          {data.capabilities.dashboard.appointments && data.appointments && (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-              <SchedulePanel data={data} isToday={isToday} />
-              <OperationalSummary data={data} />
+          {(data.patients || data.appointments) && (
+            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+              {data.patients && <PatientOverview data={data} />}
+              {data.appointments && <AppointmentOverview data={data} />}
             </div>
           )}
 
-          {(data.capabilities.dashboard.registrations || data.capabilities.dashboard.doctors) && (
+          {data.revenue && <RevenueSection data={data} />}
+
+          {(data.schedule || data.recentActivity) && (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+              {data.schedule && <SchedulePanel data={data} />}
+              {data.recentActivity && <ActivityPanel data={data} now={now} />}
+            </div>
+          )}
+
+          {data.doctors && <DoctorPanel data={data} />}
+
+          {(data.messages || data.tasks) && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {data.capabilities.dashboard.registrations && data.registrations && (
-                <RegistrationPanel data={data} isToday={isToday} />
-              )}
-              {data.capabilities.dashboard.doctors && data.doctors && (
-                <DoctorAvailabilityPanel data={data} isToday={isToday} />
-              )}
+              {data.messages && <MessagePanel data={data} />}
+              {data.tasks && <TaskPanel data={data} />}
             </div>
           )}
 
-          {data.capabilities.dashboard.tasks && data.tasks && (
-            <TaskSummaryPanel data={data} />
-          )}
-
-          {(data.capabilities.dashboard.activity || data.capabilities.dashboard.notifications) && (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {data.capabilities.dashboard.activity && (
-                <ActivityPanel data={data} now={now} />
-              )}
-              {data.capabilities.dashboard.notifications && data.notifications && (
-                <NotificationsPanel data={data} now={now} />
-              )}
-            </div>
-          )}
+          {data.clinicPerformance && data.clinicPerformance.length > 1 && <ClinicPerformance data={data} />}
         </>
       )}
     </div>
   );
 }
 
-function TaskSummaryPanel({ data }: { data: AdminDashboardData }) {
-  const summary = data.tasks!;
-  const items = [
-    { label: "My open tasks", value: summary.myOpen },
-    { label: "Due today", value: summary.dueToday },
-    { label: "Overdue", value: summary.overdue },
-    { label: "Completed today", value: summary.completedToday },
-  ];
-
-  return (
-    <Panel
-      title="Tasks"
-      description="Your current workload and deadlines"
-      actions={<ViewAll href="/tasks" label="View tasks" />}
-    >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {items.map((item) => (
-          <div key={item.label} className="rounded-2xl border border-line bg-canvas-deep p-4">
-            <div className="flex items-center gap-2 text-muted">
-              <ListTodo className="h-4 w-4" strokeWidth={2} />
-              <span className="text-label">{item.label}</span>
-            </div>
-            <p className="tnum mt-2 text-section font-semibold text-ink">
-              {item.value.toLocaleString("en-IN")}
-            </p>
-          </div>
-        ))}
-      </div>
-    </Panel>
+function KpiGrid({ data }: { data: AdminDashboardData }) {
+  const cards: ReactNode[] = [];
+  const summary = data.summary;
+  if (summary.totalPatients !== undefined) cards.push(
+    <MetricCard key="patients" label="Total patients" value={summary.totalPatients.toLocaleString("en-IN")} footnote={data.patients ? `${data.patients.new} new in period` : undefined} icon={<UsersRound className="h-[18px] w-[18px]" />} />,
   );
-}
-
-function KpiRow({ data, isToday }: { data: AdminDashboardData; isToday: boolean }) {
-  const cards = [];
-
-  if (data.capabilities.dashboard.appointments && data.appointments) {
-    cards.push(
-      <MetricCard
-        key="appointments"
-        label={isToday ? "Today's appointments" : "Appointments"}
-        value={data.appointments.active.toLocaleString("en-IN")}
-        footnote={`${data.appointments.byStatus.CONVERTED} registered · ${data.appointments.byStatus.CHECKED_IN} arrived`}
-        icon={<CalendarDays className="h-[18px] w-[18px]" strokeWidth={2} />}
-      />,
-    );
-  }
-
-  if (data.capabilities.dashboard.registrations && data.registrations) {
-    cards.push(
-      <MetricCard
-        key="registrations"
-        label={isToday ? "Today's registrations" : "Registrations"}
-        value={data.registrations.total.toLocaleString("en-IN")}
-        footnote={`${data.registrations.newPatients} new · ${data.registrations.followUps} follow-up`}
-        icon={<ClipboardList className="h-[18px] w-[18px]" strokeWidth={2} />}
-      />,
-    );
-  }
-
-  if (data.capabilities.dashboard.revenue && data.revenueToday !== null) {
-    cards.push(
-      <MetricCard
-        key="revenue"
-        label={isToday ? "Today's revenue" : "Revenue"}
-        value={formatRupees(data.revenueToday)}
-        footnote="Recorded registrations"
-        icon={<IndianRupee className="h-[18px] w-[18px]" strokeWidth={2} />}
-      />,
-    );
-  }
-
-  if (data.capabilities.dashboard.doctors && data.doctors) {
-    cards.push(
-      <MetricCard
-        key="doctors"
-        label={isToday ? "Active doctors today" : "Available doctors"}
-        value={data.doctors.available.toLocaleString("en-IN")}
-        footnote={`${data.doctors.onLeave} on leave · ${data.doctors.notScheduled} not scheduled`}
-        icon={<Stethoscope className="h-[18px] w-[18px]" strokeWidth={2} />}
-      />,
-    );
-  }
-
+  if (summary.todaysAppointments !== undefined) cards.push(
+    <MetricCard key="appointments" label="Today's appointments" value={summary.todaysAppointments.toLocaleString("en-IN")} delta={roundedDelta(summary.appointmentChange)} deltaCaption={data.comparisonLabel} icon={<CalendarDays className="h-[18px] w-[18px]" />} />,
+  );
+  if (summary.todaysCollection !== undefined) cards.push(
+    <MetricCard key="today-revenue" label="Today's collection" value={formatRupees(summary.todaysCollection)} footnote="Recorded registrations" icon={<IndianRupee className="h-[18px] w-[18px]" />} />,
+  );
+  if (summary.monthRevenue !== undefined) cards.push(
+    <MetricCard key="month-revenue" label="Month-to-date revenue" value={formatRupees(summary.monthRevenue)} delta={roundedDelta(summary.revenueChange)} deltaCaption={data.comparisonLabel} icon={<IndianRupee className="h-[18px] w-[18px]" />} />,
+  );
+  if (summary.activeDoctors !== undefined) cards.push(
+    <MetricCard key="doctors" label="Active doctors" value={summary.activeDoctors.toLocaleString("en-IN")} footnote={data.doctors ? `${data.doctors.availableToday} available today` : undefined} icon={<Stethoscope className="h-[18px] w-[18px]" />} />,
+  );
+  if (summary.pendingTasks !== undefined) cards.push(
+    <MetricCard key="tasks" label="Pending tasks" value={summary.pendingTasks.toLocaleString("en-IN")} isUpGood={false} footnote={`${summary.overdueTasks ?? 0} overdue`} icon={<ListTodo className="h-[18px] w-[18px]" />} />,
+  );
+  if (summary.messageHealth !== undefined) cards.push(
+    <MetricCard key="messages" label="Message acceptance" value={summary.messageHealth === null ? "—" : `${summary.messageHealth.toFixed(1)}%`} footnote="Gateway accepted today" icon={<MessageCircleMore className="h-[18px] w-[18px]" />} />,
+  );
   return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>;
 }
 
-function SchedulePanel({ data, isToday }: { data: AdminDashboardData; isToday: boolean }) {
-  const rows = data.schedule;
-
+function PatientOverview({ data }: { data: AdminDashboardData }) {
+  const patients = data.patients!;
   return (
-    <Panel
-      title={isToday ? "Today's schedule" : "Schedule"}
-      description="Appointments in time order"
-      className="xl:col-span-2"
-      actions={<ViewAll href={`/appointments?date=${data.date}`} label="View full schedule" />}
-      isFlush
-      hasDivider
-    >
-      {rows.length === 0 ? (
-        <EmptyState
-          isBare
-          icon={<CalendarDays className="h-5 w-5" strokeWidth={2} />}
-          title={isToday ? "No appointments scheduled for today" : "No appointments scheduled"}
-          guidance="New bookings for this date will appear here."
-          action={
-            data.capabilities.actions.canBookAppointment ? (
-              <EmptyAction href="/appointments/new" label="Book appointment" />
-            ) : undefined
-          }
-        />
-      ) : (
-        <>
-          <div className="hidden md:block">
-            <Table caption="Appointments for the selected day" className="rounded-none border-0 shadow-none">
-              <THead>
-                <TH>Time</TH>
-                <TH>Patient</TH>
-                <TH>Doctor</TH>
-                <TH>Service</TH>
-                <TH>Status</TH>
-                <TH>Action</TH>
-              </THead>
-              <TBody>
-                {rows.map((row) => (
-                  <TR key={row.id}>
-                    <TD isNumeric className="whitespace-nowrap">{row.startTime}</TD>
-                    <TD isPrimary>
-                      <span className="block">{row.patientName}</span>
-                      {data.scope.type === "ACCOUNT" && (
-                        <span className="mt-0.5 block text-meta font-normal text-muted">{row.clinicName}</span>
-                      )}
-                    </TD>
-                    <TD>{row.doctorName}</TD>
-                    <TD>{row.serviceName}</TD>
-                    <TD>
-                      <StatusPill tone={APPOINTMENT_STATUS_TONES[row.status]}>
-                        {APPOINTMENT_STATUS_LABELS[row.status]}
-                      </StatusPill>
-                    </TD>
-                    <TD>
-                      <Link className="font-medium text-accent hover:text-accent-strong" href={`/appointments/${row.id}`}>
-                        View
-                      </Link>
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </div>
-
-          <ul className="divide-y divide-line px-4 md:hidden">
-            {rows.map((row) => (
-              <li key={row.id} className="py-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-body font-semibold text-ink">{row.startTime} · {row.patientName}</p>
-                    <p className="mt-1 text-label text-muted">{row.doctorName} · {row.serviceName}</p>
-                    {data.scope.type === "ACCOUNT" && (
-                      <p className="mt-0.5 text-meta text-muted">{row.clinicName}</p>
-                    )}
-                  </div>
-                  <StatusPill tone={APPOINTMENT_STATUS_TONES[row.status]}>
-                    {APPOINTMENT_STATUS_LABELS[row.status]}
-                  </StatusPill>
-                </div>
-                <Link href={`/appointments/${row.id}`} className="mt-3 inline-flex min-h-9 items-center text-label font-medium text-accent">
-                  View appointment
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </Panel>
-  );
-}
-
-function OperationalSummary({ data }: { data: AdminDashboardData }) {
-  const summary = data.appointments!;
-  const statuses = [
-    "SCHEDULED",
-    "CONFIRMED",
-    "CHECKED_IN",
-    "CONVERTED",
-    "CANCELLED",
-    "NO_SHOW",
-  ] as const;
-
-  return (
-    <Panel title="Operational summary" description="Appointment status for this day">
-      <div className="mb-4 flex items-end justify-between border-b border-line pb-4">
-        <span className="text-body text-muted">Appointments</span>
-        <span className="tnum text-metric font-semibold text-ink">{summary.total}</span>
+    <Panel title="Patient overview" description={`Patient growth and visits · ${data.rangeLabel}`} actions={<ViewAll href="/registration">View patients</ViewAll>}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MiniStat label="Total patients" value={patients.total} />
+        <MiniStat label="New" value={patients.new} tone="ok" />
+        <MiniStat label="Returning" value={patients.returning} />
+        <MiniStat label="Follow-ups" value={patients.followUps} />
       </div>
-      <ul className="flex flex-col gap-3">
-        {statuses.map((status) => (
-          <li key={status} className="flex items-center justify-between gap-3">
-            <span className="text-body text-muted">{APPOINTMENT_STATUS_LABELS[status]}</span>
-            <span className="tnum text-body font-semibold text-ink">{summary.byStatus[status]}</span>
-          </li>
-        ))}
-      </ul>
-    </Panel>
-  );
-}
-
-function RegistrationPanel({ data, isToday }: { data: AdminDashboardData; isToday: boolean }) {
-  const rows = data.registrationActivity;
-
-  return (
-    <Panel
-      title="Registration activity"
-      description={isToday ? "Patient visits recorded today" : "Patient visits on this date"}
-      actions={<ViewAll href={`/registration?from=${data.date}&to=${data.date}`} label="View registrations" />}
-      isFlush
-      hasDivider
-    >
-      {rows.length === 0 ? (
-        <EmptyState
-          isBare
-          icon={<UserRoundPlus className="h-5 w-5" strokeWidth={2} />}
-          title={isToday ? "No registrations today" : "No registrations on this date"}
-          guidance="New patient visits will appear here when they are recorded."
-          action={data.capabilities.actions.canCreateRegistration ? <EmptyAction href="/registration/new" label="New registration" /> : undefined}
-        />
-      ) : (
-        <>
-          <div className="hidden md:block">
-            <Table caption="Recent registrations" className="rounded-none border-0 shadow-none">
-              <THead>
-                <TH>Patient</TH>
-                <TH>Visit</TH>
-                <TH>Doctor</TH>
-                <TH>Time</TH>
-                <TH>Created by</TH>
-              </THead>
-              <TBody>
-                {rows.map((row) => (
-                  <TR key={row.id}>
-                    <TD isPrimary>
-                      <Link href={`/registration/${row.id}`} className="hover:text-accent">{row.patientName}</Link>
-                      {data.scope.type === "ACCOUNT" && <span className="mt-0.5 block text-meta font-normal text-muted">{row.clinicName}</span>}
-                    </TD>
-                    <TD><StatusPill tone="neutral">{visitTypeLabel(row.visitType)}</StatusPill></TD>
-                    <TD>{row.doctorName ?? "Not assigned"}</TD>
-                    <TD isNumeric>{row.visitTime}</TD>
-                    <TD>{row.createdByName}</TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </div>
-
-          <ul className="divide-y divide-line px-4 md:hidden">
-            {rows.map((row) => (
-              <li key={row.id} className="py-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Link href={`/registration/${row.id}`} className="text-body font-semibold text-ink hover:text-accent">{row.patientName}</Link>
-                    <p className="mt-1 text-label text-muted">{row.doctorName ?? "Not assigned"} · {row.visitTime}</p>
-                    <p className="mt-0.5 text-meta text-muted">Created by {row.createdByName}</p>
-                  </div>
-                  <StatusPill tone="neutral">{visitTypeLabel(row.visitType)}</StatusPill>
+      <div className="mt-5 border-t border-line pt-5">
+        {patients.trend.some((point) => point.value > 0) ? (
+          <AreaChart points={chartPoints(patients.trend)} caption="New patient growth over the selected period" className="[--viz-series:var(--color-ok-mark)]" />
+        ) : <p className="flex h-44 items-center justify-center text-body text-muted">No new patients in this period.</p>}
+      </div>
+      {patients.recent.length > 0 && (
+        <div className="mt-5 border-t border-line pt-4">
+          <p className="mb-2 text-label font-semibold text-ink">Recent registrations</p>
+          <ul className="grid gap-x-6 sm:grid-cols-2">
+            {patients.recent.slice(0, 4).map((row) => (
+              <li key={row.id} className="flex items-center justify-between gap-3 border-b border-line py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-body font-medium text-ink">{row.patientName}</p>
+                  <p className="truncate text-meta text-muted">{row.clinicName}</p>
                 </div>
+                <StatusPill tone="neutral">{row.visitType === "FOLLOW_UP" ? "Follow-up" : "New"}</StatusPill>
               </li>
             ))}
           </ul>
-        </>
+        </div>
       )}
     </Panel>
   );
 }
 
-const DOCTOR_STATUS: Record<AdminDoctorRow["status"], { label: string; tone: "ok" | "warn" | "neutral" }> = {
-  AVAILABLE: { label: "Available", tone: "ok" },
-  ON_LEAVE: { label: "On leave", tone: "warn" },
-  NOT_SCHEDULED: { label: "Not scheduled", tone: "neutral" },
-};
-
-function DoctorAvailabilityPanel({ data, isToday }: { data: AdminDashboardData; isToday: boolean }) {
-  const doctors = data.doctors!;
-
+function AppointmentOverview({ data }: { data: AdminDashboardData }) {
+  const appointments = data.appointments!;
+  const visibleStatuses = ["SCHEDULED", "CONFIRMED", "CHECKED_IN", "CONVERTED", "CANCELLED", "NO_SHOW", "RESCHEDULED"] as const;
   return (
-    <Panel
-      title="Doctor availability"
-      description={isToday ? "Scheduled coverage for today" : "Scheduled coverage for this date"}
-      actions={<ViewAll href="/doctors" label="View doctors" />}
-    >
-      {doctors.rows.length === 0 ? (
-        <EmptyState
-          isBare
-          icon={<Stethoscope className="h-5 w-5" strokeWidth={2} />}
-          title="No doctors are available"
-          guidance="Doctor schedules and leave for this date will appear here."
-          action={data.capabilities.actions.canAddDoctor ? <EmptyAction href="/doctors" label="Add doctor" /> : undefined}
-        />
-      ) : (
-        <ul className="divide-y divide-line">
-          {doctors.rows.map((doctor) => {
-            const status = DOCTOR_STATUS[doctor.status];
-            return (
-              <li key={doctor.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0">
-                  <Link href={`/doctors/${doctor.id}`} className="text-body font-medium text-ink hover:text-accent">{doctor.name}</Link>
-                  <p className="mt-0.5 text-meta text-muted">
-                    {doctor.department}
-                    {data.scope.type === "ACCOUNT" ? ` · ${doctor.clinicName}` : ""}
-                  </p>
-                  {doctor.availability && doctor.status !== "ON_LEAVE" && (
-                    <p className="mt-0.5 text-meta text-muted">{doctor.availability}</p>
-                  )}
-                </div>
-                <StatusPill tone={status.tone}>{status.label}</StatusPill>
-              </li>
-            );
-          })}
-        </ul>
+    <Panel title="Appointment overview" description={`Demand, arrivals, and outcomes · ${data.rangeLabel}`} actions={<ViewAll href="/appointments">View appointments</ViewAll>}>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+        {visibleStatuses.map((status) => (
+          <div key={status} className="flex items-center justify-between gap-2 border-b border-line pb-2">
+            <span className="text-meta text-muted">{APPOINTMENT_STATUS_LABELS[status]}</span>
+            <span className="tnum text-body font-semibold text-ink">{appointments.byStatus[status]}</span>
+          </div>
+        ))}
+        <div className="flex items-center justify-between gap-2 border-b border-line pb-2">
+          <span className="text-meta text-muted">Upcoming</span><span className="tnum text-body font-semibold text-ink">{appointments.upcoming}</span>
+        </div>
+      </div>
+      <div className="mt-5 border-t border-line pt-5">
+        {appointments.trend.some((point) => point.value > 0) ? <AreaChart points={chartPoints(appointments.trend)} caption="Appointment trend over the selected period" /> : <p className="flex h-44 items-center justify-center text-body text-muted">No appointments in this period.</p>}
+      </div>
+    </Panel>
+  );
+}
+
+function RevenueSection({ data }: { data: AdminDashboardData }) {
+  const revenue = data.revenue!;
+  return (
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <Panel title="Revenue trend" description={`Registration-backed collections · ${data.rangeLabel}`} className="xl:col-span-2" actions={<ViewAll href="/reports">Open reports</ViewAll>}>
+        {revenue.trend.some((point) => point.value > 0) ? <AreaChart points={chartPoints(revenue.trend, 10)} caption="Revenue trend over the selected period" /> : <NoData icon={<IndianRupee className="h-5 w-5" />} title="No revenue in this period" guidance="Collections appear here when registrations with an amount are recorded." />}
+      </Panel>
+      <Panel title="Revenue summary" description="Current collection checkpoints">
+        <div className="grid grid-cols-2 gap-3">
+          <MiniStat label="Today" value={formatRupeesCompact(revenue.today)} />
+          <MiniStat label="This week" value={formatRupeesCompact(revenue.thisWeek)} />
+          <MiniStat label="This month" value={formatRupeesCompact(revenue.thisMonth)} />
+          <MiniStat label="Previous month" value={formatRupeesCompact(revenue.previousMonth)} />
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-2xl border border-line px-4 py-3">
+          <span className="text-body text-muted">Average per visit</span><span className="tnum font-semibold text-ink">{formatRupees(revenue.averagePerVisit)}</span>
+        </div>
+      </Panel>
+      {revenue.byDoctor.length > 0 && (
+        <Panel title="Revenue by doctor" description="Attributed registrations in this period" className="xl:col-span-3" isFlush hasDivider>
+          <div className="overflow-x-auto">
+            <Table caption="Revenue by doctor" className="min-w-[620px] rounded-none border-0 shadow-none">
+              <THead><TH>Doctor</TH><TH align="end">Patients</TH><TH align="end">Revenue</TH></THead>
+              <TBody>{revenue.byDoctor.map((row) => <TR key={row.doctorId}><TD isPrimary>{row.doctorName}</TD><TD align="end" className="tnum">{row.patients}</TD><TD align="end" className="tnum">{formatRupees(row.revenue)}</TD></TR>)}</TBody>
+            </Table>
+          </div>
+        </Panel>
+      )}
+    </div>
+  );
+}
+
+function SchedulePanel({ data }: { data: AdminDashboardData }) {
+  const schedule = data.schedule!;
+  return (
+    <Panel title="Today's schedule" description="Next appointments in chronological order" className="xl:col-span-3" actions={<ViewAll href="/appointments">View all appointments</ViewAll>} isFlush hasDivider>
+      {schedule.length === 0 ? <NoData icon={<CalendarCheck className="h-5 w-5" />} title="No upcoming appointments today" guidance="Bookings later today will appear here." /> : (
+        <div className="overflow-x-auto"><Table caption="Upcoming appointments today" className="min-w-[760px] rounded-none border-0 shadow-none"><THead><TH>Time</TH><TH>Patient</TH><TH>Doctor</TH><TH>Type</TH><TH>Clinic</TH><TH>Status</TH></THead><TBody>
+          {schedule.map((row) => <TR key={row.id}><TD isNumeric>{row.time}</TD><TD isPrimary><Link href={`/appointments/${row.id}`} className="hover:text-accent">{row.patientName}</Link></TD><TD>{row.doctorName}</TD><TD>{row.appointmentType}</TD><TD>{row.clinicName}</TD><TD><StatusPill tone={APPOINTMENT_STATUS_TONES[row.status]}>{APPOINTMENT_STATUS_LABELS[row.status]}</StatusPill></TD></TR>)}
+        </TBody></Table></div>
       )}
     </Panel>
   );
 }
 
 function ActivityPanel({ data, now }: { data: AdminDashboardData; now: Date }) {
+  const rows = data.recentActivity!;
   return (
-    <Panel title="Recent activity" description="Registration edit history in your scope">
-      {data.recentActivity.length === 0 ? (
-        <EmptyState
-          isBare
-          icon={<Activity className="h-5 w-5" strokeWidth={2} />}
-          title="No recent registration changes"
-          guidance="Created and edited registrations will appear here."
-        />
-      ) : (
-        <ol className="divide-y divide-line">
-          {data.recentActivity.map((row) => (
-            <li key={row.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink">
-                <Activity aria-hidden="true" className="h-4 w-4" strokeWidth={2} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-body text-ink">
-                  <span className="font-medium">{row.actorName}</span> {row.action} {row.patientName}&apos;s registration
-                </p>
-                {row.changedFields.length > 0 && row.action === "updated" && (
-                  <p className="mt-0.5 text-meta text-muted">
-                    Changed: {row.changedFields.slice(0, 2).join(", ")}
-                    {row.changedFields.length > 2 ? ` +${row.changedFields.length - 2} more` : ""}
-                  </p>
-                )}
-                <p className="mt-0.5 text-meta text-muted">{relativeTime(row.timestamp, now)}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+    <Panel title="Recent patient activity" description="Latest events in your clinic scope" className="xl:col-span-2">
+      {rows.length === 0 ? <NoData icon={<Activity className="h-5 w-5" />} title="No recent patient activity" guidance="Registrations and appointment changes will appear here." /> : (
+        <ol className="divide-y divide-line">{rows.map((row) => <li key={row.id} className="flex gap-3 py-3 first:pt-0 last:pb-0"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink"><Activity className="h-4 w-4" /></span><div className="min-w-0"><p className="text-body text-ink"><span className="font-semibold">{row.patientName}</span> · {row.description}</p><p className="mt-0.5 text-meta text-muted">{row.clinicName} · {relativeTime(row.occurredAt, now)}</p></div></li>)}</ol>
       )}
     </Panel>
   );
 }
 
-function NotificationsPanel({ data, now }: { data: AdminDashboardData; now: Date }) {
-  const notifications = data.notifications!;
-
+function DoctorPanel({ data }: { data: AdminDashboardData }) {
+  const doctors = data.doctors!;
   return (
-    <Panel
-      title="Notifications"
-      description={`${notifications.unreadCount} unread notification${notifications.unreadCount === 1 ? "" : "s"}`}
-      actions={<ViewAll href="/notifications" label="View all" />}
-    >
-      {notifications.items.length === 0 ? (
-        <EmptyState
-          isBare
-          icon={<Bell className="h-5 w-5" strokeWidth={2} />}
-          title="No notifications"
-          guidance="Patient, doctor and clinic changes will appear here."
-        />
-      ) : (
-        <ol className="divide-y divide-line">
-          {notifications.items.map((item) => (
-            <li key={item.id} className="relative flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-              <span
-                className={cx(
-                  "mt-1 h-2 w-2 shrink-0 rounded-full",
-                  item.read ? "bg-line-strong" : "bg-accent",
-                )}
-                aria-hidden="true"
-              />
-              <div className="min-w-0 flex-1">
-                <p className={cx("text-body", item.read ? "text-ink-soft" : "font-medium text-ink")}>{item.message}</p>
-                <p className="mt-0.5 text-meta text-muted">
-                  {item.typeLabel} · {relativeTime(item.createdAt, now)}
-                </p>
-                {item.href && (
-                  <Link href={item.href} className="mt-1 inline-flex min-h-8 items-center text-meta font-medium text-accent hover:text-accent-strong">
-                    Open record
-                  </Link>
-                )}
-              </div>
-              {!item.read && <span className="sr-only">Unread</span>}
-            </li>
-          ))}
-        </ol>
+    <Panel title="Doctor overview" description={`Coverage and workload · ${data.rangeLabel}`} actions={<ViewAll href="/doctors">View doctors</ViewAll>} isFlush hasDivider>
+      <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3"><MiniStat label="Active doctors" value={doctors.active} /><MiniStat label="Available today" value={doctors.availableToday} tone="ok" /><MiniStat label="On leave" value={doctors.onLeave} /></div>
+      {doctors.performance.length === 0 ? <NoData icon={<Stethoscope className="h-5 w-5" />} title="No doctor activity" guidance="Doctor workload will appear when appointments or registrations are recorded." /> : (
+        <div className="overflow-x-auto"><Table caption="Doctor workload" className="min-w-[720px] rounded-none border-0 shadow-none"><THead><TH>Doctor</TH><TH>Clinic</TH><TH align="end">Appointments</TH><TH align="end">Patients seen</TH>{doctors.performance.some((row) => row.revenue !== undefined) && <TH align="end">Revenue</TH>}</THead><TBody>
+          {doctors.performance.map((row) => <TR key={row.doctorId}><TD isPrimary>{row.doctorName}</TD><TD>{row.clinicName}</TD><TD align="end" className="tnum">{row.appointments}</TD><TD align="end" className="tnum">{row.patients}</TD>{doctors.performance.some((item) => item.revenue !== undefined) && <TD align="end" className="tnum">{row.revenue === undefined ? "—" : formatRupeesCompact(row.revenue)}</TD>}</TR>)}
+        </TBody></Table></div>
       )}
+    </Panel>
+  );
+}
+
+function MessagePanel({ data }: { data: AdminDashboardData }) {
+  const messages = data.messages!;
+  return (
+    <Panel title="Message health" description="Today's stored WhatsApp gateway outcomes" actions={<ViewAll href="/messages">View messages</ViewAll>}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><MiniStat label="Sent" value={messages.total} /><MiniStat label="Accepted" value={messages.accepted} tone="ok" /><MiniStat label="Pending" value={messages.pending} /><MiniStat label="Failed" value={messages.failed} tone={messages.failed > 0 ? "alert" : "default"} /></div>
+      <p className="mt-4 text-label text-muted">{messages.acceptanceRate === null ? "No messaging activity today." : `${messages.acceptanceRate.toFixed(1)}% accepted by the gateway. Delivery receipts are not available from the current provider.`}</p>
+    </Panel>
+  );
+}
+
+function TaskPanel({ data }: { data: AdminDashboardData }) {
+  const tasks = data.tasks!;
+  return (
+    <Panel title="Task overview" description="Deadlines and current workload" actions={<ViewAll href="/tasks">View tasks</ViewAll>}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><MiniStat label="My pending" value={tasks.myPending} /><MiniStat label="Due today" value={tasks.dueToday} /><MiniStat label="Overdue" value={tasks.overdue} tone={tasks.overdue > 0 ? "alert" : "default"} /><MiniStat label="Completed today" value={tasks.completedToday} tone="ok" />{tasks.teamPending !== undefined && <MiniStat label="Team pending" value={tasks.teamPending} />}</div>
+      {tasks.dueToday === 0 && tasks.overdue === 0 && <p className="mt-4 flex items-center gap-2 text-label text-muted"><CheckCircle2 className="h-4 w-4 text-ok-ink" />Nothing is due or overdue today.</p>}
+    </Panel>
+  );
+}
+
+function ClinicPerformance({ data }: { data: AdminDashboardData }) {
+  const rows = data.clinicPerformance!;
+  const hasPatients = rows.some((row) => row.patients !== undefined);
+  const hasAppointments = rows.some((row) => row.appointments !== undefined);
+  const hasDoctors = rows.some((row) => row.doctors !== undefined);
+  const hasRevenue = rows.some((row) => row.revenue !== undefined);
+  return (
+    <Panel title="Clinic performance" description="Only clinics and metrics permitted for this role" isFlush hasDivider>
+      <div className="overflow-x-auto"><Table caption="Clinic performance comparison" className="min-w-[680px] rounded-none border-0 shadow-none"><THead><TH>Clinic</TH>{hasPatients && <TH align="end">Patients</TH>}{hasAppointments && <TH align="end">Appointments</TH>}{hasDoctors && <TH align="end">Doctors</TH>}{hasRevenue && <TH align="end">Revenue</TH>}</THead><TBody>
+        {rows.map((row) => <TR key={row.clinicId}><TD isPrimary>{row.clinicName}</TD>{hasPatients && <TD align="end" className="tnum">{row.patients ?? "—"}</TD>}{hasAppointments && <TD align="end" className="tnum">{row.appointments ?? "—"}</TD>}{hasDoctors && <TD align="end" className="tnum">{row.doctors ?? "—"}</TD>}{hasRevenue && <TD align="end" className="tnum">{row.revenue === undefined ? "—" : formatRupeesCompact(row.revenue)}</TD>}</TR>)}
+      </TBody></Table></div>
     </Panel>
   );
 }
