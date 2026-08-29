@@ -18,6 +18,7 @@ import {
   type DateRange,
   type TrendInterval,
 } from "@/lib/dashboardDateRange";
+import { dashboardBucketSql } from "@/lib/dashboardTrend";
 import { formatClockTime } from "@/lib/dates";
 import { resolveModulesForActor } from "@/lib/features";
 import { MODULE_FEATURES } from "@/lib/moduleFeatures";
@@ -221,18 +222,26 @@ function dateRangeLabel(range: DateRange): string {
 }
 
 interface RawTrendRow { bucket: string; value: unknown }
-const APPOINTMENT_BUCKET_SQL: Record<TrendInterval, Prisma.Sql> = {
-  daily: Prisma.sql`DATE_FORMAT(slot_start, '%Y-%m-%d')`,
-  monthly: Prisma.sql`DATE_FORMAT(slot_start, '%Y-%m-01')`,
-};
-const REGISTRATION_BUCKET_SQL: Record<TrendInterval, Prisma.Sql> = {
-  daily: Prisma.sql`DATE_FORMAT(visit_date, '%Y-%m-%d')`,
-  monthly: Prisma.sql`DATE_FORMAT(visit_date, '%Y-%m-01')`,
-};
-const PATIENT_BUCKET_SQL: Record<TrendInterval, Prisma.Sql> = {
-  daily: Prisma.sql`DATE_FORMAT(created_at, '%Y-%m-%d')`,
-  monthly: Prisma.sql`DATE_FORMAT(created_at, '%Y-%m-01')`,
-};
+
+async function loadOptionalTrendRows(
+  widget: "patients" | "appointments" | "revenue",
+  actor: ActorContext,
+  query: Promise<RawTrendRow[]>,
+): Promise<RawTrendRow[]> {
+  try {
+    return await query;
+  } catch (error) {
+    // A chart is secondary to its KPI counts. Keep the rest of the authorised
+    // dashboard usable if one aggregate expression is incompatible with the
+    // database, while leaving a scoped diagnostic in server logs.
+    console.error(`Dashboard ${widget} trend query failed`, {
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      error,
+    });
+    return [];
+  }
+}
 
 function zeroFillTrend(
   rows: readonly RawTrendRow[],
@@ -275,15 +284,15 @@ async function loadPatientDashboardStats(
       take: 8,
       select: { id: true, visitType: true, visitDate: true, patient: { select: { name: true } }, clinic: { select: { name: true } } },
     }),
-    prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
-      SELECT ${PATIENT_BUCKET_SQL[interval]} AS bucket, COUNT(*) AS value
+    loadOptionalTrendRows("patients", actor, prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
+      SELECT ${dashboardBucketSql("patients", interval)} AS bucket, COUNT(*) AS value
       FROM patients p
       INNER JOIN clinics c ON c.id = p.clinic_id
       WHERE p.clinic_id IN (${Prisma.join(ids)})
         AND c.tenant_id = ${actor.tenantId}
         AND p.created_at >= ${range.start} AND p.created_at < ${range.end}
       GROUP BY bucket
-    `),
+    `)),
   ]);
   const byType = new Map(visits.map((row) => [row.visitType, row._count._all]));
   return {
@@ -321,15 +330,15 @@ async function loadAppointmentDashboardStats(
     prisma.appointment.count({ where: { ...base, slotStart: { gte: previous.start, lt: previous.end }, status: { not: "RESCHEDULED" } } }),
     prisma.appointment.count({ where: { ...base, slotStart: { gte: today, lt: tomorrow }, status: { not: "RESCHEDULED" } } }),
     prisma.appointment.count({ where: { ...base, slotStart: { gte: now }, status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN"] } } }),
-    prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
-      SELECT ${APPOINTMENT_BUCKET_SQL[interval]} AS bucket, COUNT(*) AS value
-      FROM appointments
-      WHERE tenant_id = ${actor.tenantId}
-        AND clinic_id IN (${Prisma.join(ids)})
-        AND slot_start >= ${range.start} AND slot_start < ${range.end}
-        AND status <> 'RESCHEDULED'
+    loadOptionalTrendRows("appointments", actor, prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
+      SELECT ${dashboardBucketSql("appointments", interval)} AS bucket, COUNT(*) AS value
+      FROM appointments a
+      WHERE a.tenant_id = ${actor.tenantId}
+        AND a.clinic_id IN (${Prisma.join(ids)})
+        AND a.slot_start >= ${range.start} AND a.slot_start < ${range.end}
+        AND a.status <> 'RESCHEDULED'
       GROUP BY bucket
-    `),
+    `)),
   ]);
   const byStatus = emptyStatusCounts();
   for (const row of grouped) byStatus[row.status] = row._count._all;
@@ -403,15 +412,15 @@ async function loadRevenueDashboardStats(
     prisma.registration.aggregate({ where: whereFor(week, tomorrow), _sum: { amount: true } }),
     prisma.registration.aggregate({ where: whereFor(month, nextMonth), _sum: { amount: true } }),
     prisma.registration.aggregate({ where: whereFor(previousMonth, month), _sum: { amount: true } }),
-    prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
-      SELECT ${REGISTRATION_BUCKET_SQL[interval]} AS bucket, SUM(r.amount) AS value
+    loadOptionalTrendRows("revenue", actor, prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
+      SELECT ${dashboardBucketSql("registrations", interval)} AS bucket, SUM(r.amount) AS value
       FROM registrations r
       INNER JOIN clinics c ON c.id = r.clinic_id
       WHERE r.clinic_id IN (${Prisma.join(ids)})
         AND c.tenant_id = ${actor.tenantId}
         AND r.visit_date >= ${range.start} AND r.visit_date < ${range.end}
       GROUP BY bucket
-    `),
+    `)),
     prisma.registration.groupBy({
       by: ["doctorId"], where: { ...whereFor(range.start, range.end), doctorId: { not: null } },
       _sum: { amount: true }, _count: { _all: true }, orderBy: { _sum: { amount: "desc" } }, take: 6,
