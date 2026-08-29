@@ -390,7 +390,14 @@ function SignupContent() {
                         pattern="^(\+91)?[0-9]{10}$"
                         title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
                         value={phone}
-                        onChange={(event) => setPhone(event.target.value.replace(/[^0-9+]/g, ''))}
+                        onChange={(event) => {
+                          let val = event.target.value.replace(/[^0-9+]/g, '');
+                          if (val.startsWith('+')) {
+                            setPhone(val.slice(0, 13));
+                          } else {
+                            setPhone(val.slice(0, 10));
+                          }
+                        }}
                         icon={<Phone className="h-[18px] w-[18px]" strokeWidth={2} />}
                         className={inputClass}
                       />
