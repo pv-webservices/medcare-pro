@@ -86,6 +86,22 @@ const ALWAYS_REACHABLE_AUTH_PATHS = new Set<string>([
 
 const LOGIN_PATH = "/login";
 const DEFAULT_SIGNED_IN_PATH = "/dashboard";
+const AUTH_CACHE_CONTROL =
+  "private, no-cache, no-store, max-age=0, must-revalidate";
+
+/**
+ * Auth pages and session-dependent redirects must never be retained by a
+ * browser, reverse proxy or CDN. In particular, cached auth HTML can outlive
+ * the hashed assets from the release that produced it.
+ */
+function preventAuthCaching(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", AUTH_CACHE_CONTROL);
+  response.headers.set("CDN-Cache-Control", "no-store");
+  response.headers.set("Surrogate-Control", "no-store");
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("Expires", "0");
+  return response;
+}
 
 function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
@@ -108,12 +124,18 @@ export default auth((req) => {
   }
 
   if (nextUrl.pathname === "/") {
-    return NextResponse.redirect(new URL(isSignedIn ? DEFAULT_SIGNED_IN_PATH : LOGIN_PATH, nextUrl));
+    return preventAuthCaching(
+      NextResponse.redirect(
+        new URL(isSignedIn ? DEFAULT_SIGNED_IN_PATH : LOGIN_PATH, nextUrl),
+      ),
+    );
   }
 
   // FR-1.2 — unauthenticated users are redirected to /login.
   if (!isSignedIn && isProtectedPath(nextUrl.pathname)) {
-    return NextResponse.redirect(new URL(LOGIN_PATH, nextUrl));
+    return preventAuthCaching(
+      NextResponse.redirect(new URL(LOGIN_PATH, nextUrl)),
+    );
   }
 
   // A signed-in user has no use for the signup/login screens — UNLESS the
@@ -133,10 +155,13 @@ export default auth((req) => {
   const isAlwaysReachable = ALWAYS_REACHABLE_AUTH_PATHS.has(nextUrl.pathname);
   const isSessionEnded = nextUrl.searchParams.get("ended") === "1";
   if (isSignedIn && isPublicAuthPath && !isAlwaysReachable && !isSessionEnded) {
-    return NextResponse.redirect(new URL(DEFAULT_SIGNED_IN_PATH, nextUrl));
+    return preventAuthCaching(
+      NextResponse.redirect(new URL(DEFAULT_SIGNED_IN_PATH, nextUrl)),
+    );
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  return isPublicAuthPath ? preventAuthCaching(response) : response;
 });
 
 export const config = {
