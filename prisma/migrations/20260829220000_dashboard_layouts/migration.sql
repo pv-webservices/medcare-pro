@@ -15,9 +15,12 @@ CREATE TABLE `dashboard_layouts` (
     INDEX `dashboard_layouts_tenant_id_idx`(`tenant_id`),
     INDEX `dashboard_layouts_user_id_idx`(`user_id`),
     INDEX `dashboard_layouts_role_id_idx`(`role_id`),
-    CONSTRAINT `dashboard_layouts_exactly_one_subject` CHECK ((`user_id` IS NULL) <> (`role_id` IS NULL)),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Hostinger's MariaDB rejects a nullable foreign-key column when the same
+-- column participates in a CHECK constraint (error 1901). The service layer
+-- enforces exactly one subject and exposes separate user/role write paths.
 
 ALTER TABLE `dashboard_layouts` ADD CONSTRAINT `dashboard_layouts_tenant_id_fkey` FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE `dashboard_layouts` ADD CONSTRAINT `dashboard_layouts_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
