@@ -160,7 +160,7 @@ export default async function AppointmentDetailPage({
   const doctors = await listDoctorsForActor(actor, { clinicId });
 
   return (
-    <section className="mx-auto w-full max-w-[1200px]">
+    <section className="mx-auto w-full max-w-4xl space-y-5">
       <PageHeader
         title={appointment.name}
         breadcrumbs={[
@@ -169,288 +169,261 @@ export default async function AppointmentDetailPage({
         ]}
         meta={
           <>
-            {appointment.clinicName} · Booked by {appointment.bookedByName ?? "Unknown"}
+            {formatAppointmentDate(appointment.date)} at{""}
+            <span className="tnum font-semibold text-ink">
+              {appointment.startTime}
+            </span>
+            {"–"}
+            <span className="tnum">{appointment.endTime}</span>
+            {"·"}
+            {appointment.clinicName}
           </>
+        }
+        actions={
+          <StatusPill tone={APPOINTMENT_STATUS_TONES[appointment.status]}>
+            {APPOINTMENT_STATUS_LABELS[appointment.status]}
+          </StatusPill>
         }
       />
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Main Column */}
-        <div className="min-w-0 flex-1 space-y-5">
-          {/* The visit this became. First, because on a converted appointment it is
-              the thing the desk came here to find. */}
-          {appointment.registration && (
-            <Card isFlush className="border-ok-line bg-ok-bg p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="flex items-center gap-2 text-body font-semibold text-ok-ink">
-                  <ClipboardList
-                    aria-hidden="true"
-                    strokeWidth={1.75}
-                    className="h-4 w-4"
-                  />
-                  Registered as{""}
-                  <span className="serial">
-                    {appointment.registration.patientCode}
-                  </span>
-                </p>
-                {canReadRegistration && (
-                  <Link
-                    href={`/registration/${appointment.registration.id}`}
-                    className={buttonClasses("secondary", "sm")}
-                  >
-                    Open registration
-                    <ArrowRight
-                      aria-hidden="true"
-                      strokeWidth={1.75}
-                      className="ml-1 h-4 w-4"
-                    />
-                  </Link>
-                )}
-              </div>
-            </Card>
-          )}
-
-          {/* The row that replaced this one, when it was moved. */}
-          {appointment.rescheduledToId && (
-            <Card isFlush className="p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-body font-medium text-ink">
-                  This booking was moved. The live one is on another slot.
-                </p>
-                <Link
-                  href={`/appointments/${appointment.rescheduledToId}`}
-                  className={buttonClasses("secondary", "sm")}
-                >
-                  Open the new appointment
-                  <ArrowRight
-                    aria-hidden="true"
-                    strokeWidth={1.75}
-                    className="ml-1 h-4 w-4"
-                  />
-                </Link>
-              </div>
-            </Card>
-          )}
-
-          {!isFinished && (canCheckIn || canConvert || canCancel || canUpdate) && (
-            <Panel
-              title="What happens next"
-              description="Move this appointment on as the patient arrives, or close it out."
-            >
-              <AppointmentActions
-                appointmentId={appointment.id}
-                status={appointment.status}
-                canCheckIn={canCheckIn}
-                canConvert={canConvert}
-                canCancel={canCancel}
-                canConfirm={canUpdate}
-                size="md"
+      {/* The visit this became. First, because on a converted appointment it is
+          the thing the desk came here to find. */}
+      {appointment.registration && (
+        <Card isFlush className="border-ok-line bg-ok-bg p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-body text-ok-ink">
+              <ClipboardList
+                aria-hidden="true"
+                strokeWidth={1.75}
+                className="h-4 w-4"
               />
-            </Panel>
-          )}
+              Registered as{""}
+              <span className="serial font-semibold">
+                {appointment.registration.patientCode}
+              </span>
+            </p>
+            {canReadRegistration && (
+              <Link
+                href={`/registration/${appointment.registration.id}`}
+                className={buttonClasses("secondary", "sm")}
+              >
+                Open registration
+                <ArrowRight
+                  aria-hidden="true"
+                  strokeWidth={1.75}
+                  className="h-4 w-4"
+                />
+              </Link>
+            )}
+          </div>
+        </Card>
+      )}
 
-          <Panel title="The slot" description="What was booked, and with whom.">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Fact label="Doctor">
-                {appointment.doctorName}
+      {/* The row that replaced this one, when it was moved. */}
+      {appointment.rescheduledToId && (
+        <Card isFlush className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-body text-muted">
+              This booking was moved. The live one is on another slot.
+            </p>
+            <Link
+              href={`/appointments/${appointment.rescheduledToId}`}
+              className={buttonClasses("secondary", "sm")}
+            >
+              Open the new appointment
+              <ArrowRight
+                aria-hidden="true"
+                strokeWidth={1.75}
+                className="h-4 w-4"
+              />
+            </Link>
+          </div>
+        </Card>
+      )}
+
+      {!isFinished && (canCheckIn || canConvert || canCancel || canUpdate) && (
+        <Panel
+          title="What happens next"
+          description="Move this appointment on as the patient arrives, or close it out."
+        >
+          <AppointmentActions
+            appointmentId={appointment.id}
+            status={appointment.status}
+            canCheckIn={canCheckIn}
+            canConvert={canConvert}
+            canCancel={canCancel}
+            canConfirm={canUpdate}
+            size="md"
+          />
+        </Panel>
+      )}
+
+      {showReminder && (
+        <Panel
+          title="Remind the patient"
+          description="Send one of the account's approved messages about this appointment over WhatsApp."
+        >
+          <SendReminderPanel
+            appointmentId={appointment.id}
+            templates={reminderTemplates.map(({ id, name, body, footer }) => ({
+              id,
+              name,
+              body,
+              footer,
+            }))}
+            values={reminderValues}
+            refusal={reminderRefusalText}
+          />
+        </Panel>
+      )}
+
+      <Panel title="The slot" description="What was booked, and with whom.">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <Fact label="Doctor">
+            {appointment.doctorName}
+            <p className="mt-0.5 text-body text-muted">
+              {appointment.doctorDepartment}
+            </p>
+          </Fact>
+
+          <Fact label="Service">
+            {appointment.appointmentTypeName}
+            <p className="mt-0.5 text-body tnum text-muted">
+              {appointment.durationMinutes} minutes
+            </p>
+          </Fact>
+
+          <Fact label="Amount quoted">
+            <span className="font-semibold tnum">
+              {formatRupees(appointment.amount)}
+            </span>
+          </Fact>
+
+          <Fact label="Clinic">{appointment.clinicName}</Fact>
+
+          <Fact label="Booked by">
+            {appointment.bookedByName ?? <NotSet />}
+          </Fact>
+
+          {appointment.checkedInAt && (
+            <Fact label="Arrived">
+              <span className="tnum">
+                {new Date(appointment.checkedInAt).toLocaleString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              {appointment.checkedInByName && (
                 <p className="mt-0.5 text-body text-muted">
-                  {appointment.doctorDepartment}
+                  Recorded by {appointment.checkedInByName}
                 </p>
-              </Fact>
-
-              <Fact label="Service">
-                {appointment.appointmentTypeName}
-                <p className="mt-0.5 text-body tnum text-muted">
-                  {appointment.durationMinutes} minutes
-                </p>
-              </Fact>
-
-              <Fact label="Clinic">{appointment.clinicName}</Fact>
-
-              <Fact label="Booked by">
-                {appointment.bookedByName ?? <NotSet />}
-              </Fact>
-
-              {appointment.checkedInAt && (
-                <Fact label="Arrived">
-                  <span className="tnum">
-                    {new Date(appointment.checkedInAt).toLocaleString(undefined, {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  {appointment.checkedInByName && (
-                    <p className="mt-0.5 text-body text-muted">
-                      Recorded by {appointment.checkedInByName}
-                    </p>
-                  )}
-                </Fact>
               )}
-
-              {appointment.cancelledAt && (
-                <Fact label="Cancelled">
-                  <span className="tnum">
-                    {new Date(appointment.cancelledAt).toLocaleString(undefined, {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  {appointment.cancelledByName && (
-                    <p className="mt-0.5 text-body text-muted">
-                      By {appointment.cancelledByName}
-                    </p>
-                  )}
-                  {appointment.cancellationReason && (
-                    <p className="mt-1 text-body text-muted">
-                      {appointment.cancellationReason}
-                    </p>
-                  )}
-                </Fact>
-              )}
-            </div>
-          </Panel>
-
-          <Panel
-            title="The patient"
-            description={
-              appointment.patientCode
-                ? "Linked to a record on the register."
-                : "Not on the register yet — a patient record is created when this appointment is registered."
-            }
-          >
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Fact label="Name">{appointment.name}</Fact>
-
-              <Fact label="Mobile number">
-                <span className="tnum">{appointment.mobileNumber}</span>
-              </Fact>
-
-              <Fact label="Patient ID">
-                {appointment.patientCode ? (
-                  <span className="serial font-semibold">
-                    {appointment.patientCode}
-                  </span>
-                ) : (
-                  <span className="text-faint">Not created yet</span>
-                )}
-              </Fact>
-
-              <Fact label="Age">
-                {appointment.age === null ? (
-                  <NotSet />
-                ) : (
-                  <span className="tnum">{appointment.age}</span>
-                )}
-              </Fact>
-
-              <Fact label="Gender">{appointment.gender ?? <NotSet />}</Fact>
-
-              <Fact label="City">{appointment.city ?? <NotSet />}</Fact>
-
-              <div className="sm:col-span-2">
-                <Fact label="Address">{appointment.address ?? <NotSet />}</Fact>
-              </div>
-            </div>
-          </Panel>
-
-          {canEditBooking && (
-            <Panel
-              title="Correct these details"
-              description="Fix what was written down when the booking was taken. Moving it to another slot is separate."
-            >
-              <EditBookingForm
-                appointmentId={appointment.id}
-                initial={{
-                  name: appointment.name,
-                  mobileNumber: appointment.mobileNumber,
-                  age: appointment.age === null ? "" : String(appointment.age),
-                  gender: appointment.gender ?? "",
-                  city: appointment.city ?? "",
-                  address: appointment.address ?? "",
-                  amount: appointment.amount,
-                }}
-              />
-            </Panel>
+            </Fact>
           )}
 
-        </div>
-
-        {/* Right Rail */}
-        <div className="w-full shrink-0 space-y-5 lg:w-[320px] xl:w-[360px] lg:sticky lg:top-24">
-          <Card className="p-5">
-            <h2 className="mb-4 text-section font-semibold text-ink">Appointment status</h2>
-            
-            <div className="mb-5 flex items-center justify-between">
-              <span className="text-body font-medium text-muted">Status</span>
-              <StatusPill tone={APPOINTMENT_STATUS_TONES[appointment.status]}>
-                {APPOINTMENT_STATUS_LABELS[appointment.status]}
-              </StatusPill>
-            </div>
-
-            <dl className="space-y-3">
-              <div className="min-w-0">
-                <dt className="text-meta font-medium text-muted">Date</dt>
-                <dd className="mt-0.5 truncate text-body font-medium text-ink">{formatAppointmentDate(appointment.date)}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-meta font-medium text-muted">Time</dt>
-                <dd className="mt-0.5 truncate text-body font-medium tnum text-ink">{appointment.startTime} to {appointment.endTime}</dd>
-              </div>
-            </dl>
-
-            <div className="mt-5 rounded-xl border border-line bg-canvas-deep px-4 py-3 flex justify-between items-center">
-              <span className="text-body font-medium text-muted">Amount quoted</span>
-              <span className="text-body font-semibold tnum text-ink">{formatRupees(appointment.amount)}</span>
-            </div>
-          </Card>
-
-          {showReminder && (
-            <Card className="p-5">
-              <h2 className="mb-2 text-section font-semibold text-ink">Remind the patient</h2>
-              <p className="mb-4 text-body text-muted">
-                Send an approved message about this appointment over WhatsApp.
-              </p>
-              <SendReminderPanel
-                appointmentId={appointment.id}
-                templates={reminderTemplates.map(({ id, name, body, footer }) => ({
-                  id,
-                  name,
-                  body,
-                  footer,
-                }))}
-                values={reminderValues}
-                refusal={reminderRefusalText}
-              />
-            </Card>
-          )}
-
-          {!isFinished && canReschedule && doctors.length > 0 && (
-            <Card className="p-5">
-              <h2 className="mb-2 text-section font-semibold text-ink">Reschedule</h2>
-              <p className="mb-4 text-body text-muted">
-                Move this booking to another day or another doctor.
-              </p>
-              <RescheduleForm
-                appointmentId={appointment.id}
-                clinicId={clinicId}
-                appointmentTypeId={appointment.appointmentTypeId}
-                appointmentTypeName={appointment.appointmentTypeName}
-                currentDoctorId={appointment.doctorId}
-                currentDate={appointment.date}
-                doctors={doctors.map(({ id: doctorId, name, department }) => ({
-                  id: doctorId,
-                  name,
-                  department,
-                }))}
-              />
-            </Card>
+          {appointment.cancelledAt && (
+            <Fact label="Cancelled">
+              <span className="tnum">
+                {new Date(appointment.cancelledAt).toLocaleString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              {appointment.cancelledByName && (
+                <p className="mt-0.5 text-body text-muted">
+                  By {appointment.cancelledByName}
+                </p>
+              )}
+              {appointment.cancellationReason && (
+                <p className="mt-1 text-body text-muted">
+                  {appointment.cancellationReason}
+                </p>
+              )}
+            </Fact>
           )}
         </div>
-      </div>
+      </Panel>
+
+      <Panel
+        title="The patient"
+        description={
+          appointment.patientCode
+            ? "Linked to a record on the register."
+            : "Not on the register yet — a patient record is created when this appointment is registered."
+        }
+      >
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <Fact label="Name">{appointment.name}</Fact>
+
+          <Fact label="Mobile number">
+            <span className="tnum">{appointment.mobileNumber}</span>
+          </Fact>
+
+          <Fact label="Patient ID">
+            {appointment.patientCode ? (
+              <span className="serial font-semibold">
+                {appointment.patientCode}
+              </span>
+            ) : (
+              <span className="text-faint">Not created yet</span>
+            )}
+          </Fact>
+
+          <Fact label="Age">
+            {appointment.age === null ? (
+              <NotSet />
+            ) : (
+              <span className="tnum">{appointment.age}</span>
+            )}
+          </Fact>
+
+          <Fact label="Gender">{appointment.gender ?? <NotSet />}</Fact>
+
+          <Fact label="City">{appointment.city ?? <NotSet />}</Fact>
+
+          <Fact label="Address">{appointment.address ?? <NotSet />}</Fact>
+        </div>
+      </Panel>
+
+      {canEditBooking && (
+        <Panel
+          title="Correct these details"
+          description="Fix what was written down when the booking was taken. Moving it to another slot is separate."
+        >
+          <EditBookingForm
+            appointmentId={appointment.id}
+            initial={{
+              name: appointment.name,
+              mobileNumber: appointment.mobileNumber,
+              age: appointment.age === null ? "" : String(appointment.age),
+              gender: appointment.gender ?? "",
+              city: appointment.city ?? "",
+              address: appointment.address ?? "",
+              amount: appointment.amount,
+            }}
+          />
+        </Panel>
+      )}
+
+      {!isFinished && canReschedule && doctors.length > 0 && (
+        <RescheduleForm
+          appointmentId={appointment.id}
+          clinicId={clinicId}
+          appointmentTypeId={appointment.appointmentTypeId}
+          appointmentTypeName={appointment.appointmentTypeName}
+          currentDoctorId={appointment.doctorId}
+          currentDate={appointment.date}
+          doctors={doctors.map(({ id: doctorId, name, department }) => ({
+            id: doctorId,
+            name,
+            department,
+          }))}
+        />
+      )}
     </section>
   );
 }

@@ -289,9 +289,9 @@ function RowActions({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
+    <div className="flex flex-wrap justify-end gap-2">
       <Button
-        variant="ghost"
+        variant="secondary"
         size="sm"
         onClick={onEdit}
         disabled={isPending}
@@ -299,9 +299,8 @@ function RowActions({
         {isEditing ? "Close" : "Edit"}
       </Button>
       <Button
-        variant="ghost"
+        variant={service.isActive ? "danger" : "secondary"}
         size="sm"
-        className={service.isActive ? "text-alert-ink hover:text-alert-ink hover:bg-alert-bg" : ""}
         onClick={onToggle}
         isBusy={isPending}
         busyLabel={service.isActive ? "Retiring…" : "Restoring…"}
