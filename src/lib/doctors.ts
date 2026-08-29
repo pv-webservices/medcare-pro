@@ -36,12 +36,11 @@ import {
 // Schemas
 // ---------------------------------------------------------------------------
 
-/** Loose on purpose: international formats vary and the PRD does not fix one. */
 const phoneSchema = z
   .string()
   .trim()
-  .regex(/^[+()\d][\d\s()-]{4,24}$/, "Enter a valid phone number.")
-  .max(25);
+  .regex(/^(\+91)?[0-9]{10}$/, "Enter a valid 10-digit Indian phone number.")
+  .max(13);
 
 export const createDoctorSchema = z.object({
   // FR-4.2 — "Clinic Location (which clinic they belong to)".

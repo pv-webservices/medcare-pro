@@ -91,7 +91,7 @@ interface RegistrationFormProps {
 /** Free text in the database — this list is a shortcut, not a constraint. */
 const GENDERS = ["Female", "Male", "Other"] as const;
 
-const MOBILE = /^\d{10}$/;
+const MOBILE = /^(\+91)?[0-9]{10}$/;
 const MAX_AMOUNT = 99_999_999.99;
 
 type FieldErrors = Partial<Record<keyof RegistrationFormValues, string>>;
@@ -103,7 +103,7 @@ function validate(values: RegistrationFormValues): FieldErrors {
   if (values.name.trim().length === 0) errors.name = "Enter the patient's name.";
 
   if (!MOBILE.test(values.mobileNumber.trim())) {
-    errors.mobileNumber = "Mobile number must be exactly 10 digits.";
+    errors.mobileNumber = "Mobile number must be a valid 10-digit Indian number.";
   }
 
   if (values.age.trim()) {
@@ -455,11 +455,18 @@ export default function RegistrationForm({
             inputMode="numeric"
             label="Mobile number"
             autoComplete="off"
-            maxLength={10}
+            maxLength={13}
+            pattern="^(\+91)?[0-9]{10}$"
+            title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
             value={values.mobileNumber}
             onChange={(e) => {
-              const digits = e.target.value.replace(/\D/g, "");
-              update("mobileNumber", digits);
+              let val = e.target.value.replace(/[^0-9+]/g, "");
+              if (val.startsWith("+")) {
+                val = val.slice(0, 13);
+              } else {
+                val = val.slice(0, 10);
+              }
+              update("mobileNumber", val);
             }}
             onBlur={() => touch("mobileNumber")}
             error={errorFor("mobileNumber")}

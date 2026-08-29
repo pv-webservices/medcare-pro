@@ -193,85 +193,80 @@ export default function RescheduleForm({
   }
 
   return (
-    <Panel
-      title="Move to another slot"
-      description={`The original booking is kept and marked as moved, and a new one is created in its place. The service stays ${appointmentTypeName}.`}
-    >
-      <form onSubmit={handleSubmit} noValidate>
-        {formError && (
-          <p
-            role="alert"
-            className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body font-medium text-alert-ink"
-          >
-            {formError}
-          </p>
-        )}
+    <form onSubmit={handleSubmit} noValidate>
+      {formError && (
+        <p
+          role="alert"
+          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body font-medium text-alert-ink"
+        >
+          {formError}
+        </p>
+      )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            id="reschedule-doctor"
-            label="Doctor"
-            hint="Leave as-is to keep the same doctor."
-            value={doctorId}
-            onChange={(e) => {
-              setDoctorId(e.target.value);
-              setSlotStart("");
-              setSlotEnd("");
-            }}
-          >
-            {doctors.map((doctor) => (
-              <option key={doctor.id} value={doctor.id}>
-                {doctor.name} — {doctor.department}
-              </option>
-            ))}
-          </Select>
+      <div className="grid gap-5 sm:grid-cols-1">
+        <Select
+          id="reschedule-doctor"
+          label="Doctor"
+          hint="Leave as-is to keep the same doctor."
+          value={doctorId}
+          onChange={(e) => {
+            setDoctorId(e.target.value);
+            setSlotStart("");
+            setSlotEnd("");
+          }}
+        >
+          {doctors.map((doctor) => (
+            <option key={doctor.id} value={doctor.id}>
+              {doctor.name}
+            </option>
+          ))}
+        </Select>
 
-          <Input
-            id="reschedule-date"
-            type="date"
-            label="New date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setSlotStart("");
-              setSlotEnd("");
-            }}
-          />
-        </div>
-
-        <div className="mt-5">
-          <p className="mb-2 text-body font-semibold text-ink">New slot</p>
-          <SlotPicker
-            result={slots}
-            isLoading={isLoadingSlots}
-            error={slotError}
-            selected={slotStart}
-            onSelect={handleSlot}
-          />
-        </div>
-
-        <Textarea
-          id="reschedule-reason"
-          label="Reason"
-          hint="Optional. Recorded in the audit trail, not shown to the patient."
-          rows={2}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          fieldClassName="mt-5"
+        <Input
+          id="reschedule-date"
+          type="date"
+          label="New date"
+          value={date}
+          onChange={(e) => {
+            setDate(e.target.value);
+            setSlotStart("");
+            setSlotEnd("");
+          }}
         />
+      </div>
 
-        <div className="mt-5">
-          <Button
-            type="submit"
-            variant="primary"
-            isBusy={isSaving}
-            busyLabel="Moving…"
-          >
-            <CalendarSync aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-            Move Appointment
-          </Button>
-        </div>
-      </form>
-    </Panel>
+      <div className="mt-5 pt-4 border-t border-line">
+        <SlotPicker
+          result={slots}
+          isLoading={isLoadingSlots}
+          error={slotError}
+          selected={slotStart}
+          onSelect={handleSlot}
+        />
+      </div>
+
+      <Textarea
+        id="reschedule-reason"
+        label="Reason"
+        hint="Optional. Recorded in the audit trail."
+        rows={2}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        fieldClassName="mt-5"
+      />
+
+      <div className="mt-6 pt-5 border-t border-line">
+        <Button
+          type="submit"
+          variant="primary"
+          className="w-full"
+          isBusy={isSaving}
+          busyLabel="Moving…"
+        >
+          <CalendarSync aria-hidden="true" strokeWidth={1.75} className="mr-2 h-4 w-4" />
+          Move Appointment
+        </Button>
+      </div>
+    </form>
   );
 }

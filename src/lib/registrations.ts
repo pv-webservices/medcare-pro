@@ -90,12 +90,11 @@ export const MAX_PATIENT_CODE_ATTEMPTS = 5;
 // Schemas
 // ---------------------------------------------------------------------------
 
-/** Loose on purpose: international formats vary and the PRD does not fix one. */
 const mobileSchema = z
   .string()
   .trim()
-  .regex(/^[+()\d][\d\s()-]{4,24}$/, "Enter a valid mobile number.")
-  .max(25);
+  .regex(/^(\+91)?[0-9]{10}$/, "Enter a valid 10-digit Indian mobile number.")
+  .max(13);
 
 /** Bounded by the `Decimal(10, 2)` column — a larger number would be truncated. */
 const amountSchema = z.coerce

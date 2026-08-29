@@ -100,7 +100,7 @@ type FieldErrors = Partial<Record<keyof FormValues, string>>;
 const GENDERS = ["Female", "Male", "Other"] as const;
 
 /** Mirrors mobileSchema in lib/appointmentInput.ts. */
-const MOBILE = /^[+()\d][\d\s()-]{4,24}$/;
+const MOBILE = /^(\+91)?[0-9]{10}$/;
 
 function emptyForm(clinicId: string, date: string): FormValues {
   return {
@@ -308,7 +308,7 @@ export default function BookingForm({
     if (!values.slotStart) next.slotStart = "Choose a slot.";
     if (values.name.trim() === "") next.name = "Enter the patient's name.";
     if (!MOBILE.test(values.mobileNumber.trim())) {
-      next.mobileNumber = "Enter a valid mobile number.";
+      next.mobileNumber = "Mobile number must be a valid 10-digit Indian number.";
     }
     if (values.age !== "") {
       const age = Number(values.age);
@@ -388,274 +388,294 @@ export default function BookingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit} noValidate>
       {formError && (
         <p
           role="alert"
-          className="rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
+          className="mb-5 rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {formError}
         </p>
       )}
 
-      <Panel
-        title="The slot"
-        description="Who is being seen, for what, and when."
-      >
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {clinics.length > 1 && (
-            <Select
-              id="booking-clinic"
-              label="Clinic"
-              value={values.clinicId}
-              error={errors.clinicId}
-              onChange={(e) => updateQuery("clinicId", e.target.value)}
-            >
-              <option value="">Choose a clinic</option>
-              {clinics.map((clinic) => (
-                <option key={clinic.id} value={clinic.id}>
-                  {clinic.name}
-                </option>
-              ))}
-            </Select>
-          )}
-
-          <Select
-            id="booking-doctor"
-            label="Doctor"
-            value={values.doctorId}
-            error={errors.doctorId}
-            disabled={!values.clinicId}
-            onChange={(e) => updateQuery("doctorId", e.target.value)}
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        {/* Main Column */}
+        <div className="min-w-0 flex-1 space-y-5">
+          <Panel
+            title="1. Choose the slot"
+            description="Doctor, service, date and an available time."
           >
-            <option value="">Choose a doctor</option>
-            {clinicDoctors.map((doctor) => (
-              <option key={doctor.id} value={doctor.id}>
-                {doctor.name} — {doctor.department}
-              </option>
-            ))}
-          </Select>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {clinics.length > 1 && (
+                <Select
+                  id="booking-clinic"
+                  label="Clinic"
+                  value={values.clinicId}
+                  error={errors.clinicId}
+                  onChange={(e) => updateQuery("clinicId", e.target.value)}
+                >
+                  <option value="">Choose a clinic</option>
+                  {clinics.map((clinic) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
 
-          <Select
-            id="booking-service"
-            label="Service"
-            value={values.appointmentTypeId}
-            error={errors.appointmentTypeId}
-            disabled={!values.clinicId}
-            onChange={(e) => updateQuery("appointmentTypeId", e.target.value)}
+              <Select
+                id="booking-doctor"
+                label="Doctor"
+                value={values.doctorId}
+                error={errors.doctorId}
+                disabled={!values.clinicId}
+                onChange={(e) => updateQuery("doctorId", e.target.value)}
+              >
+                <option value="">Choose a doctor</option>
+                {clinicDoctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.name}
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                id="booking-service"
+                label="Service"
+                value={values.appointmentTypeId}
+                error={errors.appointmentTypeId}
+                disabled={!values.clinicId}
+                onChange={(e) => updateQuery("appointmentTypeId", e.target.value)}
+              >
+                <option value="">Choose a service</option>
+                {clinicServices.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </Select>
+
+              <Input
+                id="booking-date"
+                type="date"
+                label="Date"
+                value={values.date}
+                error={errors.date}
+                disabled={!values.clinicId}
+                onChange={(e) => updateQuery("date", e.target.value)}
+              />
+            </div>
+
+            {selectedService && (
+              <div className="mt-5 rounded-2xl bg-canvas-deep px-4 py-3 text-meta text-muted">
+                <span className="font-semibold text-ink">
+                  {selectedService.name}
+                </span> runs {selectedService.durationMinutes} minutes and costs {formatRupees(selectedService.defaultAmount)}.
+              </div>
+            )}
+
+            <div className="mt-5 pt-5 border-t border-line">
+              <SlotPicker
+                result={slots}
+                isLoading={isLoadingSlots}
+                error={slotError}
+                selected={values.slotStart}
+                onSelect={handleSlot}
+              />
+              {errors.slotStart && (
+                <p className="mt-2 text-label text-alert-ink">
+                  {errors.slotStart}
+                </p>
+              )}
+            </div>
+          </Panel>
+
+          <Panel
+            title="2. Patient details"
+            description="Search for a returning patient, otherwise enter the details."
           >
-            <option value="">Choose a service</option>
-            {clinicServices.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} — {option.durationMinutes} min
-              </option>
-            ))}
-          </Select>
-
-          <Input
-            id="booking-date"
-            type="date"
-            label="Date"
-            value={values.date}
-            error={errors.date}
-            onChange={(e) => updateQuery("date", e.target.value)}
-          />
-        </div>
-
-        {service && (
-          <p className="mt-4 rounded-xl bg-accent-soft px-4 py-3 text-body text-ink">
-            <span className="font-semibold">{service.name}</span> runs{""}
-            <span className="font-semibold tnum">
-              {service.durationMinutes}
-            </span>{""}
-            minutes and is quoted at{""}
-            <span className="font-semibold tnum">
-              {formatRupees(service.defaultAmount)}
-            </span>
-            .
-          </p>
-        )}
-
-        <div className="mt-5">
-          <p className="mb-2 text-body font-semibold text-ink">Slot</p>
-          <SlotPicker
-            result={slots}
-            isLoading={isLoadingSlots}
-            error={slotError}
-            selected={values.slotStart}
-            onSelect={handleSlot}
-          />
-          {errors.slotStart && (
-            <p role="alert" className="mt-2 text-body font-medium text-alert-ink">
-              {errors.slotStart}
-            </p>
-          )}
-        </div>
-      </Panel>
-
-      <Panel
-        title="The patient"
-        description="Find them if they have been here before, so the appointment joins the record they already have."
-      >
-        {values.clinicId && values.patientId === null && (
-          <div className="mb-5">
-            <PatientLookup
-              clinicId={values.clinicId}
-              onSelect={handlePatientSelect}
-            />
-          </div>
-        )}
-
-        {values.patientId !== null && (
-          <Card isFlush className="mb-5 border-accent/30 bg-accent-soft p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-body text-ink">
-                <UserRoundCheck
-                  aria-hidden="true"
-                  strokeWidth={1.75}
-                  className="h-4 w-4 text-accent"
+            {values.patientId === null ? (
+              <div className="mb-6">
+                <PatientLookup
+                  clinicId={values.clinicId}
+                  onSelect={handlePatientSelect}
                 />
-                Linked to an existing patient record. No new Patient ID will be
-                created.
-              </p>
-              <Button size="sm" variant="ghost" onClick={clearPatient}>
-                <X aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-                Book for someone else
+              </div>
+            ) : (
+              <Card isFlush className="mb-6 flex items-center justify-between bg-canvas-deep p-4">
+                <div>
+                  <p className="text-body font-semibold text-ink">
+                    <UserRoundCheck
+                      aria-hidden="true"
+                      strokeWidth={2}
+                      className="mr-2 inline h-4 w-4 align-[-3px] text-accent"
+                    />
+                    Existing patient
+                  </p>
+                  <p className="mt-0.5 text-label text-muted">
+                    {values.name} will not be issued a new Patient ID.
+                  </p>
+                </div>
+                <Button size="sm" variant="ghost" onClick={clearPatient}>
+                  <X aria-hidden="true" strokeWidth={1.75} className="mr-1 h-4 w-4" />
+                  Clear
+                </Button>
+              </Card>
+            )}
+
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <Input
+                id="booking-name"
+                label="Patient name"
+                autoComplete="off"
+                value={values.name}
+                error={errors.name}
+                onChange={(e) => update("name", e.target.value)}
+                fieldClassName="sm:col-span-2"
+              />
+
+              <Input
+                id="booking-mobile"
+                type="tel"
+                inputMode="numeric"
+                label="Mobile number"
+                autoComplete="off"
+                maxLength={13}
+                pattern="^(\+91)?[0-9]{10}$"
+                title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
+                value={values.mobileNumber}
+                error={errors.mobileNumber}
+                onChange={(e) => {
+                  let val = e.target.value.replace(/[^0-9+]/g, "");
+                  if (val.startsWith("+")) {
+                    val = val.slice(0, 13);
+                  } else {
+                    val = val.slice(0, 10);
+                  }
+                  update("mobileNumber", val);
+                }}
+                fieldClassName="sm:col-span-2"
+              />
+
+              <Input
+                id="booking-age"
+                type="number"
+                inputMode="numeric"
+                label="Age"
+                hint="Optional."
+                min={0}
+                max={150}
+                value={values.age}
+                error={errors.age}
+                onChange={(e) => update("age", e.target.value)}
+              />
+
+              <Select
+                id="booking-gender"
+                label="Gender"
+                hint="Optional."
+                value={values.gender}
+                onChange={(e) => update("gender", e.target.value)}
+              >
+                <option value="">Not recorded</option>
+                {GENDERS.map((gender) => (
+                  <option key={gender} value={gender}>
+                    {gender}
+                  </option>
+                ))}
+              </Select>
+
+              <Input
+                id="booking-city"
+                label="City"
+                hint="Optional."
+                autoComplete="off"
+                value={values.city}
+                onChange={(e) => update("city", e.target.value)}
+                fieldClassName="sm:col-span-2"
+              />
+
+              <Textarea
+                id="booking-address"
+                label="Address"
+                hint="Optional."
+                rows={2}
+                value={values.address}
+                onChange={(e) => update("address", e.target.value)}
+                fieldClassName="sm:col-span-2 lg:col-span-4"
+              />
+            </div>
+          </Panel>
+        </div>
+
+        {/* Right Summary Column */}
+        <div className="w-full shrink-0 lg:w-[340px] xl:w-[380px] lg:sticky lg:top-24">
+          <Card className="p-5">
+            <h2 className="mb-4 text-section font-semibold text-ink">Booking summary</h2>
+            
+            <dl className="space-y-3">
+              <SummaryItem
+                label="Date"
+                value={values.date ? formatAppointmentDate(values.date) : "Not chosen"}
+              />
+              <SummaryItem
+                label="Time"
+                value={
+                  values.slotStart
+                    ? `${values.slotStart} to ${values.slotEnd}`
+                    : "No slot chosen"
+                }
+              />
+              <SummaryItem label="Doctor" value={selectedDoctor?.name ?? "Not chosen"} />
+              <SummaryItem
+                label="Service"
+                value={selectedService?.name ?? "Not chosen"}
+              />
+              <SummaryItem label="Patient" value={values.name.trim() || "Not entered"} />
+              <SummaryItem
+                label="Mobile"
+                value={values.mobileNumber.trim() || "Not entered"}
+              />
+              <SummaryItem
+                label="Record"
+                value={
+                  values.patientId
+                    ? "Existing patient"
+                    : "New patient"
+                }
+              />
+            </dl>
+
+            {selectedService && (
+              <div className="mt-5 rounded-xl border border-line bg-canvas-deep px-4 py-3 flex justify-between items-center">
+                <span className="text-body font-medium text-muted">Amount quoted</span>
+                <span className="text-body font-semibold text-ink">{formatRupees(selectedService.defaultAmount)}</span>
+              </div>
+            )}
+
+            <div className="mt-6 pt-5 border-t border-line space-y-3">
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                isBusy={isSaving}
+                busyLabel="Booking…"
+              >
+                <CalendarCheck aria-hidden="true" strokeWidth={1.75} className="mr-2 h-4 w-4" />
+                Book appointment
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => router.push("/appointments")}
+              >
+                Cancel
               </Button>
             </div>
           </Card>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input
-            id="booking-name"
-            label="Patient name"
-            autoComplete="off"
-            value={values.name}
-            error={errors.name}
-            onChange={(e) => update("name", e.target.value)}
-          />
-
-          <Input
-            id="booking-mobile"
-            type="tel"
-            label="Mobile number"
-            autoComplete="off"
-            value={values.mobileNumber}
-            error={errors.mobileNumber}
-            onChange={(e) => update("mobileNumber", e.target.value)}
-          />
-
-          <Input
-            id="booking-age"
-            type="number"
-            inputMode="numeric"
-            label="Age"
-            hint="Optional."
-            min={0}
-            max={150}
-            value={values.age}
-            error={errors.age}
-            onChange={(e) => update("age", e.target.value)}
-          />
-
-          <Select
-            id="booking-gender"
-            label="Gender"
-            hint="Optional."
-            value={values.gender}
-            onChange={(e) => update("gender", e.target.value)}
-          >
-            <option value="">Not recorded</option>
-            {GENDERS.map((gender) => (
-              <option key={gender} value={gender}>
-                {gender}
-              </option>
-            ))}
-          </Select>
-
-          <Input
-            id="booking-city"
-            label="City"
-            hint="Optional."
-            autoComplete="off"
-            value={values.city}
-            onChange={(e) => update("city", e.target.value)}
-          />
-
-          <Textarea
-            id="booking-address"
-            label="Address"
-            hint="Optional."
-            rows={2}
-            value={values.address}
-            onChange={(e) => update("address", e.target.value)}
-            fieldClassName="sm:col-span-2 lg:col-span-3"
-          />
         </div>
-      </Panel>
-
-      {/*
-        THE LAST THING BEFORE COMMITTING. A booking is read back to the desk in
-        one block — day, time, doctor, service, patient — because the fields
-        that produce it are spread over two panels and a slot grid, and the
-        commonest booking error is the right patient in the wrong slot. It
-        renders only once there is something to confirm.
-      */}
-      {(values.slotStart || selectedDoctor || selectedService) && (
-        <Panel
-          title="Check before booking"
-          description="Confirm the slot and the patient, then book."
-        >
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <SummaryItem
-              label="Date"
-              value={values.date ? formatAppointmentDate(values.date) : "Not chosen"}
-            />
-            <SummaryItem
-              label="Time"
-              value={
-                values.slotStart
-                  ? `${values.slotStart} to ${values.slotEnd}`
-                  : "No slot chosen"
-              }
-            />
-            <SummaryItem label="Doctor" value={selectedDoctor?.name ?? "Not chosen"} />
-            <SummaryItem
-              label="Service"
-              value={selectedService?.name ?? "Not chosen"}
-            />
-            <SummaryItem label="Patient" value={values.name.trim() || "Not entered"} />
-            <SummaryItem
-              label="Mobile"
-              value={values.mobileNumber.trim() || "Not entered"}
-            />
-            <SummaryItem
-              label="Record"
-              value={
-                values.patientId
-                  ? "Existing patient"
-                  : "New patient - an ID is created on arrival"
-              }
-            />
-          </dl>
-        </Panel>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          type="submit"
-          variant="primary"
-          isBusy={isSaving}
-          busyLabel="Booking…"
-        >
-          <CalendarCheck aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-          Book appointment
-        </Button>
-
-        <Button variant="ghost" onClick={() => router.push("/appointments")}>
-          Cancel
-        </Button>
       </div>
     </form>
   );

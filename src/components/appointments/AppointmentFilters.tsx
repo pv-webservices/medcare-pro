@@ -134,7 +134,7 @@ export default function AppointmentFilters({
   return (
     <div className="space-y-3">
       {/* The day strip. */}
-      <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-canvas p-2 shadow-card">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-canvas p-1.5 shadow-none">
         <IconButton
           label="Previous day"
           size="sm"
@@ -144,7 +144,7 @@ export default function AppointmentFilters({
           <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
         </IconButton>
 
-        <div className="min-w-0 flex-1 px-1 text-center sm:text-left">
+        <div className="min-w-0 flex-1 px-2 text-center sm:text-left">
           <p className="truncate text-body font-semibold text-ink">
             {hasDate ? formatAppointmentDate(values.date) : "All upcoming days"}
           </p>
@@ -166,10 +166,10 @@ export default function AppointmentFilters({
           <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
         </IconButton>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 pr-1">
           <Button
             size="sm"
-            variant={isToday ? "primary" : "secondary"}
+            variant={isToday ? "secondary" : "ghost"}
             onClick={() => goToDate(today)}
           >
             Today
@@ -189,7 +189,7 @@ export default function AppointmentFilters({
             value={values.date}
             onChange={(event) => goToDate(event.target.value)}
             className={cx(
-              "h-9 rounded-xl border border-line bg-canvas px-3 text-body text-ink",
+              "h-8 rounded-xl border border-line bg-canvas px-2.5 text-body text-ink",
               "transition-colors duration-150 hover:border-line-strong",
             )}
           />

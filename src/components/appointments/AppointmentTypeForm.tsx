@@ -209,7 +209,7 @@ export default function AppointmentTypeForm({
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <Input
           id={`service-name-${initial?.id ?? "new"}`}
           name="name"

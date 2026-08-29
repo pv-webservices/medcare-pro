@@ -171,7 +171,7 @@ export default function EditBookingForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <Input
           id="edit-booking-name"
           name="name"
@@ -186,11 +186,23 @@ export default function EditBookingForm({
           id="edit-booking-mobile"
           name="mobileNumber"
           type="tel"
+          inputMode="numeric"
           label="Mobile number"
           autoComplete="off"
+          maxLength={13}
+          pattern="^(\+91)?[0-9]{10}$"
+          title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
           value={values.mobileNumber}
           error={errors.mobileNumber}
-          onChange={(event) => update("mobileNumber", event.target.value)}
+          onChange={(event) => {
+            let val = event.target.value.replace(/[^0-9+]/g, "");
+            if (val.startsWith("+")) {
+              val = val.slice(0, 13);
+            } else {
+              val = val.slice(0, 10);
+            }
+            update("mobileNumber", val);
+          }}
         />
 
         <Input

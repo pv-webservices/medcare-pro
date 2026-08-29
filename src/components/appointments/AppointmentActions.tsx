@@ -1,11 +1,13 @@
 "use client";
 
-import { CalendarX2, CheckCheck, CheckCircle2, LogIn, UserPlus } from "lucide-react";
+import { CalendarX2, CheckCheck, CheckCircle2, ChevronDown, LogIn, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button, { type ButtonSize } from "@/components/ui/Button";
+import Menu, { menuItemClasses } from "@/components/ui/Menu";
 import { ConfirmDialog } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { cx } from "@/components/ui/cx";
 import type { AppointmentStatus } from "@/lib/appointmentRules";
 
 /**
@@ -184,30 +186,42 @@ export default function AppointmentActions({
         )}
 
         {canCancel && (
-          <>
-            <Button
-              size={size}
-              variant="ghost"
-              isBusy={busy === "no-show"}
-              busyLabel="Saving..."
+          <Menu
+            label="More actions"
+            align="end"
+            trigger={({ isOpen }) => (
+              <span
+                className={cx(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-medium transition-colors duration-150",
+                  size === "sm" ? "h-9 text-body" : "h-11 px-4 text-body",
+                  isOpen
+                    ? "bg-canvas-deep border-line-strong text-ink"
+                    : "border-line bg-canvas text-ink-soft hover:border-line-strong hover:bg-canvas-deep hover:text-ink"
+                )}
+              >
+                More
+                <ChevronDown aria-hidden="true" strokeWidth={2} className="h-4 w-4 opacity-70" />
+              </span>
+            )}
+          >
+            <button
+              type="button"
+              className={menuItemClasses()}
               disabled={busy !== null}
               onClick={() => run("no-show")}
             >
-              <CalendarX2 aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+              <CalendarX2 aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 text-muted" />
               Did not attend
-            </Button>
-
-            <Button
-              size={size}
-              variant="danger"
-              isBusy={busy === "cancel"}
-              busyLabel="Cancelling..."
+            </button>
+            <button
+              type="button"
+              className={menuItemClasses(false, "danger")}
               disabled={busy !== null}
               onClick={() => setIsConfirmingCancel(true)}
             >
               Cancel appointment
-            </Button>
-          </>
+            </button>
+          </Menu>
         )}
       </div>
 

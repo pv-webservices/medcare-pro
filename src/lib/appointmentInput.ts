@@ -208,8 +208,8 @@ const slotInstantSchema = z
 const mobileSchema = z
   .string()
   .trim()
-  .regex(/^[+()\d][\d\s()-]{4,24}$/, "Enter a valid mobile number.")
-  .max(25);
+  .regex(/^(\+91)?[0-9]{10}$/, "Enter a valid 10-digit Indian mobile number.")
+  .max(13);
 
 /**
  * What a booking accepts.
