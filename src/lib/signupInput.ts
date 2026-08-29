@@ -42,31 +42,17 @@ export const MAX_ADDRESS_LENGTH = 1000;
 export const MAX_EMAIL_LENGTH = 255;
 
 /**
- * Deliberately permissive: punctuation, spaces and a leading + are all allowed,
- * because this is an Indian clinic's contact number typed by a human and the
- * only thing the platform does with it is display it and message it. The one
- * hard requirement is that it contains enough digits to be a real number.
+ * Strictly enforce Indian phone numbers for this product.
+ * Formats allowed: 9599995599, +919599995599
  */
-const PHONE_ALLOWED = /^[0-9+()\-.\s]+$/;
-const MIN_PHONE_DIGITS = 7;
-const MAX_PHONE_DIGITS = 15;
-
-function countDigits(value: string): number {
-  return (value.match(/[0-9]/g) ?? []).length;
-}
+const PHONE_ALLOWED = /^(\+91)?[0-9]{10}$/;
 
 const phoneField = z
   .string()
   .trim()
   .min(1, "Phone number is required")
-  .max(MAX_PHONE_LENGTH)
-  .regex(PHONE_ALLOWED, "Enter a valid phone number.")
-  .refine(
-    (value) =>
-      countDigits(value) >= MIN_PHONE_DIGITS &&
-      countDigits(value) <= MAX_PHONE_DIGITS,
-    "Enter a valid phone number.",
-  );
+  .max(13) // max length for +919599995599
+  .regex(PHONE_ALLOWED, "Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599).");
 
 /**
  * An optional text field. The empty string is what an untouched form input

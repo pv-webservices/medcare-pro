@@ -386,11 +386,11 @@ function SignupContent() {
                         label="Phone"
                         autoComplete="tel"
                         required
-                        maxLength={32}
-                        pattern="^[0-9+()\-.\s]+$"
-                        title="Enter a valid phone number (7-15 digits)"
+                        maxLength={13}
+                        pattern="^(\+91)?[0-9]{10}$"
+                        title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
                         value={phone}
-                        onChange={(event) => setPhone(event.target.value.replace(/[^0-9+()\-\.\s]/g, ''))}
+                        onChange={(event) => setPhone(event.target.value.replace(/[^0-9+]/g, ''))}
                         icon={<Phone className="h-[18px] w-[18px]" strokeWidth={2} />}
                         className={inputClass}
                       />
