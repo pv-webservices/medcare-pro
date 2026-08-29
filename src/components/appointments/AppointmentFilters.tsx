@@ -134,39 +134,28 @@ export default function AppointmentFilters({
   return (
     <div className="space-y-3">
       {/* The day strip. */}
-      <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-canvas p-2 shadow-card">
-        <IconButton
-          label="Previous day"
-          size="sm"
-          disabled={!hasDate}
-          onClick={() => goToDate(shiftDate(values.date, -1))}
-        >
-          <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-        </IconButton>
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-line bg-canvas p-2 shadow-card">
+        <div className="flex min-w-0 items-center gap-3 pl-2">
+          <IconButton
+            label="Previous day"
+            size="sm"
+            disabled={!hasDate}
+            onClick={() => goToDate(shiftDate(values.date, -1))}
+          >
+            <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+          </IconButton>
 
-        <div className="min-w-0 flex-1 px-1 text-center sm:text-left">
-          <p className="truncate text-body font-semibold text-ink">
-            {hasDate ? formatAppointmentDate(values.date) : "All upcoming days"}
-          </p>
-          <p className="truncate text-meta text-muted">
-            {hasDate
-              ? isToday
-                ? "Today"
-                : "Selected day"
-              : "Every scheduled appointment"}
-          </p>
+          <div className="min-w-0">
+            <p className="truncate text-body font-semibold text-ink">
+              {hasDate ? formatAppointmentDate(values.date) : "All upcoming days"}
+            </p>
+            <p className="truncate text-meta text-muted font-medium">
+              {hasDate ? (isToday ? "Today" : "Selected day") : "Every scheduled appointment"}
+            </p>
+          </div>
         </div>
 
-        <IconButton
-          label="Next day"
-          size="sm"
-          disabled={!hasDate}
-          onClick={() => goToDate(shiftDate(values.date, 1))}
-        >
-          <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-        </IconButton>
-
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pr-1">
           <Button
             size="sm"
             variant={isToday ? "primary" : "secondary"}
@@ -175,11 +164,6 @@ export default function AppointmentFilters({
             Today
           </Button>
 
-          {/*
-            The native date input is the picker. On the front-desk tablet the OS
-            wheel beats anything built here, and it is one tab stop rather than
-            a grid of forty buttons.
-          */}
           <label htmlFor="appointment-filter-date" className="sr-only">
             Jump to date
           </label>
@@ -199,6 +183,15 @@ export default function AppointmentFilters({
               All days
             </Button>
           )}
+
+          <IconButton
+            label="Next day"
+            size="sm"
+            disabled={!hasDate}
+            onClick={() => goToDate(shiftDate(values.date, 1))}
+          >
+            <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+          </IconButton>
         </div>
       </div>
 

@@ -34,12 +34,12 @@ export const APPOINTMENT_STATUS_LABELS: Readonly<
 export const APPOINTMENT_STATUS_TONES: Readonly<
   Record<AppointmentStatus, StatusTone>
 > = {
-  SCHEDULED: "warn",
-  CONFIRMED: "warn",
-  CHECKED_IN: "warn",
+  SCHEDULED: "info",
+  CONFIRMED: "ok",
+  CHECKED_IN: "accent",
   CONVERTED: "ok",
   CANCELLED: "alert",
-  NO_SHOW: "alert",
+  NO_SHOW: "warn",
   RESCHEDULED: "neutral",
 };
 

@@ -50,12 +50,23 @@ export default function AddServicePanel({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         title="Add a service"
-        description="Its length divides the doctor's day into slots, and its price is what the desk quotes at booking."
+        description="Define what the desk can book, how long it runs, and the price quoted."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" form="add-service-form">
+              Add service
+            </Button>
+          </>
+        }
       >
         <AppointmentTypeForm
           clinics={clinics}
           canScopeTenantWide={canScopeTenantWide}
-          onCancel={() => setIsOpen(false)}
+          hideActions
+          onDone={() => setIsOpen(false)}
         />
       </Drawer>
     </>
