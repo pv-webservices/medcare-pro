@@ -47,7 +47,7 @@ export default function EmptyState({
     <div
       className={cx(
         "px-6 py-12 text-center",
-        !isBare && "rounded-3xl border border-line bg-canvas shadow-card",
+        !isBare && "rounded-2xl border border-line bg-canvas shadow-card",
         className,
       )}
     >

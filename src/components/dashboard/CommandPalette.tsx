@@ -151,7 +151,7 @@ export default function CommandPalette({ links, actions }: CommandPaletteProps) 
           openerRef.current = event.currentTarget;
           setIsOpen(true);
         }}
-        className="flex h-10 w-full max-w-xs items-center gap-2.5 rounded-2xl border border-line bg-canvas px-3 text-left text-body text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
+        className="flex h-10 w-full max-w-sm items-center gap-2.5 rounded-xl border border-line bg-canvas px-3 text-left text-label text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
       >
         <Search aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0" />
         <span className="flex-1 truncate">Search MedCare Pro</span>

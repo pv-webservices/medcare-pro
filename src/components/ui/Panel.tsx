@@ -46,13 +46,13 @@ export default function Panel({
     <section
       aria-label={title}
       className={cx(
-        "rounded-3xl border border-line bg-canvas shadow-card",
+        "overflow-hidden rounded-2xl border border-line bg-canvas shadow-card",
         className,
       )}
     >
       <div
         className={cx(
-          "flex flex-wrap items-start justify-between gap-3 px-5 pt-5",
+          "flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5",
           hasDivider ? "border-b border-line pb-4" : "pb-4",
         )}
       >
@@ -71,7 +71,7 @@ export default function Panel({
         )}
       </div>
 
-      <div className={cx(isFlush ? "" : "px-5 pb-5")}>{children}</div>
+      <div className={cx(isFlush ? "" : "px-4 pb-4 sm:px-5 sm:pb-5")}>{children}</div>
     </section>
   );
 }

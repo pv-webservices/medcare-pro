@@ -115,7 +115,7 @@ export default function PageHeader({
 
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-title font-semibold text-ink">{title}</h1>
             {scope && (
               <span className="inline-flex items-center rounded-full border border-line bg-canvas-deep px-2.5 py-1 text-meta font-medium text-muted">
@@ -125,13 +125,13 @@ export default function PageHeader({
           </div>
 
           {description && (
-            <p className="mt-1.5 max-w-[70ch] text-body text-muted">{description}</p>
+            <p className="mt-1 max-w-[70ch] text-label text-muted sm:text-body">{description}</p>
           )}
           {meta && <div className="mt-1.5 text-label text-muted">{meta}</div>}
         </div>
 
         {actions && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 lg:w-auto lg:justify-end">{actions}</div>
         )}
       </div>
     </header>

@@ -1,51 +1,58 @@
-import Skeleton, { MetricSkeleton, SkeletonText } from "@/components/ui/Skeleton";
+import Skeleton, { SkeletonText } from "@/components/ui/Skeleton";
+
+function PanelSkeleton({ className = "", rows = 4 }: { className?: string; rows?: number }) {
+  return (
+    <div className={`rounded-2xl border border-line bg-canvas p-4 shadow-card sm:p-5 ${className}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div><Skeleton className="w-36" /><Skeleton className="mt-2 h-3 w-52 max-w-full" /></div>
+        <Skeleton className="h-3 w-20" />
+      </div>
+      <SkeletonText className="mt-6" lines={rows} />
+    </div>
+  );
+}
 
 export default function Loading() {
   return (
-    <div aria-busy="true" aria-label="Loading" className="space-y-4">
-      {/* Header */}
-      <div className="space-y-2">
-        <span aria-hidden="true" className="skeleton block h-7 w-52" />
-        <span aria-hidden="true" className="skeleton block h-3.5 w-80 max-w-full" />
-      </div>
-
-      {/* KPIs */}
-      <MetricSkeleton />
-
-      {/* Primary schedule + operational summary */}
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card xl:col-span-2">
-          <Skeleton className="h-3 w-36" />
-          <SkeletonText className="mt-5" lines={6} />
-        </div>
-        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
-          <Skeleton className="h-3 w-40" />
-          <SkeletonText className="mt-5" lines={6} />
-        </div>
-      </div>
-
-      {/* Registrations + doctor availability */}
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
+    <div aria-busy="true" aria-label="Loading dashboard" className="space-y-4 sm:space-y-5">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-60 max-w-full" />
+          <Skeleton className="h-3.5 w-96 max-w-full" />
           <Skeleton className="h-3 w-44" />
-          <SkeletonText className="mt-5" lines={5} />
         </div>
-        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
-          <Skeleton className="h-3 w-40" />
-          <SkeletonText className="mt-5" lines={5} />
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          <Skeleton className="col-span-2 h-9 w-full sm:w-32" />
+          <Skeleton className="h-9 w-full sm:w-24" />
+          <Skeleton className="h-9 w-full sm:w-24" />
+          <Skeleton className="col-span-2 h-9 w-full sm:w-28" />
         </div>
       </div>
 
-      {/* Activity + notifications */}
+      <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className={`min-h-[116px] rounded-2xl border border-line bg-canvas p-4 shadow-card ${index === 6 ? "xl:col-span-2" : ""}`}>
+            <div className="flex justify-between"><Skeleton className="h-3 w-24" /><Skeleton className="h-9 w-9" /></div>
+            <Skeleton className="mt-3 h-7 w-24" /><Skeleton className="mt-2.5 h-3 w-28" />
+          </div>
+        ))}
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
-          <Skeleton className="h-3 w-36" />
-          <SkeletonText className="mt-5" lines={5} />
-        </div>
-        <div className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
-          <Skeleton className="h-3 w-40" />
-          <SkeletonText className="mt-5" lines={3} />
-        </div>
+        <PanelSkeleton rows={8} /><PanelSkeleton rows={8} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <PanelSkeleton className="xl:col-span-2" rows={7} /><PanelSkeleton rows={6} />
+      </div>
+
+      <PanelSkeleton rows={4} />
+      <div className="grid gap-4 xl:grid-cols-5">
+        <PanelSkeleton className="xl:col-span-3" rows={5} /><PanelSkeleton className="xl:col-span-2" rows={5} />
+      </div>
+      <PanelSkeleton rows={5} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PanelSkeleton rows={4} /><PanelSkeleton rows={4} />
       </div>
     </div>
   );

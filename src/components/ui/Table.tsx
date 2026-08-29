@@ -49,7 +49,7 @@ export default function Table({
   return (
     <div
       className={cx(
-        "overflow-x-auto rounded-3xl border border-line bg-canvas shadow-card",
+        "overflow-x-auto rounded-2xl border border-line bg-canvas shadow-card",
         hasStickyHeader && "max-h-[70vh] overflow-y-auto",
         className,
       )}

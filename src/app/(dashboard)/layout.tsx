@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Bell, CalendarPlus, UserPlus } from "lucide-react";
+import { Bell, CalendarPlus, MessageSquare, UserPlus } from "lucide-react";
 import BrandMark from "@/components/dashboard/BrandMark";
 import ClinicSwitcher from "@/components/dashboard/ClinicSwitcher";
 import CommandPalette, {
@@ -169,10 +169,12 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     logoUrl,
   }));
 
+  const canViewMessages = links.some((link) => link.href === "/messages");
+
   return (
     <div className="flex min-h-screen bg-app">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[268px] shrink-0 flex-col border-r border-line bg-canvas lg:flex">
-        <div className="px-4 py-4">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[236px] shrink-0 flex-col border-r border-line bg-canvas lg:flex">
+        <div className="px-4 py-[18px]">
           <BrandMark />
         </div>
 
@@ -185,7 +187,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           switcher itself is in the header; repeating the control here would give
           the reader two places to change one thing.
         */}
-        <div className="border-t border-line px-4 py-3">
+        <div className="border-t border-line px-4 py-4">
           <p className="text-micro font-semibold uppercase text-faint">Viewing</p>
           <p className="mt-1 truncate text-label font-medium text-ink">
             {scopeLabel}
@@ -193,9 +195,9 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-[268px]">
-        <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
-          <div className="mx-auto flex w-full max-w-[1500px] items-center gap-3 px-4 py-3 md:px-6 xl:px-8">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-[236px]">
+        <header className="sticky top-0 z-20 border-b border-line bg-canvas">
+          <div className="mx-auto flex h-16 w-full max-w-[1560px] items-center gap-2.5 px-3 sm:px-4 md:px-6 xl:px-7">
             {/*
               Below `lg` the sidebar is not on screen, so the drawer and the
               wordmark stand in for it. They take the same already-filtered
@@ -210,7 +212,9 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
               roleName={roleName}
             />
 
-            <div className="min-w-0 flex-1 lg:max-w-[17rem]">
+            <BrandMark isCompact className="lg:hidden" />
+
+            <div className="hidden min-w-0 flex-1 sm:block lg:max-w-[16.5rem]">
               <ClinicSwitcher
                 clinics={switcherClinics}
                 selectedClinicId={selectedClinicId}
@@ -227,13 +231,23 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
                   href={quickActions[0]!.href}
                   aria-label={quickActions[0]!.label}
                   title={quickActions[0]!.label}
-                  className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink sm:flex"
+                  className="hidden h-10 w-10 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink xl:flex"
                 >
                   {quickActions[0]!.href === "/appointments/new" ? (
                     <CalendarPlus aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
                   ) : (
                     <UserPlus aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
                   )}
+                </Link>
+              )}
+
+              {canViewMessages && (
+                <Link
+                  href="/messages"
+                  aria-label="Messages"
+                  className="hidden h-10 w-10 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink sm:flex"
+                >
+                  <MessageSquare aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
                 </Link>
               )}
 
@@ -244,7 +258,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
                     ? `Notifications, ${unreadNotifications} unread`
                     : "Notifications"
                 }
-                className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
               >
                 <Bell aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
                 {unreadNotifications > 0 && (
@@ -258,10 +272,18 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
               <UserMenu name={userName} role={roleName} scopeLabel={scopeLabel} />
             </div>
           </div>
+
+          <div className="grid gap-2 border-t border-line px-3 py-3 sm:hidden">
+            <ClinicSwitcher
+              clinics={switcherClinics}
+              selectedClinicId={selectedClinicId}
+            />
+            <CommandPalette links={links} actions={quickActions} />
+          </div>
         </header>
 
-        <main className="flex-1 px-4 pb-10 pt-5 md:px-6 md:pt-6 xl:px-8">
-          <div className="mx-auto w-full max-w-[1500px]">
+        <main className="min-w-0 flex-1 px-3 pb-10 pt-4 sm:px-4 md:px-6 md:pt-5 xl:px-7">
+          <div className="mx-auto w-full max-w-[1560px]">
             <ToastProvider>{children}</ToastProvider>
           </div>
         </main>

@@ -96,10 +96,10 @@ export default function DashboardNav({
   }
 
   return (
-    <nav aria-label="Main" className="flex flex-col gap-5">
+    <nav aria-label="Main" className="flex flex-col gap-4">
       {groupLinks(links).map((group) => (
         <div key={group.caption}>
-          <p className="mb-1.5 px-3 text-micro font-semibold uppercase text-faint">
+          <p className="mb-1.5 px-3 text-micro font-semibold uppercase tracking-[0.08em] text-faint">
             {group.caption}
           </p>
 
@@ -115,7 +115,7 @@ export default function DashboardNav({
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cx(
-                      "group relative flex h-10 items-center gap-2.5 rounded-2xl px-3",
+                      "group relative flex h-10 items-center gap-2.5 rounded-xl px-3",
                       "text-body font-medium transition-colors duration-150",
                       active
                         ? "bg-accent-soft text-accent-soft-ink"

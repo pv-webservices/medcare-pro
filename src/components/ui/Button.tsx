@@ -39,7 +39,7 @@ export type ButtonVariant =
 export type ButtonSize = "md" | "sm";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-2xl font-semibold whitespace-nowrap " +
+  "inline-flex items-center justify-center gap-2 rounded-xl font-semibold whitespace-nowrap " +
   "transition-[background-color,box-shadow,color,border-color,transform] duration-[180ms] " +
   "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55 disabled:active:translate-y-0";
 

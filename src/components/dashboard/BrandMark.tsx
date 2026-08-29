@@ -15,19 +15,25 @@ import { cx } from "@/components/ui/cx";
  * application is expected to go home, and a user who has followed three
  * detail pages deep looks for it before they look for the nav.
  */
-export default function BrandMark({ className }: { className?: string }) {
+export default function BrandMark({
+  className,
+  isCompact = false,
+}: {
+  className?: string;
+  isCompact?: boolean;
+}) {
   return (
     <Link
       href="/dashboard"
-      className={cx("flex min-w-0 items-center gap-2.5 rounded-2xl", className)}
+      className={cx("flex min-w-0 items-center gap-2.5 rounded-xl", className)}
     >
       <span
         aria-hidden="true"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-accent-bright to-accent text-accent-ink shadow-cta"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink shadow-cta"
       >
         <Plus strokeWidth={3} className="h-[18px] w-[18px]" />
       </span>
-      <span className="min-w-0">
+      <span className={cx("min-w-0", isCompact && "hidden")}>
         <span className="block truncate text-section font-semibold leading-none tracking-[-0.01em] text-ink">
           MedCare Pro
         </span>

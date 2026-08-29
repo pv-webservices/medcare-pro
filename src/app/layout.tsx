@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 /*
@@ -44,11 +43,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       suppressHydrationWarning
       className={`h-full antialiased ${jakarta.variable}`}
     >
-      <body className="min-h-full font-sans">
-        <ThemeProvider attribute="data-theme" defaultTheme="light">
-          {children}
-        </ThemeProvider>
-      </body>
+      <body className="min-h-full font-sans">{children}</body>
     </html>
   );
 }

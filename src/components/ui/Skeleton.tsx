@@ -58,7 +58,7 @@ export function TableSkeleton({
     <div
       aria-busy="true"
       aria-label="Loading"
-      className="overflow-hidden rounded-3xl border border-line bg-canvas shadow-card"
+      className="overflow-hidden rounded-2xl border border-line bg-canvas shadow-card"
     >
       <div className="flex gap-4 border-b border-line bg-canvas-deep px-4 py-3">
         {Array.from({ length: columns }).map((_, index) => (
@@ -98,7 +98,7 @@ export function MetricSkeleton({ count = 4 }: { count?: number }) {
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="rounded-3xl border border-line bg-canvas p-5 shadow-card"
+          className="min-h-[116px] rounded-2xl border border-line bg-canvas p-5 shadow-card"
         >
           <span aria-hidden="true" className="skeleton block h-3 w-24" />
           <span aria-hidden="true" className="skeleton mt-4 block h-7 w-32" />

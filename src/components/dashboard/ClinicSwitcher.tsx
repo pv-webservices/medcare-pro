@@ -104,7 +104,7 @@ export default function ClinicSwitcher({
     return (
       <div
         className={cx(
-          "flex min-w-0 items-center gap-2.5 rounded-2xl border border-line bg-canvas px-3 py-2 shadow-card",
+          "flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-canvas px-3 py-2 shadow-card",
           className,
         )}
       >
@@ -131,7 +131,7 @@ export default function ClinicSwitcher({
       trigger={({ isOpen }) => (
         <span
           className={cx(
-            "flex min-w-0 items-center gap-2.5 rounded-2xl border bg-canvas px-3 py-2 shadow-card",
+            "flex min-w-0 items-center gap-2.5 rounded-xl border bg-canvas px-3 py-2 shadow-card",
             "transition-colors duration-150",
             isOpen ? "border-line-strong" : "border-line hover:border-line-strong",
           )}

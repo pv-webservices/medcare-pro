@@ -132,16 +132,9 @@ export default function AreaChart({
         // the caption above carries the meaning for anyone who cannot see it.
         role="img"
         aria-label={caption}
-        className="h-56 w-full"
+        className="h-52 w-full sm:h-56"
         preserveAspectRatio="none"
       >
-        <defs>
-          <linearGradient id="area-wash" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--viz-series)" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="var(--viz-series)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
         {Array.from({ length: GRID_LINES + 1 }, (_, index) => {
           const y = PADDING.top + (index / GRID_LINES) * PLOT_HEIGHT;
           return (
@@ -158,14 +151,14 @@ export default function AreaChart({
           );
         })}
 
-        {areaPath && <path d={areaPath} fill="url(#area-wash)" />}
+        {areaPath && <path d={areaPath} fill="var(--viz-series)" fillOpacity="0.07" />}
 
         {linePath && (
           <path
             d={linePath}
             fill="none"
             stroke="var(--viz-series)"
-            strokeWidth="2.5"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
@@ -189,6 +182,12 @@ export default function AreaChart({
           </span>
         ))}
       </div>
+
+      <ul className="sr-only">
+        {points.map((point, index) => (
+          <li key={`${point.label || "point"}-${index}`}>{point.label || `Point ${index + 1}`}: {point.value}</li>
+        ))}
+      </ul>
     </figure>
   );
 }

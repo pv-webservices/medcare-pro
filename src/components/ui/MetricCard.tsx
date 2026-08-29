@@ -31,8 +31,18 @@ interface MetricCardProps {
   icon?: ReactNode;
   /** A footnote under the number — scope, denominator, anything qualifying. */
   footnote?: ReactNode;
+  /** Soft colour used only by the icon tile. */
+  tone?: "violet" | "blue" | "cyan" | "green" | "orange";
   className?: string;
 }
+
+const ICON_TONES = {
+  violet: "bg-accent-soft text-accent-soft-ink",
+  blue: "bg-info-bg text-info-ink",
+  cyan: "bg-cyan-50 text-cyan-700",
+  green: "bg-ok-bg text-ok-ink",
+  orange: "bg-warn-bg text-warn-ink",
+} as const;
 
 export default function MetricCard({
   label,
@@ -42,6 +52,7 @@ export default function MetricCard({
   deltaCaption,
   icon,
   footnote,
+  tone = "violet",
   className,
 }: MetricCardProps) {
   const hasDelta = typeof delta === "number" && Number.isFinite(delta);
@@ -52,7 +63,7 @@ export default function MetricCard({
   return (
     <div
       className={cx(
-        "rounded-3xl border border-line bg-canvas p-5 shadow-card",
+        "h-full min-h-[116px] rounded-2xl border border-line bg-canvas p-4 shadow-card sm:p-5",
         className,
       )}
     >
@@ -61,14 +72,17 @@ export default function MetricCard({
         {icon && (
           <span
             aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink"
+            className={cx(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+              ICON_TONES[tone],
+            )}
           >
             {icon}
           </span>
         )}
       </div>
 
-      <p className="tnum mt-3 text-metric font-semibold text-ink">{value}</p>
+      <p className="tnum mt-2.5 text-metric font-semibold text-ink">{value}</p>
 
       {(hasDelta || footnote) && (
         <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">

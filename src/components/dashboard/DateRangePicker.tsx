@@ -38,7 +38,7 @@ export default function DateRangePicker({ current }: DateRangePickerProps) {
       value={current}
       onChange={handleChange}
       aria-label="Date range"
-      className="cursor-pointer rounded-full border border-line bg-canvas-deep px-3 py-1.5 text-meta font-medium text-muted transition-colors duration-150 hover:border-line-strong focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      className="h-9 w-full cursor-pointer rounded-xl border border-line bg-canvas px-3 text-meta font-medium text-muted shadow-card transition-colors duration-150 hover:border-line-strong focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:w-auto"
     >
       {DASHBOARD_PRESETS.map((preset) => (
         <option key={preset} value={preset}>

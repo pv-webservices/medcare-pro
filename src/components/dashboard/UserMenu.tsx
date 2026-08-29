@@ -5,13 +5,11 @@ import { ChevronDown, Settings, UserRound } from "lucide-react";
 import {
   Avatar,
   Menu,
-  MenuLabel,
   MenuSeparator,
   menuItemClasses,
   cx,
 } from "@/components/ui";
 import SignOutButton from "@/components/dashboard/SignOutButton";
-import ThemeSwitcher from "@/components/ThemeSwitcher";
 
 /**
  * The account menu: who am I signed in as, in what role, over what scope, and
@@ -22,7 +20,7 @@ import ThemeSwitcher from "@/components/ThemeSwitcher";
  * are all stated in the panel rather than being something the user has to infer
  * from what the app will let them do.
  *
- * IT OFFERS ONLY WHAT EXISTS. Settings, appearance and sign out — no profile
+ * IT OFFERS ONLY WHAT EXISTS. Settings, team and sign out — no profile
  * page, no account preferences, no billing, because this application has none
  * of those and a menu item that 404s is worse than an absent one.
  *
@@ -56,7 +54,7 @@ export default function UserMenu({
       trigger={({ isOpen }) => (
         <span
           className={cx(
-            "flex items-center gap-2.5 rounded-2xl border py-1.5 pl-1.5 pr-2.5 transition-colors duration-150",
+            "flex items-center gap-2 rounded-xl border py-1.5 pl-1.5 pr-2 transition-colors duration-150",
             isOpen
               ? "border-line-strong bg-canvas-deep"
               : "border-transparent hover:border-line hover:bg-canvas-deep",
@@ -100,18 +98,6 @@ export default function UserMenu({
         <UserRound aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0" />
         Team
       </Link>
-
-      <MenuSeparator />
-
-      <MenuLabel>Appearance</MenuLabel>
-      {/*
-        The theme picker lives here rather than in the sidebar. It is set once
-        and then never touched, and a permanent row of swatches in the primary
-        navigation spends prime real estate on a preference.
-      */}
-      <div className="px-2 pb-2">
-        <ThemeSwitcher />
-      </div>
 
       <MenuSeparator />
 
