@@ -260,6 +260,44 @@ export async function resolveModulesForActor(
   );
 }
 
+/** Module verdicts for one tenant role, used to filter role-default widgets. */
+export async function resolveModulesForRole(
+  actor: ActorContext,
+  roleId: string,
+): Promise<Map<string, FeatureResolution>> {
+  const [features, role] = await Promise.all([
+    loadTenantFeatures(actor.tenantId),
+    prisma.role.findFirst({
+      where: { id: roleId, tenantId: actor.tenantId },
+      select: {
+        permissions: true,
+        featureAccess: { select: { featureId: true, enabled: true } },
+      },
+    }),
+  ]);
+
+  if (!role) {
+    throw new ScopeError();
+  }
+
+  const access = new Map(role.featureAccess.map((row) => [row.featureId, row.enabled]));
+  const holdsWildcard = toPermissionList(role.permissions).includes(WILDCARD);
+
+  return new Map(
+    [...features.values()].map((feature) => [
+      feature.key,
+      resolveModuleAccess({
+        globalEnabled: feature.globalEnabled,
+        planEnabled: feature.planEnabled,
+        tenantOverride: feature.tenantOverride,
+        tier: feature.tier,
+        roleAccess: access.get(feature.id) ?? null,
+        roleHoldsWildcard: holdsWildcard,
+      }),
+    ]),
+  );
+}
+
 export async function resolveModuleForActor(
   actor: ActorContext,
   featureKey: string,

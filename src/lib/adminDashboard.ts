@@ -19,6 +19,11 @@ import {
   type TrendInterval,
 } from "@/lib/dashboardDateRange";
 import { dashboardBucketSql } from "@/lib/dashboardTrend";
+import {
+  dashboardDataGroupsForWidgetIds,
+  type DashboardWidgetDataGroup,
+  type DashboardWidgetId,
+} from "@/lib/dashboardWidgets";
 import { formatClockTime } from "@/lib/dates";
 import { resolveModulesForActor } from "@/lib/features";
 import { MODULE_FEATURES } from "@/lib/moduleFeatures";
@@ -605,6 +610,7 @@ export async function getAdminDashboardData(
   selectedClinicId: string | null,
   period: DashboardPreset,
   now: Date = new Date(),
+  visibleWidgetIds?: ReadonlySet<DashboardWidgetId>,
 ): Promise<AdminDashboardData> {
   const [user, clinics, modules, scopes] = await Promise.all([
     prisma.user.findFirst({ where: { id: actor.userId, tenantId: actor.tenantId }, select: { name: true } }),
@@ -656,21 +662,29 @@ export async function getAdminDashboardData(
   const teamTaskIds = capabilities.dashboard.team
     ? taskIds.filter((id) => actionIdsFor("task:manage").includes(id))
     : [];
+  const requestedGroups = visibleWidgetIds
+    ? dashboardDataGroupsForWidgetIds(visibleWidgetIds)
+    : null;
+
+  // Authorization and module gates above are authoritative. Layout can only
+  // narrow already-authorized work; it never causes a query to run on its own.
+  const wants = (group: DashboardWidgetDataGroup) =>
+    requestedGroups === null || requestedGroups.has(group);
 
   const [patients, appointments, schedule, revenue, messages, tasks, recentActivity] = await Promise.all([
-    capabilities.dashboard.patients ? loadPatientDashboardStats(actor, patientIds, range, previous, interval) : Promise.resolve(undefined),
-    capabilities.dashboard.appointments ? loadAppointmentDashboardStats(actor, appointmentIds, range, previous, interval, now) : Promise.resolve(undefined),
-    capabilities.dashboard.schedule ? loadTodaySchedule(actor, scheduleIds, now) : Promise.resolve(undefined),
-    capabilities.dashboard.revenue ? loadRevenueDashboardStats(actor, revenueIds, range, previous, interval, now) : Promise.resolve(undefined),
-    capabilities.dashboard.messages ? loadMessageDashboardStats(actor, messageIds, now) : Promise.resolve(undefined),
-    capabilities.dashboard.tasks ? loadTaskDashboardStats(actor, taskIds, teamTaskIds, now) : Promise.resolve(undefined),
-    capabilities.dashboard.activity ? loadRecentPatientActivity(actor, activityIds) : Promise.resolve(undefined),
+    capabilities.dashboard.patients && wants("patients") ? loadPatientDashboardStats(actor, patientIds, range, previous, interval) : Promise.resolve(undefined),
+    capabilities.dashboard.appointments && wants("appointments") ? loadAppointmentDashboardStats(actor, appointmentIds, range, previous, interval, now) : Promise.resolve(undefined),
+    capabilities.dashboard.schedule && wants("schedule") ? loadTodaySchedule(actor, scheduleIds, now) : Promise.resolve(undefined),
+    capabilities.dashboard.revenue && wants("revenue") ? loadRevenueDashboardStats(actor, revenueIds, range, previous, interval, now) : Promise.resolve(undefined),
+    capabilities.dashboard.messages && wants("messages") ? loadMessageDashboardStats(actor, messageIds, now) : Promise.resolve(undefined),
+    capabilities.dashboard.tasks && wants("tasks") ? loadTaskDashboardStats(actor, taskIds, teamTaskIds, now) : Promise.resolve(undefined),
+    capabilities.dashboard.activity && wants("activity") ? loadRecentPatientActivity(actor, activityIds) : Promise.resolve(undefined),
   ]);
 
   const revenueByDoctor = new Map(revenue?.byDoctor.map((row) => [row.doctorId, row.revenue]) ?? []);
   const [doctors, clinicPerformance] = await Promise.all([
-    capabilities.dashboard.doctors ? loadDoctorDashboardStats(actor, doctorIds, range, now, revenueByDoctor) : Promise.resolve(undefined),
-    capabilities.dashboard.clinics && clinicIds.length > 1 ? loadClinicPerformance(
+    capabilities.dashboard.doctors && wants("doctors") ? loadDoctorDashboardStats(actor, doctorIds, range, now, revenueByDoctor) : Promise.resolve(undefined),
+    capabilities.dashboard.clinics && wants("clinics") && clinicIds.length > 1 ? loadClinicPerformance(
       actor,
       clinics.filter((clinic) => clinicIds.includes(clinic.id)),
       range,

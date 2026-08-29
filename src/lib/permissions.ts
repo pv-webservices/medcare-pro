@@ -62,6 +62,12 @@ export const DASHBOARD_DATA_PERMISSIONS = [
   "dashboard:clinics:view",
 ] as const;
 
+/** Presentation-only rights added with versioned dashboard layouts. */
+export const DASHBOARD_LAYOUT_PERMISSIONS = [
+  "dashboard:customize",
+  "dashboard:layout:manage",
+] as const;
+
 /** Task page/action permissions, kept separate from dashboard summaries. */
 export const TASK_PERMISSIONS = [
   "task:view",
@@ -152,6 +158,22 @@ export const DASHBOARD_PERMISSION_GROUP: PermissionGroup = {
       key: "dashboard:clinics:view",
       label: "Clinic comparison",
       description: "Compare only the clinics and metrics this role may access.",
+    },
+  ],
+};
+
+export const DASHBOARD_LAYOUT_PERMISSION_GROUP: PermissionGroup = {
+  module: "Dashboard Layout",
+  permissions: [
+    {
+      key: DASHBOARD_LAYOUT_PERMISSIONS[0],
+      label: "Customize own dashboard",
+      description: "Reorder, resize, show, and hide authorized dashboard widgets for yourself.",
+    },
+    {
+      key: DASHBOARD_LAYOUT_PERMISSIONS[1],
+      label: "Manage role dashboard defaults",
+      description: "Configure dashboard defaults only for roles below your own authority.",
     },
   ],
 };
@@ -608,11 +630,16 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     ],
   },
   DASHBOARD_PERMISSION_GROUP,
+  DASHBOARD_LAYOUT_PERMISSION_GROUP,
 ] as const;
 
 /** Operational/action permissions shown separately from Dashboard Data. */
 export const ACTION_PERMISSION_GROUPS: readonly PermissionGroup[] =
-  PERMISSION_GROUPS.filter((group) => group.module !== DASHBOARD_PERMISSION_GROUP.module);
+  PERMISSION_GROUPS.filter(
+    (group) =>
+      group.module !== DASHBOARD_PERMISSION_GROUP.module &&
+      group.module !== DASHBOARD_LAYOUT_PERMISSION_GROUP.module,
+  );
 
 export const ALL_PERMISSIONS: readonly string[] = PERMISSION_GROUPS.flatMap(
   (group) => group.permissions.map((permission) => permission.key),
@@ -732,6 +759,9 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
+    !DASHBOARD_LAYOUT_PERMISSIONS.includes(
+      permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
+    ) &&
     !DASHBOARD_DATA_PERMISSIONS.includes(
       permission as DashboardDataPermission,
     ),
@@ -781,6 +811,9 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
+    !DASHBOARD_LAYOUT_PERMISSIONS.includes(
+      permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
+    ) &&
     !DASHBOARD_DATA_PERMISSIONS.includes(
       permission as DashboardDataPermission,
     ),
@@ -822,6 +855,9 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
     (permission) =>
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
+      !DASHBOARD_LAYOUT_PERMISSIONS.includes(
+        permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
+      ) &&
       !DASHBOARD_DATA_PERMISSIONS.includes(
         permission as DashboardDataPermission,
       ),

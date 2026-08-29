@@ -119,6 +119,7 @@ model Tenant {
   sessions          AppSession[]
   auditLogs         AuditLog[]
   tasks             Task[]
+  dashboardLayouts  DashboardLayout[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments     Appointment[]
@@ -195,6 +196,7 @@ model User {
   /// Tenant.updatedAt for the three-step path.
   updatedAt            DateTime              @updatedAt @map("updated_at")
   userRoles            UserRole[]
+  dashboardLayouts     DashboardLayout[]
   registrationsCreated Registration[]        @relation("RegistrationCreatedBy")
   registrationEdits    RegistrationEditLog[]
 
@@ -312,6 +314,7 @@ model Role {
   userRoles     UserRole[]
   featureAccess RoleFeatureAccess[]
   invitations   Invitation[]
+  dashboardLayouts DashboardLayout[]
 
   /// Role names are unique within a tenant, not globally.
   @@unique([tenantId, name])
@@ -355,6 +358,30 @@ model UserRole {
   /// migration risk for no functional gain.
   @@index([assignedById])
   @@map("user_roles")
+}
+
+/// A normalized presentation preference. Exactly one of userId / roleId is set:
+/// personal overrides and role defaults deliberately share no row or scope.
+model DashboardLayout {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String?  @map("user_id")
+  roleId    String?  @map("role_id")
+  layout    Json
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role?  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@unique([tenantId, roleId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("dashboard_layouts")
 }
 
 // ---------------------------------------------------------------------------

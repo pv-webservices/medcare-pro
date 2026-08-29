@@ -243,6 +243,13 @@ export const AUDIT_ACTIONS = {
   TASK_UPDATED: "TASK_UPDATED",
   TASK_COMPLETED: "TASK_COMPLETED",
   TASK_ARCHIVED: "TASK_ARCHIVED",
+
+  // Dashboard layouts store presentation preferences only — widget ids,
+  // order, visibility and size. They never contain dashboard data.
+  DASHBOARD_LAYOUT_PERSONAL_SAVED: "DASHBOARD_LAYOUT_PERSONAL_SAVED",
+  DASHBOARD_LAYOUT_PERSONAL_RESET: "DASHBOARD_LAYOUT_PERSONAL_RESET",
+  DASHBOARD_LAYOUT_ROLE_SAVED: "DASHBOARD_LAYOUT_ROLE_SAVED",
+  DASHBOARD_LAYOUT_ROLE_RESET: "DASHBOARD_LAYOUT_ROLE_RESET",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

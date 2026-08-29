@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONES } from "@/components/appointments/status";
 import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
+import DashboardLayoutEditor, { type DashboardWidgetSlot } from "@/components/dashboard/DashboardLayoutEditor";
 import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import {
   EmptyState,
@@ -33,10 +34,13 @@ import {
   buttonClasses,
 } from "@/components/ui";
 import type { AdminDashboardData, DashboardTrendPoint } from "@/lib/adminDashboard";
+import type { EffectiveDashboardLayout } from "@/lib/dashboardLayouts";
+import { DASHBOARD_WIDGETS, type DashboardWidgetId } from "@/lib/dashboardWidgets";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
 
 interface Props {
   data: AdminDashboardData;
+  layout: EffectiveDashboardLayout;
   now?: Date;
 }
 
@@ -114,9 +118,12 @@ function NoData({ title, guidance, icon }: { title: string; guidance: string; ic
   return <EmptyState isBare icon={icon} title={title} guidance={guidance} />;
 }
 
-export default function AdminDashboard({ data, now = new Date() }: Props) {
-  const hasWidgets = Object.entries(data.capabilities.dashboard).some(([key, value]) => key !== "view" && value);
+export default function AdminDashboard({ data, layout, now = new Date() }: Props) {
   const scopeLabel = data.scope.clinicName ?? (data.scope.clinicCount > 1 ? "All accessible clinics" : "Accessible clinic");
+  const slots = layout.layout.widgets.map((preference): DashboardWidgetSlot => ({
+    id: preference.widgetId,
+    content: renderDashboardWidget(preference.widgetId, data, now),
+  }));
 
   return (
     <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
@@ -141,79 +148,61 @@ export default function AdminDashboard({ data, now = new Date() }: Props) {
         }
       />
 
-      {!hasWidgets ? (
+      {layout.layout.widgets.length === 0 ? (
         <EmptyState
           icon={<CircleAlert className="h-5 w-5" />}
           title="No dashboard data is assigned"
           guidance="This role can open the dashboard, but no dashboard data permissions are enabled for the selected clinic."
         />
       ) : (
-        <>
-          <KpiGrid data={data} />
-
-          {(data.patients || data.appointments) && (
-            <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
-              {data.patients && <PatientOverview data={data} />}
-              {data.appointments && <AppointmentOverview data={data} />}
-            </div>
-          )}
-
-          {data.revenue && <RevenueSection data={data} />}
-
-          {(data.schedule || data.recentActivity) && (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
-              {data.schedule && <SchedulePanel data={data} />}
-              {data.recentActivity && <ActivityPanel data={data} now={now} />}
-            </div>
-          )}
-
-          {data.doctors && <DoctorPanel data={data} />}
-
-          {(data.messages || data.tasks) && (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {data.messages && <MessagePanel data={data} />}
-              {data.tasks && <TaskPanel data={data} />}
-            </div>
-          )}
-
-          {data.clinicPerformance && data.clinicPerformance.length > 1 && <ClinicPerformance data={data} />}
-        </>
+        <DashboardLayoutEditor
+          initialLayout={layout.layout}
+          widgets={slots}
+          canCustomize={layout.canCustomize}
+          sourceLabel={layout.source === "personal" ? "your saved layout" : layout.source === "role" ? "your role default" : "system default"}
+        />
       )}
     </div>
   );
 }
 
-function KpiGrid({ data }: { data: AdminDashboardData }) {
-  const cards: ReactNode[] = [];
-  const summary = data.summary;
-  if (summary.totalPatients !== undefined) cards.push(
-    <MetricCard key="patients" label="Total patients" value={summary.totalPatients.toLocaleString("en-IN")} footnote={data.patients ? `${data.patients.new} new in period` : undefined} tone="violet" icon={<UsersRound className="h-[18px] w-[18px]" />} />,
-  );
-  if (summary.todaysAppointments !== undefined) cards.push(
-    <MetricCard key="appointments" label="Today's appointments" value={summary.todaysAppointments.toLocaleString("en-IN")} delta={roundedDelta(summary.appointmentChange)} deltaCaption={data.comparisonLabel} tone="blue" icon={<CalendarDays className="h-[18px] w-[18px]" />} />,
-  );
-  if (summary.todaysCollection !== undefined) cards.push(
-    <MetricCard key="today-revenue" label="Today's collection" value={formatRupees(summary.todaysCollection)} footnote="Recorded registrations" tone="green" icon={<IndianRupee className="h-[18px] w-[18px]" />} />,
-  );
-  if (summary.monthRevenue !== undefined) cards.push(
-    <MetricCard key="month-revenue" label="Month-to-date revenue" value={formatRupees(summary.monthRevenue)} delta={roundedDelta(summary.revenueChange)} deltaCaption={data.comparisonLabel} tone="blue" icon={<IndianRupee className="h-[18px] w-[18px]" />} />,
-  );
-  if (summary.activeDoctors !== undefined) cards.push(
-    <MetricCard key="doctors" label="Active doctors" value={summary.activeDoctors.toLocaleString("en-IN")} footnote={data.doctors ? `${data.doctors.availableToday} available today` : undefined} tone="cyan" icon={<Stethoscope className="h-[18px] w-[18px]" />} />,
-  );
-  if (summary.pendingTasks !== undefined) cards.push(
-    <MetricCard key="tasks" label="Pending tasks" value={summary.pendingTasks.toLocaleString("en-IN")} isUpGood={false} footnote={`${summary.overdueTasks ?? 0} overdue`} tone="orange" icon={<ListTodo className="h-[18px] w-[18px]" />} />,
-  );
-  if (summary.messageHealth !== undefined) cards.push(
-    <MetricCard key="messages" label="Message acceptance" value={summary.messageHealth === null ? "—" : `${summary.messageHealth.toFixed(1)}%`} footnote="Gateway accepted today" tone="violet" icon={<MessageCircleMore className="h-[18px] w-[18px]" />} />,
-  );
+function DeferredWidget({ widgetId }: { widgetId: DashboardWidgetId }) {
+  const widget = DASHBOARD_WIDGETS.get(widgetId)!;
   return (
-    <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card, index) => (
-        <div key={index} className={cards.length === 7 && index === 6 ? "xl:col-span-2" : undefined}>{card}</div>
-      ))}
+    <div className="flex min-h-[116px] items-center justify-center rounded-2xl border border-line bg-canvas p-5 text-center shadow-card">
+      <div><p className="text-label font-semibold text-ink">{widget.title}</p><p className="mt-1 text-meta text-muted">Save the layout to load this widget&apos;s current data.</p></div>
     </div>
   );
+}
+
+function renderDashboardWidget(widgetId: DashboardWidgetId, data: AdminDashboardData, now: Date): ReactNode {
+  switch (widgetId) {
+    case "total-patients":
+      return data.summary.totalPatients === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Total patients" value={data.summary.totalPatients.toLocaleString("en-IN")} footnote={data.patients ? `${data.patients.new} new in period` : undefined} tone="violet" icon={<UsersRound className="h-[18px] w-[18px]" />} />;
+    case "todays-appointments":
+      return data.summary.todaysAppointments === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Today's appointments" value={data.summary.todaysAppointments.toLocaleString("en-IN")} delta={roundedDelta(data.summary.appointmentChange)} deltaCaption={data.comparisonLabel} tone="blue" icon={<CalendarDays className="h-[18px] w-[18px]" />} />;
+    case "todays-collection":
+      return data.summary.todaysCollection === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Today's collection" value={formatRupees(data.summary.todaysCollection)} footnote="Recorded registrations" tone="green" icon={<IndianRupee className="h-[18px] w-[18px]" />} />;
+    case "month-revenue":
+      return data.summary.monthRevenue === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Month-to-date revenue" value={formatRupees(data.summary.monthRevenue)} delta={roundedDelta(data.summary.revenueChange)} deltaCaption={data.comparisonLabel} tone="blue" icon={<IndianRupee className="h-[18px] w-[18px]" />} />;
+    case "active-doctors":
+      return data.summary.activeDoctors === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Active doctors" value={data.summary.activeDoctors.toLocaleString("en-IN")} footnote={data.doctors ? `${data.doctors.availableToday} available today` : undefined} tone="cyan" icon={<Stethoscope className="h-[18px] w-[18px]" />} />;
+    case "pending-tasks":
+      return data.summary.pendingTasks === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Pending tasks" value={data.summary.pendingTasks.toLocaleString("en-IN")} isUpGood={false} footnote={`${data.summary.overdueTasks ?? 0} overdue`} tone="orange" icon={<ListTodo className="h-[18px] w-[18px]" />} />;
+    case "message-acceptance":
+      return data.summary.messageHealth === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Message acceptance" value={data.summary.messageHealth === null ? "—" : `${data.summary.messageHealth.toFixed(1)}%`} footnote="Gateway accepted today" tone="violet" icon={<MessageCircleMore className="h-[18px] w-[18px]" />} />;
+    case "patient-overview": return data.patients ? <PatientOverview data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "appointment-overview": return data.appointments ? <AppointmentOverview data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "revenue-trend": return data.revenue ? <RevenueTrendPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "revenue-summary": return data.revenue ? <RevenueSummaryPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "revenue-by-doctor": return data.revenue ? <RevenueByDoctorPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "today-schedule": return data.schedule ? <SchedulePanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "recent-patient-activity": return data.recentActivity ? <ActivityPanel data={data} now={now} /> : <DeferredWidget widgetId={widgetId} />;
+    case "doctor-overview": return data.doctors ? <DoctorPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "message-health": return data.messages ? <MessagePanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "task-overview": return data.tasks ? <TaskPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "clinic-performance": return <ClinicPerformance data={data} />;
+  }
 }
 
 function PatientOverview({ data }: { data: AdminDashboardData }) {
@@ -269,57 +258,37 @@ function AppointmentOverview({ data }: { data: AdminDashboardData }) {
   );
 }
 
-function RevenueSection({ data }: { data: AdminDashboardData }) {
+function RevenueTrendPanel({ data }: { data: AdminDashboardData }) {
   const revenue = data.revenue!;
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <Panel title="Revenue trend" description={`Registration-backed collections · ${data.rangeLabel}`} className="xl:col-span-2" actions={<ViewAll href="/reports">Open reports</ViewAll>}>
-        {revenue.trend.some((point) => point.value > 0) ? <AreaChart points={chartPoints(revenue.trend, 10)} caption="Revenue trend over the selected period" className="[--viz-series:#3678e8]" /> : <NoData icon={<IndianRupee className="h-5 w-5" />} title="No revenue in this period" guidance="Collections appear here when registrations with an amount are recorded." />}
-      </Panel>
-      <Panel title="Revenue summary" description="Current collection checkpoints">
-        <div className="grid grid-cols-2 gap-3">
-          <MiniStat label="Today" value={formatRupeesCompact(revenue.today)} />
-          <MiniStat label="This week" value={formatRupeesCompact(revenue.thisWeek)} />
-          <MiniStat label="This month" value={formatRupeesCompact(revenue.thisMonth)} />
-          <MiniStat label="Previous month" value={formatRupeesCompact(revenue.previousMonth)} />
-        </div>
-        <div className="mt-4 flex items-center justify-between rounded-xl border border-line px-4 py-3">
-          <span className="text-body text-muted">Average per visit</span><span className="tnum font-semibold text-ink">{formatRupees(revenue.averagePerVisit)}</span>
-        </div>
-      </Panel>
-      <Panel title="Revenue by doctor" description="Attributed registrations in this period" className="xl:col-span-3" isFlush hasDivider>
-        {revenue.byDoctor.length === 0 ? (
-          <NoData icon={<Stethoscope className="h-5 w-5" />} title="No attributed doctor revenue" guidance="Doctor attribution will appear when registrations are recorded in this period." />
-        ) : (
-          <>
-            <div className="divide-y divide-line px-4 md:hidden">
-              {revenue.byDoctor.map((row) => (
-                <div key={row.doctorId} className="py-3.5">
-                  <p className="font-semibold text-ink">{row.doctorName}</p>
-                  <dl className="mt-2 grid grid-cols-2 gap-3 text-meta">
-                    <div><dt className="text-muted">Patients</dt><dd className="tnum mt-0.5 font-semibold text-ink">{row.patients}</dd></div>
-                    <div className="text-right"><dt className="text-muted">Revenue</dt><dd className="tnum mt-0.5 font-semibold text-ink">{formatRupees(row.revenue)}</dd></div>
-                  </dl>
-                </div>
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto md:block">
-            <Table caption="Revenue by doctor" className="min-w-[620px] rounded-none border-0 shadow-none">
-              <THead><TH>Doctor</TH><TH align="end">Patients</TH><TH align="end">Revenue</TH></THead>
-              <TBody>{revenue.byDoctor.map((row) => <TR key={row.doctorId}><TD isPrimary>{row.doctorName}</TD><TD align="end" className="tnum">{row.patients}</TD><TD align="end" className="tnum">{formatRupees(row.revenue)}</TD></TR>)}</TBody>
-            </Table>
-          </div>
-          </>
-        )}
-      </Panel>
-    </div>
+    <Panel title="Revenue trend" description={`Registration-backed collections · ${data.rangeLabel}`} actions={<ViewAll href="/reports">Open reports</ViewAll>} className="h-full">
+      {revenue.trend.some((point) => point.value > 0) ? <AreaChart points={chartPoints(revenue.trend, 10)} caption="Revenue trend over the selected period" className="[--viz-series:#3678e8]" /> : <NoData icon={<IndianRupee className="h-5 w-5" />} title="No revenue in this period" guidance="Collections appear here when registrations with an amount are recorded." />}
+    </Panel>
   );
+}
+
+function RevenueSummaryPanel({ data }: { data: AdminDashboardData }) {
+  const revenue = data.revenue!;
+  return <Panel title="Revenue summary" description="Current collection checkpoints" className="h-full">
+    <div className="grid grid-cols-2 gap-3"><MiniStat label="Today" value={formatRupeesCompact(revenue.today)} /><MiniStat label="This week" value={formatRupeesCompact(revenue.thisWeek)} /><MiniStat label="This month" value={formatRupeesCompact(revenue.thisMonth)} /><MiniStat label="Previous month" value={formatRupeesCompact(revenue.previousMonth)} /></div>
+    <div className="mt-4 flex items-center justify-between rounded-xl border border-line px-4 py-3"><span className="text-body text-muted">Average per visit</span><span className="tnum font-semibold text-ink">{formatRupees(revenue.averagePerVisit)}</span></div>
+  </Panel>;
+}
+
+function RevenueByDoctorPanel({ data }: { data: AdminDashboardData }) {
+  const rows = data.revenue!.byDoctor;
+  return <Panel title="Revenue by doctor" description="Attributed registrations in this period" isFlush hasDivider className="h-full">
+    {rows.length === 0 ? <NoData icon={<Stethoscope className="h-5 w-5" />} title="No attributed doctor revenue" guidance="Doctor attribution will appear when registrations are recorded in this period." /> : <>
+      <div className="divide-y divide-line px-4 md:hidden">{rows.map((row) => <div key={row.doctorId} className="py-3.5"><p className="font-semibold text-ink">{row.doctorName}</p><dl className="mt-2 grid grid-cols-2 gap-3 text-meta"><div><dt className="text-muted">Patients</dt><dd className="tnum mt-0.5 font-semibold text-ink">{row.patients}</dd></div><div className="text-right"><dt className="text-muted">Revenue</dt><dd className="tnum mt-0.5 font-semibold text-ink">{formatRupees(row.revenue)}</dd></div></dl></div>)}</div>
+      <div className="hidden overflow-x-auto md:block"><Table caption="Revenue by doctor" className="min-w-[620px] rounded-none border-0 shadow-none"><THead><TH>Doctor</TH><TH align="end">Patients</TH><TH align="end">Revenue</TH></THead><TBody>{rows.map((row) => <TR key={row.doctorId}><TD isPrimary>{row.doctorName}</TD><TD align="end" className="tnum">{row.patients}</TD><TD align="end" className="tnum">{formatRupees(row.revenue)}</TD></TR>)}</TBody></Table></div>
+    </>}
+  </Panel>;
 }
 
 function SchedulePanel({ data }: { data: AdminDashboardData }) {
   const schedule = data.schedule!;
   return (
-    <Panel title="Today's schedule" description="Next appointments in chronological order" className="xl:col-span-3" actions={<ViewAll href="/appointments">View all appointments</ViewAll>} isFlush hasDivider>
+    <Panel title="Today's schedule" description="Next appointments in chronological order" className="h-full" actions={<ViewAll href="/appointments">View all appointments</ViewAll>} isFlush hasDivider>
       {schedule.length === 0 ? <NoData icon={<CalendarCheck className="h-5 w-5" />} title="No upcoming appointments today" guidance="Bookings later today will appear here." /> : (
         <>
           <div className="divide-y divide-line px-4 md:hidden">
@@ -345,7 +314,7 @@ function SchedulePanel({ data }: { data: AdminDashboardData }) {
 function ActivityPanel({ data, now }: { data: AdminDashboardData; now: Date }) {
   const rows = data.recentActivity!;
   return (
-    <Panel title="Recent patient activity" description="Latest events in your clinic scope" className="xl:col-span-2">
+    <Panel title="Recent patient activity" description="Latest events in your clinic scope" className="h-full">
       {rows.length === 0 ? <NoData icon={<Activity className="h-5 w-5" />} title="No recent patient activity" guidance="Registrations and appointment changes will appear here." /> : (
         <ol className="divide-y divide-line">{rows.slice(0, 7).map((row) => <li key={row.id} className="flex gap-3 py-2.5 first:pt-0 last:pb-0"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink"><Activity className="h-4 w-4" /></span><div className="min-w-0"><p className="text-label text-ink sm:text-body"><span className="font-semibold">{row.patientName}</span> · {row.description}</p><p className="mt-0.5 text-meta text-muted">{row.clinicName} · {relativeTime(row.occurredAt, now)}</p></div></li>)}</ol>
       )}
@@ -403,16 +372,16 @@ function TaskPanel({ data }: { data: AdminDashboardData }) {
 }
 
 function ClinicPerformance({ data }: { data: AdminDashboardData }) {
-  const rows = data.clinicPerformance!;
+  const rows = data.clinicPerformance ?? [];
   const hasPatients = rows.some((row) => row.patients !== undefined);
   const hasAppointments = rows.some((row) => row.appointments !== undefined);
   const hasDoctors = rows.some((row) => row.doctors !== undefined);
   const hasRevenue = rows.some((row) => row.revenue !== undefined);
   return (
     <Panel title="Clinic performance" description="Only clinics and metrics permitted for this role" isFlush hasDivider>
-      <div className="overflow-x-auto"><Table caption="Clinic performance comparison" className="min-w-[680px] rounded-none border-0 shadow-none"><THead><TH>Clinic</TH>{hasPatients && <TH align="end">Patients</TH>}{hasAppointments && <TH align="end">Appointments</TH>}{hasDoctors && <TH align="end">Doctors</TH>}{hasRevenue && <TH align="end">Revenue</TH>}</THead><TBody>
+      {rows.length === 0 ? <NoData icon={<UsersRound className="h-5 w-5" />} title="No clinic comparison available" guidance="This widget appears when more than one accessible clinic can be compared." /> : <div className="overflow-x-auto"><Table caption="Clinic performance comparison" className="min-w-[680px] rounded-none border-0 shadow-none"><THead><TH>Clinic</TH>{hasPatients && <TH align="end">Patients</TH>}{hasAppointments && <TH align="end">Appointments</TH>}{hasDoctors && <TH align="end">Doctors</TH>}{hasRevenue && <TH align="end">Revenue</TH>}</THead><TBody>
         {rows.map((row) => <TR key={row.clinicId}><TD isPrimary>{row.clinicName}</TD>{hasPatients && <TD align="end" className="tnum">{row.patients ?? "—"}</TD>}{hasAppointments && <TD align="end" className="tnum">{row.appointments ?? "—"}</TD>}{hasDoctors && <TD align="end" className="tnum">{row.doctors ?? "—"}</TD>}{hasRevenue && <TD align="end" className="tnum">{row.revenue === undefined ? "—" : formatRupeesCompact(row.revenue)}</TD>}</TR>)}
-      </TBody></Table></div>
+      </TBody></Table></div>}
     </Panel>
   );
 }

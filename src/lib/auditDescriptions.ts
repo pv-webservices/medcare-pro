@@ -41,6 +41,7 @@ export type AuditCategory =
   | "entitlements"
   | "appointments"
   | "tasks"
+  | "dashboard"
   | "platform";
 
 export interface AuditDescription {
@@ -433,6 +434,30 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "tasks",
   },
+  [AUDIT_ACTIONS.DASHBOARD_LAYOUT_PERSONAL_SAVED]: {
+    label: "Personal dashboard saved",
+    detail: "A user changed the order, visibility, or supported sizes of their authorized dashboard widgets.",
+    side: "tenant",
+    category: "dashboard",
+  },
+  [AUDIT_ACTIONS.DASHBOARD_LAYOUT_PERSONAL_RESET]: {
+    label: "Personal dashboard reset",
+    detail: "A personal override was removed so the role or system default applies again.",
+    side: "tenant",
+    category: "dashboard",
+  },
+  [AUDIT_ACTIONS.DASHBOARD_LAYOUT_ROLE_SAVED]: {
+    label: "Role dashboard default saved",
+    detail: "An authorized manager changed the dashboard default for a lower-authority role.",
+    side: "tenant",
+    category: "dashboard",
+  },
+  [AUDIT_ACTIONS.DASHBOARD_LAYOUT_ROLE_RESET]: {
+    label: "Role dashboard default reset",
+    detail: "A role override was removed so the system dashboard layout applies again.",
+    side: "tenant",
+    category: "dashboard",
+  },
 };
 
 /**
@@ -465,6 +490,7 @@ export const AUDIT_CATEGORIES: readonly {
   { key: "entitlements", label: "Features and plan" },
   { key: "appointments", label: "Appointments" },
   { key: "tasks", label: "Tasks" },
+  { key: "dashboard", label: "Dashboard" },
   { key: "platform", label: "Platform" },
 ];
 

@@ -1,5 +1,7 @@
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import { getAdminDashboardData } from "@/lib/adminDashboard";
+import { getEffectiveDashboardLayout } from "@/lib/dashboardLayouts";
+import { visibleDashboardWidgetIds } from "@/lib/dashboardWidgets";
 import { parsePreset } from "@/lib/dashboardDateRange";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor } from "@/lib/session";
@@ -16,7 +18,14 @@ export default async function DashboardPage(props: {
   const selectedClinicId = await resolveSelectedClinicId(actor);
   const period = parsePreset(typeof params.range === "string" ? params.range : undefined);
   const now = new Date();
-  const data = await getAdminDashboardData(actor, selectedClinicId, period, now);
+  const layout = await getEffectiveDashboardLayout(actor);
+  const data = await getAdminDashboardData(
+    actor,
+    selectedClinicId,
+    period,
+    now,
+    visibleDashboardWidgetIds(layout.layout),
+  );
 
-  return <AdminDashboard data={data} now={now} />;
+  return <AdminDashboard data={data} layout={layout} now={now} />;
 }

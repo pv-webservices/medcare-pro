@@ -4,6 +4,7 @@ import { DEFAULT_ROLES, ROLE_KEYS } from "@/lib/defaultRoles";
 import {
   ACTION_PERMISSION_GROUPS,
   DASHBOARD_DATA_PERMISSIONS,
+  DASHBOARD_LAYOUT_PERMISSION_GROUP,
   DASHBOARD_PERMISSION_GROUP,
 } from "@/lib/permissions";
 import type { ClinicScope } from "@/lib/rbac";
@@ -49,6 +50,12 @@ describe("dashboard permission catalogue", () => {
       ]),
     );
     expect(rolePermissions(ROLE_KEYS.DOCTOR)).not.toContain("dashboard:revenue:view");
+    expect(rolePermissions(ROLE_KEYS.DOCTOR)).toContain("dashboard:customize");
+    expect(rolePermissions(ROLE_KEYS.RECEPTIONIST)).toContain("dashboard:customize");
+    expect(rolePermissions(ROLE_KEYS.STAFF)).toContain("dashboard:customize");
+    expect(rolePermissions(ROLE_KEYS.CLINIC_ADMIN)).toEqual(
+      expect.arrayContaining(DASHBOARD_LAYOUT_PERMISSION_GROUP.permissions.map((item) => item.key)),
+    );
     expect(rolePermissions(ROLE_KEYS.STAFF)).toEqual(
       expect.arrayContaining(["dashboard:view", "dashboard:patients:view"]),
     );

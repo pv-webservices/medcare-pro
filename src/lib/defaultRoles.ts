@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import {
   ALL_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
+  DASHBOARD_LAYOUT_PERMISSIONS,
   PRE_APPOINTMENTS_PERMISSIONS,
   STAGE_AP1_PERMISSIONS,
   TASK_PERMISSIONS,
@@ -98,6 +99,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       // Staff may edit (the edit is still logged) but cannot read the log back.
       "registration:edit",
       "dashboard:view",
+      "dashboard:customize",
       "dashboard:patients:view",
       "dashboard:tasks:view",
       "task:view",
@@ -125,6 +127,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       // a doctor deciding a slot is free is a front-desk decision.
       "appointment:read",
       "dashboard:view",
+      "dashboard:customize",
       "dashboard:appointments:view",
       "dashboard:schedule:view",
       "dashboard:patients:view",
@@ -167,6 +170,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "appointment:checkin",
       "appointment:convert",
       "dashboard:view",
+      "dashboard:customize",
       "dashboard:appointments:view",
       "dashboard:patients:view",
       "dashboard:messages:view",
@@ -192,6 +196,9 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
     (permission) =>
       !TASK_PERMISSIONS.includes(
         permission as (typeof TASK_PERMISSIONS)[number],
+      ) &&
+      !DASHBOARD_LAYOUT_PERMISSIONS.includes(
+        permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
       ) &&
       !DASHBOARD_DATA_PERMISSIONS.includes(
         permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
@@ -282,6 +289,9 @@ export const PRE_TASK_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
       permission !== "dashboard:tasks:view" &&
+      !DASHBOARD_LAYOUT_PERMISSIONS.includes(
+        permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
+      ) &&
       !TASK_PERMISSIONS.includes(
         permission as (typeof TASK_PERMISSIONS)[number],
       ),
