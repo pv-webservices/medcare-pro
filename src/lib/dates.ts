@@ -66,3 +66,35 @@ export function todayDateOnly(now: Date = new Date()): string {
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/** Calendar date at an instant in an explicit IANA timezone. */
+export function dateOnlyInTimeZone(now: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const value = (type: "year" | "month" | "day") =>
+    parts.find((part) => part.type === type)?.value;
+  const year = value("year");
+  const month = value("month");
+  const day = value("day");
+
+  if (!year || !month || !day) {
+    throw new Error("Could not resolve the clinic-local date.");
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
+/** Tomorrow as a calendar date in an explicit IANA timezone. */
+export function tomorrowDateOnlyInTimeZone(
+  now: Date,
+  timeZone: string,
+): string {
+  const localDate = dateOnlyInTimeZone(now, timeZone);
+  const nextDay = parseDateOnly(localDate);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  return formatDateOnly(nextDay);
+}

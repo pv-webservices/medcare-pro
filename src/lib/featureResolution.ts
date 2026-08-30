@@ -126,6 +126,22 @@ export function isTenantEntitled(
   return input.planEnabled === true;
 }
 
+/** Layers 1-2 for a trusted non-human system channel. */
+export function resolveTenantFeatureAccess(
+  input: Pick<
+    FeatureResolutionInput,
+    "globalEnabled" | "planEnabled" | "tenantOverride"
+  >,
+): FeatureResolution {
+  if (!input.globalEnabled) {
+    return { allowed: false, reason: "global" };
+  }
+
+  return isTenantEntitled(input)
+    ? { allowed: true, reason: null }
+    : { allowed: false, reason: "entitlement" };
+}
+
 /**
  * Layers 1-3 — has this organisation got the module, and is this role allowed
  * to use it?

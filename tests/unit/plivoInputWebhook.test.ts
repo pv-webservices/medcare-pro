@@ -4,6 +4,7 @@ import {
   STAGE_2_INVALID_SELECTION_MESSAGE,
   STAGE_2_NO_INPUT_MESSAGE,
 } from "@/lib/telephony/ivr";
+import { FeatureError } from "@/lib/featureResolution";
 import {
   buildPlivoWebhookRequest,
   buildSignedPlivoWebhookRequest,
@@ -18,9 +19,20 @@ const INPUT_WEBHOOK_URL =
   "https://medcare-tunnel.example/api/webhooks/plivo/input";
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
+const requireTenantFeatureEntitlement = vi.hoisted(() => vi.fn());
+const buildDoctorMenuForClinic = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
+}));
+
+vi.mock("@/lib/features", () => ({
+  MODULE_FEATURES: { appointments: "appointments" },
+  requireTenantFeatureEntitlement,
+}));
+
+vi.mock("@/lib/telephony/availability", () => ({
+  buildDoctorMenuForClinic,
 }));
 
 const TEST_CLINIC = Object.freeze({
@@ -50,6 +62,12 @@ describe("POST /api/webhooks/plivo/input", () => {
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
     resolveClinic.mockReset();
     resolveClinic.mockResolvedValue(TEST_CLINIC);
+    requireTenantFeatureEntitlement.mockReset();
+    requireTenantFeatureEntitlement.mockResolvedValue(undefined);
+    buildDoctorMenuForClinic.mockReset();
+    buildDoctorMenuForClinic.mockResolvedValue(
+      "<Response><GetInput><Speak>Select a doctor.</Speak></GetInput></Response>",
+    );
   });
 
   afterEach(() => {
@@ -62,7 +80,6 @@ describe("POST /api/webhooks/plivo/input", () => {
   });
 
   it.each([
-    ["1", "You selected tomorrow appointment availability."],
     ["2", "You selected appointment booking."],
     ["3", "You selected urgent assistance."],
     ["4", "You selected clinic information."],
@@ -77,6 +94,37 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).not.toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain("<Record");
+  });
+
+  it("opens the doctor menu for signed digit 1 after tenant entitlement", async () => {
+    const { response, xml } = await postDigit("1");
+
+    expect(response.status).toBe(200);
+    expect(requireTenantFeatureEntitlement).toHaveBeenCalledWith(
+      "tenant-a",
+      "appointments",
+    );
+    expect(buildDoctorMenuForClinic).toHaveBeenCalledWith(
+      INPUT_WEBHOOK_URL,
+      TEST_CLINIC,
+    );
+    expect(xml).toContain("Select a doctor.");
+    expect(xml).not.toContain("You selected tomorrow appointment availability.");
+  });
+
+  it("keeps Press 1 unavailable when tenant entitlement is denied", async () => {
+    requireTenantFeatureEntitlement.mockRejectedValueOnce(
+      new FeatureError("appointments", "entitlement"),
+    );
+
+    const { response, xml } = await postDigit("1");
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain(
+      "Telephone appointment availability is not available for this clinic.",
+    );
+    expect(xml).toContain("Welcome to Sunrise Clinic.");
+    expect(buildDoctorMenuForClinic).not.toHaveBeenCalled();
   });
 
   it("replays the complete menu for signed digit 9", async () => {

@@ -2,6 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import {
+  Building2,
+  Calendar,
+  History,
+  Home,
+  Hospital,
+  MapPin,
+  Pencil,
+  Phone,
+  User,
+  Users,
+  Wallet,
+} from "lucide-react";
 import RegistrationForm, {
   type DoctorOption,
 } from "@/components/registration/RegistrationForm";
@@ -13,8 +26,7 @@ import {
   type RegistrationRecord,
 } from "@/lib/registrations";
 import PageHeader from "@/components/ui/PageHeader";
-import Button, { buttonClasses } from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 
 /**
@@ -22,8 +34,7 @@ import StatusPill from "@/components/ui/StatusPill";
  *
  * Details read as a summary; editing is an explicit choice, so a record cannot
  * be changed by accidental typing. The edit history link appears only for roles
- * that hold `registration:history:read` — but the API enforces that too, since
- * hiding a link is not access control.
+ * that hold `registration:history:read` — but the API enforces that too.
  */
 
 interface RegistrationDetailProps {
@@ -38,19 +49,29 @@ interface RegistrationDetailProps {
   canViewHistory: boolean;
 }
 
-function NotSet() {
-  return <span className="text-faint">Not set</span>;
-}
-
 function formatVisitDate(date: string): string {
-  // Parsed as UTC to match how the date is stored, so the label cannot slip a day.
-  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
+  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-US", {
     weekday: "short",
-    day: "numeric",
     month: "short",
+    day: "numeric",
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+function formatCreatedAt(iso: string): string {
+  const d = new Date(iso);
+  const dateStr = d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const timeStr = d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${dateStr} at ${timeStr}`;
 }
 
 export default function RegistrationDetail({
@@ -67,16 +88,19 @@ export default function RegistrationDetail({
 
   if (isEditing) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <PageHeader
           title={`Edit ${registration.patientName}`}
-          meta="Every change is recorded in this registration's edit history."
+          breadcrumbs={[
+            { label: "Registrations", href: "/registration" },
+            { label: registration.patientCode, href: `/registration/${registration.id}` },
+            { label: "Edit" },
+          ]}
+          description="Every change is recorded in this registration's edit history."
         />
 
-        <Card>
+        <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
           <RegistrationForm
-            // The clinic cannot change after creation, so the picker is not
-            // offered; this list exists only to satisfy the shared form's props.
             clinics={[
               { id: registration.clinicId, name: registration.clinicName },
             ]}
@@ -87,7 +111,6 @@ export default function RegistrationDetail({
             registrationId={registration.id}
             initial={{
               clinicId: registration.clinicId,
-              // Fixed for an edit — the visit already belongs to this patient.
               patientId: registration.patientId,
               patientCode: registration.patientCode,
               name: registration.patientName,
@@ -105,106 +128,196 @@ export default function RegistrationDetail({
             }}
             onCancel={() => setIsEditing(false)}
           />
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        breadcrumbs={[
-          { label: "Registrations", href: "/registration" },
-          { label: registration.patientCode },
-        ]}
-        title={registration.patientName}
-        scope={registration.clinicName}
-        meta={
-          <div className="flex flex-col gap-1.5">
-            <span className="serial text-body text-muted">
-              {registration.patientCode}
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-body text-muted">
-                {registration.department}
-                {registration.doctorName ? ` · ${registration.doctorName}` : ""} ·{""}
-                {registration.clinicName}
-              </span>
-              <StatusPill
-                tone={registration.visitType === "FOLLOW_UP" ? "accent" : "neutral"}
-                hasDot={false}
-              >
-                {VISIT_TYPE_LABELS[registration.visitType]}
-              </StatusPill>
-              {visits.length > 1 && (
-                <span className="text-body text-muted">
-                  · {visits.length} visits on this record
-                </span>
+    <div className="space-y-6">
+      {/* Header & Meta Strip */}
+      <div className="space-y-4">
+        <PageHeader
+          breadcrumbs={[
+            { label: "Registrations", href: "/registration" },
+            { label: registration.patientCode },
+          ]}
+          title={registration.patientName}
+          scope={registration.clinicName}
+          actions={
+            <div className="flex items-center gap-3">
+              {canViewHistory && (
+                <Link
+                  href={`/registration/${registration.id}/history`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-canvas px-4 py-2 text-label font-semibold text-ink shadow-sm hover:bg-canvas-deep transition-colors"
+                >
+                  <History className="h-4 w-4 text-muted" aria-hidden="true" />
+                  <span>Edit history</span>
+                </Link>
+              )}
+              {canEdit && (
+                <Button
+                  variant="primary"
+                  onClick={() => setIsEditing(true)}
+                  className="rounded-xl px-4 py-2 font-semibold text-label shadow-cta flex items-center gap-2"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                  <span>Edit registration</span>
+                </Button>
               )}
             </div>
-          </div>
-        }
-        actions={
-          <>
-            {canViewHistory && (
-              <Link
-                href={`/registration/${registration.id}/history`}
-                className={buttonClasses("secondary", "md")}
-              >
-                Edit history
-              </Link>
-            )}
-            {canEdit && (
-              <Button variant="primary" onClick={() => setIsEditing(true)}>
-                Edit registration
-              </Button>
-            )}
-          </>
-        }
-      />
+          }
+        />
 
-      <Card>
-        <dl className="grid gap-5 sm:grid-cols-3">
-          <div>
-            <dt className="text-label font-medium text-muted">Amount</dt>
-            <dd className="tnum mt-1 text-metric font-semibold text-ink">
-              {formatRupees(registration.amount)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-label font-medium text-muted">Visit date &amp; time</dt>
-            <dd className="mt-1 text-body font-medium tnum text-ink">
-              {formatVisitDate(registration.visitDate)} at {registration.visitTime}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-label font-medium text-muted">Mobile number</dt>
-            <dd className="mt-1 text-body font-medium tnum text-ink">{registration.mobileNumber}</dd>
-          </div>
-          <div>
-            <dt className="text-label font-medium text-muted">Age</dt>
-            <dd className="mt-1 text-body font-medium tnum text-ink">
-              {registration.age === null ? <NotSet /> : registration.age}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-label font-medium text-muted">Gender</dt>
-            <dd className="mt-1 text-body font-medium text-ink">{registration.gender ?? <NotSet />}</dd>
-          </div>
-          <div>
-            <dt className="text-label font-medium text-muted">City</dt>
-            <dd className="mt-1 text-body font-medium text-ink">{registration.city ?? <NotSet />}</dd>
-          </div>
-          <div className="sm:col-span-3">
-            <dt className="text-label font-medium text-muted">Address</dt>
-            <dd className="mt-1 text-body font-medium text-ink">{registration.address ?? <NotSet />}</dd>
-          </div>
-        </dl>
-      </Card>
+        <div>
+          <p className="serial text-body font-semibold text-muted">
+            {registration.patientCode}
+          </p>
 
-      <p className="text-label text-muted">
-        Registered by {registration.createdByName ?? registration.createdByEmail}
-      </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-label text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <Building2 className="h-4 w-4 text-muted" aria-hidden="true" />
+              <span>Department: <strong className="font-semibold text-ink">{registration.department}</strong></span>
+            </span>
+
+            <span className="inline-flex items-center gap-1.5">
+              <User className="h-4 w-4 text-muted" aria-hidden="true" />
+              <span>Doctor: <strong className="font-semibold text-ink">{registration.doctorName ?? "—"}</strong></span>
+            </span>
+
+            <span className="inline-flex items-center gap-1.5">
+              <Hospital className="h-4 w-4 text-muted" aria-hidden="true" />
+              <span>Clinic: <strong className="font-semibold text-ink">{registration.clinicName}</strong></span>
+            </span>
+
+            <StatusPill
+              tone={registration.visitType === "FOLLOW_UP" ? "accent" : "neutral"}
+              hasDot={false}
+            >
+              {VISIT_TYPE_LABELS[registration.visitType]}
+            </StatusPill>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Details Card — Visual Facts */}
+      <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-8 shadow-card space-y-6">
+        {/* Row 1: Amount, Visit Date & Time, Mobile Number */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line/60">
+          <div className="flex items-center gap-3.5 pt-0">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+              <Wallet className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-label font-medium text-muted">Amount</p>
+              <p className="mt-0.5 text-2xl font-bold tracking-tight text-ink tnum">
+                {formatRupees(registration.amount)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 pt-4 sm:pt-0 sm:pl-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+              <Calendar className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-label font-medium text-muted">Visit date &amp; time</p>
+              <p className="mt-0.5 text-base font-bold text-ink">
+                {formatVisitDate(registration.visitDate)}
+              </p>
+              <p className="text-label text-muted tnum">{registration.visitTime}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 pt-4 sm:pt-0 sm:pl-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+              <Phone className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-label font-medium text-muted">Mobile number</p>
+              <p className="mt-0.5 text-base font-bold text-ink tnum">
+                {registration.mobileNumber}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <hr className="border-line/60" />
+
+        {/* Row 2: Age, Gender, City */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line/60">
+          <div className="flex items-center gap-3.5 pt-0">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+              <User className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-label font-medium text-muted">Age</p>
+              <p className="mt-0.5 text-base font-bold text-ink tnum">
+                {registration.age ?? "Not set"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 pt-4 sm:pt-0 sm:pl-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+              <Users className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-label font-medium text-muted">Gender</p>
+              <p className="mt-0.5 text-base font-bold text-ink">
+                {registration.gender ?? "Not set"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 pt-4 sm:pt-0 sm:pl-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+              <MapPin className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-label font-medium text-muted">City</p>
+              <p className="mt-0.5 text-base font-bold text-ink">
+                {registration.city ?? "Not set"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <hr className="border-line/60" />
+
+        {/* Row 3: Address */}
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+            <Home className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-label font-medium text-muted">Address</p>
+            <p className="mt-0.5 text-base font-bold text-ink">
+              {registration.address ?? "Not set"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Meta Footer Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-canvas px-6 py-4 shadow-card">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF2FF] text-[#4F46E5]">
+            <User className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <span className="text-label font-medium text-muted">
+            Registered by{" "}
+            <strong className="font-semibold text-ink">
+              {registration.createdByName ?? registration.createdByEmail}
+            </strong>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 text-label text-muted">
+          <Calendar className="h-4 w-4 text-muted" aria-hidden="true" />
+          <span>Created on {formatCreatedAt(registration.createdAt)}</span>
+        </div>
+      </div>
 
       <PatientVisits visits={visits} currentId={registration.id} />
     </div>

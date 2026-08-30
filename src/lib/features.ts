@@ -6,6 +6,7 @@ import {
   FeatureError,
   isTenantEntitled,
   resolveModuleAccess,
+  resolveTenantFeatureAccess,
   type FeatureResolution,
   type ModuleDenialReason,
 } from "@/lib/featureResolution";
@@ -326,6 +327,65 @@ export async function requireModule(
 
   if (!verdict.allowed) {
     throw new FeatureError(featureKey, verdict.reason as ModuleDenialReason);
+  }
+}
+
+/**
+ * Layers 1-2 only, for a trusted non-human channel such as a validated voice
+ * webhook. It deliberately never loads RoleFeatureAccess or action permissions.
+ */
+export async function requireTenantFeatureEntitlement(
+  tenantId: string,
+  featureKey: ModuleFeatureKey,
+): Promise<void> {
+  const [tenant, feature] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { planId: true },
+    }),
+    prisma.feature.findUnique({
+      where: { key: featureKey },
+      select: { id: true, globalEnabled: true },
+    }),
+  ]);
+
+  if (!feature) {
+    const verdict = missingFeature(featureKey);
+    throw new FeatureError(
+      featureKey,
+      verdict.reason as ModuleDenialReason,
+    );
+  }
+
+  const [planFeature, tenantOverride] = await Promise.all([
+    tenant?.planId
+      ? prisma.planFeature.findUnique({
+          where: {
+            planId_featureId: {
+              planId: tenant.planId,
+              featureId: feature.id,
+            },
+          },
+          select: { enabled: true },
+        })
+      : Promise.resolve(null),
+    prisma.tenantFeatureOverride.findUnique({
+      where: { tenantId_featureId: { tenantId, featureId: feature.id } },
+      select: { enabled: true },
+    }),
+  ]);
+
+  const verdict = resolveTenantFeatureAccess({
+    globalEnabled: feature.globalEnabled,
+    planEnabled: planFeature?.enabled ?? null,
+    tenantOverride: tenantOverride?.enabled ?? null,
+  });
+
+  if (!verdict.allowed) {
+    throw new FeatureError(
+      featureKey,
+      verdict.reason as ModuleDenialReason,
+    );
   }
 }
 

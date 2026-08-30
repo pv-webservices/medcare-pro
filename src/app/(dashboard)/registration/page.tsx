@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Plus } from "lucide-react";
 import RegistrationFilters from "@/components/registration/RegistrationFilters";
 import RegistrationsTable from "@/components/registration/RegistrationsTable";
-import { buttonClasses } from "@/components/ui/Button";
-import PageHeader, { Count } from "@/components/ui/PageHeader";
-import Pagination from "@/components/ui/Pagination";
+import PageHeader from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { can } from "@/lib/rbac";
@@ -102,15 +101,14 @@ export default async function RegistrationListPage({
   const lastOnPage = Math.min(result.page * result.pageSize, result.total);
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <PageHeader
         title="Registrations"
         description="Manage patient registrations and visit records."
         scope={selectedClinic ? selectedClinic.name : "All clinics"}
         meta={
           <>
-            <Count>{result.total}</Count>{" "}
-            {result.total === 1 ? "registration" : "registrations"}
+            {result.total} {result.total === 1 ? "registration" : "registrations"}
             {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
             {isFiltered ? " matching your filters" : ""}
             .
@@ -120,8 +118,9 @@ export default async function RegistrationListPage({
           canCreate && (
             <Link
               href="/registration/new"
-              className={buttonClasses("primary", "md")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 font-semibold text-body text-white shadow-cta hover:bg-accent-strong transition-colors"
             >
+              <Plus className="h-4 w-4" />
               New registration
             </Link>
           )
@@ -146,16 +145,12 @@ export default async function RegistrationListPage({
         showClinic={!selectedClinic}
         isFiltered={isFiltered}
         canCreate={canCreate}
-      />
-
-      <Pagination
+        total={result.total}
         page={result.page}
         lastPage={lastPage}
-        total={result.total}
         firstOnPage={firstOnPage}
         lastOnPage={lastOnPage}
         hrefFor={(page) => pageHref(params, page)}
-        label="Registration pages"
       />
     </section>
   );

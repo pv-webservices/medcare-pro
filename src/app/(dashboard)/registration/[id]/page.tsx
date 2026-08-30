@@ -65,7 +65,7 @@ export default async function RegistrationDetailPage({
     ]);
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <RegistrationDetail
         registration={registration}
         doctors={doctors.map(({ id: doctorId, name, clinicId, department }) => ({

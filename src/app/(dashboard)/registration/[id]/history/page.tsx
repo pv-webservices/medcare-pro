@@ -67,7 +67,7 @@ export default async function RegistrationHistoryPage({
   }
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <PageHeader
         breadcrumbs={[
           { label: "Registrations", href: "/registration" },
