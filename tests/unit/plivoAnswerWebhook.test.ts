@@ -38,6 +38,21 @@ describe("POST /api/webhooks/plivo/answer", () => {
     expect(response.status).toBe(200);
   });
 
+  it("accepts a valid signature among comma-separated V3 signatures", async () => {
+    const request = buildSignedPlivoWebhookRequest({ url: WEBHOOK_URL });
+    const validSignature = request.headers.get("X-Plivo-Signature-V3");
+
+    expect(validSignature).not.toBeNull();
+    request.headers.set(
+      "X-Plivo-Signature-V3",
+      `invalid-token-signature,${validSignature},another-invalid-signature`,
+    );
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+  });
+
   it("rejects an invalid Plivo signature", async () => {
     const response = await POST(
       buildSignedPlivoWebhookRequest({
