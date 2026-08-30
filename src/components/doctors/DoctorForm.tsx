@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Briefcase, Calendar, Phone, User } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -39,7 +40,7 @@ interface DoctorFormProps {
 /** Free text in the database — this list is a shortcut, not a constraint. */
 const GENDERS = ["Female", "Male", "Other"] as const;
 
-const PHONE = /^(\+91)?[0-9]{10}$/
+const PHONE = /^(\+91)?[0-9]{10}$/;
 
 type FieldErrors = Partial<Record<keyof DoctorFormValues, string>>;
 
@@ -73,7 +74,6 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
 
   const [values, setValues] = useState<DoctorFormValues>(
     initial ?? {
-      // With a single clinic there is nothing to choose — preselect it.
       clinicId: clinics.length === 1 ? clinics[0].id : "",
       name: "",
       department: "",
@@ -112,7 +112,6 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
 
     setIsSaving(true);
     try {
-      // Clinic is fixed after creation — see the note in the API route.
       const payload = {
         name: values.name.trim(),
         department: values.department.trim(),
@@ -143,7 +142,6 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
         router.refresh();
         onCancel?.();
       } else {
-        // Straight to the profile — the next task is setting availability.
         router.push(`/doctors/${body.data?.id ?? ""}`);
         router.refresh();
       }
@@ -165,8 +163,130 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {!isEdit && (
+      {isEdit ? (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-bold tracking-tight text-ink">
+              Doctor details
+            </h3>
+            <p className="mt-0.5 text-label text-muted">
+              Update the personal and professional information.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                id="doctor-name"
+                name="name"
+                label="Name"
+                type="text"
+                autoComplete="name"
+                icon={<User className="h-4 w-4 text-muted" />}
+                value={values.name}
+                onChange={(e) => update("name", e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+                error={errorFor("name")}
+              />
+
+              <Input
+                id="doctor-department"
+                name="department"
+                label="Department"
+                type="text"
+                icon={<Briefcase className="h-4 w-4 text-muted" />}
+                value={values.department}
+                onChange={(e) => update("department", e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, department: true }))}
+                error={errorFor("department")}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3 items-start">
+              <Select
+                id="doctor-gender"
+                name="gender"
+                label="Gender"
+                icon={<User className="h-4 w-4 text-muted" />}
+                value={values.gender}
+                onChange={(e) => update("gender", e.target.value)}
+              >
+                <option value="">Not recorded</option>
+                {GENDERS.map((gender) => (
+                  <option key={gender} value={gender}>
+                    {gender}
+                  </option>
+                ))}
+              </Select>
+
+              <Input
+                id="doctor-age"
+                name="age"
+                label="Age"
+                type="number"
+                inputMode="numeric"
+                icon={<Calendar className="h-4 w-4 text-muted" />}
+                min={0}
+                max={120}
+                value={values.age}
+                onChange={(e) => update("age", e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, age: true }))}
+                error={errorFor("age")}
+              />
+
+              <Input
+                id="doctor-phone"
+                name="phone"
+                label="Phone"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                maxLength={13}
+                icon={<Phone className="h-4 w-4 text-muted" />}
+                pattern="^(\+91)?[0-9]{10}$"
+                title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
+                value={values.phone}
+                onChange={(e) => {
+                  let val = e.target.value.replace(/[^0-9+]/g, "");
+                  if (val.startsWith("+")) {
+                    val = val.slice(0, 13);
+                  } else {
+                    val = val.slice(0, 10);
+                  }
+                  update("phone", val);
+                }}
+                onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
+                error={errorFor("phone")}
+                hint="Optional. 10-digit Indian number."
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button
+              type="submit"
+              variant="primary"
+              isBusy={isSaving}
+              busyLabel="Saving…"
+              className="rounded-xl px-5 py-2.5 font-semibold shadow-cta"
+            >
+              Save changes
+            </Button>
+
+            {onCancel && (
+              <Button
+                variant="secondary"
+                onClick={onCancel}
+                disabled={isSaving}
+                className="rounded-xl px-5 py-2.5 font-semibold"
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
           <Select
             id="doctor-clinic"
             name="clinicId"
@@ -175,7 +295,6 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
             onChange={(e) => update("clinicId", e.target.value)}
             onBlur={() => setTouched((t) => ({ ...t, clinicId: true }))}
             error={errorFor("clinicId")}
-            fieldClassName="sm:col-span-2"
           >
             <option value="">Choose a clinic…</option>
             {clinics.map((clinic) => (
@@ -184,103 +303,116 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
               </option>
             ))}
           </Select>
-        )}
 
-        <Input
-          id="doctor-name"
-          name="name"
-          label="Name"
-          type="text"
-          autoComplete="name"
-          value={values.name}
-          onChange={(e) => update("name", e.target.value)}
-          onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-          error={errorFor("name")}
-        />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              id="doctor-name"
+              name="name"
+              label="Name"
+              type="text"
+              autoComplete="name"
+              placeholder="e.g. Dr. Jane Doe"
+              value={values.name}
+              onChange={(e) => update("name", e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+              error={errorFor("name")}
+            />
 
-        <Input
-          id="doctor-department"
-          name="department"
-          label="Department"
-          type="text"
-          value={values.department}
-          onChange={(e) => update("department", e.target.value)}
-          onBlur={() => setTouched((t) => ({ ...t, department: true }))}
-          error={errorFor("department")}
-        />
+            <Input
+              id="doctor-department"
+              name="department"
+              label="Department"
+              type="text"
+              placeholder="e.g. Cardiology"
+              value={values.department}
+              onChange={(e) => update("department", e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, department: true }))}
+              error={errorFor("department")}
+            />
+          </div>
 
-        <Select
-          id="doctor-gender"
-          name="gender"
-          label="Gender"
-          value={values.gender}
-          onChange={(e) => update("gender", e.target.value)}
-        >
-          <option value="">Not recorded</option>
-          {GENDERS.map((gender) => (
-            <option key={gender} value={gender}>
-              {gender}
-            </option>
-          ))}
-        </Select>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select
+              id="doctor-gender"
+              name="gender"
+              label="Gender"
+              value={values.gender}
+              onChange={(e) => update("gender", e.target.value)}
+            >
+              <option value="">Not recorded</option>
+              {GENDERS.map((gender) => (
+                <option key={gender} value={gender}>
+                  {gender}
+                </option>
+              ))}
+            </Select>
 
-        <Input
-          id="doctor-age"
-          name="age"
-          label="Age"
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={120}
-          value={values.age}
-          onChange={(e) => update("age", e.target.value)}
-          onBlur={() => setTouched((t) => ({ ...t, age: true }))}
-          error={errorFor("age")}
-        />
+            <Input
+              id="doctor-age"
+              name="age"
+              label="Age"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={120}
+              placeholder="e.g. 35"
+              value={values.age}
+              onChange={(e) => update("age", e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, age: true }))}
+              error={errorFor("age")}
+            />
+          </div>
 
-        <Input
-          id="doctor-phone"
-          name="phone"
-          label="Phone"
-          type="tel"
-          inputMode="numeric"
-          autoComplete="tel"
-          maxLength={13}
-          pattern="^(\+91)?[0-9]{10}$"
-          title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
-          value={values.phone}
-          onChange={(e) => {
-            let val = e.target.value.replace(/[^0-9+]/g, "");
-            if (val.startsWith("+")) {
-              val = val.slice(0, 13);
-            } else {
-              val = val.slice(0, 10);
-            }
-            update("phone", val);
-          }}
-          onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
-          error={errorFor("phone")}
-          hint="Optional. 10-digit Indian number."
-          fieldClassName="sm:col-span-2"
-        />
-      </div>
+          <Input
+            id="doctor-phone"
+            name="phone"
+            label="Phone"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            maxLength={13}
+            pattern="^(\+91)?[0-9]{10}$"
+            title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
+            placeholder="e.g. 9876543210"
+            value={values.phone}
+            onChange={(e) => {
+              let val = e.target.value.replace(/[^0-9+]/g, "");
+              if (val.startsWith("+")) {
+                val = val.slice(0, 13);
+              } else {
+                val = val.slice(0, 10);
+              }
+              update("phone", val);
+            }}
+            onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
+            error={errorFor("phone")}
+            hint="Optional. 10-digit Indian number."
+          />
 
-      <div className="mt-6 flex flex-wrap gap-3">
-        <Button
-          type="submit"
-          variant="primary"
-          isBusy={isSaving}
-          busyLabel={isEdit ? "Saving…" : "Adding Doctor…"}
-        >
-          {isEdit ? "Save changes" : "Add doctor"}
-        </Button>
+          <div className="mt-8 flex flex-wrap gap-3 pt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              isBusy={isSaving}
+              busyLabel="Adding Doctor…"
+              className="rounded-xl px-5 py-2.5 font-semibold shadow-cta"
+            >
+              Add doctor
+            </Button>
 
-        {onCancel && (
-          <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
-            Cancel
-          </Button>
-        )}
-      </div>
+            {onCancel && (
+              <Button
+                variant="secondary"
+                onClick={onCancel}
+                disabled={isSaving}
+                className="rounded-xl px-5 py-2.5 font-semibold"
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
     </form>
   );
 }

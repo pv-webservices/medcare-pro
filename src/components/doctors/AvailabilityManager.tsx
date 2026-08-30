@@ -128,19 +128,19 @@ export default function AvailabilityManager({
     return (
       <li
         key={group.date}
-        className={`border-b border-line py-4 last:border-b-0 ${
+        className={`py-3.5 first:pt-0 last:pb-0 ${
           isPast ? "opacity-60" : ""
         }`}
       >
-        <p className="text-body font-semibold text-ink">{formatDayLabel(group.date)}</p>
-        <ul className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="text-body font-bold text-ink">{formatDayLabel(group.date)}</p>
+        <ul className="mt-2 flex flex-wrap items-center gap-4">
           {group.slots
             .slice()
             .sort((a, b) => a.startTime.localeCompare(b.startTime))
             .map((slot) => (
               <li
                 key={slot.id}
-                className="flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-1.5 bg-canvas-deep"
+                className="flex items-center gap-3"
               >
                 <span className="text-body tnum text-ink font-medium">
                   {slot.startTime}–{slot.endTime}
@@ -151,9 +151,9 @@ export default function AvailabilityManager({
                     onClick={() => handleRemove(slot.id)}
                     disabled={removingId === slot.id}
                     aria-label={`Remove ${slot.startTime} to ${slot.endTime} on ${formatDayLabel(group.date)}`}
-                    className="min-h-8 rounded-md px-2 text-meta font-medium text-muted hover:bg-canvas-deep disabled:opacity-50 transition-colors"
+                    className="text-label font-semibold text-accent hover:underline disabled:opacity-50 transition-colors"
                   >
-                    {removingId === slot.id ? "…" : "Remove"}
+                    {removingId === slot.id ? "Removing…" : "Remove"}
                   </button>
                 )}
               </li>
@@ -164,25 +164,28 @@ export default function AvailabilityManager({
   }
 
   return (
-    <section aria-labelledby="availability-heading" className="space-y-4">
-      <h2 id="availability-heading" className="text-heading font-semibold text-ink">
+    <section
+      aria-labelledby="availability-heading"
+      className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card space-y-6"
+    >
+      <h2 id="availability-heading" className="text-lg font-bold tracking-tight text-ink">
         Availability
       </h2>
 
       {error && (
         <p
           role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
+          className="rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
       )}
 
       {canEdit && (
-        <Card isFlush={false} className="p-4 bg-canvas-deep border-line">
+        <div className="rounded-2xl border border-line/60 bg-canvas-deep/30 p-4 sm:p-5">
           <form
             onSubmit={handleAdd}
-            className="grid gap-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
+            className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
           >
             <Input
               id="availability-date"
@@ -213,33 +216,38 @@ export default function AvailabilityManager({
               variant="primary"
               isBusy={isSaving}
               busyLabel="Adding…"
+              className="rounded-xl px-4 py-2.5 font-semibold text-body shadow-cta"
             >
               Add Hours
             </Button>
           </form>
-        </Card>
+        </div>
       )}
 
       {entries.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center border border-line shadow-card">
-          <p className="text-body font-medium text-muted">
+        <div className="rounded-2xl border border-dashed border-line/80 p-8 text-center bg-canvas-deep/20">
+          <p className="text-label font-medium text-muted">
             No availability set. Add the dates and hours this doctor is in.
           </p>
         </div>
       ) : (
-        <Card isFlush={false} className="p-2 sm:p-4">
-          <ul>{upcoming.map((group) => renderGroup(group, false))}</ul>
+        <div>
+          <ul className="divide-y divide-line/60">
+            {upcoming.map((group) => renderGroup(group, false))}
+          </ul>
 
           {past.length > 0 && (
-            <details className="mt-4 border-t border-line pt-4 group">
-              <summary className="cursor-pointer text-body font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
-                <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
+            <details className="mt-4 border-t border-line/60 pt-4 group">
+              <summary className="cursor-pointer text-label font-semibold text-muted hover:text-ink transition-colors list-none flex items-center gap-1.5">
+                <span className="group-open:rotate-90 transition-transform">▶</span>
                 Past dates ({past.length})
               </summary>
-              <ul className="mt-2 pl-4">{past.map((group) => renderGroup(group, true))}</ul>
+              <ul className="mt-2 pl-4 divide-y divide-line/40">
+                {past.map((group) => renderGroup(group, true))}
+              </ul>
             </details>
           )}
-        </Card>
+        </div>
       )}
     </section>
   );

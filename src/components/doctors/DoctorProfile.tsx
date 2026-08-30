@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Calendar, Pencil, Phone, User } from "lucide-react";
 import DoctorForm from "@/components/doctors/DoctorForm";
 import AvailabilityManager from "@/components/doctors/AvailabilityManager";
 import LeaveManager from "@/components/doctors/LeaveManager";
 import type { DoctorDetail } from "@/lib/doctors";
-
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import StatusPill from "@/components/ui/StatusPill";
 
 /**
@@ -25,19 +24,13 @@ interface DoctorProfileProps {
   today: string;
 }
 
-const FIELD_LABEL_CLASS = "text-body font-semibold text-muted";
-
-function NotSet() {
-  return <span className="text-faint">Not set</span>;
-}
-
 export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
 
   return (
-    <div>
+    <div className="space-y-6">
       {isEditing ? (
-        <div className="mb-5 space-y-4">
+        <div className="space-y-5">
           <PageHeader
             title={`Edit ${doctor.name}`}
             breadcrumbs={[
@@ -46,10 +39,8 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
               { label: "Edit" },
             ]}
           />
-          <Card>
+          <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
             <DoctorForm
-              // Clinic cannot be changed after creation, so the picker is not
-              // offered — this list exists only to satisfy the shared form's props.
               clinics={[{ id: doctor.clinicId, name: doctor.clinicName }]}
               initial={{
                 id: doctor.id,
@@ -62,10 +53,10 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
               }}
               onCancel={() => setIsEditing(false)}
             />
-          </Card>
+          </div>
         </div>
       ) : (
-        <div className="mb-5 space-y-4">
+        <div className="space-y-5">
           <PageHeader
             title={doctor.name}
             breadcrumbs={[
@@ -81,35 +72,66 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
             }
             actions={
               canEdit && (
-                <Button variant="secondary" onClick={() => setIsEditing(true)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsEditing(true)}
+                  className="rounded-xl px-4 py-2 font-semibold text-label shadow-sm flex items-center gap-1.5"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
                   Edit doctor
                 </Button>
               )
             }
           />
 
-          <Card>
-            <dl className="grid gap-5 sm:grid-cols-3">
-              <div>
-                <dt className={FIELD_LABEL_CLASS}>Phone</dt>
-                <dd className="tnum mt-1 text-body font-medium text-ink">{doctor.phone ?? <NotSet />}</dd>
+          {/* Quick Info Summary Card */}
+          <div className="rounded-3xl border border-line bg-canvas p-6 shadow-card">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line/60">
+              {/* Phone */}
+              <div className="flex items-center gap-3.5 pt-0">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+                  <Phone className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-label font-medium text-muted">Phone</p>
+                  <p className="mt-0.5 text-lg font-bold tracking-tight text-ink tnum">
+                    {doctor.phone || "—"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <dt className={FIELD_LABEL_CLASS}>Gender</dt>
-                <dd className="mt-1 text-body font-medium text-ink">{doctor.gender ?? <NotSet />}</dd>
+
+              {/* Gender */}
+              <div className="flex items-center gap-3.5 pt-4 sm:pt-0 sm:pl-6">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#3B82F6]">
+                  <User className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-label font-medium text-muted">Gender</p>
+                  <p className="mt-0.5 text-lg font-bold tracking-tight text-ink">
+                    {doctor.gender || "Not recorded"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <dt className={FIELD_LABEL_CLASS}>Age</dt>
-                <dd className="tnum mt-1 text-body font-medium text-ink">
-                  {doctor.age === null ? <NotSet /> : doctor.age}
-                </dd>
+
+              {/* Age */}
+              <div className="flex items-center gap-3.5 pt-4 sm:pt-0 sm:pl-6">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED]">
+                  <Calendar className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-label font-medium text-muted">Age</p>
+                  <p className="mt-0.5 text-lg font-bold tracking-tight text-ink tnum">
+                    {doctor.age ?? "—"}
+                  </p>
+                </div>
               </div>
-            </dl>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Availability and Leave Two-Column Section */}
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
         <AvailabilityManager
           doctorId={doctor.id}
           entries={doctor.availability}

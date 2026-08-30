@@ -47,7 +47,7 @@ export default async function DoctorsListPage() {
     : undefined;
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <PageHeader
         title="Doctors"
         description="Manage doctors, availability and leave."

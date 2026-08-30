@@ -47,7 +47,7 @@ export default async function DoctorDetailPage({ params }: DoctorDetailPageProps
   const canEdit = await can(actor, "doctor:edit", doctor.clinicId);
 
   return (
-    <section className="space-y-4">
+    <section className="w-full">
       <DoctorProfile
         doctor={doctor}
         canEdit={canEdit}

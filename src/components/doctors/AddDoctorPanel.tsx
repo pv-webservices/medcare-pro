@@ -40,7 +40,11 @@ export default function AddDoctorPanel({ clinics }: AddDoctorPanelProps) {
 
   return (
     <>
-      <Button variant="primary" onClick={() => setIsOpen(true)}>
+      <Button
+        variant="primary"
+        onClick={() => setIsOpen(true)}
+        className="rounded-xl px-4 py-2 font-semibold text-body shadow-cta flex items-center gap-1.5"
+      >
         <Plus aria-hidden="true" strokeWidth={2.5} className="h-4 w-4" />
         Add doctor
       </Button>
@@ -50,6 +54,7 @@ export default function AddDoctorPanel({ clinics }: AddDoctorPanelProps) {
         onClose={() => setIsOpen(false)}
         title="Add a doctor"
         description="They will appear on the list and can be given availability straight away."
+        className="sm:w-[32rem] md:w-[36rem] max-w-full"
       >
         <DoctorForm clinics={clinics} onCancel={() => setIsOpen(false)} />
       </Drawer>

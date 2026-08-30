@@ -1,11 +1,11 @@
 "use client";
 
+import { CalendarCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { LeaveEntry } from "@/lib/doctors";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Card from "@/components/ui/Card";
 
 /**
  * Doctor leave — PRD §6.4 (FR-4.4): a date range plus an optional reason.
@@ -118,21 +118,21 @@ export default function LeaveManager({
     return (
       <li
         key={entry.id}
-        className={`flex flex-wrap items-center justify-between gap-2 border-b border-line py-4 last:border-b-0 ${
+        className={`flex flex-wrap items-center justify-between gap-2 py-3.5 first:pt-0 last:pb-0 ${
           isEnded ? "opacity-60" : ""
         }`}
       >
         <div>
-          <p className="text-body font-semibold text-ink">
+          <p className="text-body font-bold text-ink">
             {formatRange(entry)}
             {isActiveNow && (
-              <span className="ml-3 rounded-md bg-warn-bg px-2.5 py-1 text-meta font-semibold text-warn-ink">
+              <span className="ml-3 rounded-lg bg-warn-bg px-2.5 py-0.5 text-micro font-semibold text-warn-ink border border-warn-line">
                 Away now
               </span>
             )}
           </p>
           {entry.reason && (
-            <p className="mt-1 text-body text-muted">
+            <p className="mt-1 text-label text-muted">
               {entry.reason}
             </p>
           )}
@@ -143,7 +143,7 @@ export default function LeaveManager({
             onClick={() => handleRemove(entry.id)}
             disabled={removingId === entry.id}
             aria-label={`Remove leave ${formatRange(entry)}`}
-            className="min-h-9 rounded-md px-3 text-meta font-medium text-muted hover:bg-canvas-deep hover:text-ink disabled:opacity-50 transition-colors"
+            className="text-label font-semibold text-accent hover:underline disabled:opacity-50 transition-colors"
           >
             {removingId === entry.id ? "Removing…" : "Remove"}
           </button>
@@ -153,90 +153,98 @@ export default function LeaveManager({
   }
 
   return (
-    <section aria-labelledby="leave-heading" className="space-y-4">
-      <h2 id="leave-heading" className="text-heading font-semibold text-ink">
-        Leave
-      </h2>
+    <section aria-labelledby="leave-heading" className="space-y-6">
+      {/* Record Leave Form Card */}
+      <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card space-y-6">
+        <h2 id="leave-heading" className="text-lg font-bold tracking-tight text-ink">
+          Leave
+        </h2>
 
-      {error && (
-        <p
-          role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
-        >
-          {error}
-        </p>
-      )}
-
-      {canEdit && (
-        <Card isFlush={false} className="p-4 bg-canvas-deep border-line">
-          <form
-            onSubmit={handleAdd}
-            className="grid gap-4 sm:grid-cols-2"
+        {error && (
+          <p
+            role="alert"
+            className="rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
           >
-            <Input
-              id="leave-start"
-              label="First day away"
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                // Keep the range valid as the user types rather than rejecting it later.
-                if (e.target.value > endDate) setEndDate(e.target.value);
-              }}
-              required
-            />
-            <Input
-              id="leave-end"
-              label="Last day away"
-              type="date"
-              value={endDate}
-              min={startDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              required
-            />
-            <Input
-              id="leave-reason"
-              label="Reason"
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              hint="Optional"
-              fieldClassName="sm:col-span-2"
-            />
-            <div className="sm:col-span-2">
+            {error}
+          </p>
+        )}
+
+        {canEdit && (
+          <div className="rounded-2xl border border-line/60 bg-canvas-deep/30 p-4 sm:p-5 space-y-4">
+            <form onSubmit={handleAdd} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id="leave-start"
+                  label="First day away"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (e.target.value > endDate) setEndDate(e.target.value);
+                  }}
+                  required
+                />
+                <Input
+                  id="leave-end"
+                  label="Last day away"
+                  type="date"
+                  value={endDate}
+                  min={startDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  required
+                />
+              </div>
+              <Input
+                id="leave-reason"
+                label="Reason"
+                type="text"
+                placeholder="Enter reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                hint="Optional"
+              />
               <Button
                 type="submit"
                 variant="primary"
                 isBusy={isSaving}
                 busyLabel="Recording…"
+                className="rounded-xl px-5 py-2.5 font-semibold text-body shadow-cta"
               >
                 Record Leave
               </Button>
-            </div>
-          </form>
-        </Card>
-      )}
+            </form>
+          </div>
+        )}
+      </div>
 
+      {/* Leave List or Empty Card */}
       {entries.length === 0 ? (
-        <div className="rounded-2xl bg-canvas px-6 py-8 text-center border border-line shadow-card">
-          <p className="text-body font-medium text-muted">
+        <div className="rounded-3xl border border-line bg-canvas p-8 shadow-card flex flex-col items-center justify-center text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5] mb-3">
+            <CalendarCheck className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <p className="text-label font-medium text-muted">
             No leave recorded.
           </p>
         </div>
       ) : (
-        <Card isFlush={false} className="p-2 sm:p-4">
-          <ul>{current.map((entry) => renderEntry(entry, false))}</ul>
+        <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+          <ul className="divide-y divide-line/60">
+            {current.map((entry) => renderEntry(entry, false))}
+          </ul>
 
           {ended.length > 0 && (
-            <details className="mt-4 border-t border-line pt-4 group">
-              <summary className="cursor-pointer text-body font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
-                <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
+            <details className="mt-4 border-t border-line/60 pt-4 group">
+              <summary className="cursor-pointer text-label font-semibold text-muted hover:text-ink transition-colors list-none flex items-center gap-1.5">
+                <span className="group-open:rotate-90 transition-transform">▶</span>
                 Past leave ({ended.length})
               </summary>
-              <ul className="mt-2 pl-4">{ended.map((entry) => renderEntry(entry, true))}</ul>
+              <ul className="mt-2 pl-4 divide-y divide-line/40">
+                {ended.map((entry) => renderEntry(entry, true))}
+              </ul>
             </details>
           )}
-        </Card>
+        </div>
       )}
     </section>
   );

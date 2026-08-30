@@ -26,6 +26,7 @@ interface SelectProps
   /** Hides the label visually but keeps it for screen readers. */
   isLabelHidden?: boolean;
   fieldClassName?: string;
+  icon?: ReactNode;
   children: ReactNode;
 }
 
@@ -36,12 +37,21 @@ export default function Select({
   error,
   isLabelHidden = false,
   fieldClassName,
+  icon,
   className,
   children,
   ...rest
 }: SelectProps) {
   const control = (
     <div className="relative">
+      {icon && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted"
+        >
+          {icon}
+        </span>
+      )}
       <select
         id={id}
         aria-invalid={error ? true : undefined}
@@ -49,7 +59,11 @@ export default function Select({
         aria-label={isLabelHidden ? label : undefined}
         className={controlClasses(
           Boolean(error),
-          cx("min-h-11 cursor-pointer appearance-none py-0 pl-4 pr-11", className),
+          cx(
+            "min-h-11 cursor-pointer appearance-none py-0 pr-11",
+            icon ? "pl-10" : "pl-4",
+            className
+          ),
         )}
         {...rest}
       >
