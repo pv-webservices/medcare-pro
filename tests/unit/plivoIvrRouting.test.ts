@@ -56,15 +56,19 @@ describe("unexposed Plivo IVR design", () => {
         url: INPUT_WEBHOOK_URL,
         paramOverrides: { Digits: digits },
       });
-      const readableCopy = request.clone();
+      const verification = await verifyPlivoV3Webhook(
+        request,
+        TEST_PLIVO_AUTH_TOKEN,
+      );
 
-      await expect(
-        verifyPlivoV3Webhook(request, TEST_PLIVO_AUTH_TOKEN),
-      ).resolves.toEqual({ ok: true });
+      expect(verification.ok).toBe(true);
+      if (!verification.ok) {
+        throw new Error("The signed Plivo test callback was not validated.");
+      }
 
-      const callback = await readableCopy.formData();
-      expect(callback.get("Digits")).toBe(digits);
-      expect(resolveMainMenuAction(callback.get("Digits")?.toString())).toBe(
+      expect(Object.isFrozen(verification.params)).toBe(true);
+      expect(verification.params.Digits).toBe(digits);
+      expect(resolveMainMenuAction(verification.params.Digits.toString())).toBe(
         MAIN_MENU_ROUTES[digits].action,
       );
     },

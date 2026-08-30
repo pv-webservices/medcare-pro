@@ -11,13 +11,17 @@ export type PlivoVerificationFailure =
   | "invalid-signature";
 
 export type PlivoVerificationResult =
-  | { ok: true }
+  | { ok: true; params: ValidatedPlivoParams }
   | { ok: false; reason: PlivoVerificationFailure };
 
-type PlivoPostParams = Record<string, string | string[]>;
+export type ValidatedPlivoParams = Readonly<
+  Record<string, string | readonly string[]>
+>;
 
-function toPlivoPostParams(formData: FormData): PlivoPostParams | null {
-  const params: PlivoPostParams = {};
+type MutablePlivoPostParams = Record<string, string | string[]>;
+
+function toPlivoPostParams(formData: FormData): MutablePlivoPostParams | null {
+  const params: MutablePlivoPostParams = {};
 
   for (const [key, value] of formData.entries()) {
     if (typeof value !== "string") {
@@ -37,10 +41,24 @@ function toPlivoPostParams(formData: FormData): PlivoPostParams | null {
   return params;
 }
 
+function freezeValidatedParams(
+  params: MutablePlivoPostParams,
+): ValidatedPlivoParams {
+  for (const value of Object.values(params)) {
+    if (Array.isArray(value)) {
+      Object.freeze(value);
+    }
+  }
+
+  return Object.freeze(params);
+}
+
 /**
  * Validates a form-encoded Plivo Voice webhook before any fields are trusted.
  * `request.url` is intentionally passed through unchanged: V3 signatures bind
  * to the exact public URL Plivo requested, including its scheme and host.
+ * Success returns the same parameter map supplied to the SDK, frozen after
+ * validation so downstream routing cannot mutate its trusted input.
  */
 export async function verifyPlivoV3Webhook(
   request: Request,
@@ -83,7 +101,7 @@ export async function verifyPlivoV3Webhook(
       params,
     );
     return valid === true
-      ? { ok: true }
+      ? { ok: true, params: freezeValidatedParams(params) }
       : { ok: false, reason: "invalid-signature" };
   } catch {
     return { ok: false, reason: "invalid-signature" };

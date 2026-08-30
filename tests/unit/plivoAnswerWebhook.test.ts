@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/webhooks/plivo/answer/route";
-import { STAGE_1_GREETING } from "@/lib/telephony/plivo";
+import { buildStage2MainMenuPrompt } from "@/lib/telephony/ivr";
 import {
   buildPlivoWebhookRequest,
   buildSignedPlivoWebhookRequest,
@@ -62,7 +62,7 @@ describe("POST /api/webhooks/plivo/answer", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(await response.text()).not.toContain(STAGE_1_GREETING);
+    expect(await response.text()).not.toContain("MedCare Pro");
   });
 
   it("rejects a request with no Plivo signature", async () => {
@@ -119,7 +119,7 @@ describe("POST /api/webhooks/plivo/answer", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(await response.text()).not.toContain(STAGE_1_GREETING);
+    expect(await response.text()).not.toContain("MedCare Pro");
   });
 
   it("accepts signed unexpected and repeated form parameters", async () => {
@@ -155,7 +155,7 @@ describe("POST /api/webhooks/plivo/answer", () => {
     expect(response.status).toBe(403);
   });
 
-  it("returns valid Stage 1 Plivo XML and the XML content type", async () => {
+  it("returns valid Stage 2 Plivo XML and the XML content type", async () => {
     const response = await POST(
       buildSignedPlivoWebhookRequest({ url: WEBHOOK_URL }),
     );
@@ -166,19 +166,52 @@ describe("POST /api/webhooks/plivo/answer", () => {
       "application/xml; charset=utf-8",
     );
     expect(xml).toMatch(/^<Response>/);
-    expect(xml).toContain(`<Speak>${STAGE_1_GREETING}</Speak>`);
+    expect(xml).toContain(`<Speak>${buildStage2MainMenuPrompt()}</Speak>`);
     expect(xml).toMatch(/<\/Response>$/);
   });
 
-  it("contains only the fixed Stage 1 greeting flow", async () => {
+  it("returns the documented one-digit DTMF GetInput menu", async () => {
     const response = await POST(
       buildSignedPlivoWebhookRequest({ url: WEBHOOK_URL }),
     );
     const xml = await response.text();
 
-    expect(xml).toContain(STAGE_1_GREETING);
-    expect(xml).not.toContain("GetInput");
-    expect(xml).not.toContain("Dial");
+    expect(xml).toContain("<GetInput");
+    expect(xml).toContain('inputType="dtmf"');
+    expect(xml).toContain('numDigits="1"');
+    expect(xml).toContain('method="POST"');
+    expect(xml).toContain('digitEndTimeout="5"');
+    expect(xml).toContain('executionTimeout="10"');
+    expect(xml).toContain(
+      'action="https://medcare-tunnel.example/api/webhooks/plivo/input"',
+    );
+    for (const digit of ["1", "2", "3", "4", "9"]) {
+      expect(xml).toContain(`Press ${digit}`);
+    }
+    expect(xml).not.toContain("<Dial");
+    expect(xml).not.toContain("<Record");
+  });
+
+  it("builds the input action from the signed public origin only", async () => {
+    const publicUrl =
+      "https://voice.medcare.example:8443/api/webhooks/plivo/answer?source=provider";
+    const response = await POST(
+      buildSignedPlivoWebhookRequest({
+        url: publicUrl,
+        paramOverrides: {
+          action: "https://attacker.example/collect",
+          callbackUrl: "https://attacker.example/callback",
+        },
+      }),
+    );
+    const xml = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain(
+      'action="https://voice.medcare.example:8443/api/webhooks/plivo/input"',
+    );
+    expect(xml).not.toContain("source=provider");
+    expect(xml).not.toContain("attacker.example");
   });
 
   it("never returns the Plivo Auth Token", async () => {
