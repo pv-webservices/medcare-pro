@@ -1,5 +1,6 @@
 "use client";
 
+import { Pencil, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { MEDIA_TYPES } from "@/lib/whatsapp";
@@ -12,24 +13,11 @@ import type { TemplateRecord } from "@/lib/whatsappTemplates";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-import Card from "@/components/ui/Card";
-
-/**
- * The approved message set — PRD §6.9 (FR-9.1).
- *
- * This provider has no template approval of its own, so this list IS the
- * approved set: the send screen can only choose from it, and no endpoint in
- * the app accepts a free-typed body. Editing is gated on `message:template`
- * separately from `message:send`, so the front desk sends the wording but does
- * not rewrite it.
- *
- * Placeholders are validated as you type. A body referring to `{doctrName}`
- * is refused at save rather than going out with a literal brace in it.
- */
 
 interface TemplateManagerProps {
   templates: readonly TemplateRecord[];
   canManage: boolean;
+  clinicName?: string | null;
 }
 
 interface DraftState {
@@ -53,6 +41,7 @@ const EMPTY_DRAFT: DraftState = {
 export default function TemplateManager({
   templates,
   canManage,
+  clinicName,
 }: TemplateManagerProps) {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftState | null>(null);
@@ -84,7 +73,6 @@ export default function TemplateManager({
         .catch(() => ({}));
 
       if (!response.ok || !payload.success) {
-        // Covers the 409 for a duplicate name, written for the user by the server.
         setError(payload.error ?? "Could not save that template. Try again.");
         return false;
       }
@@ -133,18 +121,23 @@ export default function TemplateManager({
   }
 
   return (
-    <section aria-labelledby="templates-heading">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-4">
+    <section aria-labelledby="templates-heading" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 id="templates-heading" className="text-heading font-semibold text-ink">
+          <h2 id="templates-heading" className="text-lg font-bold tracking-tight text-ink">
             Message templates
           </h2>
-          <p className="mt-1 text-body text-muted">
+          <p className="mt-0.5 text-label text-muted">
             Only these can be sent. Nothing else goes out from this account.
           </p>
         </div>
         {canManage && draft === null && (
-          <Button onClick={() => setDraft({ ...EMPTY_DRAFT })} variant="primary">
+          <Button
+            onClick={() => setDraft({ ...EMPTY_DRAFT })}
+            variant="primary"
+            className="rounded-xl px-4 py-2 font-semibold text-body shadow-cta flex items-center gap-1.5"
+          >
+            <Plus className="h-4 w-4" />
             Add template
           </Button>
         )}
@@ -153,150 +146,152 @@ export default function TemplateManager({
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
+          className="rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
         >
           {error}
         </p>
       )}
 
       {draft && (
-        <Card className="mb-6 p-4 sm:p-6 bg-canvas-deep border-line">
-          <form
-            onSubmit={handleSubmit}
-            className="grid gap-6"
-          >
-          <div className="max-w-md">
-            <Input
-              id="template-name"
-              name="name"
-              label="Template name"
-              value={draft.name}
-              onChange={(event) =>
-                setDraft({ ...draft, name: event.target.value })
-              }
-              required
-              maxLength={120}
-              placeholder="e.g. Appointment reminder"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="template-body" className="mb-1.5 block text-body font-medium text-ink">
-              Message
-            </label>
-            <textarea
-              id="template-body"
-              value={draft.body}
-              onChange={(event) =>
-                setDraft({ ...draft, body: event.target.value })
-              }
-              required
-              rows={5}
-              maxLength={4000}
-              aria-invalid={badTokens.length > 0}
-              aria-describedby="template-body-help"
-              className={`block w-full rounded-lg border bg-canvas px-3 py-2 text-body outline-none transition-colors   ${badTokens.length > 0 ? "border-line focus:border-line" : "border-line"}`}
-            />
-            <p
-              id="template-body-help"
-              className={`mt-2 text-meta ${
-                badTokens.length > 0
-                  ? "text-alert-ink"
-                  : "text-muted"
-              }`}
-            >
-              {badTokens.length > 0
-                ? `Nothing can fill {${badTokens[0]}}. Use one of the placeholders below.`
-                : "Tap a placeholder to insert it. Each is filled per patient when the message is sent."}
-            </p>
-
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {TEMPLATE_PLACEHOLDERS.map((token) => (
-                <li key={token}>
-                  <button
-                    type="button"
-                    onClick={() => insertPlaceholder(token)}
-                    className="min-h-8 rounded-lg bg-canvas px-2.5 text-meta font-medium text-ink hover:bg-canvas-deep hover:border-line transition-colors border border-line shadow-card"
-                  >
-                    {PLACEHOLDER_LABELS[token]}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="max-w-md">
-            <Input
-              id="template-footer"
-              name="footer"
-              label="Footer"
-              hint="Optional."
-              value={draft.footer}
-              onChange={(event) =>
-                setDraft({ ...draft, footer: event.target.value })
-              }
-              maxLength={255}
-              placeholder="e.g. Sent by Alpha Clinic"
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
-            <div>
-              <Select
-                id="template-media-type"
-                name="mediaType"
-                label="Attach"
-                value={draft.mediaType}
-                onChange={(event) =>
-                  setDraft({ ...draft, mediaType: event.target.value })
-                }
-              >
-                <option value="">Text only</option>
-                {MEDIA_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
+        <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card mb-6">
+          <h3 className="text-base font-bold text-ink mb-4">
+            {draft.id ? "Edit template" : "New template"}
+          </h3>
+          <form onSubmit={handleSubmit} className="grid gap-5">
+            <div className="max-w-md">
               <Input
-                id="template-media-url"
-                name="mediaUrl"
-                label="File link"
-                type="url"
-                value={draft.mediaUrl}
+                id="template-name"
+                name="name"
+                label="Template name"
+                value={draft.name}
                 onChange={(event) =>
-                  setDraft({ ...draft, mediaUrl: event.target.value })
+                  setDraft({ ...draft, name: event.target.value })
                 }
-                maxLength={2000}
-                placeholder="https://example.com/leaflet.pdf"
-                error={mediaHalfSet ? "Set both the attachment type and the file link, or neither." : undefined}
-                hint={!mediaHalfSet ? "Must be a direct link — a Drive or Dropbox share page will not work." : undefined}
+                required
+                maxLength={120}
+                placeholder="e.g. Appointment reminder"
               />
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Button
-              type="submit"
-              disabled={!canSave || isSaving}
-              variant="primary"
-              isBusy={isSaving}
-              busyLabel="Saving…"
-            >
-              {draft.id ? "Save Template" : "Create Template"}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setDraft(null)}
-              variant="secondary"
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-        </Card>
+            <div>
+              <label htmlFor="template-body" className="mb-1.5 block text-label font-semibold text-ink">
+                Message
+              </label>
+              <textarea
+                id="template-body"
+                value={draft.body}
+                onChange={(event) =>
+                  setDraft({ ...draft, body: event.target.value })
+                }
+                required
+                rows={5}
+                maxLength={4000}
+                aria-invalid={badTokens.length > 0}
+                aria-describedby="template-body-help"
+                className={`block w-full rounded-xl border bg-canvas px-3.5 py-2.5 text-body outline-none transition-colors ${
+                  badTokens.length > 0 ? "border-alert-line focus:border-alert-line" : "border-line focus:border-accent"
+                }`}
+              />
+              <p
+                id="template-body-help"
+                className={`mt-2 text-micro ${
+                  badTokens.length > 0 ? "text-alert-ink" : "text-muted"
+                }`}
+              >
+                {badTokens.length > 0
+                  ? `Nothing can fill {${badTokens[0]}}. Use one of the placeholders below.`
+                  : "Tap a placeholder to insert it. Each is filled per patient when the message is sent."}
+              </p>
+
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {TEMPLATE_PLACEHOLDERS.map((token) => (
+                  <li key={token}>
+                    <button
+                      type="button"
+                      onClick={() => insertPlaceholder(token)}
+                      className="rounded-lg border border-line bg-canvas px-2.5 py-1 text-micro font-medium text-ink shadow-sm hover:bg-canvas-deep transition-colors"
+                    >
+                      {PLACEHOLDER_LABELS[token]}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="max-w-md">
+              <Input
+                id="template-footer"
+                name="footer"
+                label="Footer"
+                hint="Optional."
+                value={draft.footer}
+                onChange={(event) =>
+                  setDraft({ ...draft, footer: event.target.value })
+                }
+                maxLength={255}
+                placeholder="e.g. Sent by Sharma Clinic"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
+              <div>
+                <Select
+                  id="template-media-type"
+                  name="mediaType"
+                  label="Attach"
+                  value={draft.mediaType}
+                  onChange={(event) =>
+                    setDraft({ ...draft, mediaType: event.target.value })
+                  }
+                >
+                  <option value="">Text only</option>
+                  {MEDIA_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Input
+                  id="template-media-url"
+                  name="mediaUrl"
+                  label="File link"
+                  type="url"
+                  value={draft.mediaUrl}
+                  onChange={(event) =>
+                    setDraft({ ...draft, mediaUrl: event.target.value })
+                  }
+                  maxLength={2000}
+                  placeholder="https://example.com/leaflet.pdf"
+                  error={mediaHalfSet ? "Set both the attachment type and the file link, or neither." : undefined}
+                  hint={!mediaHalfSet ? "Must be a direct link — a Drive or Dropbox share page will not work." : undefined}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button
+                type="submit"
+                disabled={!canSave || isSaving}
+                variant="primary"
+                isBusy={isSaving}
+                busyLabel="Saving…"
+                className="rounded-xl px-4 py-2 font-semibold"
+              >
+                {draft.id ? "Save template" : "Create template"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setDraft(null)}
+                variant="secondary"
+                className="rounded-xl px-4 py-2"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
       )}
 
       {templates.length === 0 ? (
@@ -309,62 +304,71 @@ export default function TemplateManager({
           </p>
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {templates.map((template) => (
-            <li
-              key={template.id}
-              className="rounded-2xl border border-line bg-canvas p-5 shadow-card"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {templates.map((tmpl) => (
+            <div
+              key={tmpl.id}
+              className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card flex flex-col justify-between"
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-                <p className="font-semibold text-ink">{template.name}</p>
-                {template.mediaType && (
-                  <span className="rounded-lg bg-canvas-deep px-2 py-1 text-meta font-medium text-muted">
-                    {template.mediaType}
-                  </span>
+              <div>
+                <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                  <h3 className="text-body font-bold text-ink">{tmpl.name}</h3>
+                  {tmpl.mediaType && (
+                    <span className="rounded-lg bg-canvas-deep px-2 py-0.5 text-micro font-medium text-muted">
+                      {tmpl.mediaType}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-canvas-deep/40 border border-line/60 p-4 min-h-[140px] flex flex-col justify-between">
+                  <p className="whitespace-pre-wrap text-label text-ink leading-relaxed break-words font-normal">
+                    {tmpl.body}
+                  </p>
+
+                  <div className="mt-4 pt-2 text-micro font-medium text-muted">
+                    {clinicName ?? "Sharma Clinic"}
+                  </div>
+                </div>
+
+                {tmpl.footer && (
+                  <p className="mt-2 text-meta text-muted italic">
+                    {tmpl.footer}
+                  </p>
                 )}
               </div>
 
-              <p className="whitespace-pre-wrap text-body text-ink">
-                {template.body}
-              </p>
-
-              {template.footer && (
-                <p className="mt-3 text-meta text-faint">
-                  {template.footer}
-                </p>
-              )}
-
               {canManage && (
-                <div className="mt-5 flex flex-wrap gap-2 pt-4 border-t border-line">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() =>
-                      setDraft({
-                        id: template.id,
-                        name: template.name,
-                        body: template.body,
-                        footer: template.footer ?? "",
-                        mediaType: template.mediaType ?? "",
-                        mediaUrl: template.mediaUrl ?? "",
-                      })
-                    }
-                  >
-                    Edit Template
-                  </Button>
+                <div className="mt-5 flex items-center gap-3 pt-3">
                   <button
                     type="button"
-                    onClick={() => handleDelete(template.id)}
-                    disabled={removingId === template.id}
-                    className="min-h-10 rounded-lg px-3 text-body font-medium text-muted hover:bg-canvas-deep hover:text-ink disabled:opacity-50 transition-colors"
+                    onClick={() =>
+                      setDraft({
+                        id: tmpl.id,
+                        name: tmpl.name,
+                        body: tmpl.body,
+                        footer: tmpl.footer ?? "",
+                        mediaType: tmpl.mediaType ?? "",
+                        mediaUrl: tmpl.mediaUrl ?? "",
+                      })
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl border border-line bg-canvas px-3.5 py-1.5 text-label font-semibold text-ink shadow-sm hover:bg-canvas-deep transition-colors"
                   >
-                    {removingId === template.id ? "Removing…" : "Remove"}
+                    <Pencil className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+                    Edit template
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(tmpl.id)}
+                    disabled={removingId === tmpl.id}
+                    className="text-label font-semibold text-accent hover:underline disabled:opacity-50 transition-colors px-2 py-1"
+                  >
+                    {removingId === tmpl.id ? "Removing…" : "Remove"}
                   </button>
                 </div>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </section>
   );

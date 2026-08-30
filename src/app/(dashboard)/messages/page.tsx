@@ -117,36 +117,35 @@ export default async function MessagesPage() {
         </p>
       )}
 
-      <section aria-labelledby="send-heading" className="space-y-4">
-        <h2 id="send-heading" className="text-heading font-semibold text-ink">
-          Send a message
-        </h2>
-        {templates.length === 0 ? (
-          <EmptyState
-            icon={<MessageSquare className="h-5 w-5" strokeWidth={2} />}
-            title="No approved templates yet"
-            guidance={
-              canManageTemplates
-                ? "Add a template below before you can message patients."
-                : "Ask an admin to add one before you can message patients."
-            }
-          />
-        ) : (
-          <MessageComposer
-            templates={templates}
-            clinicId={clinicId}
-            clinicName={clinicName}
-            isConfigured={configured}
-          />
-        )}
-      </section>
+      {templates.length === 0 ? (
+        <EmptyState
+          icon={<MessageSquare className="h-5 w-5" strokeWidth={2} />}
+          title="No approved templates yet"
+          guidance={
+            canManageTemplates
+              ? "Add a template below before you can message patients."
+              : "Ask an admin to add one before you can message patients."
+          }
+        />
+      ) : (
+        <MessageComposer
+          templates={templates}
+          clinicId={clinicId}
+          clinicName={clinicName}
+          isConfigured={configured}
+        />
+      )}
 
       <div className="pt-2">
-        <TemplateManager templates={templates} canManage={canManageTemplates} />
+        <TemplateManager
+          templates={templates}
+          canManage={canManageTemplates}
+          clinicName={clinicName}
+        />
       </div>
 
       <section aria-labelledby="history-heading" className="space-y-4 pt-2">
-        <h2 id="history-heading" className="text-heading font-semibold text-ink">
+        <h2 id="history-heading" className="text-lg font-bold tracking-tight text-ink">
           Message history
         </h2>
         <MessageHistory messages={messages} />
