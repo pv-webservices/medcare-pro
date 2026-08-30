@@ -139,17 +139,17 @@ export default async function AppointmentServicesPage({
     <section className="space-y-4">
       <PageHeader
         title="Services"
-        description="The visit types this account offers, with their duration and price."
+        description="Visit types offered for appointment booking."
         breadcrumbs={[
           { label: "Appointments", href: "/appointments" },
           { label: "Services" },
         ]}
         meta={
           <>
-            <Count>{bookable}</Count>{""}
+            <Count>{bookable}</Count>{" "}
             {bookable === 1 ? "service" : "services"} bookable
-            {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}
-            . Each one sets how long an appointment runs and what it costs.
+            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
+            . Duration controls slot length; price is quoted at booking.
           </>
         }
         scope={selectedClinic ? selectedClinic.name : "All clinics"}

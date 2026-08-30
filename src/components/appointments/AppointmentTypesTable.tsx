@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import Panel from "@/components/ui/Panel";
 import StatusPill from "@/components/ui/StatusPill";
@@ -118,19 +117,6 @@ export default function AppointmentTypesTable({
     }
   }
 
-  if (services.length === 0) {
-    return (
-      <EmptyState
-        title={showsRetired ? "No services yet" : "No bookable services yet"}
-        guidance={
-          showsRetired
-            ? "Add a service — its length and its price — and it becomes bookable straight away."
-            : "Add one, or show retired services if you are looking for something you have already stopped offering."
-        }
-      />
-    );
-  }
-
   return (
     <div className="space-y-4">
       {editing && (
@@ -155,108 +141,141 @@ export default function AppointmentTypesTable({
         </Panel>
       )}
 
-      {/* Desktop */}
-      <Table
-        caption="Bookable services, their length and their price"
-        className="hidden md:block"
-      >
-        <THead>
-          <TH>Service</TH>
-          <TH>Offered at</TH>
-          <TH align="end">Length</TH>
-          <TH align="end">Price</TH>
-          <TH>Status</TH>
-          {canManageAny && (
-            <TH>
-              <span className="sr-only">Actions</span>
-            </TH>
-          )}
-        </THead>
-        <TBody>
-          {services.map((service) => {
-            const status = serviceStatus(service.isActive);
+      {/* Services card */}
+      <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+        <div className="mb-6">
+          <h2 className="text-lg font-bold tracking-tight text-ink">
+            {showsRetired ? "All services" : "Bookable services"}
+          </h2>
+          <p className="mt-1 text-label text-muted">
+            Active appointment types, pricing and where each service can be booked.
+          </p>
+        </div>
 
-            return (
-              <TR key={service.id} isCurrent={service.id === editingId}>
-                {/* No `hasRail`: that bar is the clinic-identity marker the
-                    clinic list uses, and a service row is not a clinic — a
-                    tenant-wide one belongs to all of them. */}
-                <TD>
-                  <span className="font-semibold text-ink">
-                    {service.name}
-                  </span>
-                </TD>
-                <TD>{scopeLabel(service.clinicName)}</TD>
-                <TD isNumeric>{formatDuration(service.durationMinutes)}</TD>
-                <TD isNumeric>{formatRupees(service.defaultAmount)}</TD>
-                <TD>
-                  <StatusPill tone={status.tone}>{status.label}</StatusPill>
-                </TD>
-                {canManageAny && (
-                  <TD align="end">
-                    <RowActions
-                      service={service}
-                      isEditing={service.id === editingId}
-                      isPending={pendingId === service.id}
-                      onEdit={() =>
-                        setEditingId(
-                          service.id === editingId ? null : service.id,
-                        )
-                      }
-                      onToggle={() => toggleRetired(service)}
-                    />
-                  </TD>
-                )}
-              </TR>
-            );
-          })}
-        </TBody>
-      </Table>
+        {services.length === 0 ? (
+          <EmptyState
+            isBare
+            title={showsRetired ? "No services yet" : "No bookable services yet"}
+            guidance={
+              showsRetired
+                ? "Add a service — its length and its price — and it becomes bookable straight away."
+                : "Add one, or show retired services if you are looking for something you have already stopped offering."
+            }
+          />
+        ) : (
+          <>
+            {/* Desktop */}
+            <Table
+              caption="Bookable services, their length and their price"
+              className="hidden md:block shadow-none"
+            >
+              <THead>
+                <TH>Service</TH>
+                <TH>Offered at</TH>
+                <TH>Length</TH>
+                <TH align="end">Price</TH>
+                <TH>Status</TH>
+                {canManageAny && <TH align="end">Action</TH>}
+              </THead>
+              <TBody>
+                {services.map((service) => {
+                  const status = serviceStatus(service.isActive);
 
-      {/* Below tablet: the same fields, stacked. */}
-      <div className="space-y-3 md:hidden">
-        {services.map((service) => {
-          const status = serviceStatus(service.isActive);
+                  return (
+                    <TR key={service.id} isCurrent={service.id === editingId}>
+                      <TD className="py-4">
+                        <span className="font-semibold text-ink">
+                          {service.name}
+                        </span>
+                      </TD>
+                      <TD className="py-4 text-ink-soft">
+                        {scopeLabel(service.clinicName)}
+                      </TD>
+                      <TD className="py-4 font-medium text-ink-soft">
+                        {formatDuration(service.durationMinutes)}
+                      </TD>
+                      <TD align="end" className="py-4 tnum font-semibold text-ink">
+                        {formatRupees(service.defaultAmount)}
+                      </TD>
+                      <TD className="py-4">
+                        <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                      </TD>
+                      {canManageAny && (
+                        <TD align="end" className="py-4">
+                          <RowActions
+                            service={service}
+                            isEditing={service.id === editingId}
+                            isPending={pendingId === service.id}
+                            onEdit={() =>
+                              setEditingId(
+                                service.id === editingId ? null : service.id,
+                              )
+                            }
+                            onToggle={() => toggleRetired(service)}
+                          />
+                        </TD>
+                      )}
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
 
-          return (
-            <Card key={service.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold text-ink">{service.name}</p>
-                  <p className="mt-0.5 text-label text-muted">
-                    {scopeLabel(service.clinicName)}
-                  </p>
-                </div>
-                <StatusPill tone={status.tone}>{status.label}</StatusPill>
-              </div>
+            {/* Below tablet: stacked cards */}
+            <div className="space-y-3 md:hidden">
+              {services.map((service) => {
+                const status = serviceStatus(service.isActive);
 
-              <p className="mt-3 text-body text-muted">
-                <span className="tnum font-semibold text-ink">
-                  {formatDuration(service.durationMinutes)}
-                </span>{""}
-                ·{""}
-                <span className="tnum font-semibold text-ink">
-                  {formatRupees(service.defaultAmount)}
-                </span>
-              </p>
+                return (
+                  <div
+                    key={service.id}
+                    className="rounded-2xl border border-line bg-canvas p-4 sm:p-5 shadow-sm space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-ink">{service.name}</p>
+                        <p className="mt-0.5 text-label text-muted">
+                          {scopeLabel(service.clinicName)}
+                        </p>
+                      </div>
+                      <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                    </div>
 
-              {canManageAny && (
-                <div className="mt-4">
-                  <RowActions
-                    service={service}
-                    isEditing={service.id === editingId}
-                    isPending={pendingId === service.id}
-                    onEdit={() =>
-                      setEditingId(service.id === editingId ? null : service.id)
-                    }
-                    onToggle={() => toggleRetired(service)}
-                  />
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
+                    <div className="flex items-center justify-between border-t border-line/60 pt-3 text-body text-muted">
+                      <div>
+                        <span className="text-micro font-semibold uppercase text-muted block mb-0.5">Length</span>
+                        <span className="font-medium text-ink">
+                          {formatDuration(service.durationMinutes)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-micro font-semibold uppercase text-muted block mb-0.5">Price</span>
+                        <span className="tnum font-semibold text-ink">
+                          {formatRupees(service.defaultAmount)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {canManageAny && (
+                      <div className="border-t border-line/60 pt-3 flex items-center justify-end">
+                        <RowActions
+                          service={service}
+                          isEditing={service.id === editingId}
+                          isPending={pendingId === service.id}
+                          onEdit={() =>
+                            setEditingId(service.id === editingId ? null : service.id)
+                          }
+                          onToggle={() => toggleRetired(service)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }
@@ -289,12 +308,13 @@ function RowActions({
   }
 
   return (
-    <div className="flex flex-wrap justify-end gap-2">
+    <div className="inline-flex items-center justify-end gap-2">
       <Button
         variant="secondary"
         size="sm"
         onClick={onEdit}
         disabled={isPending}
+        className="rounded-xl px-3.5 py-1.5 font-medium shadow-none"
       >
         {isEditing ? "Close" : "Edit"}
       </Button>
@@ -304,6 +324,7 @@ function RowActions({
         onClick={onToggle}
         isBusy={isPending}
         busyLabel={service.isActive ? "Retiring…" : "Restoring…"}
+        className="rounded-xl px-3.5 py-1.5 font-medium shadow-none"
       >
         {service.isActive ? "Retire" : "Restore"}
       </Button>
