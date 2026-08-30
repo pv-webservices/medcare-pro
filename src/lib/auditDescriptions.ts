@@ -171,6 +171,13 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "platform",
     category: "roles",
   },
+  [AUDIT_ACTIONS.CLINIC_TELEPHONY_CONFIG_UPDATED]: {
+    label: "Clinic telephone routing changed",
+    detail:
+      "An administrator changed this clinic's inbound telephone configuration.",
+    side: "tenant",
+    category: "organisation",
+  },
   [AUDIT_ACTIONS.TENANT_ENTITLEMENTS_SET]: {
     label: "Plan or features changed",
     detail:

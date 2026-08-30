@@ -401,6 +401,8 @@ model Clinic {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  telephonyConfig ClinicTelephonyConfig?
+
   doctors          Doctor[]
   patients         Patient[]
   registrations    Registration[]
@@ -416,6 +418,25 @@ model Clinic {
 
   @@index([tenantId])
   @@map("clinics")
+}
+
+/// Optional per-clinic voice routing configuration. Provider credentials stay
+/// deployment-level; the destination number is the only inbound routing key.
+model ClinicTelephonyConfig {
+  id                   String   @id @default(cuid())
+  clinicId             String   @unique @map("clinic_id")
+  plivoNumber          String?  @unique @map("plivo_number") @db.VarChar(16)
+  publicPhoneNumber    String?  @map("public_phone_number") @db.VarChar(16)
+  receptionPhoneNumber String?  @map("reception_phone_number") @db.VarChar(16)
+  urgentPhoneNumber    String?  @map("urgent_phone_number") @db.VarChar(16)
+  timezone             String   @default("Asia/Kolkata") @db.VarChar(64)
+  enabled              Boolean  @default(false)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@map("clinic_telephony_configs")
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { Response as createPlivoResponse } from "plivo";
 import {
-  buildStage2MainMenuPrompt,
+  buildMainMenuPrompt,
   getStage2Acknowledgement,
   STAGE_2_INVALID_SELECTION_MESSAGE,
   STAGE_2_NO_INPUT_MESSAGE,
@@ -23,9 +23,10 @@ export function buildPlivoInputActionUrl(requestUrl: string): string {
   return new URL(PLIVO_INPUT_WEBHOOK_PATH, requestedUrl.origin).toString();
 }
 
-function addStage2MainMenu(
+function addMainMenu(
   response: PlivoResponse,
   actionUrl: string,
+  clinicName: string,
 ): void {
   const getInput = response.addGetInput({
     action: actionUrl,
@@ -37,38 +38,55 @@ function addStage2MainMenu(
     redirect: true,
   }) as PlivoGetInputElement;
 
-  getInput.addSpeak(buildStage2MainMenuPrompt(), {});
+  getInput.addSpeak(buildMainMenuPrompt(clinicName), {});
 }
 
-function buildMainMenuXml(actionUrl: string, invalidSelection: boolean): string {
+function buildMainMenuXml(
+  actionUrl: string,
+  clinicName: string,
+  invalidSelection: boolean,
+): string {
   const response = createPlivoResponse();
 
   if (invalidSelection) {
     response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
   }
 
-  addStage2MainMenu(response, actionUrl);
+  addMainMenu(response, actionUrl, clinicName);
   response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
   return response.toXML();
 }
 
-export function buildStage2MainMenuXml(actionUrl: string): string {
-  return buildMainMenuXml(actionUrl, false);
+export function buildClinicMainMenuXml(
+  actionUrl: string,
+  clinicName: string,
+): string {
+  return buildMainMenuXml(actionUrl, clinicName, false);
 }
 
-export function buildStage2SelectionXml(
+export function buildClinicSelectionXml(
   action: MainMenuAction,
   inputActionUrl: string,
+  clinicName: string,
 ): string {
   if (action === "repeat-menu") {
-    return buildMainMenuXml(inputActionUrl, false);
+    return buildMainMenuXml(inputActionUrl, clinicName, false);
   }
 
   if (action === "invalid-input") {
-    return buildMainMenuXml(inputActionUrl, true);
+    return buildMainMenuXml(inputActionUrl, clinicName, true);
   }
 
   const response = createPlivoResponse();
   response.addSpeak(getStage2Acknowledgement(action), {});
+  return response.toXML();
+}
+
+export function buildTelephonyUnavailableXml(): string {
+  const response = createPlivoResponse();
+  response.addSpeak(
+    "Telephone assistance is not configured for this number.",
+    {},
+  );
   return response.toXML();
 }

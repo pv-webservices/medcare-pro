@@ -1,7 +1,9 @@
 import {
+  buildClinicSelectionXml,
   buildPlivoInputActionUrl,
-  buildStage2SelectionXml,
+  buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
+import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { resolveMainMenuAction } from "@/lib/telephony/routing";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 
@@ -19,22 +21,37 @@ export async function POST(request: Request): Promise<Response> {
     return new Response("Forbidden.", { status: 403 });
   }
 
-  const validatedDigits = verification.params.Digits;
-  const digits =
-    typeof validatedDigits === "string" ? validatedDigits : undefined;
-  const action = resolveMainMenuAction(digits);
-
   try {
+    const clinic = await resolveInboundClinicByPlivoNumber(
+      verification.params.To,
+    );
+    if (!clinic) {
+      return new Response(buildTelephonyUnavailableXml(), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
+    const validatedDigits = verification.params.Digits;
+    const digits =
+      typeof validatedDigits === "string" ? validatedDigits : undefined;
+    const action = resolveMainMenuAction(digits);
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
-    return new Response(buildStage2SelectionXml(action, inputActionUrl), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": "no-store",
+    return new Response(
+      buildClinicSelectionXml(action, inputActionUrl, clinic.clinicName),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
       },
-    });
+    );
   } catch {
-    console.error("Could not generate the Plivo Stage 2 input XML.");
+    console.error("Could not resolve or generate the Plivo input XML.");
     return new Response("Service unavailable.", { status: 503 });
   }
 }

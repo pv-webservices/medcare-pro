@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/webhooks/plivo/answer/route";
-import { buildStage2MainMenuPrompt } from "@/lib/telephony/ivr";
+import { buildMainMenuPrompt } from "@/lib/telephony/ivr";
 import {
   buildPlivoWebhookRequest,
   buildSignedPlivoWebhookRequest,
@@ -12,10 +12,27 @@ import {
 
 const WEBHOOK_URL = "https://medcare-tunnel.example/api/webhooks/plivo/answer";
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
+const resolveClinic = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/telephony/clinicConfig", () => ({
+  resolveInboundClinicByPlivoNumber: resolveClinic,
+}));
+
+const TEST_CLINIC = Object.freeze({
+  clinicId: "clinic-a",
+  tenantId: "tenant-a",
+  clinicName: "Sunrise Clinic",
+  timezone: "Asia/Kolkata",
+  publicPhoneNumber: null,
+  receptionPhoneNumber: null,
+  urgentPhoneNumber: null,
+});
 
 describe("POST /api/webhooks/plivo/answer", () => {
   beforeEach(() => {
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
+    resolveClinic.mockReset();
+    resolveClinic.mockResolvedValue(TEST_CLINIC);
   });
 
   afterEach(() => {
@@ -166,7 +183,7 @@ describe("POST /api/webhooks/plivo/answer", () => {
       "application/xml; charset=utf-8",
     );
     expect(xml).toMatch(/^<Response>/);
-    expect(xml).toContain(`<Speak>${buildStage2MainMenuPrompt()}</Speak>`);
+    expect(xml).toContain(`<Speak>${buildMainMenuPrompt("Sunrise Clinic")}</Speak>`);
     expect(xml).toMatch(/<\/Response>$/);
   });
 
@@ -227,5 +244,69 @@ describe("POST /api/webhooks/plivo/answer", () => {
 
     expect(await validResponse.text()).not.toContain(TEST_PLIVO_AUTH_TOKEN);
     expect(await invalidResponse.text()).not.toContain(TEST_PLIVO_AUTH_TOKEN);
+  });
+
+  it("uses the resolved clinic name rather than a platform-wide greeting", async () => {
+    resolveClinic.mockResolvedValueOnce({
+      ...TEST_CLINIC,
+      clinicId: "clinic-b",
+      clinicName: "Lakeside Clinic",
+    });
+
+    const response = await POST(
+      buildSignedPlivoWebhookRequest({
+        url: WEBHOOK_URL,
+        paramOverrides: { To: "+14155550102" },
+      }),
+    );
+    const xml = await response.text();
+
+    expect(resolveClinic).toHaveBeenCalledWith("+14155550102");
+    expect(xml).toContain("Welcome to Lakeside Clinic.");
+    expect(xml).not.toContain("Welcome to Sunrise Clinic.");
+  });
+
+  it("returns generic XML and no menu for an unresolved destination", async () => {
+    resolveClinic.mockResolvedValueOnce(null);
+
+    const response = await POST(
+      buildSignedPlivoWebhookRequest({
+        url: WEBHOOK_URL,
+        paramOverrides: { To: "+14155550999" },
+      }),
+    );
+    const xml = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain("Telephone assistance is not configured for this number.");
+    expect(xml).not.toContain("<GetInput");
+    expect(xml).not.toContain("Clinic");
+  });
+
+  it("ignores signed tenant and clinic identifiers when resolving", async () => {
+    await POST(
+      buildSignedPlivoWebhookRequest({
+        url: WEBHOOK_URL,
+        paramOverrides: {
+          To: "+14155550101",
+          clinicId: "clinic-c",
+          tenantId: "tenant-b",
+        },
+      }),
+    );
+
+    expect(resolveClinic).toHaveBeenCalledTimes(1);
+    expect(resolveClinic).toHaveBeenCalledWith("+14155550101");
+  });
+
+  it("does not use From to select the clinic", async () => {
+    await POST(
+      buildSignedPlivoWebhookRequest({
+        url: WEBHOOK_URL,
+        paramOverrides: { To: "+14155550101", From: "+14155550103" },
+      }),
+    );
+
+    expect(resolveClinic).toHaveBeenCalledWith("+14155550101");
   });
 });

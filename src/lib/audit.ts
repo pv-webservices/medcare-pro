@@ -43,6 +43,7 @@ export const AUDIT_ACTIONS = {
   CLINIC_REACTIVATED: "CLINIC_REACTIVATED",
   /** The first user was given their account-wide role at approval. */
   CLINIC_ADMIN_ASSIGNED: "CLINIC_ADMIN_ASSIGNED",
+  CLINIC_TELEPHONY_CONFIG_UPDATED: "CLINIC_TELEPHONY_CONFIG_UPDATED",
   /** The Owner set the tenant's plan and/or its feature overrides. */
   TENANT_ENTITLEMENTS_SET: "TENANT_ENTITLEMENTS_SET",
 

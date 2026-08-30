@@ -17,6 +17,21 @@ import {
 const INPUT_WEBHOOK_URL =
   "https://medcare-tunnel.example/api/webhooks/plivo/input";
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
+const resolveClinic = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/telephony/clinicConfig", () => ({
+  resolveInboundClinicByPlivoNumber: resolveClinic,
+}));
+
+const TEST_CLINIC = Object.freeze({
+  clinicId: "clinic-a",
+  tenantId: "tenant-a",
+  clinicName: "Sunrise Clinic",
+  timezone: "Asia/Kolkata",
+  publicPhoneNumber: null,
+  receptionPhoneNumber: null,
+  urgentPhoneNumber: null,
+});
 
 async function postDigit(digits?: string): Promise<{
   response: Response;
@@ -33,6 +48,8 @@ async function postDigit(digits?: string): Promise<{
 describe("POST /api/webhooks/plivo/input", () => {
   beforeEach(() => {
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
+    resolveClinic.mockReset();
+    resolveClinic.mockResolvedValue(TEST_CLINIC);
   });
 
   afterEach(() => {
@@ -72,6 +89,7 @@ describe("POST /api/webhooks/plivo/input", () => {
       expect(xml).toContain(`Press ${digit}`);
     }
     expect(xml).not.toContain(STAGE_2_INVALID_SELECTION_MESSAGE);
+    expect(xml).toContain("Welcome to Sunrise Clinic.");
   });
 
   it.each(["0", "5", "", "12"])(
@@ -226,5 +244,52 @@ describe("POST /api/webhooks/plivo/input", () => {
     );
     expect(xml).not.toContain("next=");
     expect(xml).not.toContain("attacker.example");
+  });
+
+  it("uses the independently resolved clinic for invalid-input replay", async () => {
+    resolveClinic.mockResolvedValueOnce({
+      ...TEST_CLINIC,
+      clinicId: "clinic-b",
+      clinicName: "Lakeside Clinic",
+    });
+
+    const request = buildSignedPlivoWebhookRequest({
+      url: INPUT_WEBHOOK_URL,
+      paramOverrides: { To: "+14155550102", Digits: "0" },
+    });
+    const response = await POST(request);
+    const xml = await response.text();
+
+    expect(resolveClinic).toHaveBeenCalledWith("+14155550102");
+    expect(xml).toContain("Welcome to Lakeside Clinic.");
+  });
+
+  it("does not route digits when the destination is unresolved", async () => {
+    resolveClinic.mockResolvedValueOnce(null);
+
+    const { response, xml } = await postDigit("1");
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain("Telephone assistance is not configured for this number.");
+    expect(xml).not.toContain("tomorrow appointment");
+    expect(xml).not.toContain("<GetInput");
+  });
+
+  it("ignores signed scope fields and From when selecting the clinic", async () => {
+    const request = buildSignedPlivoWebhookRequest({
+      url: INPUT_WEBHOOK_URL,
+      paramOverrides: {
+        To: "+14155550101",
+        From: "+14155550103",
+        clinicId: "clinic-c",
+        tenantId: "tenant-b",
+        Digits: "9",
+      },
+    });
+
+    await POST(request);
+
+    expect(resolveClinic).toHaveBeenCalledTimes(1);
+    expect(resolveClinic).toHaveBeenCalledWith("+14155550101");
   });
 });

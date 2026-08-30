@@ -1,7 +1,9 @@
 import {
+  buildClinicMainMenuXml,
   buildPlivoInputActionUrl,
-  buildStage2MainMenuXml,
+  buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
+import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 
 export const runtime = "nodejs";
@@ -19,16 +21,32 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    const clinic = await resolveInboundClinicByPlivoNumber(
+      verification.params.To,
+    );
+    if (!clinic) {
+      return new Response(buildTelephonyUnavailableXml(), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
-    return new Response(buildStage2MainMenuXml(inputActionUrl), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": "no-store",
+    return new Response(
+      buildClinicMainMenuXml(inputActionUrl, clinic.clinicName),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
       },
-    });
+    );
   } catch {
-    console.error("Could not generate the Plivo Stage 2 answer XML.");
+    console.error("Could not resolve or generate the Plivo answer XML.");
     return new Response("Service unavailable.", { status: 503 });
   }
 }
