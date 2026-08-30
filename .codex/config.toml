@@ -1,0 +1,4 @@
+[mcp_servers.plivo]
+url = "https://plivo.com/docs/mcp"
+enabled = true
+enabled_tools = ["SearchPlivo"]
