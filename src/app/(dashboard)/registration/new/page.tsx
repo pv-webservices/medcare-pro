@@ -51,7 +51,7 @@ export default async function NewRegistrationPage() {
         : [];
 
   return (
-    <section className="space-y-4">
+    <section className="w-full space-y-6">
       <PageHeader
         title="New registration"
         description="Record a patient visit. A Patient ID is assigned when you save."

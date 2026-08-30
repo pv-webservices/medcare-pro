@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { UserRoundCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Calendar,
+  Info,
+  User,
+  UserRoundCheck,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import PatientLookup from "@/components/registration/PatientLookup";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
-import Panel from "@/components/ui/Panel";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { CURRENCY_SYMBOL } from "@/lib/money";
@@ -369,261 +374,304 @@ export default function RegistrationForm({
       {formError && (
         <p
           role="alert"
-          className="mb-4 rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body text-alert-ink"
+          className="mb-6 rounded-2xl border border-alert-line bg-alert-bg px-4 py-3 text-body font-medium text-alert-ink"
         >
           {formError}
         </p>
       )}
 
-      <Panel
-        title="Patient"
-        description="Check for an existing record first — a returning patient keeps their Patient ID."
-        className="mb-4"
-      >
-        {/* Above the lookup, because the lookup searches within a clinic. */}
-        {!isEdit && clinics.length > 1 && (
-          <Select
-            id="registration-clinic"
-            label="Clinic"
-            value={values.clinicId}
-            onChange={(e) => handleClinicChange(e.target.value)}
-            onBlur={() => touch("clinicId")}
-            error={errorFor("clinicId")}
-            fieldClassName="mb-4"
-          >
-            <option value="">Choose a clinic…</option>
-            {clinics.map((clinic) => (
-              <option key={clinic.id} value={clinic.id}>
-                {clinic.name}
-              </option>
-            ))}
-          </Select>
-        )}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
+        {/* Left card — Patient */}
+        <section className="flex flex-col justify-between rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+          <div>
+            <div className="mb-6 flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                <User className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink">Patient</h2>
+                <p className="mt-0.5 text-label text-muted">
+                  Check for an existing record first — a returning patient keeps their Patient ID.
+                </p>
+              </div>
+            </div>
 
-        {!isEdit &&
-          (values.patientId ? (
-            <Card
-              isFlush
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-accent-soft bg-accent-soft p-4"
-            >
-              <p className="flex items-center gap-2 text-body text-ink">
-                <UserRoundCheck
-                  aria-hidden="true"
-                  strokeWidth={2}
-                  className="h-4 w-4 shrink-0 text-accent"
-                />
-                <span>
-                  Follow-up visit for{" "}
-                  <span className="font-semibold">{values.name}</span>{" "}
-                  <span className="serial text-muted">({values.patientCode})</span>
-                  . Their existing Patient ID is kept.
-                </span>
-              </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="shrink-0"
-                onClick={handlePatientClear}
+            {/* Above the lookup, because the lookup searches within a clinic. */}
+            {!isEdit && clinics.length > 1 && (
+              <Select
+                id="registration-clinic"
+                label="Clinic"
+                value={values.clinicId}
+                onChange={(e) => handleClinicChange(e.target.value)}
+                onBlur={() => touch("clinicId")}
+                error={errorFor("clinicId")}
+                fieldClassName="mb-5"
               >
-                Register as new patient
-              </Button>
-            </Card>
-          ) : (
-            <div className="mb-4">
-              <PatientLookup
-                clinicId={values.clinicId}
-                onSelect={handlePatientSelect}
+                <option value="">Choose a clinic…</option>
+                {clinics.map((clinic) => (
+                  <option key={clinic.id} value={clinic.id}>
+                    {clinic.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+
+            {!isEdit &&
+              (values.patientId ? (
+                <Card
+                  isFlush
+                  className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-accent-soft bg-accent-soft p-4"
+                >
+                  <p className="flex items-center gap-2 text-body text-ink">
+                    <UserRoundCheck
+                      aria-hidden="true"
+                      strokeWidth={2}
+                      className="h-4 w-4 shrink-0 text-accent"
+                    />
+                    <span>
+                      Follow-up visit for{" "}
+                      <span className="font-semibold">{values.name}</span>{" "}
+                      <span className="serial text-muted">({values.patientCode})</span>
+                      . Their existing Patient ID is kept.
+                    </span>
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0 rounded-xl"
+                    onClick={handlePatientClear}
+                  >
+                    Register as new patient
+                  </Button>
+                </Card>
+              ) : (
+                <div className="mb-5">
+                  <PatientLookup
+                    clinicId={values.clinicId}
+                    onSelect={handlePatientSelect}
+                  />
+                </div>
+              ))}
+
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id="registration-name"
+                  type="text"
+                  label="Patient name"
+                  placeholder="Enter patient name"
+                  autoComplete="off"
+                  value={values.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  onBlur={() => touch("name")}
+                  error={errorFor("name")}
+                />
+
+                <Input
+                  id="registration-mobile"
+                  type="tel"
+                  inputMode="numeric"
+                  label="Mobile number"
+                  placeholder="Enter mobile number"
+                  autoComplete="off"
+                  maxLength={13}
+                  pattern="^(\+91)?[0-9]{10}$"
+                  title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
+                  value={values.mobileNumber}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/[^0-9+]/g, "");
+                    if (val.startsWith("+")) {
+                      val = val.slice(0, 13);
+                    } else {
+                      val = val.slice(0, 10);
+                    }
+                    update("mobileNumber", val);
+                  }}
+                  onBlur={() => touch("mobileNumber")}
+                  error={errorFor("mobileNumber")}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id="registration-age"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={150}
+                  label="Age (optional)"
+                  placeholder="Enter age"
+                  value={values.age}
+                  onChange={(e) => update("age", e.target.value)}
+                  onBlur={() => touch("age")}
+                  error={errorFor("age")}
+                />
+
+                <Select
+                  id="registration-gender"
+                  label="Gender"
+                  value={values.gender}
+                  onChange={(e) => update("gender", e.target.value)}
+                >
+                  <option value="">Not recorded</option>
+                  {GENDERS.map((gender) => (
+                    <option key={gender} value={gender}>
+                      {gender}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <Input
+                id="registration-city"
+                type="text"
+                label="City (optional)"
+                placeholder="Enter city"
+                autoComplete="off"
+                value={values.city}
+                onChange={(e) => update("city", e.target.value)}
+              />
+
+              <Input
+                id="registration-address"
+                type="text"
+                label="Address (optional)"
+                placeholder="Enter address"
+                autoComplete="off"
+                value={values.address}
+                onChange={(e) => update("address", e.target.value)}
               />
             </div>
-          ))}
+          </div>
+        </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            id="registration-name"
-            type="text"
-            label="Patient name"
-            autoComplete="off"
-            value={values.name}
-            onChange={(e) => update("name", e.target.value)}
-            onBlur={() => touch("name")}
-            error={errorFor("name")}
-          />
-
-          <Input
-            id="registration-mobile"
-            type="tel"
-            inputMode="numeric"
-            label="Mobile number"
-            autoComplete="off"
-            maxLength={13}
-            pattern="^(\+91)?[0-9]{10}$"
-            title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
-            value={values.mobileNumber}
-            onChange={(e) => {
-              let val = e.target.value.replace(/[^0-9+]/g, "");
-              if (val.startsWith("+")) {
-                val = val.slice(0, 13);
-              } else {
-                val = val.slice(0, 10);
-              }
-              update("mobileNumber", val);
-            }}
-            onBlur={() => touch("mobileNumber")}
-            error={errorFor("mobileNumber")}
-          />
-
-          <Input
-            id="registration-age"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={150}
-            label="Age (optional)"
-            value={values.age}
-            onChange={(e) => update("age", e.target.value)}
-            onBlur={() => touch("age")}
-            error={errorFor("age")}
-          />
-
-          <Select
-            id="registration-gender"
-            label="Gender"
-            value={values.gender}
-            onChange={(e) => update("gender", e.target.value)}
-          >
-            <option value="">Not recorded</option>
-            {GENDERS.map((gender) => (
-              <option key={gender} value={gender}>
-                {gender}
-              </option>
-            ))}
-          </Select>
-
-          <Input
-            id="registration-address"
-            type="text"
-            label="Address (optional)"
-            autoComplete="off"
-            value={values.address}
-            onChange={(e) => update("address", e.target.value)}
-            fieldClassName="sm:col-span-2"
-          />
-
-          <Input
-            id="registration-city"
-            type="text"
-            label="City (optional)"
-            autoComplete="off"
-            value={values.city}
-            onChange={(e) => update("city", e.target.value)}
-          />
-        </div>
-      </Panel>
-
-      <Panel
-        title="Visit"
-        description="What happened at the desk today, and what it came to."
-        className="mb-5"
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            id="registration-visit-type"
-            label="Visit type"
-            value={values.visitType}
-            onChange={(e) =>
-              setValues((current) => ({
-                ...current,
-                visitType: e.target.value as VisitType,
-              }))
-            }
-            // Derived from the patient lookup, but the desk can override:
-            // a returning patient with a new complaint is a new case.
-            hint="Set automatically when you pick an existing patient — change it if this visit is for something new."
-            fieldClassName="sm:col-span-2"
-          >
-            {VISIT_TYPES.map((visitType) => (
-              <option key={visitType} value={visitType}>
-                {VISIT_TYPE_LABELS[visitType]}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            id="registration-doctor"
-            label="Doctor (optional)"
-            value={values.doctorId}
-            onChange={(e) => handleDoctorChange(e.target.value)}
-            disabled={!values.clinicId}
-            hint={
-              values.clinicId && clinicDoctors.length === 0
-                ? "No doctors added for this clinic yet."
-                : undefined
-            }
-          >
-            <option value="">Not assigned yet</option>
-            {clinicDoctors.map((doctor) => (
-              <option key={doctor.id} value={doctor.id}>
-                {doctor.name} · {doctor.department}
-              </option>
-            ))}
-          </Select>
-
+        {/* Right card — Visit */}
+        <section className="flex flex-col justify-between rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
           <div>
-            <Input
-              id="registration-department"
-              type="text"
-              label="Department"
-              list="registration-departments"
-              autoComplete="off"
-              value={values.department}
-              onChange={(e) => update("department", e.target.value)}
-              onBlur={() => touch("department")}
-              error={errorFor("department")}
-            />
-            <datalist id="registration-departments">
-              {departments.map((department) => (
-                <option key={department} value={department} />
-              ))}
-            </datalist>
+            <div className="mb-6 flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                <Calendar className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink">Visit</h2>
+                <p className="mt-0.5 text-label text-muted">
+                  What happened at the desk today, and what it came to.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Select
+                id="registration-visit-type"
+                label="Visit type"
+                value={values.visitType}
+                onChange={(e) =>
+                  setValues((current) => ({
+                    ...current,
+                    visitType: e.target.value as VisitType,
+                  }))
+                }
+                // Derived from the patient lookup, but the desk can override:
+                // a returning patient with a new complaint is a new case.
+                hint="Set automatically when you pick an existing patient — change it if this visit is for something new."
+              >
+                {VISIT_TYPES.map((visitType) => (
+                  <option key={visitType} value={visitType}>
+                    {VISIT_TYPE_LABELS[visitType]}
+                  </option>
+                ))}
+              </Select>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Select
+                  id="registration-doctor"
+                  label="Doctor (optional)"
+                  value={values.doctorId}
+                  onChange={(e) => handleDoctorChange(e.target.value)}
+                  disabled={!values.clinicId}
+                  hint={
+                    values.clinicId && clinicDoctors.length === 0
+                      ? "No doctors added for this clinic yet."
+                      : undefined
+                  }
+                >
+                  <option value="">Not assigned yet</option>
+                  {clinicDoctors.map((doctor) => (
+                    <option key={doctor.id} value={doctor.id}>
+                      {doctor.name} · {doctor.department}
+                    </option>
+                  ))}
+                </Select>
+
+                <div>
+                  <Input
+                    id="registration-department"
+                    type="text"
+                    label="Department"
+                    placeholder="Enter department"
+                    list="registration-departments"
+                    autoComplete="off"
+                    value={values.department}
+                    onChange={(e) => update("department", e.target.value)}
+                    onBlur={() => touch("department")}
+                    error={errorFor("department")}
+                  />
+                  <datalist id="registration-departments">
+                    {departments.map((department) => (
+                      <option key={department} value={department} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              <Input
+                id="registration-amount"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                label={`Amount (${CURRENCY_SYMBOL})`}
+                unit={CURRENCY_SYMBOL}
+                placeholder="Enter amount"
+                value={values.amount}
+                onChange={(e) => update("amount", e.target.value)}
+                onBlur={() => touch("amount")}
+                error={errorFor("amount")}
+              />
+
+              {!isEdit && (
+                <div className="flex items-center gap-3 rounded-2xl border border-line bg-canvas-deep/40 px-4 py-3.5 text-label text-ink">
+                  <Info className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                  <span>A Patient ID is assigned automatically when you save.</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <Input
-            id="registration-amount"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            label={`Amount (${CURRENCY_SYMBOL})`}
-            unit={CURRENCY_SYMBOL}
-            value={values.amount}
-            onChange={(e) => update("amount", e.target.value)}
-            onBlur={() => touch("amount")}
-            error={errorFor("amount")}
-          />
-        </div>
-      </Panel>
+          <div className="mt-8 flex items-center justify-end gap-3 pt-2">
+            {onCancel && (
+              <Button
+                variant="secondary"
+                onClick={onCancel}
+                disabled={isSaving}
+                className="rounded-xl font-medium"
+              >
+                Cancel
+              </Button>
+            )}
 
-      {!isEdit && values.patientId === "" && (
-        <p className="mb-4 text-meta text-muted">
-          A Patient ID is assigned automatically when you save.
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-3">
-        <Button
-          type="submit"
-          variant="primary"
-          isBusy={isSaving}
-          busyLabel={isEdit ? "Saving…" : "Registering…"}
-        >
-          {isEdit ? "Save changes" : "Register patient"}
-        </Button>
-
-        {onCancel && (
-          <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
-            Cancel
-          </Button>
-        )}
+            <Button
+              type="submit"
+              variant="primary"
+              isBusy={isSaving}
+              busyLabel={isEdit ? "Saving…" : "Registering…"}
+              className="rounded-xl px-5 py-2.5 font-medium shadow-cta flex items-center gap-2"
+            >
+              <span>{isEdit ? "Save changes" : "Register patient"}</span>
+              <ArrowRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            </Button>
+          </div>
+        </section>
       </div>
     </form>
   );
