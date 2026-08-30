@@ -103,23 +103,23 @@ model Tenant {
   /// NOT NULL column with no default, which MySQL cannot add to a table that
   /// already holds rows — so the expand migration adds it nullable, the backfill
   /// sets it to created_at, and the constrain migration makes it NOT NULL.
-  updatedAt         DateTime                @updatedAt @map("updated_at")
-  users             User[]
-  roles             Role[]
-  clinics           Clinic[]
-  patients          Patient[]
-  notifications     Notification[]
-  whatsappTemplates WhatsappTemplate[]
-  plan              Plan?                   @relation(fields: [planId], references: [id], onDelete: Restrict)
-  approvedBy        User?                   @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  rejectedBy        User?                   @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
-  suspendedBy       User?                   @relation("TenantSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
-  featureOverrides  TenantFeatureOverride[]
-  invitations       Invitation[]
-  sessions          AppSession[]
-  auditLogs         AuditLog[]
-  tasks             Task[]
-  dashboardLayouts  DashboardLayout[]
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+  users                    User[]
+  roles                    Role[]
+  clinics                  Clinic[]
+  patients                 Patient[]
+  notifications            Notification[]
+  whatsappTemplates        WhatsappTemplate[]
+  plan                     Plan?                     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  approvedBy               User?                     @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy               User?                     @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  suspendedBy              User?                     @relation("TenantSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
+  featureOverrides         TenantFeatureOverride[]
+  invitations              Invitation[]
+  sessions                 AppSession[]
+  auditLogs                AuditLog[]
+  tasks                    Task[]
+  dashboardLayouts         DashboardLayout[]
   telephonyBookingRequests TelephonyBookingRequest[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
@@ -312,9 +312,9 @@ model Role {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  userRoles     UserRole[]
-  featureAccess RoleFeatureAccess[]
-  invitations   Invitation[]
+  userRoles        UserRole[]
+  featureAccess    RoleFeatureAccess[]
+  invitations      Invitation[]
   dashboardLayouts DashboardLayout[]
 
   /// Role names are unique within a tenant, not globally.
@@ -413,10 +413,10 @@ model Clinic {
   invitations      Invitation[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
-  appointments     Appointment[]
-  appointmentTypes AppointmentType[]
+  appointments             Appointment[]
+  appointmentTypes         AppointmentType[]
   telephonyBookingRequests TelephonyBookingRequest[]
-  tasks            Task[]
+  tasks                    Task[]
 
   @@index([tenantId])
   @@map("clinics")
@@ -457,21 +457,21 @@ enum TelephonyBookingRequestStatus {
 /// cannot safely continue automated booking. It never reserves a slot and
 /// deliberately stores no patient id, candidate names, or match count.
 model TelephonyBookingRequest {
-  id             String                          @id @default(cuid())
-  tenantId       String                          @map("tenant_id")
-  clinicId       String                          @map("clinic_id")
-  provider       String                          @db.VarChar(32)
-  providerCallId String                          @map("provider_call_id") @db.VarChar(128)
-  callerNumber   String?                         @map("caller_number") @db.VarChar(16)
+  id             String                        @id @default(cuid())
+  tenantId       String                        @map("tenant_id")
+  clinicId       String                        @map("clinic_id")
+  provider       String                        @db.VarChar(32)
+  providerCallId String                        @map("provider_call_id") @db.VarChar(128)
+  callerNumber   String?                       @map("caller_number") @db.VarChar(16)
   reason         TelephonyBookingRequestReason
-  status         TelephonyBookingRequestStatus   @default(PENDING)
-  createdAt      DateTime                        @default(now()) @map("created_at")
-  updatedAt      DateTime                        @updatedAt @map("updated_at")
+  status         TelephonyBookingRequestStatus @default(PENDING)
+  createdAt      DateTime                      @default(now()) @map("created_at")
+  updatedAt      DateTime                      @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Restrict)
 
-  @@unique([clinicId, provider, providerCallId])
+  @@unique([clinicId, provider, providerCallId], map: "telephony_booking_requests_clinic_provider_call_id_key")
   @@index([tenantId, clinicId, status])
   @@index([createdAt])
   @@map("telephony_booking_requests")
@@ -1273,8 +1273,8 @@ model Task {
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
-  createdBy  User  @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  assignedTo User? @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy   User  @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignedTo  User? @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   completedBy User? @relation("TaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId])

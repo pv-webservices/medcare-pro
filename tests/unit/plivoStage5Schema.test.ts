@@ -25,7 +25,7 @@ describe("Plivo Stage 5 schema and architecture", () => {
   });
 
   it("gives callback requests a scoped database idempotency backstop", () => {
-    expect(schema).toContain("@@unique([clinicId, provider, providerCallId])");
+    expect(schema).toMatch(/@@unique\(\[clinicId, provider, providerCallId\].*\)/);
     expect(schema).toContain("@@index([tenantId, clinicId, status])");
   });
 

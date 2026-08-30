@@ -21,9 +21,9 @@ ALTER TABLE `appointments`
 ALTER TABLE `appointments`
     ADD CONSTRAINT `appointments_booking_provenance_check`
     CHECK (
-      (`booking_source` = 'STAFF' AND `booking_source_ref` IS NULL AND `booked_by_id` IS NOT NULL)
+      (`booking_source` = 'STAFF' AND `booking_source_ref` IS NULL)
       OR
-      (`booking_source` = 'PHONE_IVR' AND `booking_source_ref` IS NOT NULL AND `booked_by_id` IS NULL)
+      (`booking_source` = 'PHONE_IVR' AND `booking_source_ref` IS NOT NULL)
     );
 
 CREATE TABLE `telephony_booking_requests` (
@@ -38,7 +38,7 @@ CREATE TABLE `telephony_booking_requests` (
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `telephony_booking_requests_clinic_id_provider_provider_call_id_key`
+    UNIQUE INDEX `telephony_booking_requests_clinic_provider_call_id_key`
         (`clinic_id`, `provider`, `provider_call_id`),
     INDEX `telephony_booking_requests_tenant_id_clinic_id_status_idx`
         (`tenant_id`, `clinic_id`, `status`),
