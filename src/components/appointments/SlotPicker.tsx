@@ -129,18 +129,17 @@ export default function SlotPicker({
 
   return (
     <div>
-      <p className="mb-3 text-body text-muted">
-        <span className="font-semibold tnum text-ink">{free}</span>{""}
-        {free === 1 ? "slot" : "slots"} free of{""}
-        <span className="tnum">{result.slots.length}</span>, at{""}
-        <span className="tnum">{result.durationMinutes}</span> minutes
-        each.
-      </p>
+      <div className="mb-3 flex items-center gap-2.5">
+        <p className="text-body font-semibold text-ink">Available slots</p>
+        <span className="text-label text-muted">
+          <span className="tnum font-medium text-ink-soft">{free}</span> free today
+        </span>
+      </div>
 
       <div
         role="radiogroup"
         aria-label="Available slots"
-        className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+        className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5"
       >
         {result.slots.map((slot) => {
           const isTaken = slot.status === "booked";
@@ -155,14 +154,14 @@ export default function SlotPicker({
               disabled={isTaken}
               onClick={() => onSelect(slot)}
               className={cx(
-                "min-h-11 rounded-xl border px-2 text-body font-semibold tnum transition-colors",
+                "h-11 rounded-xl border text-body font-semibold tnum transition-all duration-150 flex items-center justify-center",
                 isTaken &&
-                  "cursor-not-allowed border-line bg-canvas-deep text-faint line-through",
+                  "cursor-not-allowed border-line bg-canvas-deep/80 text-faint line-through opacity-60",
                 !isTaken &&
                   !isChosen &&
-                  "border border-line bg-canvas text-ink shadow-card hover:border-accent hover:text-accent",
+                  "border-line bg-canvas text-ink shadow-sm hover:border-accent hover:text-accent hover:shadow-card",
                 isChosen &&
-                  "border border-accent bg-accent text-accent-ink shadow-cta",
+                  "border-accent bg-accent text-accent-ink shadow-cta font-bold",
               )}
             >
               {slot.start}

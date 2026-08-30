@@ -63,7 +63,7 @@ export default async function BookAppointmentPage() {
   const bookable = services.filter((service) => service.isActive);
 
   return (
-    <section className="mx-auto w-full max-w-4xl">
+    <section className="w-full">
       <PageHeader
         title="Book an appointment"
         description="Hold a slot in a doctor's day. The patient record is created later, when they arrive and the appointment is registered."

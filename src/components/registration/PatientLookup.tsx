@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
@@ -111,10 +112,11 @@ export default function PatientLookup({
         label="Returning patient?"
         hint={error ? undefined : "Search by name, mobile or Patient ID."}
         error={error ?? undefined}
+        icon={<Search className="h-4 w-4 text-muted" aria-hidden="true" />}
         value={term}
         onChange={(e) => setTerm(e.target.value)}
         disabled={!clinicId}
-        placeholder={clinicId ? "" : "Choose a clinic first"}
+        placeholder={clinicId ? "Search by name, mobile or Patient ID" : "Choose a clinic first"}
       />
 
       {isSearching && <p className="mt-2 text-label text-muted">Searching…</p>}
