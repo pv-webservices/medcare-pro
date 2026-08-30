@@ -1,7 +1,12 @@
 {
   "mcpServers": {
     "plivo": {
-      "serverUrl": "https://plivo.com/docs/mcp"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://plivo.com/docs/mcp"
+      ]
     }
   }
 }
