@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import SlotPicker from "@/components/appointments/SlotPicker";
 import Button from "@/components/ui/Button";
-import Input, { Textarea } from "@/components/ui/Input";
-import Panel from "@/components/ui/Panel";
+import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import type {
@@ -193,10 +192,16 @@ export default function RescheduleForm({
   }
 
   return (
-    <Panel
-      title="Move to another slot"
-      description={`The original booking is kept and marked as moved, and a new one is created in its place. The service stays ${appointmentTypeName}.`}
-    >
+    <section id="reschedule-section" className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+      <div className="mb-6">
+        <h2 className="text-lg font-bold tracking-tight text-ink">
+          Move to another slot
+        </h2>
+        <p className="mt-0.5 text-label text-muted">
+          The original booking is kept and marked as moved, and a new one is created in its place. The service stays {appointmentTypeName}.
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit} noValidate>
         {formError && (
           <p
@@ -240,7 +245,6 @@ export default function RescheduleForm({
         </div>
 
         <div className="mt-5">
-          <p className="mb-2 text-body font-semibold text-ink">New slot</p>
           <SlotPicker
             result={slots}
             isLoading={isLoadingSlots}
@@ -250,28 +254,29 @@ export default function RescheduleForm({
           />
         </div>
 
-        <Textarea
+        <Input
           id="reschedule-reason"
           label="Reason"
           hint="Optional. Recorded in the audit trail, not shown to the patient."
-          rows={2}
+          autoComplete="off"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           fieldClassName="mt-5"
         />
 
-        <div className="mt-5">
+        <div className="mt-6">
           <Button
             type="submit"
             variant="primary"
             isBusy={isSaving}
             busyLabel="Moving…"
+            className="rounded-xl px-4 py-2.5 font-medium shadow-cta"
           >
-            <CalendarSync aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
-            Move Appointment
+            <CalendarSync aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            Move appointment
           </Button>
         </div>
       </form>
-    </Panel>
+    </section>
   );
 }

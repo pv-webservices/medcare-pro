@@ -59,8 +59,8 @@ interface AppointmentActionsProps {
   /** AP-9. Confirming answers to `appointment:update`, not to a key of its own. */
   canConfirm: boolean;
   size?: ButtonSize;
-  /** "default" displays the full button row; "compact" renders inline primary action + overflow menu for board rows. */
-  presentation?: "default" | "compact";
+  /** "default" displays the full button row; "compact" renders inline primary action + overflow menu for board rows; "detail" renders the dedicated horizontal action strip. */
+  presentation?: "default" | "compact" | "detail";
   className?: string;
 }
 
@@ -280,6 +280,120 @@ export default function AppointmentActions({
 
   if (!isLive) {
     return null;
+  }
+
+  if (presentation === "detail") {
+    return (
+      <div className={className}>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {status === "CONFIRMED" && (
+            <span className="rounded-xl border border-line bg-canvas px-3.5 py-2 text-label font-medium text-ink shadow-sm">
+              Confirmed
+            </span>
+          )}
+
+          {isBooked && canConfirm && (
+            <Button
+              size={size}
+              variant="secondary"
+              isBusy={busy === "confirm"}
+              busyLabel="Confirming…"
+              disabled={busy !== null}
+              onClick={() => run("confirm")}
+              className="rounded-xl font-medium"
+            >
+              <CheckCheck aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+              Confirm
+            </Button>
+          )}
+
+          {isWaiting && canCheckIn && (
+            <Button
+              size={size}
+              variant="primary"
+              isBusy={busy === "check-in"}
+              busyLabel="Checking in…"
+              disabled={busy !== null}
+              onClick={() => run("check-in")}
+              className="rounded-xl font-medium shadow-cta"
+            >
+              <LogIn aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Check in
+            </Button>
+          )}
+
+          {isArrived && canConvert && (
+            <Button
+              size={size}
+              variant="primary"
+              isBusy={busy === "convert"}
+              busyLabel="Registering…"
+              disabled={busy !== null}
+              onClick={() => run("convert")}
+              className="rounded-xl font-medium shadow-cta"
+            >
+              <UserPlus aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Register patient
+            </Button>
+          )}
+
+          {canCancel && (
+            <>
+              <Button
+                size={size}
+                variant="ghost"
+                isBusy={busy === "no-show"}
+                busyLabel="Saving…"
+                disabled={busy !== null}
+                onClick={() => run("no-show")}
+                className="rounded-xl font-medium text-ink hover:bg-canvas-deep"
+              >
+                Did not attend
+              </Button>
+
+              <Button
+                size={size}
+                variant="danger"
+                isBusy={busy === "cancel"}
+                busyLabel="Cancelling…"
+                disabled={busy !== null}
+                onClick={() => setIsConfirmingCancel(true)}
+                className="rounded-xl font-medium border border-alert-mark/30"
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+        </div>
+
+        <ConfirmDialog
+          isOpen={isConfirmingCancel}
+          onCancel={() => setIsConfirmingCancel(false)}
+          onConfirm={() => {
+            setIsConfirmingCancel(false);
+            void run("cancel");
+          }}
+          title="Cancel this appointment?"
+          body="The slot is released and becomes bookable again. The appointment stays on the record as cancelled."
+          confirmLabel="Cancel appointment"
+          cancelLabel="Keep it"
+          isBusy={busy === "cancel"}
+          busyLabel="Cancelling…"
+        />
+
+        {isArrived && canConvert && (
+          <p className="mt-2 text-meta text-muted">
+            <CheckCircle2
+              aria-hidden="true"
+              strokeWidth={1.75}
+              className="mr-1 inline h-3.5 w-3.5 align-[-2px]"
+            />
+            Registering creates the patient record and Patient ID if this is their
+            first visit.
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (

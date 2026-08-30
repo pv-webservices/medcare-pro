@@ -216,7 +216,6 @@ export default function EditBookingForm({
           unit="₹"
           value={values.amount}
           error={errors.amount}
-          hint="Carried onto the visit when this booking is registered."
           onChange={(event) => update("amount", event.target.value)}
         />
 
@@ -261,12 +260,12 @@ export default function EditBookingForm({
           onChange={(event) => update("city", event.target.value)}
         />
 
-        <Textarea
+        <Input
           id="edit-booking-address"
           name="address"
           label="Address"
           hint="Optional."
-          rows={2}
+          autoComplete="off"
           value={values.address}
           error={errors.address}
           onChange={(event) => update("address", event.target.value)}
@@ -281,8 +280,9 @@ export default function EditBookingForm({
           disabled={!isDirty}
           isBusy={isSaving}
           busyLabel="Saving…"
+          className="rounded-xl px-4 py-2 font-medium shadow-cta"
         >
-          Save Corrections
+          Save corrections
         </Button>
 
         {isDirty ? (
@@ -294,11 +294,12 @@ export default function EditBookingForm({
               setValues(initial);
               setErrors({});
             }}
+            className="rounded-xl font-medium"
           >
-            Discard Changes
+            Discard changes
           </Button>
         ) : (
-          <p className="text-meta text-muted">
+          <p className="text-label text-muted">
             Nothing has been changed yet.
           </p>
         )}

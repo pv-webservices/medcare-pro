@@ -15,7 +15,6 @@ import { buttonClasses } from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import ModuleLocked from "@/components/ui/ModuleLocked";
 import PageHeader from "@/components/ui/PageHeader";
-import Panel from "@/components/ui/Panel";
 import StatusPill from "@/components/ui/StatusPill";
 import { getAppointmentDetailForActor } from "@/lib/appointmentDetail";
 import { editRefusal } from "@/lib/appointmentEditRules";
@@ -55,22 +54,38 @@ interface AppointmentDetailPageProps {
 function Fact({
   label,
   children,
+  className,
 }: {
   label: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div>
-      <p className="text-meta font-semibold uppercase tracking-wider text-muted">
+    <div className={className}>
+      <p className="text-micro font-semibold uppercase tracking-wider text-muted">
         {label}
       </p>
-      <div className="mt-1 text-ink">{children}</div>
+      <div className="mt-1 font-bold text-ink">{children}</div>
     </div>
   );
 }
 
 function NotSet() {
-  return <span className="text-faint">Not recorded</span>;
+  return <span className="font-normal text-faint">Not recorded</span>;
+}
+
+function formatBookingTimestamp(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const day = d.getUTCDate();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[d.getUTCMonth()];
+    const hours = String(d.getUTCHours()).padStart(2, "0");
+    const minutes = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${day} ${month} · ${hours}:${minutes}`;
+  } catch {
+    return dateStr;
+  }
 }
 
 export default async function AppointmentDetailPage({
@@ -160,22 +175,25 @@ export default async function AppointmentDetailPage({
   const doctors = await listDoctorsForActor(actor, { clinicId });
 
   return (
-    <section className="mx-auto w-full max-w-4xl space-y-5">
+    <section className="w-full space-y-6">
       <PageHeader
         title={appointment.name}
         breadcrumbs={[
           { label: "Appointments", href: "/appointments" },
           { label: appointment.name },
         ]}
+        description="Appointment details and patient context."
         meta={
           <>
-            {formatAppointmentDate(appointment.date)} at{""}
+            {formatAppointmentDate(appointment.date)} ·{" "}
             <span className="tnum font-semibold text-ink">
               {appointment.startTime}
             </span>
             {"–"}
-            <span className="tnum">{appointment.endTime}</span>
-            {"·"}
+            <span className="tnum font-semibold text-ink">
+              {appointment.endTime}
+            </span>
+            {" · "}
             {appointment.clinicName}
           </>
         }
@@ -189,7 +207,7 @@ export default async function AppointmentDetailPage({
       {/* The visit this became. First, because on a converted appointment it is
           the thing the desk came here to find. */}
       {appointment.registration && (
-        <Card isFlush className="border-ok-line bg-ok-bg p-4">
+        <Card isFlush className="rounded-3xl border border-ok-line bg-ok-bg p-5 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-body text-ok-ink">
               <ClipboardList
@@ -197,7 +215,7 @@ export default async function AppointmentDetailPage({
                 strokeWidth={1.75}
                 className="h-4 w-4"
               />
-              Registered as{""}
+              Registered as{" "}
               <span className="serial font-semibold">
                 {appointment.registration.patientCode}
               </span>
@@ -221,7 +239,7 @@ export default async function AppointmentDetailPage({
 
       {/* The row that replaced this one, when it was moved. */}
       {appointment.rescheduledToId && (
-        <Card isFlush className="p-4">
+        <Card isFlush className="rounded-3xl border border-line bg-canvas p-5 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-body text-muted">
               This booking was moved. The live one is on another slot.
@@ -241,189 +259,323 @@ export default async function AppointmentDetailPage({
         </Card>
       )}
 
+      {/* What happens next */}
       {!isFinished && (canCheckIn || canConvert || canCancel || canUpdate) && (
-        <Panel
-          title="What happens next"
-          description="Move this appointment on as the patient arrives, or close it out."
-        >
-          <AppointmentActions
-            appointmentId={appointment.id}
-            status={appointment.status}
-            canCheckIn={canCheckIn}
-            canConvert={canConvert}
-            canCancel={canCancel}
-            canConfirm={canUpdate}
-            size="md"
-          />
-        </Panel>
+        <section className="rounded-3xl border border-line bg-canvas p-5 sm:p-6 shadow-card">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-ink">What happens next</h2>
+              <p className="mt-0.5 text-label text-muted">
+                Move the appointment forward as the patient arrives.
+              </p>
+            </div>
+            <AppointmentActions
+              appointmentId={appointment.id}
+              status={appointment.status}
+              canCheckIn={canCheckIn}
+              canConvert={canConvert}
+              canCancel={canCancel}
+              canConfirm={canUpdate}
+              presentation="detail"
+            />
+          </div>
+        </section>
       )}
 
-      {showReminder && (
-        <Panel
-          title="Remind the patient"
-          description="Send one of the account's approved messages about this appointment over WhatsApp."
-        >
-          <SendReminderPanel
-            appointmentId={appointment.id}
-            templates={reminderTemplates.map(({ id, name, body, footer }) => ({
-              id,
-              name,
-              body,
-              footer,
-            }))}
-            values={reminderValues}
-            refusal={reminderRefusalText}
-          />
-        </Panel>
-      )}
-
-      <Panel title="The slot" description="What was booked, and with whom.">
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Fact label="Doctor">
-            {appointment.doctorName}
-            <p className="mt-0.5 text-body text-muted">
-              {appointment.doctorDepartment}
-            </p>
-          </Fact>
-
-          <Fact label="Service">
-            {appointment.appointmentTypeName}
-            <p className="mt-0.5 text-body tnum text-muted">
-              {appointment.durationMinutes} minutes
-            </p>
-          </Fact>
-
-          <Fact label="Amount quoted">
-            <span className="font-semibold tnum">
-              {formatRupees(appointment.amount)}
-            </span>
-          </Fact>
-
-          <Fact label="Clinic">{appointment.clinicName}</Fact>
-
-          <Fact label="Booked by">
-            {appointment.bookedByName ?? <NotSet />}
-          </Fact>
-
-          {appointment.checkedInAt && (
-            <Fact label="Arrived">
-              <span className="tnum">
-                {new Date(appointment.checkedInAt).toLocaleString(undefined, {
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-              {appointment.checkedInByName && (
-                <p className="mt-0.5 text-body text-muted">
-                  Recorded by {appointment.checkedInByName}
+      {/* Two-Column Grid */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+        {/* Left Column (lg:col-span-7 xl:col-span-8) */}
+        <div className="space-y-6 lg:col-span-7 xl:col-span-8">
+          {/* The slot */}
+          <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink">
+                  The slot
+                </h2>
+                <p className="mt-0.5 text-label text-muted">
+                  What was booked, where, and with whom.
                 </p>
+              </div>
+              {!isFinished && canReschedule && doctors.length > 0 && (
+                <a
+                  href="#reschedule-section"
+                  className="rounded-xl border border-line bg-canvas px-3.5 py-1.5 text-label font-medium text-ink shadow-sm hover:bg-canvas-deep transition-colors"
+                >
+                  Move slot
+                </a>
               )}
-            </Fact>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <Fact label="Doctor">
+                <span className="text-body font-bold text-ink block">
+                  {appointment.doctorName}
+                </span>
+                <p className="mt-0.5 text-label font-normal text-muted">
+                  {appointment.doctorDepartment}
+                </p>
+              </Fact>
+
+              <Fact label="Service">
+                <span className="text-body font-bold text-ink block">
+                  {appointment.appointmentTypeName}
+                </span>
+                <p className="mt-0.5 text-label font-normal tnum text-muted">
+                  {appointment.durationMinutes} minutes
+                </p>
+              </Fact>
+
+              <Fact label="Amount quoted">
+                <span className="text-body font-bold text-ink tnum">
+                  {formatRupees(appointment.amount)}
+                </span>
+              </Fact>
+
+              <Fact label="Clinic">
+                <span className="text-body font-bold text-ink">
+                  {appointment.clinicName}
+                </span>
+              </Fact>
+
+              <Fact label="Booked by">
+                <span className="text-body font-normal text-ink">
+                  {appointment.bookedByName ?? <NotSet />}
+                </span>
+              </Fact>
+
+              <Fact label="Booked">
+                <span className="text-body font-bold text-ink tnum">
+                  {formatBookingTimestamp(appointment.createdAt)}
+                </span>
+              </Fact>
+
+              {appointment.checkedInAt && (
+                <Fact label="Arrived">
+                  <span className="text-body font-bold text-ink tnum">
+                    {new Date(appointment.checkedInAt).toLocaleString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  {appointment.checkedInByName && (
+                    <p className="mt-0.5 text-label font-normal text-muted">
+                      By {appointment.checkedInByName}
+                    </p>
+                  )}
+                </Fact>
+              )}
+
+              {appointment.cancelledAt && (
+                <Fact label="Cancelled">
+                  <span className="text-body font-bold text-ink tnum">
+                    {new Date(appointment.cancelledAt).toLocaleString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  {appointment.cancelledByName && (
+                    <p className="mt-0.5 text-label font-normal text-muted">
+                      By {appointment.cancelledByName}
+                    </p>
+                  )}
+                  {appointment.cancellationReason && (
+                    <p className="mt-0.5 text-label font-normal text-muted">
+                      {appointment.cancellationReason}
+                    </p>
+                  )}
+                </Fact>
+              )}
+            </div>
+          </section>
+
+          {/* The patient */}
+          <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink">
+                  The patient
+                </h2>
+                <p className="mt-0.5 text-label text-muted">
+                  {appointment.patientCode
+                    ? "Linked to a record on the register."
+                    : "Not registered yet — a Patient ID is created on conversion."}
+                </p>
+              </div>
+              {canEditBooking && (
+                <a
+                  href="#correct-details-section"
+                  className="rounded-xl border border-line bg-canvas px-3.5 py-1.5 text-label font-medium text-ink shadow-sm hover:bg-canvas-deep transition-colors"
+                >
+                  Edit details
+                </a>
+              )}
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <Fact label="Name">
+                <span className="text-body font-bold text-ink">{appointment.name}</span>
+              </Fact>
+
+              <Fact label="Mobile number">
+                <span className="text-body font-bold text-ink tnum">{appointment.mobileNumber}</span>
+              </Fact>
+
+              <Fact label="Patient ID">
+                {appointment.patientCode ? (
+                  <span className="serial text-body font-bold text-ink">
+                    {appointment.patientCode}
+                  </span>
+                ) : (
+                  <span className="text-body font-normal text-faint">Not created yet</span>
+                )}
+              </Fact>
+
+              <Fact label="Age">
+                {appointment.age === null ? (
+                  <NotSet />
+                ) : (
+                  <span className="text-body font-bold text-ink tnum">{appointment.age}</span>
+                )}
+              </Fact>
+
+              <Fact label="Gender">
+                {appointment.gender ? (
+                  <span className="text-body font-bold text-ink">{appointment.gender}</span>
+                ) : (
+                  <NotSet />
+                )}
+              </Fact>
+
+              <Fact label="City">
+                {appointment.city ? (
+                  <span className="text-body font-bold text-ink">{appointment.city}</span>
+                ) : (
+                  <NotSet />
+                )}
+              </Fact>
+
+              <Fact label="Address" className="sm:col-span-2 lg:col-span-3">
+                {appointment.address ? (
+                  <span className="text-body font-bold text-ink">{appointment.address}</span>
+                ) : (
+                  <NotSet />
+                )}
+              </Fact>
+            </div>
+          </section>
+
+          {/* Correct these details */}
+          {canEditBooking && (
+            <section id="correct-details-section" className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+              <div className="mb-6">
+                <h2 className="text-lg font-bold tracking-tight text-ink">
+                  Correct these details
+                </h2>
+                <p className="mt-0.5 text-label text-muted">
+                  Fix what was written down when the booking was taken.
+                </p>
+              </div>
+
+              <EditBookingForm
+                appointmentId={appointment.id}
+                initial={{
+                  name: appointment.name,
+                  mobileNumber: appointment.mobileNumber,
+                  age: appointment.age === null ? "" : String(appointment.age),
+                  gender: appointment.gender ?? "",
+                  city: appointment.city ?? "",
+                  address: appointment.address ?? "",
+                  amount: appointment.amount,
+                }}
+              />
+            </section>
           )}
 
-          {appointment.cancelledAt && (
-            <Fact label="Cancelled">
-              <span className="tnum">
-                {new Date(appointment.cancelledAt).toLocaleString(undefined, {
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-              {appointment.cancelledByName && (
-                <p className="mt-0.5 text-body text-muted">
-                  By {appointment.cancelledByName}
-                </p>
-              )}
-              {appointment.cancellationReason && (
-                <p className="mt-1 text-body text-muted">
-                  {appointment.cancellationReason}
-                </p>
-              )}
-            </Fact>
+          {/* Move to another slot */}
+          {!isFinished && canReschedule && doctors.length > 0 && (
+            <RescheduleForm
+              appointmentId={appointment.id}
+              clinicId={clinicId}
+              appointmentTypeId={appointment.appointmentTypeId}
+              appointmentTypeName={appointment.appointmentTypeName}
+              currentDoctorId={appointment.doctorId}
+              currentDate={appointment.date}
+              doctors={doctors.map(({ id: doctorId, name, department }) => ({
+                id: doctorId,
+                name,
+                department,
+              }))}
+            />
           )}
         </div>
-      </Panel>
 
-      <Panel
-        title="The patient"
-        description={
-          appointment.patientCode
-            ? "Linked to a record on the register."
-            : "Not on the register yet — a patient record is created when this appointment is registered."
-        }
-      >
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Fact label="Name">{appointment.name}</Fact>
+        {/* Right Column (lg:col-span-5 xl:col-span-4) */}
+        <div className="space-y-6 lg:col-span-5 xl:col-span-4">
+          {/* Appointment summary */}
+          <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+            <h2 className="text-lg font-bold tracking-tight text-ink">
+              Appointment summary
+            </h2>
 
-          <Fact label="Mobile number">
-            <span className="tnum">{appointment.mobileNumber}</span>
-          </Fact>
+            <div className="mt-5 divide-y divide-line/60 border-t border-line/60">
+              <div className="flex items-center justify-between py-3 text-label">
+                <span className="text-muted">Status</span>
+                <span className="font-semibold text-ok-ink">
+                  {APPOINTMENT_STATUS_LABELS[appointment.status]}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-3 text-label">
+                <span className="text-muted">Date</span>
+                <span className="font-semibold text-ink">
+                  {formatAppointmentDate(appointment.date)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-3 text-label">
+                <span className="text-muted">Time</span>
+                <span className="font-semibold text-ink tnum">
+                  {appointment.startTime}–{appointment.endTime}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-3 text-label">
+                <span className="text-muted">Clinic</span>
+                <span className="font-semibold text-ink">
+                  {appointment.clinicName}
+                </span>
+              </div>
+            </div>
+          </section>
 
-          <Fact label="Patient ID">
-            {appointment.patientCode ? (
-              <span className="serial font-semibold">
-                {appointment.patientCode}
-              </span>
-            ) : (
-              <span className="text-faint">Not created yet</span>
-            )}
-          </Fact>
-
-          <Fact label="Age">
-            {appointment.age === null ? (
-              <NotSet />
-            ) : (
-              <span className="tnum">{appointment.age}</span>
-            )}
-          </Fact>
-
-          <Fact label="Gender">{appointment.gender ?? <NotSet />}</Fact>
-
-          <Fact label="City">{appointment.city ?? <NotSet />}</Fact>
-
-          <Fact label="Address">{appointment.address ?? <NotSet />}</Fact>
+          {/* Remind the patient */}
+          {showReminder && (
+            <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+              <div className="mb-5">
+                <h2 className="text-lg font-bold tracking-tight text-ink">
+                  Remind the patient
+                </h2>
+                <p className="mt-0.5 text-label text-muted">
+                  Use an approved WhatsApp template.
+                </p>
+              </div>
+              <SendReminderPanel
+                appointmentId={appointment.id}
+                templates={reminderTemplates.map(({ id, name, body, footer }) => ({
+                  id,
+                  name,
+                  body,
+                  footer,
+                }))}
+                values={reminderValues}
+                refusal={reminderRefusalText}
+              />
+            </section>
+          )}
         </div>
-      </Panel>
-
-      {canEditBooking && (
-        <Panel
-          title="Correct these details"
-          description="Fix what was written down when the booking was taken. Moving it to another slot is separate."
-        >
-          <EditBookingForm
-            appointmentId={appointment.id}
-            initial={{
-              name: appointment.name,
-              mobileNumber: appointment.mobileNumber,
-              age: appointment.age === null ? "" : String(appointment.age),
-              gender: appointment.gender ?? "",
-              city: appointment.city ?? "",
-              address: appointment.address ?? "",
-              amount: appointment.amount,
-            }}
-          />
-        </Panel>
-      )}
-
-      {!isFinished && canReschedule && doctors.length > 0 && (
-        <RescheduleForm
-          appointmentId={appointment.id}
-          clinicId={clinicId}
-          appointmentTypeId={appointment.appointmentTypeId}
-          appointmentTypeName={appointment.appointmentTypeName}
-          currentDoctorId={appointment.doctorId}
-          currentDate={appointment.date}
-          doctors={doctors.map(({ id: doctorId, name, department }) => ({
-            id: doctorId,
-            name,
-            department,
-          }))}
-        />
-      )}
+      </div>
     </section>
   );
 }

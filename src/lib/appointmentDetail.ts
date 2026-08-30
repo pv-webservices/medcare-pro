@@ -41,6 +41,8 @@ export interface AppointmentDetailView extends AppointmentStateView {
   /** Set once this person is on the register — before that, null. */
   patientCode: string | null;
 
+  /** ISO string for the creation timestamp */
+  createdAt: string;
   bookedByName: string | null;
   checkedInByName: string | null;
   cancelledByName: string | null;
@@ -81,6 +83,7 @@ export async function getAppointmentDetailForActor(
       gender: true,
       address: true,
       city: true,
+      createdAt: true,
       clinic: { select: { name: true } },
       doctor: { select: { name: true, department: true } },
       appointmentType: { select: { name: true, durationMinutes: true } },
@@ -112,6 +115,7 @@ export async function getAppointmentDetailForActor(
     address: row.address,
     city: row.city,
     patientCode: row.patient?.patientCode ?? null,
+    createdAt: row.createdAt.toISOString(),
     bookedByName: personName(row.bookedBy),
     checkedInByName: personName(row.checkedInBy),
     cancelledByName: personName(row.cancelledBy),
