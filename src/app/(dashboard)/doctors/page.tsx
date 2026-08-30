@@ -56,7 +56,7 @@ export default async function DoctorsListPage() {
           <>
             {/* FR-4.1 — the total, reflecting the current clinic filter. */}
             {doctors.length === 1 ? "1 doctor" : `${doctors.length} doctors`}
-            {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}.
+            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}.
           </>
         }
         actions={

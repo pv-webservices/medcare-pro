@@ -109,10 +109,11 @@ export default async function RegistrationListPage({
         scope={selectedClinic ? selectedClinic.name : "All clinics"}
         meta={
           <>
-            <Count>{result.total}</Count>{""}
+            <Count>{result.total}</Count>{" "}
             {result.total === 1 ? "registration" : "registrations"}
-            {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}
-            {isFiltered ? "matching your filters" : ""}
+            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
+            {isFiltered ? " matching your filters" : ""}
+            .
           </>
         }
         actions={
