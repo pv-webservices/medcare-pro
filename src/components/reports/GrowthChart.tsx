@@ -1,42 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { ChevronDown, ChevronRight, TableProperties } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
 import type { RevenuePoint } from "@/lib/reports";
-
-/**
- * Revenue trend — PRD §6.6 (FR-6.3).
- *
- * Inline SVG, no charting dependency: one line over time needs a path and an
- * axis, and CLAUDE.md says not to add to the stack without asking.
- *
- * Form and marks follow the house data-viz rules:
- *   - Trend over time, one series → a line. One series means NO legend box:
- *     the heading already says what is plotted, and a lone swatch would just
- *     restate it.
- *   - 2px line, round joins; area wash at 10%; an ≥8px end marker carrying a
- *     2px ring in the surface colour so it stays legible over the line.
- *   - Exactly one direct label, on the final point. A number on every point is
- *     noise; the axis, the tooltip and the table carry the rest.
- *   - Gridlines are solid hairlines one step off the surface — never dashed.
- *   - Colour lives on the mark. Every label is a text token, because a mid-blue
- *     is illegible as small text.
- *
- * The tooltip enhances, it never gates: the same numbers are in the table view
- * below, and the hit areas are focusable so a keyboard reaches what a pointer
- * reaches.
- */
 
 interface GrowthChartProps {
   series: readonly RevenuePoint[];
   /** Names the series, so the chart needs no legend. */
   caption: string;
+  actions?: ReactNode;
 }
 
 // Geometry is in viewBox units; the SVG scales to its container.
 const WIDTH = 720;
 const HEIGHT = 280;
-const PADDING = { top: 16, right: 20, bottom: 38, left: 66 };
+const PADDING = { top: 24, right: 32, bottom: 38, left: 66 };
 
 const PLOT_WIDTH = WIDTH - PADDING.left - PADDING.right;
 const PLOT_HEIGHT = HEIGHT - PADDING.top - PADDING.bottom;
@@ -47,7 +26,6 @@ const MAX_TICKS = 7;
 /** Rounds an axis maximum up to a clean number, so ticks read 0 / 250 / 500. */
 function niceMax(value: number): number {
   if (value <= 0) {
-    // An empty period still needs a scale, or every point sits on the axis.
     return 100;
   }
 
@@ -59,7 +37,11 @@ function niceMax(value: number): number {
   return step * magnitude;
 }
 
-export default function GrowthChart({ series, caption }: GrowthChartProps) {
+export default function GrowthChart({
+  series,
+  caption,
+  actions,
+}: GrowthChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const points = series.length > 0 ? series : [];
@@ -87,7 +69,6 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
     (_, step) => (maxValue / GRID_LINES) * step,
   );
 
-  // Counted back from the end so the most recent bucket is always labelled.
   const tickStep = Math.max(1, Math.ceil(points.length / MAX_TICKS));
   const isTick = (index: number) => (points.length - 1 - index) % tickStep === 0;
 
@@ -99,14 +80,46 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
   }
 
   return (
-    <div className="viz-root">
+    <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+      {/* Header with Title and Controls */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-ink">
+            Revenue trend
+          </h2>
+          <p className="mt-0.5 text-label text-muted">
+            {caption}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-canvas-deep/50 px-3 py-1.5 text-label font-medium text-ink">
+            <span className="h-2 w-2 rounded-full bg-accent" />
+            Total revenue
+          </span>
+          <span className="hidden sm:inline-flex items-center gap-1 rounded-xl border border-line bg-canvas-deep/50 px-3 py-1.5 text-label font-medium text-ink">
+            Line area
+            <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+          </span>
+          {actions}
+        </div>
+      </div>
+
       <div className="relative">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="h-auto w-full"
+          className="h-auto w-full overflow-visible"
           role="img"
           aria-label={`${caption}. ${points.length} periods, from ${points[0].fullLabel} to ${points[lastIndex].fullLabel}. Values are listed in the table below.`}
         >
+          <defs>
+            <linearGradient id="revenueTrendGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#6366F1" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#6366F1" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Gridlines and Y-axis labels */}
           {gridValues.map((value) => (
             <g key={value}>
               <line
@@ -114,15 +127,16 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
                 x2={WIDTH - PADDING.right}
                 y1={yFor(value)}
                 y2={yFor(value)}
-                stroke="var(--viz-grid)"
+                stroke="var(--line, #E2E8F0)"
                 strokeWidth={1}
               />
               <text
-                x={PADDING.left - 10}
+                x={PADDING.left - 12}
                 y={yFor(value) + 4}
                 textAnchor="end"
                 fontSize={11}
-                fill="var(--viz-muted)"
+                fontWeight={500}
+                fill="#64748B"
                 style={{ fontVariantNumeric: "tnum" }}
               >
                 {formatRupeesCompact(value)}
@@ -130,25 +144,28 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
             </g>
           ))}
 
+          {/* Base Axis Line */}
           <line
             x1={PADDING.left}
             x2={WIDTH - PADDING.right}
             y1={PADDING.top + PLOT_HEIGHT}
             y2={PADDING.top + PLOT_HEIGHT}
-            stroke="var(--viz-axis)"
+            stroke="var(--line, #E2E8F0)"
             strokeWidth={1}
           />
 
-          <path d={areaPath} fill="var(--viz-series)" fillOpacity={0.1} />
+          {/* Area & Stroke Paths */}
+          <path d={areaPath} fill="url(#revenueTrendGrad)" />
           <path
             d={linePath}
             fill="none"
-            stroke="var(--viz-series)"
-            strokeWidth={2}
+            stroke="#6366F1"
+            strokeWidth={3}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
 
+          {/* X-axis Ticks */}
           {points.map((point, index) =>
             isTick(index) ? (
               <text
@@ -157,60 +174,112 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
                 y={HEIGHT - 14}
                 textAnchor="middle"
                 fontSize={11}
-                fill="var(--viz-muted)"
+                fontWeight={500}
+                fill="#64748B"
               >
                 {point.label}
               </text>
             ) : null,
           )}
 
-          {/* Crosshair, drawn under the markers so it never covers one. */}
+          {/* Subtle Data Points and Point Values */}
+          {points.map((point, index) => {
+            if (index === lastIndex) return null;
+            return (
+              <g key={`pt-${point.bucket}`}>
+                <text
+                  x={xFor(index)}
+                  y={yFor(point.value) - 10}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="#1E293B"
+                  style={{ fontVariantNumeric: "tnum" }}
+                >
+                  {formatRupeesCompact(point.value)}
+                </text>
+                <circle
+                  cx={xFor(index)}
+                  cy={yFor(point.value)}
+                  r={3.5}
+                  fill="#6366F1"
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                />
+              </g>
+            );
+          })}
+
+          {/* Crosshair when hovering */}
           {activeIndex !== null && (
             <line
               x1={xFor(activeIndex)}
               x2={xFor(activeIndex)}
               y1={PADDING.top}
               y2={PADDING.top + PLOT_HEIGHT}
-              stroke="var(--viz-axis)"
+              stroke="#94A3B8"
+              strokeDasharray="2 2"
               strokeWidth={1}
             />
           )}
 
-          {/* The final point is the one the reader is looking for, so it is
-              marked and labelled whether or not anything is hovered. */}
+          {/* Final Point Glowing Ring and Pin */}
           <circle
             cx={xFor(lastIndex)}
             cy={yFor(points[lastIndex].value)}
-            r={4}
-            fill="var(--viz-series)"
-            stroke="var(--viz-surface)"
+            r={8}
+            fill="#6366F1"
+            fillOpacity={0.25}
+          />
+          <circle
+            cx={xFor(lastIndex)}
+            cy={yFor(points[lastIndex].value)}
+            r={4.5}
+            fill="#4F46E5"
+            stroke="#FFFFFF"
             strokeWidth={2}
           />
-          <text
-            x={Math.min(xFor(lastIndex), WIDTH - PADDING.right - 4)}
-            y={Math.max(yFor(points[lastIndex].value) - 12, PADDING.top + 10)}
-            textAnchor="end"
-            fontSize={12}
-            fontWeight={600}
-            fill="currentColor"
+
+          {/* Highlight Badge on Latest Value */}
+          <g
+            transform={`translate(${Math.min(xFor(lastIndex), WIDTH - PADDING.right - 26)}, ${Math.max(
+              yFor(points[lastIndex].value) - 20,
+              PADDING.top + 6,
+            )})`}
           >
-            {formatRupeesCompact(points[lastIndex].value)}
-          </text>
+            <rect
+              x={-28}
+              y={-14}
+              width={56}
+              height={22}
+              rx={11}
+              fill="#0F172A"
+            />
+            <text
+              x={0}
+              y={1}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={11}
+              fontWeight={700}
+              fill="#FFFFFF"
+            >
+              {formatRupeesCompact(points[lastIndex].value)}
+            </text>
+          </g>
 
           {activeIndex !== null && activeIndex !== lastIndex && (
             <circle
               cx={xFor(activeIndex)}
               cy={yFor(points[activeIndex].value)}
               r={4}
-              fill="var(--viz-series)"
-              stroke="var(--viz-surface)"
+              fill="#4F46E5"
+              stroke="#FFFFFF"
               strokeWidth={2}
             />
           )}
 
-          {/* Full-height hit columns: the target is the whole band, not the
-              4px dot, and each is focusable so the keyboard gets the tooltip
-              a pointer would. */}
+          {/* Focusable Interactive Hit Bands */}
           {points.map((point, index) => {
             const bandWidth = PLOT_WIDTH / Math.max(points.length - 1, 1);
 
@@ -237,15 +306,15 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
         {active && activeIndex !== null && (
           <div
             role="status"
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md bg-canvas px-3 py-2 text-meta border border-line shadow-card"
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-2xl bg-canvas px-3.5 py-2.5 text-meta border border-line shadow-card"
             style={{
               left: `${(Math.min(Math.max(xFor(activeIndex), 90), WIDTH - 90) / WIDTH) * 100}%`,
               top: `${(yFor(active.value) / HEIGHT) * 100}%`,
             }}
           >
             <p className="font-semibold text-ink">{active.fullLabel}</p>
-            <p className="mt-1 font-medium tnum text-ink">{formatRupees(active.revenue)}</p>
-            <p className="text-muted mt-1">
+            <p className="mt-1 font-bold tnum text-ink">{formatRupees(active.revenue)}</p>
+            <p className="text-muted mt-0.5 text-label">
               {active.registrations === 1
                 ? "1 registration"
                 : `${active.registrations} registrations`}
@@ -254,24 +323,25 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
         )}
       </div>
 
-      {/* The table view twin — every plotted value, reachable without hover. */}
-      <details className="mt-4 group">
-        <summary className="cursor-pointer text-body font-semibold text-muted hover:text-ink transition-colors list-none flex items-center">
-          <span className="group-open:rotate-90 transition-transform mr-2">▶</span>
-          View as table
+      {/* Accessible Table View Toggle */}
+      <details className="mt-6 group">
+        <summary className="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-line bg-canvas px-3.5 py-1.5 text-label font-medium text-ink shadow-sm hover:bg-canvas-deep transition-colors list-none">
+          <TableProperties className="h-4 w-4 text-muted" aria-hidden="true" />
+          <span>View as table</span>
+          <ChevronRight className="h-3.5 w-3.5 text-muted transition-transform group-open:rotate-90" aria-hidden="true" />
         </summary>
-        <div className="mt-3 overflow-x-auto rounded-xl border border-line shadow-card">
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-canvas shadow-sm">
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">{caption}</caption>
             <thead>
               <tr className="border-b border-line bg-canvas-deep/50">
-                <th scope="col" className="py-3 pl-4 pr-4 text-body font-semibold text-ink">
+                <th scope="col" className="py-3 pl-4 pr-4 text-label font-semibold uppercase text-muted">
                   Period
                 </th>
-                <th scope="col" className="py-3 pr-4 text-right text-body font-semibold text-ink">
+                <th scope="col" className="py-3 pr-4 text-right text-label font-semibold uppercase text-muted">
                   Registrations
                 </th>
-                <th scope="col" className="py-3 pr-4 text-right text-body font-semibold text-ink">
+                <th scope="col" className="py-3 pr-4 text-right text-label font-semibold uppercase text-muted">
                   Revenue
                 </th>
               </tr>
@@ -286,7 +356,7 @@ export default function GrowthChart({ series, caption }: GrowthChartProps) {
                   <td className="py-3 pr-4 text-right text-body tnum text-muted">
                     {point.registrations}
                   </td>
-                  <td className="py-3 pr-4 text-right text-body font-medium tnum text-ink">
+                  <td className="py-3 pr-4 text-right text-body font-bold tnum text-ink">
                     {formatRupees(point.revenue)}
                   </td>
                 </tr>

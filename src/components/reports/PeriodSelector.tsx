@@ -33,10 +33,10 @@ export default function PeriodSelector({ selected }: PeriodSelectorProps) {
               <Link
                 href={`/reports?period=${period}`}
                 aria-current={isSelected ? "page" : undefined}
-                className={`inline-flex min-h-10 items-center justify-center rounded-xl px-3.5 text-body font-medium transition-colors duration-150 ${
+                className={`inline-flex min-h-9 items-center justify-center rounded-xl px-4 py-1.5 text-label font-medium transition-all duration-150 ${
                   isSelected
-                    ? "border border-accent bg-accent text-accent-ink shadow-cta"
-                    : "border border-transparent text-muted hover:bg-canvas-deep hover:text-ink"
+                    ? "bg-accent text-accent-ink font-semibold shadow-sm"
+                    : "text-muted hover:bg-canvas-deep hover:text-ink"
                 }`}
               >
                 {REPORT_PERIOD_LABELS[period]}
