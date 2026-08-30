@@ -1,11 +1,11 @@
 {
   "mcpServers": {
     "plivo": {
-      "command": "npx",
+      "command": "npx.cmd",
       "args": [
         "-y",
         "mcp-remote",
-        "https://plivo.com/docs/mcp"
+        "https://plivo.subdirectory-docs.mintlify.me/docs/mcp"
       ]
     }
   }
