@@ -128,3 +128,43 @@ export function buildSlotPagePrompt(
     : "Press 9 for the main menu.";
   return `Available times tomorrow for ${doctorName.trim()} for ${appointmentTypeName.trim()} are ${spokenTimes}. ${controls}`;
 }
+
+export function buildPatientConfirmationPrompt(): string {
+  return [
+    "We found one patient record for this caller number.",
+    "Press 1 to continue without speaking patient details.",
+    "Press 2 to request a callback from the clinic.",
+    "Press 9 for the main menu.",
+  ].join(" ");
+}
+
+export function buildBookingSlotPagePrompt(
+  doctorName: string,
+  appointmentTypeName: string,
+  slotTimes: readonly string[],
+  hasNext: boolean,
+): string {
+  const options = slotTimes.map(
+    (time, index) => `Press ${index + 1} for ${formatClockTimeForSpeech(time)}.`,
+  );
+  if (hasNext) options.push("Press 8 for more available times.");
+  options.push("Press 9 for the main menu.");
+  return [
+    `Choose a time tomorrow with ${doctorName.trim()} for ${appointmentTypeName.trim()}.`,
+    ...options,
+  ].join(" ");
+}
+
+export function buildFinalBookingConfirmationPrompt(input: {
+  doctorName: string;
+  appointmentTypeName: string;
+  startTime: string;
+}): string {
+  return [
+    `Confirm the appointment tomorrow at ${formatClockTimeForSpeech(input.startTime)} with ${input.doctorName.trim()} for ${input.appointmentTypeName.trim()}.`,
+    "Press 1 to book this appointment.",
+    "Press 2 to choose another time.",
+    "Press 3 to request a callback from the clinic.",
+    "Press 9 for the main menu.",
+  ].join(" ");
+}

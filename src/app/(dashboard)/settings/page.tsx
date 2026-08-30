@@ -1,7 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Lock } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  History,
+  LayoutDashboard,
+  Lock,
+  ShieldCheck,
+  Star,
+  type LucideIcon,
+} from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { cx } from "@/components/ui/cx";
 import { holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import {
@@ -27,6 +37,46 @@ import {
 // are account-level screens, and a person who administers one clinic should
 // still find the section rather than be told it does not exist.
 
+interface SectionStyle {
+  icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
+  displayDescription?: string;
+}
+
+const SECTION_STYLES: Record<string, SectionStyle> = {
+  "/settings/dashboard": {
+    icon: LayoutDashboard,
+    iconBg: "bg-[#ece9fe] dark:bg-accent-soft",
+    iconColor: "text-[#5b4bff] dark:text-accent-bright",
+    displayDescription: "Arrange your dashboard and set defaults for different user roles.",
+  },
+  "/settings/roles": {
+    icon: ShieldCheck,
+    iconBg: "bg-[#e0f2fe] dark:bg-info-bg",
+    iconColor: "text-[#0284c7] dark:text-info-mark",
+    displayDescription: "Create roles, define what each one can do, and assign them to users.",
+  },
+  "/settings/features": {
+    icon: Star,
+    iconBg: "bg-[#e8f8f0] dark:bg-ok-bg",
+    iconColor: "text-[#16a34a] dark:text-ok-mark",
+    displayDescription: "Choose which features may be used and what access each role has.",
+  },
+  "/settings/audit": {
+    icon: History,
+    iconBg: "bg-[#fef3c7] dark:bg-warn-bg",
+    iconColor: "text-[#d97706] dark:text-warn-mark",
+    displayDescription: "See who did what, when — team changes, role updates, and account activity.",
+  },
+  "/settings/branding": {
+    icon: Building2,
+    iconBg: "bg-[#fce7f3] dark:bg-alert-bg",
+    iconColor: "text-[#db2777] dark:text-alert-mark",
+    displayDescription: "Update your clinic's name, address, location, and logo.",
+  },
+};
+
 export default async function SettingsPage() {
   let actor;
   try {
@@ -46,7 +96,10 @@ export default async function SettingsPage() {
   if (visible.length === 0) {
     return (
       <section className="space-y-4">
-        <PageHeader title="Settings" />
+        <PageHeader
+          title="Settings"
+          description="Manage and configure your account settings, permissions, and clinic preferences."
+        />
         <div className="rounded-2xl border border-line bg-canvas-deep px-5 py-4 text-body text-muted">
           Your role does not open any of the settings screens. Ask the account
           owner if you need access.
@@ -61,52 +114,98 @@ export default async function SettingsPage() {
   const hidden = SETTINGS_SECTIONS.filter((section) => !visible.includes(section));
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Roles, features, clinic details and activity for this account."
-
+        description="Manage and configure your account settings, permissions, and clinic preferences."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((section) => {
           const canManage = canManageSection(section, holds);
+          const style = SECTION_STYLES[section.href] ?? {
+            icon: LayoutDashboard,
+            iconBg: "bg-canvas-deep",
+            iconColor: "text-muted",
+          };
+          const Icon = style.icon;
+          const isDashboard = section.href === "/settings/dashboard";
 
           return (
             <Link
               key={section.href}
               href={section.href}
-              className="lift group rounded-3xl border border-line bg-canvas p-5 shadow-card hover:border-line-strong"
+              className={cx(
+                "group relative flex flex-col justify-between rounded-3xl border border-line bg-canvas p-6 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-raised sm:p-7",
+                "min-h-[190px]",
+              )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="text-section font-semibold text-ink">
-                  {section.title}
-                </h2>
-                <ArrowRight
+              {/* Active left indicator rail for Dashboard (matching screenshot) */}
+              {isDashboard && (
+                <span
                   aria-hidden="true"
-                  strokeWidth={1.75}
-                  className="mt-0.5 h-4 w-4 shrink-0 text-faint transition-colors duration-150 group-hover:text-accent"
+                  className="absolute inset-y-6 left-0 w-1 rounded-r-full bg-accent"
                 />
+              )}
+
+              <div>
+                <div className="flex items-start gap-4">
+                  <div
+                    className={cx(
+                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform duration-200 group-hover:scale-105",
+                      style.iconBg,
+                      style.iconColor,
+                    )}
+                  >
+                    <Icon aria-hidden="true" strokeWidth={1.8} className="h-6 w-6" />
+                  </div>
+
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <h2 className="text-section font-semibold text-ink transition-colors duration-150 group-hover:text-accent">
+                      {section.title}
+                    </h2>
+                    <p className="mt-2 text-label leading-relaxed text-muted">
+                      {style.displayDescription ?? section.description}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <p className="mt-2 text-label text-muted">{section.description}</p>
-              <p className="mt-3 text-micro font-semibold uppercase text-faint">
-                {canManage ? "You can change this" : "View only"}
-              </p>
+
+              <div className="mt-6 flex items-center justify-between gap-3 pt-2">
+                <span
+                  className={cx(
+                    "rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide",
+                    canManage
+                      ? "bg-[#eeecff] text-[#5b4bff] dark:bg-accent-soft dark:text-accent-soft-ink"
+                      : "bg-[#fef3c7] text-[#92400e] dark:bg-warn-bg dark:text-warn-ink",
+                  )}
+                >
+                  {canManage ? "YOU CAN CHANGE THIS" : "VIEW ONLY"}
+                </span>
+
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-sm transition-colors duration-150 group-hover:border-line-strong group-hover:bg-canvas-deep group-hover:text-ink">
+                  <ArrowRight
+                    aria-hidden="true"
+                    strokeWidth={2}
+                    className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5"
+                  />
+                </span>
+              </div>
             </Link>
           );
         })}
       </div>
 
       {hidden.length > 0 && (
-        <div className="rounded-3xl border border-line bg-canvas-deep p-5">
+        <div className="rounded-3xl border border-line bg-canvas-deep p-6">
           <h2 className="flex items-center gap-2 text-label font-semibold text-muted">
             <Lock aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
             Not available to your role
           </h2>
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-3 space-y-1.5">
             {hidden.map((section) => (
               <li key={section.href} className="text-label text-muted">
-                <span className="font-medium text-muted">{section.title}</span>{""}
+                <span className="font-medium text-ink">{section.title}</span>{" "}
                 — {section.description}
               </li>
             ))}

@@ -4,6 +4,9 @@ import {
   buildDoctorMenuPrompt,
   buildMainMenuPrompt,
   buildSlotPagePrompt,
+  buildBookingSlotPagePrompt,
+  buildFinalBookingConfirmationPrompt,
+  buildPatientConfirmationPrompt,
   getStage2Acknowledgement,
   type IvrNamedOption,
   STAGE_2_INVALID_SELECTION_MESSAGE,
@@ -18,6 +21,16 @@ export const PLIVO_TYPE_WEBHOOK_PATH =
   "/api/webhooks/plivo/availability/type";
 export const PLIVO_SLOTS_WEBHOOK_PATH =
   "/api/webhooks/plivo/availability/slots";
+export const PLIVO_BOOKING_IDENTITY_WEBHOOK_PATH =
+  "/api/webhooks/plivo/booking/identity";
+export const PLIVO_BOOKING_DOCTOR_WEBHOOK_PATH =
+  "/api/webhooks/plivo/booking/doctor";
+export const PLIVO_BOOKING_TYPE_WEBHOOK_PATH =
+  "/api/webhooks/plivo/booking/type";
+export const PLIVO_BOOKING_SLOTS_WEBHOOK_PATH =
+  "/api/webhooks/plivo/booking/slots";
+export const PLIVO_BOOKING_CONFIRM_WEBHOOK_PATH =
+  "/api/webhooks/plivo/booking/confirm";
 
 type PlivoResponse = ReturnType<typeof createPlivoResponse>;
 type PlivoGetInputElement = {
@@ -199,6 +212,61 @@ export function buildSlotSelectionXml(input: {
       input.hasNext,
     ),
   );
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  return response.toXML();
+}
+
+export function buildPatientConfirmationXml(input: {
+  actionUrl: string;
+  invalidSelection?: boolean;
+}): string {
+  const response = createPlivoResponse();
+  if (input.invalidSelection) {
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+  }
+  addDtmfMenu(response, input.actionUrl, buildPatientConfirmationPrompt());
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  return response.toXML();
+}
+
+export function buildBookingSlotSelectionXml(input: {
+  actionUrl: string;
+  doctorName: string;
+  appointmentTypeName: string;
+  slotTimes: readonly string[];
+  hasNext: boolean;
+  invalidSelection?: boolean;
+}): string {
+  const response = createPlivoResponse();
+  if (input.invalidSelection) {
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+  }
+  addDtmfMenu(
+    response,
+    input.actionUrl,
+    buildBookingSlotPagePrompt(
+      input.doctorName,
+      input.appointmentTypeName,
+      input.slotTimes,
+      input.hasNext,
+    ),
+  );
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  return response.toXML();
+}
+
+export function buildFinalBookingConfirmationXml(input: {
+  actionUrl: string;
+  doctorName: string;
+  appointmentTypeName: string;
+  startTime: string;
+  invalidSelection?: boolean;
+}): string {
+  const response = createPlivoResponse();
+  if (input.invalidSelection) {
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+  }
+  addDtmfMenu(response, input.actionUrl, buildFinalBookingConfirmationPrompt(input));
   response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
   return response.toXML();
 }

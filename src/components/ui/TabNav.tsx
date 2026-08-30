@@ -35,7 +35,14 @@ export default function TabNav({ items, label, className }: TabNavProps) {
   const pathname = usePathname();
 
   function isActive(href: string): boolean {
-    return pathname === href || pathname.startsWith(`${href}/`);
+    if (pathname === href || pathname.startsWith(`${href}/`)) {
+      return true;
+    }
+    // On the /settings landing page, Dashboard is the active tab
+    if (pathname === "/settings" && href === "/settings/dashboard") {
+      return true;
+    }
+    return false;
   }
 
   return (
@@ -43,7 +50,7 @@ export default function TabNav({ items, label, className }: TabNavProps) {
       aria-label={label}
       className={cx("-mx-1 overflow-x-auto px-1 pb-1", className)}
     >
-      <ul className="flex min-w-max items-center gap-1 rounded-2xl border border-line bg-canvas p-1 shadow-card">
+      <ul className="flex min-w-max items-center gap-2 rounded-2xl border border-line bg-canvas px-4 py-2.5 shadow-card sm:gap-6 sm:px-6">
         {items.map((item) => {
           const active = isActive(item.href);
 
@@ -53,14 +60,13 @@ export default function TabNav({ items, label, className }: TabNavProps) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "flex min-h-9 items-center gap-2 rounded-xl px-3 text-body font-medium",
-                  "transition-colors duration-150",
+                  "relative flex min-h-9 items-center gap-2 px-1 py-1.5 text-body font-medium transition-colors duration-150",
                   active
-                    ? "bg-accent-soft text-accent-soft-ink"
-                    : "text-muted hover:bg-canvas-deep hover:text-ink",
+                    ? "text-accent font-semibold"
+                    : "text-muted hover:text-ink",
                 )}
               >
-                {item.label}
+                <span>{item.label}</span>
                 {typeof item.count === "number" && item.count > 0 && (
                   <span
                     className={cx(
@@ -70,6 +76,12 @@ export default function TabNav({ items, label, className }: TabNavProps) {
                   >
                     {item.count}
                   </span>
+                )}
+                {active && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -bottom-2.5 left-0 right-0 h-[2.5px] rounded-full bg-accent"
+                  />
                 )}
               </Link>
             </li>

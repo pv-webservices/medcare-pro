@@ -1,18 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { BadRequestError, ConflictError } from "@/lib/apiHandler";
 import {
-  parseSlotInstant,
   resolveListStatuses,
   type AppointmentFilters,
   type CreateAppointmentInput,
 } from "@/lib/appointmentInput";
 import {
-  isUniqueConstraintError,
-  SLOT_TAKEN_MESSAGE,
-} from "@/lib/appointmentLocks";
+  createAppointmentForScope,
+  type BookedAppointment,
+} from "@/lib/appointmentBooking";
 import { notifyAppointmentBookedById } from "@/lib/appointmentNotifications";
-import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import {
   formatClockTime,
@@ -29,17 +26,8 @@ import {
   type ActorContext,
 } from "@/lib/rbac";
 import {
-  OCCUPYING_STATUSES,
-  activeSlotStartForStatus,
-  appointmentIntervalProblem,
-  appointmentLockDate,
-  isAppointmentTypeUsableAt,
-  matchesDuration,
   type AppointmentStatus,
 } from "@/lib/appointmentRules";
-import {
-  computeAppointmentSlots,
-} from "@/lib/appointmentSlots";
 import {
   getAppointmentSlotsForScope,
   type AppointmentSlotsResult,
@@ -174,29 +162,7 @@ export async function getAppointmentSlots(
 // ===========================================================================
 
 
-export interface BookedAppointment {
-  id: string;
-  clinicId: string;
-  doctorId: string;
-  appointmentTypeId: string;
-  patientId: string | null;
-  name: string;
-  slotStart: string;
-  slotEnd: string;
-  startTime: string;
-  endTime: string;
-  date: string;
-  status: AppointmentStatus;
-  /** 2-decimal string, matching the Decimal(10,2) column. */
-  amount: string;
-}
-
-/** Empty strings from an HTML form mean "not set", which is null in the database. */
-function blankToNull(value: string | undefined | null): string | null {
-  return value === undefined || value === null || value.trim() === ""
-    ? null
-    : value.trim();
-}
+export type { BookedAppointment } from "@/lib/appointmentBooking";
 
 /**
  * Books a patient into a doctor's free slot — AP-3.
@@ -217,17 +183,8 @@ export async function createAppointment(
   actor: ActorContext,
   input: CreateAppointmentInput,
 ): Promise<BookedAppointment> {
-  // Steps 1-2 happen in the route: requireActor() and the Zod parse.
-
-  // 3. The organisation must have Appointments at all. First, so someone whose
-  //    plan does not include it is told that, rather than told they lack a
-  //    permission they may well hold.
   await requireModule(actor, MODULE_FEATURES.appointments);
-
-  // 4-5. Clinic belongs to the tenant (404 if not) and the actor may book in
-  //      THAT clinic (403 if not) — one call covers both.
   await requirePermission(actor, "appointment:create", input.clinicId);
-
   const clinicWhere = await clinicWhereForActor(
     actor,
     "appointment:create",
@@ -237,381 +194,34 @@ export async function createAppointment(
   if (!clinicWhere) {
     throw new ScopeError();
   }
-
-  // 6. Doctor exists, belongs to the REQUESTED clinic, and that clinic is inside
-  //    the actor's scope. Doctor has no `isActive` column in this schema, so
-  //    existence within the right clinic is the whole liveness test.
-  const doctor = await prisma.doctor.findFirst({
-    where: { id: input.doctorId, clinicId: input.clinicId, clinic: clinicWhere },
-    select: {
-      id: true,
-      clinicId: true,
-      name: true,
-      clinic: { select: { id: true, tenantId: true } },
+  const created = await createAppointmentForScope({
+    tenantId: actor.tenantId,
+    clinicId: input.clinicId,
+    doctorId: input.doctorId,
+    appointmentTypeId: input.appointmentTypeId,
+    patientId: input.patientId,
+    patientSnapshot: {
+      name: input.name,
+      mobileNumber: input.mobileNumber,
+      age: input.age,
+      gender: input.gender,
+      address: input.address,
+      city: input.city,
+    },
+    slotStart: input.slotStart,
+    slotEnd: input.slotEnd,
+    provenance: {
+      bookingSource: "STAFF",
+      bookingSourceRef: null,
+      bookedById: actor.userId,
+      auditActorUserId: actor.userId,
     },
   });
 
-  if (!doctor) {
-    throw new ScopeError();
-  }
-
-  // 7-9. Type belongs to this tenant, is active, and is offered at this clinic
-  //      (NULL clinicId = offered everywhere in the organisation).
-  const appointmentType = await prisma.appointmentType.findFirst({
-    where: { id: input.appointmentTypeId, tenantId: actor.tenantId },
-    select: {
-      id: true,
-      tenantId: true,
-      clinicId: true,
-      name: true,
-      durationMinutes: true,
-      defaultAmount: true,
-      isActive: true,
-    },
-  });
-
-  if (
-    !appointmentType ||
-    !isAppointmentTypeUsableAt(appointmentType, actor.tenantId, input.clinicId)
-  ) {
-    throw new ScopeError();
-  }
-
-  // 10. An existing patient must belong to this organisation and be reachable at
-  //     this clinic. Resolved server-side from the id alone: the client's
-  //     demographic fields are the appointment's own snapshot (AP-1's design),
-  //     never a way to rewrite the authoritative Patient row — booking does not
-  //     edit patient records.
-  const patientId = await resolveBookingPatient(
-    actor,
-    input.patientId,
-    input.clinicId,
-  );
-
-  // 11. The price comes from the type. Never from the request.
-  const amount = appointmentType.defaultAmount.toFixed(2);
-
-  // 12. A valid interval: real dates, end after start, one calendar day. The
-  //     single-day rule is what makes (doctorId, date) a complete lock key.
-  const slotStart = parseSlotInstant(input.slotStart);
-  const slotEnd = parseSlotInstant(input.slotEnd);
-
-  if (!slotStart || !slotEnd) {
-    throw new BadRequestError("Choose a valid appointment time.");
-  }
-
-  const problem = appointmentIntervalProblem(slotStart, slotEnd);
-
-  if (problem === "end-not-after-start") {
-    throw new BadRequestError("The appointment must end after it starts.");
-  }
-
-  if (problem === "spans-two-days") {
-    throw new BadRequestError("An appointment cannot run past midnight.");
-  }
-
-  if (problem) {
-    throw new BadRequestError("Choose a valid appointment time.");
-  }
-
-  // 13. The slot must be exactly as long as the type says. A mismatch means it
-  //     was assembled by hand, or the type was re-timed after it was offered;
-  //     either way the grid it came from no longer applies.
-  if (!matchesDuration(slotStart, slotEnd, appointmentType.durationMinutes)) {
-    throw new BadRequestError(
-      `A ${appointmentType.name} appointment is ${appointmentType.durationMinutes} minutes long.`,
-    );
-  }
-
-  const date = formatDateOnly(slotStart);
-  const lockDate = appointmentLockDate(slotStart);
-  const lockId = `lock-${doctor.id}-${lockDate}`;
-  const status: AppointmentStatus = "SCHEDULED";
-
-  try {
-    // 14. One transaction, READ COMMITTED.
-    const created = await prisma.$transaction(
-      async (tx) => {
-        // 16. Ensure the lock row EXISTS and is exclusively locked.
-        //
-        //     ON DUPLICATE KEY UPDATE, never INSERT IGNORE. This is the single
-        //     most important line in the protocol, and AP-1 proved it by racing
-        //     real transactions: INSERT IGNORE takes a SHARED lock on the
-        //     conflicting index record, so two bookings for the same doctor-day
-        //     both take an S lock and both then try to upgrade to the X lock the
-        //     next step needs — a lock-upgrade deadlock (MySQL 1213) in which
-        //     neither booking succeeds and the loser is not even a clean
-        //     conflict. ON DUPLICATE KEY UPDATE takes the X lock directly, so
-        //     the second transaction blocks and waits.
-        //
-        //     Setting updated_at to itself is a deliberate no-op: the row's
-        //     contents are irrelevant, only the lock on it matters.
-        await tx.$executeRaw(
-          Prisma.sql`
-            INSERT INTO doctor_schedule_locks
-              (id, doctor_id, date, created_at, updated_at)
-            VALUES (${lockId}, ${doctor.id}, ${lockDate}, NOW(3), NOW(3))
-            ON DUPLICATE KEY UPDATE updated_at = updated_at
-          `,
-        );
-
-        // 16b. Hold it explicitly. The step above already took the X lock, so
-        //      this is belt-and-braces — but it states the serialisation point
-        //      in the code, and keeps the lock held if that step is ever
-        //      rewritten.
-        await tx.$queryRaw(
-          Prisma.sql`
-            SELECT id FROM doctor_schedule_locks
-            WHERE doctor_id = ${doctor.id} AND date = ${lockDate}
-            FOR UPDATE
-          `,
-        );
-
-        // 15. Re-read the schedule INSIDE the lock.
-        //
-        //     Not because a booking could change it — bookings are serialised
-        //     by the lock above — but because an ADMIN could, concurrently,
-        //     through the availability and leave endpoints. A window read before
-        //     the transaction opened can be stale by the time we insert, and
-        //     booking a patient into hours that were just deleted is a real
-        //     failure a receptionist would discover on the day.
-        //
-        //     NOT taken FOR UPDATE, deliberately: locking availability rows
-        //     would make every booking block every schedule edit for that
-        //     doctor. Under READ COMMITTED this plain read still sees the latest
-        //     committed rows, which closes the stale-read window. The residual
-        //     race — an edit committing between this read and our commit — is a
-        //     schedule-management conflict, not a double booking.
-        const day = parseDateOnly(date);
-
-        const [availability, leave] = await Promise.all([
-          tx.doctorAvailability.findMany({
-            where: { doctorId: doctor.id, date: day },
-            select: { date: true, startTime: true, endTime: true },
-          }),
-          tx.doctorLeave.findMany({
-            where: {
-              doctorId: doctor.id,
-              startDate: { lte: day },
-              endDate: { gte: day },
-            },
-            select: { startDate: true, endDate: true },
-          }),
-        ]);
-
-        // The offer is regenerated by AP-2's engine rather than re-derived here,
-        // so "is this a real slot?" is answered by the same code that answered
-        // "which slots are there?". `booked: []` because occupancy is the
-        // locking query's job below — this call is only about whether the doctor
-        // works then.
-        const computed = computeAppointmentSlots({
-          date,
-          durationMinutes: appointmentType.durationMinutes,
-          availability: availability.map((window) => ({
-            date: formatDateOnly(window.date),
-            startTime: window.startTime,
-            endTime: window.endTime,
-          })),
-          leave: leave.map((range) => ({
-            startDate: formatDateOnly(range.startDate),
-            endDate: formatDateOnly(range.endDate),
-          })),
-          booked: [],
-        });
-
-        if (computed.outcome === "on-leave") {
-          throw new ConflictError(
-            `${doctor.name} is on leave on ${date}. Please choose another date.`,
-          );
-        }
-
-        if (computed.outcome !== "ok") {
-          throw new ConflictError(
-            `${doctor.name} is not available on ${date}. Please choose another date.`,
-          );
-        }
-
-        const offered = computed.slots.some(
-          (slot) =>
-            slot.start.getTime() === slotStart.getTime() &&
-            slot.end.getTime() === slotEnd.getTime(),
-        );
-
-        if (!offered) {
-          throw new BadRequestError(
-            "That time is not one of this doctor's bookable slots.",
-          );
-        }
-
-        // 17. The overlap check, AS A LOCKING READ.
-        //
-        //     Half-open [start, end): an existing appointment ending exactly
-        //     when this one starts is not a conflict. Filtered to the statuses
-        //     that actually occupy the doctor — CONVERTED among them, because a
-        //     completed visit consumed the time just as surely as a booked one.
-        //
-        //     BY DOCTOR, not by clinic: a doctor's time is occupied wherever the
-        //     appointment was filed, and narrowing by clinic could hide a
-        //     conflict. FOR UPDATE because a plain read cannot see a competitor
-        //     that commits between the lock and the insert.
-        const clash = await tx.$queryRaw<{ id: string }[]>(
-          Prisma.sql`
-            SELECT id FROM appointments
-            WHERE doctor_id = ${doctor.id}
-              AND status IN (${Prisma.join([...OCCUPYING_STATUSES])})
-              AND slot_start < ${slotEnd}
-              AND slot_end > ${slotStart}
-            FOR UPDATE
-          `,
-        );
-
-        if (clash.length > 0) {
-          throw new ConflictError(SLOT_TAKEN_MESSAGE);
-        }
-
-        // 18. Only now insert.
-        const row = await tx.appointment.create({
-          data: {
-            // Denormalised from the CLINIC's tenant rather than the session, so
-            // the row satisfies isAppointmentScopeConsistent by construction.
-            tenantId: doctor.clinic.tenantId,
-            clinicId: doctor.clinicId,
-            doctorId: doctor.id,
-            appointmentTypeId: appointmentType.id,
-            patientId,
-
-            name: input.name.trim(),
-            mobileNumber: input.mobileNumber.trim(),
-            age: input.age ?? null,
-            gender: blankToNull(input.gender),
-            address: blankToNull(input.address),
-            city: blankToNull(input.city),
-
-            amount,
-            slotStart,
-            slotEnd,
-            // Derived from the status by the one helper, so the unique index and
-            // the overlap query cannot disagree about what "busy" means.
-            activeSlotStart: activeSlotStartForStatus(status, slotStart),
-            status,
-            bookedById: actor.userId,
-          },
-          select: { id: true },
-        });
-
-        // 19. Atomic with the booking. An appointment that commits without its
-        //     audit row, or a row describing a booking that rolled back, is
-        //     worse than either alone.
-        //
-        //     No patient name, phone, address, age or gender: the trail is
-        //     append-only and is read during support work. Who the appointment
-        //     is FOR lives on the appointment; what the trail records is that a
-        //     slot was taken, by whom, and at what price.
-        await writeAuditLog(tx, {
-          action: AUDIT_ACTIONS.APPOINTMENT_CREATED,
-          targetType: "Appointment",
-          targetId: row.id,
-          actorUserId: actor.userId,
-          actorTenantId: actor.tenantId,
-          afterValue: {
-            clinicId: doctor.clinicId,
-            doctorId: doctor.id,
-            appointmentTypeId: appointmentType.id,
-            date,
-            startTime: formatClockTime(slotStart),
-            endTime: formatClockTime(slotEnd),
-            durationMinutes: appointmentType.durationMinutes,
-            status,
-            amount,
-            /** Whether it was booked for an existing patient — not WHICH one. */
-            existingPatient: patientId !== null,
-          },
-        });
-
-        return row;
-        // 20. Commit.
-      },
-      {
-        /**
-         * READ COMMITTED, and the reason is specific.
-         *
-         * Under MySQL's default REPEATABLE READ the locking overlap query takes
-         * GAP LOCKS over the range it scans even when it matches nothing, so two
-         * bookings for DIFFERENT doctors at the same time of day can deadlock
-         * each other on the same index gap. READ COMMITTED takes no gap locks,
-         * and gives every statement the latest committed data rather than a
-         * snapshot pinned at the transaction's first read — which is also what
-         * makes the re-read above meaningful.
-         */
-        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-      },
-    );
-
-    // AP-8. AFTER the commit and never inside it: a feed row is a convenience,
-    // and it must not be able to roll back a booking that succeeded. The call
-    // swallows its own errors — see lib/appointmentNotifications.ts.
-    await notifyAppointmentBookedById(actor, created.id);
-
-    return {
-      id: created.id,
-      clinicId: doctor.clinicId,
-      doctorId: doctor.id,
-      appointmentTypeId: appointmentType.id,
-      patientId,
-      name: input.name.trim(),
-      slotStart: slotStart.toISOString(),
-      slotEnd: slotEnd.toISOString(),
-      startTime: formatClockTime(slotStart),
-      endTime: formatClockTime(slotEnd),
-      date,
-      status,
-      amount,
-    };
-  } catch (error: unknown) {
-    // The backstop firing. @@unique([doctorId, activeSlotStart]) catches an
-    // exact duplicate start that somehow reached the insert — a double-submitted
-    // form being the ordinary cause. Mapped to the SAME message as a detected
-    // overlap: the caller learns the slot is gone, never the constraint name nor
-    // that a row already exists.
-    if (isUniqueConstraintError(error)) {
-      throw new ConflictError(SLOT_TAKEN_MESSAGE);
-    }
-    throw error;
-  }
-}
-
-/**
- * Resolves an optional existing patient, or returns null for a new one.
- *
- * Booking NEVER creates a Patient row, a Registration or a PT-YYYY-#### code.
- * That is AP-5's job at conversion, and doing it here would fill the patient
- * register — and burn code numbers — for people who only ever cancelled.
- */
-async function resolveBookingPatient(
-  actor: ActorContext,
-  patientId: string | null | undefined,
-  clinicId: string,
-): Promise<string | null> {
-  if (!patientId) {
-    return null;
-  }
-
-  const patient = await prisma.patient.findFirst({
-    where: {
-      id: patientId,
-      // Tenant from the session. A patient belonging to another organisation is
-      // simply not found — a 404, never a 403 that would confirm they exist.
-      tenantId: actor.tenantId,
-      clinicId,
-    },
-    select: { id: true },
-  });
-
-  if (!patient) {
-    throw new ScopeError();
-  }
-
-  return patient.id;
+  // Convenience notifications remain staff-attributed. PHONE_IVR deliberately
+  // has no fabricated user actor and does not pass through this wrapper.
+  await notifyAppointmentBookedById(actor, created.id);
+  return created;
 }
 
 // ===========================================================================

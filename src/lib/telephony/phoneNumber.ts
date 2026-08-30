@@ -26,6 +26,27 @@ export function normalizePlivoDestinationNumber(value: string): string {
   return `+${digits}`;
 }
 
+/** A provider caller number is accepted only when it already carries a country code. */
+export function normalizePlivoCallerNumber(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    return normalizePlivoDestinationNumber(value);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Patient.mobileNumber currently permits these two exact Indian forms. We do
+ * not strip punctuation or guess a country for a local-looking caller value.
+ */
+export function patientMobileRepresentations(
+  canonicalCallerNumber: string,
+): readonly string[] {
+  if (!/^\+91\d{10}$/.test(canonicalCallerNumber)) return [];
+  return [canonicalCallerNumber, canonicalCallerNumber.slice(3)];
+}
+
 export const configuredPhoneNumberSchema = z
   .string()
   .trim()

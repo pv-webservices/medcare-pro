@@ -120,6 +120,7 @@ model Tenant {
   auditLogs         AuditLog[]
   tasks             Task[]
   dashboardLayouts  DashboardLayout[]
+  telephonyBookingRequests TelephonyBookingRequest[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments     Appointment[]
@@ -414,6 +415,7 @@ model Clinic {
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments     Appointment[]
   appointmentTypes AppointmentType[]
+  telephonyBookingRequests TelephonyBookingRequest[]
   tasks            Task[]
 
   @@index([tenantId])
@@ -437,6 +439,42 @@ model ClinicTelephonyConfig {
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
   @@map("clinic_telephony_configs")
+}
+
+enum TelephonyBookingRequestReason {
+  NO_PATIENT_MATCH
+  AMBIGUOUS_PATIENT_MATCH
+  USER_REQUESTED
+}
+
+enum TelephonyBookingRequestStatus {
+  PENDING
+  RESOLVED
+  CANCELLED
+}
+
+/// A staff follow-up request created when deterministic caller-number matching
+/// cannot safely continue automated booking. It never reserves a slot and
+/// deliberately stores no patient id, candidate names, or match count.
+model TelephonyBookingRequest {
+  id             String                          @id @default(cuid())
+  tenantId       String                          @map("tenant_id")
+  clinicId       String                          @map("clinic_id")
+  provider       String                          @db.VarChar(32)
+  providerCallId String                          @map("provider_call_id") @db.VarChar(128)
+  callerNumber   String?                         @map("caller_number") @db.VarChar(16)
+  reason         TelephonyBookingRequestReason
+  status         TelephonyBookingRequestStatus   @default(PENDING)
+  createdAt      DateTime                        @default(now()) @map("created_at")
+  updatedAt      DateTime                        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+
+  @@unique([clinicId, provider, providerCallId])
+  @@index([tenantId, clinicId, status])
+  @@index([createdAt])
+  @@map("telephony_booking_requests")
 }
 
 // ---------------------------------------------------------------------------
@@ -1337,6 +1375,11 @@ enum AppointmentStatus {
   RESCHEDULED
 }
 
+enum AppointmentBookingSource {
+  STAFF
+  PHONE_IVR
+}
+
 /// A bookable service: its name, how long it takes, and what it costs.
 model AppointmentType {
   id       String  @id @default(cuid())
@@ -1437,7 +1480,9 @@ model Appointment {
 
   status AppointmentStatus @default(SCHEDULED)
 
-  bookedById String @map("booked_by_id")
+  bookingSource    AppointmentBookingSource @default(STAFF) @map("booking_source")
+  bookingSourceRef String?                  @map("booking_source_ref")
+  bookedById       String?                  @map("booked_by_id")
 
   checkedInAt   DateTime? @map("checked_in_at")
   checkedInById String?   @map("checked_in_by_id")
@@ -1469,7 +1514,7 @@ model Appointment {
 
   /// Restrict, matching Registration.creator — who booked it is part of the
   /// record.
-  bookedBy    User  @relation("AppointmentBookedBy", fields: [bookedById], references: [id], onDelete: Restrict)
+  bookedBy    User? @relation("AppointmentBookedBy", fields: [bookedById], references: [id], onDelete: Restrict)
   /// SetNull — denormalised display pointers, like Tenant.approvedBy. AuditLog
   /// holds the authoritative, append-only trail of who did what.
   checkedInBy User? @relation("AppointmentCheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)
@@ -1484,6 +1529,10 @@ model Appointment {
 
   /// The backstop described on `activeSlotStart`. Not the primary guard.
   @@unique([doctorId, activeSlotStart])
+  /// Database idempotency backstop for non-null system-channel references.
+  /// MySQL permits every STAFF row's NULL reference while rejecting a second
+  /// PHONE_IVR row carrying the same deterministic reference.
+  @@unique([bookingSource, bookingSourceRef])
   /// The appointment list: this clinic's board, filtered by state.
   @@index([tenantId, clinicId, status])
   /// The overlap query in AP-3 and the day view in AP-6.

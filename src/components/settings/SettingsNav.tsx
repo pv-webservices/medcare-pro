@@ -24,5 +24,5 @@ export default function SettingsNav({ items }: SettingsNavProps) {
     return null;
   }
 
-  return <TabNav items={items} label="Settings sections" className="mb-4" />;
+  return <TabNav items={items} label="Settings sections" className="mb-6 md:mb-8" />;
 }

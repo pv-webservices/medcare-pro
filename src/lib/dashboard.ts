@@ -593,6 +593,7 @@ async function buildRecentActivity(
         createdAt: true,
         status: true,
         name: true,
+        bookingSource: true,
         bookedBy: { select: { name: true } },
       },
     }),
@@ -620,7 +621,9 @@ async function buildRecentActivity(
           ? "completed appointment for"
           : "booked appointment for";
     rows.push({
-      actor: appt.bookedBy.name ?? "Staff",
+      actor:
+        appt.bookedBy?.name ??
+        (appt.bookingSource === "PHONE_IVR" ? "Phone IVR" : "Staff"),
       action: verb,
       subject: appt.name,
       timestamp: appt.createdAt,

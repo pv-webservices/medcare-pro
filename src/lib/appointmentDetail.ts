@@ -84,6 +84,7 @@ export async function getAppointmentDetailForActor(
       address: true,
       city: true,
       createdAt: true,
+      bookingSource: true,
       clinic: { select: { name: true } },
       doctor: { select: { name: true, department: true } },
       appointmentType: { select: { name: true, durationMinutes: true } },
@@ -116,7 +117,9 @@ export async function getAppointmentDetailForActor(
     city: row.city,
     patientCode: row.patient?.patientCode ?? null,
     createdAt: row.createdAt.toISOString(),
-    bookedByName: personName(row.bookedBy),
+    bookedByName:
+      personName(row.bookedBy) ??
+      (row.bookingSource === "PHONE_IVR" ? "Phone IVR" : null),
     checkedInByName: personName(row.checkedInBy),
     cancelledByName: personName(row.cancelledBy),
     registration: row.registration
