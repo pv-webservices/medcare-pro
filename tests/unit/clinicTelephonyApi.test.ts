@@ -32,7 +32,7 @@ vi.mock("@/lib/telephony/clinicConfig", async (importOriginal) => {
 import {
   GET,
   PATCH,
-} from "@/app/api/clinics/[clinicId]/telephony/route";
+} from "@/app/api/clinics/[id]/telephony/route";
 
 const ACTOR: ActorContext = { userId: "user-a", tenantId: "tenant-a" };
 const CONFIG = {
@@ -48,7 +48,7 @@ const CONFIG = {
 };
 
 function context(clinicId = "clinic-a") {
-  return { params: Promise.resolve({ clinicId }) };
+  return { params: Promise.resolve({ id: clinicId }) };
 }
 
 function patchRequest(body: unknown): Request {
