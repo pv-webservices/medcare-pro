@@ -39,6 +39,8 @@ interface FilterBarProps {
   clearAction?: ReactNode;
   /** The submit/apply control, when the filters are a form. */
   actions?: ReactNode;
+  /** When true, omits the generic "Show results" button on mobile and shows clear/apply inside the sheet. */
+  hideMobileShowResults?: boolean;
   className?: string;
 }
 
@@ -47,6 +49,7 @@ export default function FilterBar({
   activeCount = 0,
   clearAction,
   actions,
+  hideMobileShowResults = false,
   className,
 }: FilterBarProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -133,21 +136,25 @@ export default function FilterBar({
 
           {(actions || clearAction) && (
             <div className="flex items-center gap-2 md:ml-auto">
-              <span className="hidden md:contents">{clearAction}</span>
+              <span className={hideMobileShowResults ? "contents" : "hidden md:contents"}>
+                {clearAction}
+              </span>
               {actions}
             </div>
           )}
         </div>
 
-        <div className="mt-4 md:hidden">
-          <Button
-            variant="primary"
-            className="w-full"
-            onClick={() => setIsSheetOpen(false)}
-          >
-            Show results
-          </Button>
-        </div>
+        {!hideMobileShowResults && (
+          <div className="mt-4 md:hidden">
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => setIsSheetOpen(false)}
+            >
+              Show results
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

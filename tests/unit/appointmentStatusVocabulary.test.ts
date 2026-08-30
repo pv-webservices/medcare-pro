@@ -76,27 +76,25 @@ describe("the words are the front desk's, not the database's", () => {
 });
 
 describe("tone follows meaning", () => {
-  it("marks the one state that produced a visit as ok, and only that one", () => {
-    const ok = APPOINTMENT_STATUSES.filter(
-      (status) => APPOINTMENT_STATUS_TONES[status] === "ok",
-    );
-    expect(ok).toEqual(["CONVERTED"]);
+  it("marks confirmed and converted as positive ok", () => {
+    expect(APPOINTMENT_STATUS_TONES.CONFIRMED).toBe("ok");
+    expect(APPOINTMENT_STATUS_TONES.CONVERTED).toBe("ok");
   });
 
-  it("gives every still-live state the outstanding-work tone", () => {
-    // The occupying set minus the one that is finished: these are the rows with
-    // something left for the desk to do.
-    for (const status of OCCUPYING_STATUSES) {
-      if (status === "CONVERTED") continue;
-      expect(APPOINTMENT_STATUS_TONES[status]).toBe("warn");
-    }
+  it("marks scheduled as accent and checked in as info", () => {
+    expect(APPOINTMENT_STATUS_TONES.SCHEDULED).toBe("accent");
+    expect(APPOINTMENT_STATUS_TONES.CHECKED_IN).toBe("info");
   });
 
-  it("never marks a released slot as ok", () => {
-    // Cancelled, missed and moved are outcomes, not successes.
-    for (const status of RELEASING_STATUSES) {
-      expect(APPOINTMENT_STATUS_TONES[status]).not.toBe("ok");
-    }
+  it("marks cancelled and no-show as alert, moved as neutral", () => {
+    expect(APPOINTMENT_STATUS_TONES.CANCELLED).toBe("alert");
+    expect(APPOINTMENT_STATUS_TONES.NO_SHOW).toBe("alert");
+    expect(APPOINTMENT_STATUS_TONES.RESCHEDULED).toBe("neutral");
+  });
+
+  it("never marks a cancelled or missed slot as ok", () => {
+    expect(APPOINTMENT_STATUS_TONES.CANCELLED).not.toBe("ok");
+    expect(APPOINTMENT_STATUS_TONES.NO_SHOW).not.toBe("ok");
   });
 });
 

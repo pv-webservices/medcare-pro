@@ -1,11 +1,21 @@
 "use client";
 
-import { CalendarX2, CheckCheck, CheckCircle2, LogIn, UserPlus } from "lucide-react";
+import {
+  CalendarX2,
+  CheckCheck,
+  CheckCircle2,
+  LogIn,
+  MoreVertical,
+  UserPlus,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button, { type ButtonSize } from "@/components/ui/Button";
+import Menu, { menuItemClasses } from "@/components/ui/Menu";
 import { ConfirmDialog } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { cx } from "@/components/ui/cx";
 import type { AppointmentStatus } from "@/lib/appointmentRules";
 
 /**
@@ -49,6 +59,8 @@ interface AppointmentActionsProps {
   /** AP-9. Confirming answers to `appointment:update`, not to a key of its own. */
   canConfirm: boolean;
   size?: ButtonSize;
+  /** "default" displays the full button row; "compact" renders inline primary action + overflow menu for board rows. */
+  presentation?: "default" | "compact";
   className?: string;
 }
 
@@ -80,6 +92,7 @@ export default function AppointmentActions({
   canCancel,
   canConfirm,
   size = "sm",
+  presentation = "default",
   className,
 }: AppointmentActionsProps) {
   const router = useRouter();
@@ -132,6 +145,136 @@ export default function AppointmentActions({
     } finally {
       setBusy(null);
     }
+  }
+
+  if (presentation === "compact") {
+    return (
+      <div className={cx("flex items-center justify-end gap-1.5", className)}>
+        {isBooked && canConfirm && (
+          <Button
+            size={size}
+            variant="secondary"
+            isBusy={busy === "confirm"}
+            busyLabel="Confirming..."
+            disabled={busy !== null}
+            onClick={() => run("confirm")}
+          >
+            Confirm
+          </Button>
+        )}
+
+        {isBooked && !canConfirm && canCheckIn && (
+          <Button
+            size={size}
+            variant="secondary"
+            isBusy={busy === "check-in"}
+            busyLabel="Checking in..."
+            disabled={busy !== null}
+            onClick={() => run("check-in")}
+          >
+            Check in
+          </Button>
+        )}
+
+        {status === "CONFIRMED" && canCheckIn && (
+          <Button
+            size={size}
+            variant="secondary"
+            isBusy={busy === "check-in"}
+            busyLabel="Checking in..."
+            disabled={busy !== null}
+            onClick={() => run("check-in")}
+          >
+            Check in
+          </Button>
+        )}
+
+        {isArrived && canConvert && (
+          <Button
+            size={size}
+            variant="primary"
+            isBusy={busy === "convert"}
+            busyLabel="Registering..."
+            disabled={busy !== null}
+            onClick={() => run("convert")}
+          >
+            Register
+          </Button>
+        )}
+
+        <Menu
+          align="end"
+          label="Appointment actions"
+          trigger={({ isOpen }) => (
+            <span
+              className={cx(
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-canvas text-muted transition-colors duration-150",
+                "hover:border-line-strong hover:bg-canvas-deep hover:text-ink",
+                isOpen && "border-line-strong bg-canvas-deep text-ink",
+              )}
+              aria-label="More actions"
+              title="More actions"
+            >
+              <MoreVertical className="h-4 w-4" aria-hidden="true" strokeWidth={2} />
+            </span>
+          )}
+        >
+          <Link
+            href={`/appointments/${appointmentId}`}
+            className={menuItemClasses()}
+          >
+            Open appointment
+          </Link>
+
+          {isBooked && canConfirm && canCheckIn && (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => run("check-in")}
+              className={menuItemClasses()}
+            >
+              Check in
+            </button>
+          )}
+
+          {isLive && canCancel && (
+            <>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => run("no-show")}
+                className={menuItemClasses()}
+              >
+                Did not attend
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => setIsConfirmingCancel(true)}
+                className={menuItemClasses(false, "danger")}
+              >
+                Cancel appointment
+              </button>
+            </>
+          )}
+        </Menu>
+
+        <ConfirmDialog
+          isOpen={isConfirmingCancel}
+          onCancel={() => setIsConfirmingCancel(false)}
+          onConfirm={() => {
+            setIsConfirmingCancel(false);
+            void run("cancel");
+          }}
+          title="Cancel this appointment?"
+          body="The slot is released and becomes bookable again. The appointment stays on the record as cancelled."
+          confirmLabel="Cancel appointment"
+          cancelLabel="Keep it"
+          isBusy={busy === "cancel"}
+          busyLabel="Cancelling..."
+        />
+      </div>
+    );
   }
 
   if (!isLive) {

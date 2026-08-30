@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
@@ -83,6 +83,21 @@ function shiftDate(date: string, days: number): string {
   return new Date(parsed + days * 86_400_000).toISOString().slice(0, 10);
 }
 
+/** "Sunday, 30 Aug 2026" from a "YYYY-MM-DD" stored instant. */
+function formatDayWithWeekday(date: string): string {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+  return parsed.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export default function AppointmentFilters({
   doctors,
   initial,
@@ -91,13 +106,10 @@ export default function AppointmentFilters({
   const router = useRouter();
   const [values, setValues] = useState<AppointmentFilterValues>(initial);
 
-  // The board defaults to today, so "narrowed" means anything other than that
-  // plain day view — otherwise a Clear button would sit there from first load.
   const activeCount =
     (initial.doctorId !== "" ? 1 : 0) +
     (initial.status !== "" ? 1 : 0) +
     (initial.includeHistory ? 1 : 0);
-  const isNarrowed = activeCount > 0 || initial.date !== today;
 
   const go = (next: AppointmentFilterValues) => {
     const query = toQueryString(next);
@@ -132,41 +144,91 @@ export default function AppointmentFilters({
   const hasDate = values.date !== "";
 
   return (
-    <div className="space-y-3">
-      {/* The day strip. */}
-      <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-canvas p-2 shadow-card">
-        <IconButton
-          label="Previous day"
-          size="sm"
-          disabled={!hasDate}
-          onClick={() => goToDate(shiftDate(values.date, -1))}
-        >
-          <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-        </IconButton>
+    <div className="space-y-4">
+      {/* 2. DATE / VIEW TOOLBAR */}
+      <div className="flex flex-col gap-3 rounded-3xl border border-line bg-canvas p-3 shadow-card sm:flex-row sm:items-center sm:justify-between lg:p-4">
+        {/* Left: Previous day button + Date display */}
+        <div className="flex items-center gap-3">
+          <IconButton
+            label="Previous day"
+            size="sm"
+            isOutlined
+            disabled={!hasDate}
+            onClick={() => goToDate(shiftDate(values.date, -1))}
+          >
+            <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+          </IconButton>
 
-        <div className="min-w-0 flex-1 px-1 text-center sm:text-left">
-          <p className="truncate text-body font-semibold text-ink">
-            {hasDate ? formatAppointmentDate(values.date) : "All upcoming days"}
-          </p>
-          <p className="truncate text-meta text-muted">
-            {hasDate
-              ? isToday
-                ? "Today"
-                : "Selected day"
-              : "Every scheduled appointment"}
-          </p>
+          <div className="flex items-center gap-3 min-w-0">
+            <Calendar
+              aria-hidden="true"
+              strokeWidth={2}
+              className="h-5 w-5 shrink-0 text-muted"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-body font-semibold text-ink leading-tight">
+                {hasDate ? formatDayWithWeekday(values.date) : "All upcoming days"}
+              </p>
+              <p
+                className={cx(
+                  "truncate text-meta font-medium leading-tight mt-0.5",
+                  isToday ? "text-accent font-semibold" : "text-muted",
+                )}
+              >
+                {hasDate
+                  ? isToday
+                    ? "Today"
+                    : "Selected day"
+                  : "Every scheduled appointment"}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <IconButton
-          label="Next day"
-          size="sm"
-          disabled={!hasDate}
-          onClick={() => goToDate(shiftDate(values.date, 1))}
-        >
-          <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-        </IconButton>
+        {/* Center: Day | Upcoming segmented control */}
+        <div className="flex items-center justify-center">
+          <div
+            role="tablist"
+            aria-label="View range"
+            className="inline-flex items-center rounded-2xl border border-line bg-canvas-deep p-1"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={hasDate}
+              onClick={() => {
+                if (!hasDate) goToDate(today);
+              }}
+              className={cx(
+                "min-h-9 rounded-xl px-4 text-label font-semibold transition-all duration-150",
+                hasDate
+                  ? "bg-canvas text-ink shadow-card"
+                  : "text-muted hover:text-ink",
+              )}
+            >
+              Day
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!hasDate}
+              onClick={() => {
+                if (hasDate) goToDate("");
+              }}
+              className={cx(
+                "min-h-9 rounded-xl px-4 text-label font-semibold transition-all duration-150",
+                !hasDate
+                  ? "bg-canvas text-ink shadow-card"
+                  : "text-muted hover:text-ink",
+              )}
+            >
+              Upcoming
+            </button>
+          </div>
+        </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right: Today, Date Picker, All days, Next day button */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant={isToday ? "primary" : "secondary"}
@@ -175,47 +237,65 @@ export default function AppointmentFilters({
             Today
           </Button>
 
-          {/*
-            The native date input is the picker. On the front-desk tablet the OS
-            wheel beats anything built here, and it is one tab stop rather than
-            a grid of forty buttons.
-          */}
-          <label htmlFor="appointment-filter-date" className="sr-only">
-            Jump to date
-          </label>
-          <input
-            id="appointment-filter-date"
-            type="date"
-            value={values.date}
-            onChange={(event) => goToDate(event.target.value)}
-            className={cx(
-              "h-9 rounded-xl border border-line bg-canvas px-3 text-body text-ink",
-              "transition-colors duration-150 hover:border-line-strong",
-            )}
-          />
+          {/* Accessible native date picker styled with calendar icon */}
+          <div className="relative inline-flex items-center">
+            <div
+              aria-hidden="true"
+              className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-line bg-canvas px-3 text-label font-medium text-ink shadow-card transition-colors duration-150 hover:border-line-strong hover:bg-canvas-deep pointer-events-none"
+            >
+              <Calendar aria-hidden="true" strokeWidth={2} className="h-4 w-4 text-muted" />
+              <span className="tnum">
+                {hasDate ? formatAppointmentDate(values.date) : "Select date"}
+              </span>
+            </div>
+            <label htmlFor="appointment-filter-date" className="sr-only">
+              Jump to date
+            </label>
+            <input
+              id="appointment-filter-date"
+              type="date"
+              value={values.date}
+              onChange={(event) => goToDate(event.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </div>
 
           {hasDate && (
-            <Button size="sm" variant="ghost" onClick={() => goToDate("")}>
+            <Button size="sm" variant="secondary" onClick={() => goToDate("")}>
               All days
             </Button>
           )}
+
+          <IconButton
+            label="Next day"
+            size="sm"
+            isOutlined
+            disabled={!hasDate}
+            onClick={() => goToDate(shiftDate(values.date, 1))}
+          >
+            <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+          </IconButton>
         </div>
       </div>
 
+      {/* 3. FILTER SURFACE */}
       <form onSubmit={handleSubmit}>
         <FilterBar
           activeCount={activeCount}
+          hideMobileShowResults={true}
           clearAction={
-            isNarrowed ? (
-              <Button type="button" size="sm" variant="ghost" onClick={handleClear}>
-                <X aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-                Clear filters
-              </Button>
-            ) : null
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={handleClear}
+              className="text-muted hover:text-ink"
+            >
+              Clear
+            </Button>
           }
           actions={
-            <Button type="submit" size="sm" variant="primary">
-              <Search aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            <Button type="submit" size="sm" variant="primary" className="min-w-20">
               Apply
             </Button>
           }
@@ -223,7 +303,7 @@ export default function AppointmentFilters({
           <Select
             id="appointment-filter-doctor"
             label="Doctor"
-            fieldClassName="md:w-56"
+            fieldClassName="w-full sm:w-56"
             value={values.doctorId}
             onChange={(e) => setValues({ ...values, doctorId: e.target.value })}
           >
@@ -238,7 +318,7 @@ export default function AppointmentFilters({
           <Select
             id="appointment-filter-status"
             label="State"
-            fieldClassName="md:w-48"
+            fieldClassName="w-full sm:w-48"
             value={values.status}
             onChange={(e) => setValues({ ...values, status: e.target.value })}
           >
@@ -252,7 +332,7 @@ export default function AppointmentFilters({
 
           <label
             htmlFor="appointment-filter-history"
-            className="flex min-h-11 cursor-pointer items-center gap-2.5 text-body text-ink-soft"
+            className="flex min-h-11 cursor-pointer items-center gap-2.5 text-body text-ink-soft whitespace-nowrap"
           >
             <input
               id="appointment-filter-history"

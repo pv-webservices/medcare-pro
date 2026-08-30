@@ -48,6 +48,11 @@ interface AppointmentsTableProps {
   showDate: boolean;
   /** True when a filter is applied — changes the empty state's advice. */
   isFiltered: boolean;
+  /** Optional view context to render truthful headings and empty states */
+  dateView?: {
+    date: string;
+    isToday: boolean;
+  };
   permissions: AppointmentPermissions;
 }
 
@@ -77,31 +82,72 @@ export default function AppointmentsTable({
   showClinic,
   showDate,
   isFiltered,
+  dateView,
   permissions,
 }: AppointmentsTableProps) {
+  const scheduleTitle = dateView
+    ? dateView.date !== ""
+      ? dateView.isToday
+        ? "Today's schedule"
+        : "Day's schedule"
+      : "Upcoming schedule"
+    : "Today's schedule";
+
+  const scheduleSubtitle = dateView
+    ? dateView.date !== ""
+      ? dateView.isToday
+        ? "Appointments scheduled for today."
+        : "Appointments scheduled for this day."
+      : "Upcoming appointments across available days."
+    : "Appointments scheduled for today.";
+
   if (appointments.length === 0) {
     return (
-      <EmptyState
-        icon={<CalendarDays className="h-5 w-5" strokeWidth={2} />}
-        title={isFiltered ? "No appointments match these filters" : "Nothing booked for this day"}
-        guidance={
-          isFiltered
-            ? "Try another day, a different doctor, or show past outcomes as well."
-            : "Book a patient into a doctor's slot to start filling the day."
-        }
-        action={
-          // A filtered board is not empty, it is narrowed — the way out is the
-          // controls already on screen, not a new booking.
-          !isFiltered && permissions.canCreate ? <BookAction /> : undefined
-        }
-      />
+      <div className="rounded-3xl border border-line bg-canvas shadow-card overflow-hidden">
+        <div className="border-b border-line px-5 py-4 sm:px-6">
+          <h2 className="text-section font-semibold text-ink">{scheduleTitle}</h2>
+          <p className="mt-0.5 text-label text-muted">{scheduleSubtitle}</p>
+        </div>
+
+        <div className="p-6 sm:p-12">
+          <EmptyState
+            isBare
+            icon={<CalendarDays className="h-5 w-5" strokeWidth={2} />}
+            title={
+              isFiltered
+                ? "No appointments match these filters"
+                : dateView && dateView.date === ""
+                  ? "No upcoming appointments"
+                  : "Nothing booked for this day"
+            }
+            guidance={
+              isFiltered
+                ? "Try another doctor, status, or adjust the history filter."
+                : dateView && dateView.date === ""
+                  ? "Book a patient into a doctor's slot to schedule visits."
+                  : "Book a patient into a doctor's slot to start filling the day."
+            }
+            action={!isFiltered && permissions.canCreate ? <BookAction /> : undefined}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <>
-      <div className="hidden lg:block">
-        <Table caption="Appointments, with the slot, patient, doctor and what happens next">
+    <div className="rounded-3xl border border-line bg-canvas shadow-card overflow-hidden">
+      {/* 4. SURFACE HEADING */}
+      <div className="border-b border-line px-5 py-4 sm:px-6">
+        <h2 className="text-section font-semibold text-ink">{scheduleTitle}</h2>
+        <p className="mt-0.5 text-label text-muted">{scheduleSubtitle}</p>
+      </div>
+
+      {/* 5. DESKTOP TABLE */}
+      <div className="hidden xl:block">
+        <Table
+          caption="Appointments, with the slot, patient, doctor and what happens next"
+          className="border-0 shadow-none rounded-none"
+        >
           <THead>
             <TH>Slot</TH>
             {showDate && <TH>Date</TH>}
@@ -128,7 +174,7 @@ export default function AppointmentsTable({
 
                 {showDate && (
                   <TD>
-                    <span className="tnum whitespace-nowrap">
+                    <span className="tnum whitespace-nowrap text-ink-soft">
                       {formatAppointmentDate(appointment.date)}
                     </span>
                   </TD>
@@ -146,11 +192,21 @@ export default function AppointmentsTable({
                   </p>
                 </TD>
 
-                <TD>{appointment.doctorName || <Dash />}</TD>
+                <TD>
+                  <span className="font-medium text-ink">
+                    {appointment.doctorName || <Dash />}
+                  </span>
+                </TD>
 
-                <TD>{appointment.appointmentTypeName}</TD>
+                <TD>
+                  <span className="text-ink-soft">{appointment.appointmentTypeName}</span>
+                </TD>
 
-                {showClinic && <TD>{appointment.clinicName}</TD>}
+                {showClinic && (
+                  <TD>
+                    <span className="text-ink-soft">{appointment.clinicName}</span>
+                  </TD>
+                )}
 
                 <TD isNumeric>
                   {formatRupees(appointment.amount)}
@@ -162,30 +218,16 @@ export default function AppointmentsTable({
                   </StatusPill>
                 </TD>
 
-                <TD align="end" className="py-2">
-                  <div className="flex items-center justify-end gap-1">
-                    <AppointmentActions
-                      appointmentId={appointment.id}
-                      status={appointment.status}
-                      canCheckIn={permissions.canCheckIn}
-                      canConvert={permissions.canConvert}
-                      canCancel={permissions.canCancel}
-                      canConfirm={permissions.canConfirm}
-                    />
-                    <Link
-                      href={`/appointments/${appointment.id}`}
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-faint transition-colors duration-150 hover:bg-canvas-deep hover:text-ink"
-                    >
-                      <span className="sr-only">
-                        Open {appointment.name}&apos;s appointment
-                      </span>
-                      <ChevronRight
-                        aria-hidden="true"
-                        strokeWidth={1.75}
-                        className="h-4 w-4"
-                      />
-                    </Link>
-                  </div>
+                <TD align="end" className="py-2.5">
+                  <AppointmentActions
+                    appointmentId={appointment.id}
+                    status={appointment.status}
+                    canCheckIn={permissions.canCheckIn}
+                    canConvert={permissions.canConvert}
+                    canCancel={permissions.canCancel}
+                    canConfirm={permissions.canConfirm}
+                    presentation="compact"
+                  />
                 </TD>
               </TR>
             ))}
@@ -193,52 +235,51 @@ export default function AppointmentsTable({
         </Table>
       </div>
 
-      {/* Below a laptop: the same fields, stacked. The time keeps its lead
-          position and its weight — it is still what the board is read by. */}
-      <ul className="grid gap-3 lg:hidden">
+      {/* 10. TABLET / MOBILE STACKED CARDS */}
+      <ul className="divide-y divide-line xl:hidden">
         {appointments.map((appointment) => (
-          <li key={appointment.id}>
-            <Card isFlush className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="tnum text-heading font-semibold text-ink">
-                    {appointment.startTime}
-                    <span className="ml-2 text-meta font-normal text-muted">
-                      to {appointment.endTime}
-                    </span>
-                  </p>
-                  <Link
-                    href={`/appointments/${appointment.id}`}
-                    className="mt-1 block rounded font-medium text-ink transition-colors duration-150 hover:text-accent"
-                  >
-                    {appointment.name}
-                  </Link>
-                  <p className="tnum mt-0.5 text-meta text-muted">
-                    {appointment.mobileNumber}
-                  </p>
-                </div>
-
-                <div className="shrink-0 text-right">
-                  <p className="tnum text-body font-semibold text-ink">
-                    {formatRupees(appointment.amount)}
-                  </p>
-                  <div className="mt-1.5">
-                    <StatusPill
-                      tone={APPOINTMENT_STATUS_TONES[appointment.status]}
-                    >
-                      {APPOINTMENT_STATUS_LABELS[appointment.status]}
-                    </StatusPill>
-                  </div>
-                </div>
+          <li key={appointment.id} className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="tnum text-heading font-semibold text-ink">
+                  {appointment.startTime}
+                  <span className="ml-2 text-meta font-normal text-muted">
+                    to {appointment.endTime}
+                  </span>
+                </p>
+                <Link
+                  href={`/appointments/${appointment.id}`}
+                  className="mt-1 block rounded font-medium text-ink transition-colors duration-150 hover:text-accent"
+                >
+                  {appointment.name}
+                </Link>
+                <p className="tnum mt-0.5 text-meta text-muted">
+                  {appointment.mobileNumber}
+                </p>
               </div>
 
-              <p className="mt-2 text-meta text-muted">
-                {appointment.appointmentTypeName}
-                {appointment.doctorName ? ` · ${appointment.doctorName}` : ""}
-                {showClinic ? ` · ${appointment.clinicName}` : ""}
-                {showDate ? ` · ${formatAppointmentDate(appointment.date)}` : ""}
-              </p>
+              <div className="shrink-0 text-right">
+                <p className="tnum text-body font-semibold text-ink">
+                  {formatRupees(appointment.amount)}
+                </p>
+                <div className="mt-1.5">
+                  <StatusPill
+                    tone={APPOINTMENT_STATUS_TONES[appointment.status]}
+                  >
+                    {APPOINTMENT_STATUS_LABELS[appointment.status]}
+                  </StatusPill>
+                </div>
+              </div>
+            </div>
 
+            <p className="mt-2 text-meta text-muted">
+              {appointment.appointmentTypeName}
+              {appointment.doctorName ? ` · ${appointment.doctorName}` : ""}
+              {showClinic ? ` · ${appointment.clinicName}` : ""}
+              {showDate ? ` · ${formatAppointmentDate(appointment.date)}` : ""}
+            </p>
+
+            <div className="mt-3.5 pt-3 border-t border-line/60 flex items-center justify-end">
               <AppointmentActions
                 appointmentId={appointment.id}
                 status={appointment.status}
@@ -246,12 +287,12 @@ export default function AppointmentsTable({
                 canConvert={permissions.canConvert}
                 canCancel={permissions.canCancel}
                 canConfirm={permissions.canConfirm}
-                className="mt-3"
+                presentation="compact"
               />
-            </Card>
+            </div>
           </li>
         ))}
       </ul>
-    </>
+    </div>
   );
 }

@@ -30,7 +30,27 @@ interface PaginationProps {
   hrefFor: (page: number) => string;
   /** The noun being paged through, for the accessible label. */
   label: string;
+  /** Visual presentation variant — default (buttons with text) or compact (numbered chips with chevrons). */
+  variant?: "default" | "compact";
+  /** Optional noun label displayed in the summary sentence (e.g. "appointments"). */
+  itemLabel?: string;
   className?: string;
+}
+
+function getPageRange(page: number, lastPage: number): number[] {
+  if (lastPage <= 5) {
+    return Array.from({ length: lastPage }, (_, i) => i + 1);
+  }
+  let start = Math.max(1, page - 2);
+  let end = Math.min(lastPage, start + 4);
+  if (end - start < 4) {
+    start = Math.max(1, end - 4);
+  }
+  const pages: number[] = [];
+  for (let i = start; i <= end; i++) {
+    pages.push(i);
+  }
+  return pages;
 }
 
 export default function Pagination({
@@ -41,11 +61,15 @@ export default function Pagination({
   lastOnPage,
   hrefFor,
   label,
+  variant = "default",
+  itemLabel,
   className,
 }: PaginationProps) {
   if (lastPage <= 1) {
     return null;
   }
+
+  const isCompact = variant === "compact";
 
   return (
     <nav
@@ -60,52 +84,114 @@ export default function Pagination({
         {"–"}
         <span className="tnum font-medium text-ink">{lastOnPage}</span> of{" "}
         <span className="tnum font-medium text-ink">{total}</span>
+        {itemLabel ? ` ${itemLabel}` : ""}
       </p>
 
-      <div className="flex items-center gap-2">
-        <span className="mr-1 text-label text-muted">
-          Page <span className="tnum font-medium text-ink">{page}</span> of{" "}
-          <span className="tnum font-medium text-ink">{lastPage}</span>
-        </span>
+      {isCompact ? (
+        <div className="flex items-center gap-1.5">
+          {page > 1 ? (
+            <Link
+              href={hrefFor(page - 1)}
+              rel="prev"
+              aria-label="Previous page"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-canvas text-ink transition-colors duration-150 hover:border-line-strong hover:bg-canvas-deep"
+            >
+              <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </Link>
+          ) : (
+            <span
+              aria-disabled="true"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-canvas text-faint opacity-45 pointer-events-none"
+            >
+              <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </span>
+          )}
 
-        {page > 1 ? (
-          <Link
-            href={hrefFor(page - 1)}
-            rel="prev"
-            className={buttonClasses("secondary", "sm")}
-          >
-            <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-            Previous
-          </Link>
-        ) : (
-          <span
-            aria-disabled="true"
-            className={buttonClasses("secondary", "sm", "pointer-events-none opacity-45")}
-          >
-            <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-            Previous
-          </span>
-        )}
+          {getPageRange(page, lastPage).map((p) => {
+            const isCurrent = p === page;
+            return isCurrent ? (
+              <span
+                key={p}
+                aria-current="page"
+                className="inline-flex h-9 min-w-9 px-2.5 items-center justify-center rounded-xl bg-accent text-accent-ink text-label font-semibold shadow-cta"
+              >
+                {p}
+              </span>
+            ) : (
+              <Link
+                key={p}
+                href={hrefFor(p)}
+                className="inline-flex h-9 min-w-9 px-2.5 items-center justify-center rounded-xl border border-line bg-canvas text-ink text-label font-medium transition-colors duration-150 hover:border-line-strong hover:bg-canvas-deep"
+              >
+                {p}
+              </Link>
+            );
+          })}
 
-        {page < lastPage ? (
-          <Link
-            href={hrefFor(page + 1)}
-            rel="next"
-            className={buttonClasses("secondary", "sm")}
-          >
-            Next
-            <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
-          </Link>
-        ) : (
-          <span
-            aria-disabled="true"
-            className={buttonClasses("secondary", "sm", "pointer-events-none opacity-45")}
-          >
-            Next
-            <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+          {page < lastPage ? (
+            <Link
+              href={hrefFor(page + 1)}
+              rel="next"
+              aria-label="Next page"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-canvas text-ink transition-colors duration-150 hover:border-line-strong hover:bg-canvas-deep"
+            >
+              <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </Link>
+          ) : (
+            <span
+              aria-disabled="true"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-canvas text-faint opacity-45 pointer-events-none"
+            >
+              <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="mr-1 text-label text-muted">
+            Page <span className="tnum font-medium text-ink">{page}</span> of{" "}
+            <span className="tnum font-medium text-ink">{lastPage}</span>
           </span>
-        )}
-      </div>
+
+          {page > 1 ? (
+            <Link
+              href={hrefFor(page - 1)}
+              rel="prev"
+              className={buttonClasses("secondary", "sm")}
+            >
+              <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Previous
+            </Link>
+          ) : (
+            <span
+              aria-disabled="true"
+              className={buttonClasses("secondary", "sm", "pointer-events-none opacity-45")}
+            >
+              <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+              Previous
+            </span>
+          )}
+
+          {page < lastPage ? (
+            <Link
+              href={hrefFor(page + 1)}
+              rel="next"
+              className={buttonClasses("secondary", "sm")}
+            >
+              Next
+              <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </Link>
+          ) : (
+            <span
+              aria-disabled="true"
+              className={buttonClasses("secondary", "sm", "pointer-events-none opacity-45")}
+            >
+              Next
+              <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
+            </span>
+          )}
+        </div>
+      )}
     </nav>
   );
 }

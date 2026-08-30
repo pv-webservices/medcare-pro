@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Calendar } from "lucide-react";
 import AppointmentFilters from "@/components/appointments/AppointmentFilters";
 import AppointmentsTable from "@/components/appointments/AppointmentsTable";
 import { buttonClasses } from "@/components/ui/Button";
@@ -135,7 +136,7 @@ export default async function AppointmentBoardPage({
 
   const appliedDate = filters.date ?? "";
   const isFiltered = Boolean(
-    filters.doctorId || filters.status || filters.includeHistory || appliedDate,
+    filters.doctorId || filters.status || filters.includeHistory,
   );
   const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
   const firstOnPage = (result.page - 1) * result.pageSize + 1;
@@ -149,14 +150,15 @@ export default async function AppointmentBoardPage({
         scope={selectedClinic ? selectedClinic.name : "All clinics"}
         meta={
           <>
-            <Count>{result.total}</Count>{""}
+            <Count>{result.total}</Count>{" "}
             {result.total === 1 ? "appointment" : "appointments"}
             {appliedDate
               ? appliedDate === today
-                ? "today"
+                ? " today"
                 : ` on ${formatAppointmentDate(appliedDate)}`
-              : "upcoming"}
-            {selectedClinic ? ` at ${selectedClinic.name}` : "across all clinics"}
+              : " upcoming"}
+            {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
+            .
           </>
         }
         actions={
@@ -177,6 +179,7 @@ export default async function AppointmentBoardPage({
                 href="/appointments/new"
                 className={buttonClasses("primary", "md")}
               >
+                <Calendar aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
                 Book appointment
               </Link>
             )}
@@ -200,6 +203,10 @@ export default async function AppointmentBoardPage({
         showClinic={!selectedClinic}
         showDate={appliedDate === ""}
         isFiltered={isFiltered}
+        dateView={{
+          date: appliedDate,
+          isToday: appliedDate === today,
+        }}
         permissions={{ canCheckIn, canConvert, canCancel, canConfirm, canCreate }}
       />
 
@@ -211,6 +218,8 @@ export default async function AppointmentBoardPage({
         lastOnPage={lastOnPage}
         hrefFor={(page) => pageHref(params, page)}
         label="Appointment pages"
+        variant="compact"
+        itemLabel="appointments"
       />
     </section>
   );
