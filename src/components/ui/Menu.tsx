@@ -3,11 +3,13 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { cx } from "@/components/ui/cx";
 
 /**
@@ -28,6 +30,15 @@ import { cx } from "@/components/ui/cx";
  * for navigation and actions.
  */
 
+interface PositionStyle {
+  top: number;
+  left: number;
+  maxHeight?: number;
+}
+
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 interface MenuProps {
   /** The control that opens the panel. Receives the open state for its chevron. */
   trigger: (state: { isOpen: boolean }) => ReactNode;
@@ -35,6 +46,11 @@ interface MenuProps {
   label: string;
   /** Which edge of the trigger the panel lines up with. */
   align?: "start" | "end";
+  /**
+   * When true, renders the panel via createPortal into document.body with fixed positioning
+   * to escape overflow clipping in scrollable tables and cards, with automatic flip & collision handling.
+   */
+  usePortal?: boolean;
   /** Panel width. Defaults to a comfortable menu measure. */
   panelClassName?: string;
   className?: string;
@@ -45,15 +61,101 @@ export default function Menu({
   trigger,
   label,
   align = "start",
+  usePortal = false,
   panelClassName,
   className,
   children,
 }: MenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [position, setPosition] = useState<PositionStyle | null>(null);
+
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  /** Computes fixed position and collision/flip when usePortal is active. */
+  useIsomorphicLayoutEffect(() => {
+    if (!isOpen || !usePortal) {
+      setPosition(null);
+      return;
+    }
+
+    function updatePosition() {
+      if (!triggerRef.current) return;
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      if (triggerRect.width === 0 && triggerRect.height === 0) return;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Close if trigger scrolled out of viewport
+      if (triggerRect.bottom < 0 || triggerRect.top > viewportHeight) {
+        setIsOpen(false);
+        return;
+      }
+
+      const panelEl = panelRef.current;
+      const panelWidth = panelEl?.offsetWidth || 240;
+      const panelHeight = panelEl?.offsetHeight || 160;
+
+      const spaceBelow = viewportHeight - triggerRect.bottom - 8;
+      const spaceAbove = triggerRect.top - 8;
+
+      let top: number;
+      let openUpward = false;
+
+      if (spaceBelow < panelHeight && spaceAbove > spaceBelow) {
+        openUpward = true;
+        top = triggerRect.top - 8 - panelHeight;
+        if (top < 8) {
+          top = 8;
+        }
+      } else {
+        top = triggerRect.bottom + 8;
+        if (top + panelHeight > viewportHeight - 8) {
+          top = Math.max(8, viewportHeight - 8 - panelHeight);
+        }
+      }
+
+      let left: number;
+      if (align === "end") {
+        left = triggerRect.right - panelWidth;
+      } else {
+        left = triggerRect.left;
+      }
+
+      if (left + panelWidth > viewportWidth - 8) {
+        left = viewportWidth - 8 - panelWidth;
+      }
+      if (left < 8) {
+        left = 8;
+      }
+
+      setPosition({
+        top: Math.round(top),
+        left: Math.round(left),
+        maxHeight: Math.floor(Math.max(120, openUpward ? spaceAbove : spaceBelow)),
+      });
+    }
+
+    updatePosition();
+    const rafId = requestAnimationFrame(updatePosition);
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen, usePortal, align]);
 
   /** Anything focusable inside the panel, in DOM order. */
   function items(): HTMLElement[] {
@@ -82,13 +184,21 @@ export default function Menu({
     }
 
     function handlePointerDown(event: MouseEvent | TouchEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
 
     function handleFocusIn(event: FocusEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -136,6 +246,38 @@ export default function Menu({
     focusable[next]?.focus();
   }
 
+  const panelElement = (
+    <div
+      ref={panelRef}
+      id={panelId}
+      role="menu"
+      aria-label={label}
+      onKeyDown={handlePanelKeyDown}
+      onClick={() => setIsOpen(false)}
+      style={
+        usePortal
+          ? {
+              position: "fixed",
+              top: position ? `${position.top}px` : undefined,
+              left: position ? `${position.left}px` : undefined,
+              maxHeight: position?.maxHeight ? `${position.maxHeight}px` : undefined,
+              visibility: position ? "visible" : "hidden",
+            }
+          : undefined
+      }
+      className={cx(
+        "panel-in z-50 min-w-[15rem] overflow-y-auto rounded-2xl",
+        "border border-line bg-canvas p-1.5 shadow-float",
+        usePortal
+          ? ""
+          : cx("absolute mt-2", align === "end" ? "right-0" : "left-0"),
+        panelClassName,
+      )}
+    >
+      {children}
+    </div>
+  );
+
   return (
     <div ref={rootRef} className={cx("relative", className)}>
       <button
@@ -151,24 +293,10 @@ export default function Menu({
         {trigger({ isOpen })}
       </button>
 
-      {isOpen && (
-        <div
-          ref={panelRef}
-          id={panelId}
-          role="menu"
-          aria-label={label}
-          onKeyDown={handlePanelKeyDown}
-          onClick={() => setIsOpen(false)}
-          className={cx(
-            "panel-in absolute z-40 mt-2 min-w-[15rem] overflow-hidden rounded-2xl",
-            "border border-line bg-canvas p-1.5 shadow-float",
-            align === "end" ? "right-0" : "left-0",
-            panelClassName,
-          )}
-        >
-          {children}
-        </div>
-      )}
+      {isOpen &&
+        (usePortal && mounted && typeof document !== "undefined"
+          ? createPortal(panelElement, document.body)
+          : panelElement)}
     </div>
   );
 }

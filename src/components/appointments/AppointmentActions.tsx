@@ -204,6 +204,7 @@ export default function AppointmentActions({
 
         <Menu
           align="end"
+          usePortal
           label="Appointment actions"
           trigger={({ isOpen }) => (
             <span
