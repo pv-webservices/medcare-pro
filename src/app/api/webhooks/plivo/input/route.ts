@@ -5,6 +5,7 @@ import {
   buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
 import { buildDoctorMenuForClinic } from "@/lib/telephony/availability";
+import { beginTelephoneBooking } from "@/lib/telephony/booking";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { FeatureError } from "@/lib/featureResolution";
 import {
@@ -47,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
       typeof validatedDigits === "string" ? validatedDigits : undefined;
     const action = resolveMainMenuAction(digits);
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
-    if (action === "tomorrow-slots") {
+    if (action === "tomorrow-slots" || action === "appointment-booking") {
       try {
         await requireTenantFeatureEntitlement(
           clinic.tenantId,
@@ -63,7 +64,18 @@ export async function POST(request: Request): Promise<Response> {
           ),
         );
       }
-      return xmlResponse(await buildDoctorMenuForClinic(request.url, clinic));
+      if (action === "tomorrow-slots") {
+        return xmlResponse(await buildDoctorMenuForClinic(request.url, clinic));
+      }
+      return xmlResponse(
+        await beginTelephoneBooking({
+          requestUrl: request.url,
+          clinic,
+          from: verification.params.From,
+          callUuid: verification.params.CallUUID,
+          digits,
+        }),
+      );
     }
     return new Response(
       buildClinicSelectionXml(action, inputActionUrl, clinic.clinicName),

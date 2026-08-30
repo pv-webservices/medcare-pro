@@ -236,8 +236,12 @@ export function buildBookingSlotSelectionXml(input: {
   slotTimes: readonly string[];
   hasNext: boolean;
   invalidSelection?: boolean;
+  leadingMessage?: string;
 }): string {
   const response = createPlivoResponse();
+  if (input.leadingMessage) {
+    response.addSpeak(input.leadingMessage, {});
+  }
   if (input.invalidSelection) {
     response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
   }

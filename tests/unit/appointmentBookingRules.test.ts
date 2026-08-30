@@ -85,14 +85,21 @@ describe("createAppointmentSchema — what a client may say", () => {
   it("validates the mobile number the same way registrations does", () => {
     // The two columns hold the same kind of value and AP-5 copies one to the
     // other, so a number bookable here must be registrable there.
-    for (const mobileNumber of ["9876500011", "+91 98765 00011", "(080) 4567-8901"]) {
+    for (const mobileNumber of ["9876500011", "+919876500011"]) {
       expect(
         createAppointmentSchema.parse({ ...validBooking, mobileNumber })
           .mobileNumber,
       ).toBe(mobileNumber);
     }
 
-    for (const mobileNumber of ["", "abc", "12", "not a number"]) {
+    for (const mobileNumber of [
+      "",
+      "abc",
+      "12",
+      "not a number",
+      "+91 98765 00011",
+      "(080) 4567-8901",
+    ]) {
       expect(() =>
         createAppointmentSchema.parse({ ...validBooking, mobileNumber }),
       ).toThrow();

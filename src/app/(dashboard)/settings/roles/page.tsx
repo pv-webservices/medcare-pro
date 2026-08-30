@@ -1,20 +1,20 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import RoleList from "@/components/settings/RoleList";
-import UserRoleAssignments from "@/components/settings/UserRoleAssignments";
+import RolesViewManager from "@/components/settings/RolesViewManager";
 import PageHeader from "@/components/ui/PageHeader";
+import Skeleton from "@/components/ui/Skeleton";
 import { PermissionError } from "@/lib/rbac";
 import { getRolesOverview, type RolesOverview } from "@/lib/roles";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
-// Roles — PRD §6.8 (FR-8.1, FR-8.2): create roles, assign with optional clinic scope.
+// Roles & permissions — PRD §6.8 (FR-8.1, FR-8.2).
 //
 // `role:read` gates the page and `role:manage` gates every control on it, both
-// enforced in @/lib/roles rather than by hiding anything: reaching this URL
-// directly gets the same refusal the API gives.
+// enforced in @/lib/roles rather than by hiding anything.
 //
-// PRD §4 lists role management under the Owner only, so the seeded Admin does
-// not hold either permission. They are ordinary strings, though — an Owner can
-// put them on a custom role, which is what "not a hardcoded enum" means.
+// Overview matching 02-roles-permission.png and permission manager matching
+// 03-edit-permission.png, keeping all RBAC guarantees, grantable boundaries,
+// and audit rules unchanged.
 
 export default async function RolesSettingsPage() {
   let actor;
@@ -49,31 +49,32 @@ export default async function RolesSettingsPage() {
   }
 
   return (
-    <section className="space-y-5">
-      <PageHeader
-        title="Roles & permissions"
-        description="Define what each role can see and change."
-        breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Roles & permissions" }]}
-        meta={overview.canManage
-            ? "Create roles, choose what each one can do, and assign them to users."
-            : "You can see roles and who holds them, but not change them."}
-      />
+    <Suspense fallback={<RolesPageSkeleton />}>
+      <RolesViewManager overview={overview} />
+    </Suspense>
+  );
+}
 
-      <div className="mb-5">
-        <RoleList
-          roles={overview.roles}
-          grantablePermissions={overview.grantablePermissions}
-          canManage={overview.canManage}
-        />
+function RolesPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="h-10 w-48 animate-pulse rounded-2xl bg-canvas-deep" />
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-44 rounded-3xl border border-line bg-canvas p-6 shadow-card"
+          >
+            <div className="flex items-center gap-3.5">
+              <Skeleton className="h-12 w-12 rounded-2xl" />
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-24 rounded-lg" />
+                <Skeleton className="h-3 w-32 rounded-md" />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-
-      <UserRoleAssignments
-        users={overview.users}
-        roles={overview.roles}
-        clinics={overview.clinics}
-        canManage={overview.canManage}
-        canAssignAccountWide={overview.canAssignAccountWide}
-      />
-    </section>
+    </div>
   );
 }

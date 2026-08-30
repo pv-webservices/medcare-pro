@@ -160,6 +160,23 @@ async function findExistingPhoneBooking(input: {
   });
 }
 
+export async function getPhoneIvrAppointmentForCall(input: {
+  tenantId: string;
+  clinicId: string;
+  callUuid: string;
+}): Promise<BookedAppointment | null> {
+  const bookingSourceRef = buildPhoneBookingSourceRef(
+    input.clinicId,
+    input.callUuid,
+  );
+  const existing = await findExistingPhoneBooking({
+    tenantId: input.tenantId,
+    clinicId: input.clinicId,
+    bookingSourceRef,
+  });
+  return existing ? toBookedAppointment(existing) : null;
+}
+
 /**
  * The single appointment booking implementation used by staff and PHONE_IVR.
  * It performs no human RBAC; callers must establish scope and provenance, and

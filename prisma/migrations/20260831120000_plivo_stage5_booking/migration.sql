@@ -18,6 +18,14 @@ ALTER TABLE `appointments`
     FOREIGN KEY (`booked_by_id`) REFERENCES `users`(`id`)
     ON DELETE RESTRICT ON UPDATE CASCADE;
 
+ALTER TABLE `appointments`
+    ADD CONSTRAINT `appointments_booking_provenance_check`
+    CHECK (
+      (`booking_source` = 'STAFF' AND `booking_source_ref` IS NULL AND `booked_by_id` IS NOT NULL)
+      OR
+      (`booking_source` = 'PHONE_IVR' AND `booking_source_ref` IS NOT NULL AND `booked_by_id` IS NULL)
+    );
+
 CREATE TABLE `telephony_booking_requests` (
     `id` VARCHAR(191) NOT NULL,
     `tenant_id` VARCHAR(191) NOT NULL,

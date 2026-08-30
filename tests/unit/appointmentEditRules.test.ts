@@ -208,7 +208,7 @@ describe("the schema and the pure patch agree", () => {
   it("parses a full form body into something applyAppointmentEdit accepts", () => {
     const parsed = updateAppointmentSchema.parse({
       name: "Priya S",
-      mobileNumber: "+91 90000 11111",
+      mobileNumber: "+919000011111",
       age: null,
       gender: "",
       address: "",

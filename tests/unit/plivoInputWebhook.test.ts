@@ -21,6 +21,7 @@ const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
 const requireTenantFeatureEntitlement = vi.hoisted(() => vi.fn());
 const buildDoctorMenuForClinic = vi.hoisted(() => vi.fn());
+const beginTelephoneBooking = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
@@ -33,6 +34,10 @@ vi.mock("@/lib/features", () => ({
 
 vi.mock("@/lib/telephony/availability", () => ({
   buildDoctorMenuForClinic,
+}));
+
+vi.mock("@/lib/telephony/booking", () => ({
+  beginTelephoneBooking,
 }));
 
 const TEST_CLINIC = Object.freeze({
@@ -68,6 +73,10 @@ describe("POST /api/webhooks/plivo/input", () => {
     buildDoctorMenuForClinic.mockResolvedValue(
       "<Response><GetInput><Speak>Select a doctor.</Speak></GetInput></Response>",
     );
+    beginTelephoneBooking.mockReset();
+    beginTelephoneBooking.mockResolvedValue(
+      "<Response><GetInput><Speak>We found one patient record for this caller number.</Speak></GetInput></Response>",
+    );
   });
 
   afterEach(() => {
@@ -80,7 +89,6 @@ describe("POST /api/webhooks/plivo/input", () => {
   });
 
   it.each([
-    ["2", "You selected appointment booking."],
     ["3", "You selected urgent assistance."],
     ["4", "You selected clinic information."],
   ] as const)("acknowledges signed digit %s", async (digits, message) => {
@@ -154,6 +162,24 @@ describe("POST /api/webhooks/plivo/input", () => {
     },
   );
 
+  it("starts real telephone booking for signed digit 2", async () => {
+    const { response, xml } = await postDigit("2");
+
+    expect(response.status).toBe(200);
+    expect(requireTenantFeatureEntitlement).toHaveBeenCalledWith(
+      "tenant-a",
+      "appointments",
+    );
+    expect(beginTelephoneBooking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestUrl: INPUT_WEBHOOK_URL,
+        clinic: TEST_CLINIC,
+        digits: "2",
+      }),
+    );
+    expect(xml).toContain("one patient record");
+  });
+
   it("returns the invalid message and menu when Digits is missing", async () => {
     const { response, xml } = await postDigit();
 
@@ -222,7 +248,7 @@ describe("POST /api/webhooks/plivo/input", () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain("appointment booking");
+    expect(await response.text()).toContain("one patient record");
   });
 
   it("accepts unexpected fields only when they are part of the signature", async () => {
