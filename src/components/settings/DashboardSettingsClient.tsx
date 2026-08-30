@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { ChevronDown, LayoutGrid, ShieldCheck } from "lucide-react";
 import DashboardLayoutEditor, { type DashboardWidgetSlot } from "@/components/dashboard/DashboardLayoutEditor";
 import { cx } from "@/components/ui";
 import { DASHBOARD_WIDGETS, type DashboardLayoutConfig } from "@/lib/dashboardWidgets";
@@ -15,7 +15,7 @@ function previewSlots(layout: DashboardLayoutConfig): DashboardWidgetSlot[] {
       id: item.widgetId,
       content: (
         <div className="flex min-h-[116px] items-center rounded-2xl border border-line bg-canvas p-4 shadow-card">
-          <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink"><BarChart3 className="h-4 w-4" /></span>
+          <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink"><LayoutGrid className="h-4 w-4" /></span>
           <div className="min-w-0"><p className="text-label font-semibold text-ink">{widget.title}</p><p className="mt-1 text-meta text-muted">{widget.description}</p></div>
         </div>
       ),
@@ -63,9 +63,37 @@ export default function DashboardSettingsClient({
   return (
     <div className="space-y-5">
       {canCustomize && roles.length > 0 && (
-        <div className="inline-flex rounded-xl border border-line bg-canvas-deep p-1">
-          <button type="button" onClick={() => setTab("personal")} className={cx("inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-label font-semibold", tab === "personal" ? "bg-canvas text-accent shadow-card" : "text-muted")}><LayoutDashboard className="h-4 w-4" />My Dashboard</button>
-          <button type="button" onClick={() => { setLoadingRole(true); setRoleError(null); setTab("roles"); }} className={cx("inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-label font-semibold", tab === "roles" ? "bg-canvas text-accent shadow-card" : "text-muted")}><ShieldCheck className="h-4 w-4" />Role Defaults</button>
+        <div className="inline-flex rounded-2xl border border-line bg-canvas p-1 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setTab("personal")}
+            className={cx(
+              "inline-flex min-h-9 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+              tab === "personal"
+                ? "border border-accent bg-canvas text-accent shadow-xs"
+                : "border border-transparent text-muted hover:text-ink"
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            My Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLoadingRole(true);
+              setRoleError(null);
+              setTab("roles");
+            }}
+            className={cx(
+              "inline-flex min-h-9 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+              tab === "roles"
+                ? "border border-accent bg-canvas text-accent shadow-xs"
+                : "border border-transparent text-muted hover:text-ink"
+            )}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Role Defaults
+          </button>
         </div>
       )}
 
@@ -82,12 +110,29 @@ export default function DashboardSettingsClient({
 
       {tab === "roles" && (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-line bg-canvas p-4 shadow-card">
-            <label htmlFor="dashboard-role" className="text-label font-semibold text-ink">Role</label>
-            <p className="mt-1 text-meta text-muted">Configure the default inherited by users with this single role and no personal override.</p>
-            <select id="dashboard-role" value={roleId} onChange={(event) => { setLoadingRole(true); setRoleError(null); setRoleId(event.target.value); setRoleResult(null); }} className="mt-3 h-10 w-full max-w-sm rounded-xl border border-line bg-canvas px-3 text-body text-ink shadow-field">
-              {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-            </select>
+          <div className="rounded-2xl border border-line bg-canvas p-5 shadow-card">
+            <h2 className="text-sm font-bold text-ink">Role</h2>
+            <p className="mt-1 text-xs text-muted">Configure the default inherited by users with this single role and no personal override.</p>
+            <div className="relative mt-3 w-full max-w-sm">
+              <select
+                id="dashboard-role"
+                value={roleId}
+                onChange={(event) => {
+                  setLoadingRole(true);
+                  setRoleError(null);
+                  setRoleId(event.target.value);
+                  setRoleResult(null);
+                }}
+                className="h-10 w-full appearance-none rounded-xl border border-line bg-canvas pl-3.5 pr-10 text-body text-ink shadow-field focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 cursor-pointer"
+              >
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+            </div>
           </div>
           {loadingRole && <div className="rounded-2xl border border-line bg-canvas p-8 text-center text-body text-muted">Loading role dashboard…</div>}
           {roleError && <div role="alert" className="rounded-2xl border border-alert-line bg-alert-bg p-4 text-body text-alert-ink">{roleError}</div>}

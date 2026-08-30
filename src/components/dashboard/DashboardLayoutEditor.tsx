@@ -26,18 +26,26 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Activity,
   ArrowDown,
   ArrowDownToLine,
   ArrowUp,
   ArrowUpToLine,
+  Calendar,
   Check,
+  CheckSquare2,
+  CircleDollarSign,
   Eye,
   EyeOff,
   GripVertical,
   LayoutGrid,
+  MessageSquare,
+  PieChart,
   RotateCcw,
   Save,
   Settings2,
+  Stethoscope,
+  Users,
   X,
 } from "lucide-react";
 import { Button, cx } from "@/components/ui";
@@ -79,6 +87,17 @@ const CATEGORY_LABELS: Record<DashboardWidgetCategory, string> = {
   tasks: "Tasks",
   messages: "Messages",
   activity: "Activity",
+};
+
+const CATEGORY_ICONS: Record<DashboardWidgetCategory, typeof PieChart> = {
+  summary: PieChart,
+  patients: Users,
+  appointments: Calendar,
+  revenue: CircleDollarSign,
+  doctors: Stethoscope,
+  tasks: CheckSquare2,
+  messages: MessageSquare,
+  activity: Activity,
 };
 
 const END_DROP_ID = "dashboard-layout-end";
@@ -353,43 +372,189 @@ export default function DashboardLayoutEditor({
     );
   }
 
-  return (
-    <section aria-label="Dashboard layout editor" className="space-y-4">
-      <div className="sticky top-[76px] z-10 rounded-2xl border border-accent/25 bg-canvas p-4 shadow-raised">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-section font-semibold text-ink">{editorTitle}</h2>
-            <p className="mt-0.5 text-label text-muted">Drag by the handle or use the move buttons. Based on: {sourceLabel}.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {changed && <span className="mr-1 inline-flex items-center gap-1.5 text-meta font-semibold text-warn-ink"><span className="h-1.5 w-1.5 rounded-full bg-warn-mark" />Unsaved changes</span>}
-            <Button size="sm" variant="ghost" onClick={reset} disabled={isSaving}><RotateCcw className="h-4 w-4" />Reset</Button>
-            {!startInEditMode && <Button size="sm" variant="secondary" onClick={() => { setItems(persisted); setIsEditing(false); setMessage(null); }} disabled={isSaving}><X className="h-4 w-4" />Cancel</Button>}
-            <Button size="sm" variant="primary" onClick={save} isBusy={isSaving} busyLabel="Saving" disabled={!changed}><Save className="h-4 w-4" />Save layout</Button>
-          </div>
-        </div>
-        {message && <p role="status" className={cx("mt-3 flex items-center gap-2 text-label", message.includes("saved") || message.includes("restored") ? "text-ok-ink" : "text-alert-ink")}>{message.includes("saved") && <Check className="h-4 w-4" />}{message}</p>}
-      </div>
+  const activeCategories = DASHBOARD_WIDGET_CATEGORIES.filter((category) =>
+    items.some((item) => DASHBOARD_WIDGETS.get(item.widgetId)?.category === category)
+  );
+  const hasAll8Categories = activeCategories.length === DASHBOARD_WIDGET_CATEGORIES.length;
 
-      <aside className="rounded-2xl border border-line bg-canvas p-4 shadow-card">
-        <div className="flex items-center gap-2"><Eye className="h-4 w-4 text-accent" /><h3 className="text-label font-semibold text-ink">Available widgets</h3></div>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {DASHBOARD_WIDGET_CATEGORIES.map((category) => {
-            const categoryItems = items.filter((item) => DASHBOARD_WIDGETS.get(item.widgetId)?.category === category);
-            if (categoryItems.length === 0) return null;
+  const renderCategoryCard = (category: DashboardWidgetCategory) => {
+    const categoryItems = items.filter(
+      (item) => DASHBOARD_WIDGETS.get(item.widgetId)?.category === category
+    );
+    if (categoryItems.length === 0) return null;
+    const Icon = CATEGORY_ICONS[category];
+
+    return (
+      <div
+        key={category}
+        className="flex flex-col rounded-2xl border border-line bg-canvas p-3.5 shadow-xs"
+      >
+        <div className="flex items-center gap-2 border-b border-line/60 pb-2 mb-1.5">
+          <Icon className="h-4 w-4 shrink-0 text-accent" />
+          <span className="text-xs font-bold uppercase tracking-wider text-accent">
+            {CATEGORY_LABELS[category]}
+          </span>
+        </div>
+        <div className="flex-1 divide-y divide-line/40">
+          {categoryItems.map((item) => {
+            const definition = DASHBOARD_WIDGETS.get(item.widgetId)!;
             return (
-              <div key={category}>
-                <p className="text-micro font-semibold uppercase text-faint">{CATEGORY_LABELS[category]}</p>
-                <div className="mt-1.5 space-y-1">
-                  {categoryItems.map((item) => {
-                    const definition = DASHBOARD_WIDGETS.get(item.widgetId)!;
-                    return <button key={item.widgetId} type="button" onClick={() => update(item.widgetId, { visible: !item.visible })} className="flex min-h-12 w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-meta text-muted hover:bg-canvas-deep hover:text-ink"><span className={cx("mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md", item.visible ? "bg-ok-bg text-ok-ink" : "bg-canvas-deep text-faint")}>{item.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}</span><span className="min-w-0"><span className="block truncate font-semibold text-ink">{definition.title}</span><span className="mt-0.5 block text-micro leading-4 text-muted">{definition.description}</span></span></button>;
-                  })}
-                </div>
-              </div>
+              <button
+                key={item.widgetId}
+                type="button"
+                onClick={() => update(item.widgetId, { visible: !item.visible })}
+                className="group -mx-1 flex w-[calc(100%+8px)] items-start gap-2.5 rounded-lg px-1 py-2 text-left transition-colors hover:bg-canvas-deep/50"
+              >
+                <span
+                  className={cx(
+                    "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
+                    item.visible
+                      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+                      : "bg-slate-100 text-slate-400 dark:bg-canvas-deep dark:text-faint"
+                  )}
+                >
+                  {item.visible ? (
+                    <Eye className="h-3 w-3" />
+                  ) : (
+                    <EyeOff className="h-3 w-3" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold text-ink transition-colors group-hover:text-accent leading-tight">
+                    {definition.title}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-muted">
+                    {definition.description}
+                  </span>
+                </span>
+              </button>
             );
           })}
         </div>
+      </div>
+    );
+  };
+
+  const gridColsClass =
+    activeCategories.length === 6
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      : activeCategories.length === 5
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+      : activeCategories.length === 4
+      ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+      : activeCategories.length === 3
+      ? "grid-cols-1 sm:grid-cols-3"
+      : activeCategories.length === 2
+      ? "grid-cols-1 sm:grid-cols-2"
+      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+
+  return (
+    <section aria-label="Dashboard layout editor" className="space-y-4">
+      <div className="sticky top-[76px] z-10 rounded-2xl border border-line bg-canvas p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-bold text-ink">{editorTitle}</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              Drag by the handle or use the move buttons. Based on: {sourceLabel}.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {changed && (
+              <span className="mr-1 inline-flex items-center gap-1.5 text-meta font-semibold text-warn-ink">
+                <span className="h-1.5 w-1.5 rounded-full bg-warn-mark" />
+                Unsaved changes
+              </span>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={reset}
+              disabled={isSaving}
+              className="text-muted hover:text-ink font-medium"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
+            {!startInEditMode && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setItems(persisted);
+                  setIsEditing(false);
+                  setMessage(null);
+                }}
+                disabled={isSaving}
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={save}
+              isBusy={isSaving}
+              busyLabel="Saving"
+              disabled={!changed}
+            >
+              <Save className="h-4 w-4" />
+              Save layout
+            </Button>
+          </div>
+        </div>
+        {message && (
+          <p
+            role="status"
+            className={cx(
+              "mt-3 flex items-center gap-2 text-label",
+              message.includes("saved") || message.includes("restored")
+                ? "text-ok-ink"
+                : "text-alert-ink"
+            )}
+          >
+            {message.includes("saved") && <Check className="h-4 w-4" />}
+            {message}
+          </p>
+        )}
+      </div>
+
+      <aside className="rounded-2xl border border-line bg-canvas p-4 sm:p-5 shadow-card space-y-3.5">
+        <div className="flex items-center gap-2">
+          <Eye className="h-4 w-4 text-accent" />
+          <h3 className="text-sm font-bold text-ink">Available widgets</h3>
+        </div>
+
+        {hasAll8Categories ? (
+          <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-4">
+            {/* Column 1: Overview */}
+            <div className="xl:col-span-1">
+              {renderCategoryCard("summary")}
+            </div>
+
+            {/* Columns 2-4: Right side multi-row layout */}
+            <div className="flex flex-col gap-3.5 xl:col-span-3">
+              {/* Row 1: Patients, Appointments, Revenue */}
+              <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
+                {renderCategoryCard("patients")}
+                {renderCategoryCard("appointments")}
+                {renderCategoryCard("revenue")}
+              </div>
+
+              {/* Row 2: Doctors, Tasks, Messages, Activity */}
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-4">
+                {renderCategoryCard("doctors")}
+                {renderCategoryCard("tasks")}
+                {renderCategoryCard("messages")}
+                {renderCategoryCard("activity")}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={cx("grid gap-3.5", gridColsClass)}>
+            {activeCategories.map((category) => renderCategoryCard(category))}
+          </div>
+        )}
       </aside>
 
       <DndContext
