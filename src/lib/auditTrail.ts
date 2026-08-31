@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePermission, type ActorContext } from "@/lib/rbac";
 import {
@@ -48,6 +49,12 @@ export const AUDIT_PAGE_SIZE = 50;
 
 export const auditFilterSchema = z.object({
   category: z.string().trim().optional(),
+  module: z.string().trim().optional(),
+  decision: z.string().trim().optional(),
+  role: z.string().trim().optional(),
+  userId: z.string().trim().optional(),
+  period: z.string().trim().optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
   /** Free text over the actor's name and email. */
   search: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).max(1000).optional(),
@@ -55,19 +62,89 @@ export const auditFilterSchema = z.object({
 
 export type AuditFilterInput = z.infer<typeof auditFilterSchema>;
 
+export type AuditDecision = "success" | "cancelled" | "failed";
+
+export const FAILED_AUDIT_ACTIONS = [
+  "LOGIN_CODE_FAILED",
+  "LOGIN_CODE_RATE_LIMITED",
+  "PASSWORD_RESET_FAILED",
+  "PASSWORD_RESET_RATE_LIMITED",
+  "CLINIC_REJECTED",
+  "CLINIC_SUSPENDED",
+  "TEAM_MEMBER_REJECTED",
+  "TEAM_MEMBER_SUSPENDED",
+  "FEATURE_GLOBAL_DISABLED",
+  "PLAN_FEATURE_REMOVED",
+  "ROLE_FEATURE_DISABLED",
+  "APPOINTMENT_TYPE_DEACTIVATED",
+];
+
+export const CANCELLED_AUDIT_ACTIONS = [
+  "APPOINTMENT_CANCELLED",
+  "APPOINTMENT_NO_SHOW",
+  "TEAM_INVITATION_REVOKED",
+  "TEAM_MEMBER_REMOVED",
+];
+
+export function getAuditDecision(action: string): AuditDecision {
+  if (FAILED_AUDIT_ACTIONS.includes(action)) {
+    return "failed";
+  }
+  if (CANCELLED_AUDIT_ACTIONS.includes(action)) {
+    return "cancelled";
+  }
+  return "success";
+}
+
+export function getAuditModule(action: string, category: AuditCategory): string {
+  if (category === "appointments") return "Appointments";
+  if (category === "tasks") return "Tasks";
+  if (category === "dashboard") return "Dashboard";
+  if (category === "access") return "Security";
+  if (category === "team") return "Team";
+  if (category === "roles") return "Roles";
+  if (category === "entitlements") return "Settings";
+  if (category === "organisation") {
+    if (action.includes("TELEPHONY") || action.includes("SETTINGS")) {
+      return "Settings";
+    }
+    return "Clinic";
+  }
+  return "Platform";
+}
+
 export interface AuditEntryView {
   id: string;
   action: string;
   label: string;
   detail: string;
   category: AuditCategory;
+  /** Semantic module name for the table pill (e.g. Appointments, Tasks, Security, etc.) */
+  module: string;
+  /** Semantic decision for the row (success, cancelled, failed) */
+  decision: AuditDecision;
   /** True when MEDCARE PRO took this, rather than someone in the organisation. */
   byPlatform: boolean;
   /** Null for a system action with no person behind it. */
   actorName: string | null;
+  actorEmail: string | null;
+  actorRole: string;
   targetType: string;
+  targetId: string | null;
   reason: string | null;
   createdAt: Date;
+}
+
+export interface AuditMetricsSummary {
+  totalActivities: number;
+  successCount: number;
+  failedCount: number;
+  uniqueUsersCount: number;
+}
+
+export interface AuditFilterOption {
+  id: string;
+  name: string;
 }
 
 export interface AuditTrailPage {
@@ -78,6 +155,16 @@ export interface AuditTrailPage {
   category: AuditCategory | null;
   search: string;
   categories: readonly { key: AuditCategory; label: string }[];
+  metrics: AuditMetricsSummary;
+  availableRoles: AuditFilterOption[];
+  availableUsers: AuditFilterOption[];
+  filters: {
+    decision?: string;
+    role?: string;
+    module?: string;
+    userId?: string;
+    period?: string;
+  };
 }
 
 /**
@@ -101,28 +188,101 @@ function actionsForCategory(category: AuditCategory | null): string[] {
   );
 }
 
+const MODULE_TO_CATEGORY: Record<string, AuditCategory> = {
+  appointments: "appointments",
+  tasks: "tasks",
+  dashboard: "dashboard",
+  security: "access",
+  access: "access",
+  team: "team",
+  roles: "roles",
+  clinic: "organisation",
+  organisation: "organisation",
+  settings: "entitlements",
+  entitlements: "entitlements",
+  platform: "platform",
+};
+
 export async function getAuditTrail(
   actor: ActorContext,
   filters: AuditFilterInput = {},
 ): Promise<AuditTrailPage> {
   await requirePermission(actor, "audit:read");
 
+  const moduleParam = filters.module?.trim().toLowerCase();
+  const rawCategory =
+    filters.category || (moduleParam && MODULE_TO_CATEGORY[moduleParam]);
+
   const category =
-    filters.category && isAuditCategory(filters.category) ? filters.category : null;
+    rawCategory && isAuditCategory(rawCategory) ? rawCategory : null;
   const search = filters.search?.trim() ?? "";
   const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? AUDIT_PAGE_SIZE;
 
-  const actions = actionsForCategory(category);
+  let actions = actionsForCategory(category);
 
-  const where = {
-    action: { in: actions },
+  // Filter actions by decision if requested
+  const decisionParam = filters.decision?.trim().toLowerCase();
+  if (decisionParam === "success") {
+    actions = actions.filter((a) => getAuditDecision(a) === "success");
+  } else if (decisionParam === "failed") {
+    actions = actions.filter((a) => getAuditDecision(a) === "failed");
+  } else if (decisionParam === "cancelled") {
+    actions = actions.filter((a) => getAuditDecision(a) === "cancelled");
+  }
+
+  // Base scope for this tenant
+  const tenantBaseScope = {
     OR: [
       // Clause 1 — written by somebody acting inside this organisation.
       { actorTenantId: actor.tenantId },
-      // Clause 2 — a platform decision about this organisation. Both halves are
-      // constants or session-derived; nothing here comes from the request.
+      // Clause 2 — a platform decision about this organisation.
       { targetType: "Tenant", targetId: actor.tenantId },
     ],
+  };
+
+  // Date period filter
+  let periodDateFilter: { gte?: Date } | undefined;
+  const periodParam = filters.period?.trim();
+  if (periodParam && periodParam !== "all") {
+    const now = new Date();
+    if (periodParam === "today") {
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      periodDateFilter = { gte: todayStart };
+    } else if (periodParam === "yesterday") {
+      const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      periodDateFilter = { gte: yesterdayStart };
+    } else if (periodParam === "7d") {
+      periodDateFilter = { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) };
+    } else if (periodParam === "30d") {
+      periodDateFilter = { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (periodParam === "90d") {
+      periodDateFilter = { gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) };
+    }
+  }
+
+  const roleParam = filters.role?.trim();
+  const userIdParam = filters.userId?.trim();
+
+  const where: Prisma.AuditLogWhereInput = {
+    action: { in: actions },
+    ...tenantBaseScope,
+    ...(periodDateFilter ? { createdAt: periodDateFilter } : {}),
+    ...(userIdParam ? { actorUserId: userIdParam } : {}),
+    ...(roleParam
+      ? {
+          actor: {
+            userRoles: {
+              some: {
+                OR: [
+                  { roleId: roleParam },
+                  { role: { name: roleParam } },
+                ],
+              },
+            },
+          },
+        }
+      : {}),
     ...(search
       ? {
           actor: {
@@ -137,30 +297,94 @@ export async function getAuditTrail(
       : {}),
   };
 
-  const [rows, total] = await Promise.all([
-    prisma.auditLog.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * AUDIT_PAGE_SIZE,
-      take: AUDIT_PAGE_SIZE,
-      // Note what is NOT selected: ip, userAgent, beforeValue, afterValue.
-      // Withholding by omission rather than by deleting fields afterwards means
-      // there is no redaction step a later edit could skip.
-      select: {
-        id: true,
-        action: true,
-        targetType: true,
-        reason: true,
-        createdAt: true,
-        actor: { select: { name: true, email: true } },
-      },
-    }),
-    prisma.auditLog.count({ where }),
-  ]);
+  // Query rows, total, and tenant metrics in parallel
+  const [rows, total, totalActivitiesCount, failedActivitiesCount, distinctActors, availableRoles, availableUsers] =
+    await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        // Note what is NOT selected: ip, userAgent, beforeValue, afterValue.
+        // Withholding by omission rather than by deleting fields afterwards means
+        // there is no redaction step a later edit could skip.
+        select: {
+          id: true,
+          action: true,
+          targetType: true,
+          targetId: true,
+          reason: true,
+          createdAt: true,
+          actor: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              userRoles: {
+                where: {
+                  role: { tenantId: actor.tenantId },
+                },
+                select: {
+                  role: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.auditLog.count({ where }),
+      // Overall activities count for tenant
+      prisma.auditLog.count({
+        where: tenantBaseScope,
+      }),
+      // Failed activities count for tenant
+      prisma.auditLog.count({
+        where: {
+          ...tenantBaseScope,
+          action: { in: FAILED_AUDIT_ACTIONS },
+        },
+      }),
+      // Unique users who performed activities in this tenant
+      prisma.auditLog.findMany({
+        where: {
+          ...tenantBaseScope,
+          actorUserId: { not: null },
+        },
+        select: { actorUserId: true },
+        distinct: ["actorUserId"],
+      }),
+      // Available roles in tenant for filter dropdown
+      prisma.role.findMany({
+        where: { tenantId: actor.tenantId },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      // Available users in tenant for filter dropdown
+      prisma.user.findMany({
+        where: { tenantId: actor.tenantId },
+        select: { id: true, name: true, email: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+  const uniqueUsersCount = distinctActors.length;
+  const failedCount = failedActivitiesCount;
+  const successCount = Math.max(0, totalActivitiesCount - failedCount);
 
   return {
     entries: rows.map((row): AuditEntryView => {
       const description = describeAuditAction(row.action);
+      const decision = getAuditDecision(row.action);
+      const moduleName = getAuditModule(row.action, description.category);
+
+      let actorRole = "Staff";
+      if (description.side === "platform") {
+        actorRole = "Platform";
+      } else if (!row.actor) {
+        actorRole = "System";
+      } else if (row.actor.userRoles && row.actor.userRoles.length > 0) {
+        actorRole = row.actor.userRoles[0].role.name;
+      }
 
       return {
         id: row.id,
@@ -168,21 +392,44 @@ export async function getAuditTrail(
         label: description.label,
         detail: description.detail,
         category: description.category,
+        module: moduleName,
+        decision,
         byPlatform: description.side === "platform",
         // Falls back to the email so a person who never set a name is still
         // identifiable, and to null so the screen can say "MEDCARE PRO" or
         // "System" rather than printing an empty cell.
         actorName: row.actor?.name ?? row.actor?.email ?? null,
+        actorEmail: row.actor?.email ?? null,
+        actorRole,
         targetType: row.targetType,
+        targetId: row.targetId,
         reason: row.reason,
         createdAt: row.createdAt,
       };
     }),
     total,
     page,
-    pageSize: AUDIT_PAGE_SIZE,
+    pageSize,
     category,
     search,
     categories: AUDIT_CATEGORIES,
+    metrics: {
+      totalActivities: totalActivitiesCount,
+      successCount,
+      failedCount,
+      uniqueUsersCount,
+    },
+    availableRoles: availableRoles.map((r) => ({ id: r.id, name: r.name })),
+    availableUsers: availableUsers.map((u) => ({
+      id: u.id,
+      name: u.name?.trim() ? u.name : u.email,
+    })),
+    filters: {
+      decision: filters.decision,
+      role: filters.role,
+      module: filters.module || (category ? String(category) : undefined),
+      userId: filters.userId,
+      period: filters.period,
+    },
   };
 }
