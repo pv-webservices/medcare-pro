@@ -249,6 +249,7 @@ export default function AppointmentFilters({
               className="!min-h-9 !py-1.5 !rounded-xl !text-label"
               showClear={false}
               showToday={false}
+              align="end"
             />
           </div>
 

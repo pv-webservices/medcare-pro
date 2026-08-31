@@ -209,74 +209,79 @@ export default function MessageComposer({
           </Select>
 
           {/* Filter by visit date */}
-          <div className="space-y-2">
-            <label className="block text-label font-semibold text-ink">
-              Filter by visit date
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => { setStartDateFilter(""); setEndDateFilter(""); }}
-                className={`rounded-xl px-3.5 py-1.5 text-label font-medium transition-all ${
-                  startDateFilter === "" && endDateFilter === ""
-                    ? "bg-accent text-accent-ink font-semibold shadow-sm"
-                    : "border border-line bg-canvas text-muted hover:bg-canvas-deep hover:text-ink"
-                }`}
-              >
-                Any
-              </button>
-              <button
-                type="button"
-                onClick={() => { setStartDateFilter(todayStr); setEndDateFilter(todayStr); }}
-                className={`rounded-xl px-3.5 py-1.5 text-label font-medium transition-all ${
-                  startDateFilter === todayStr && endDateFilter === todayStr
-                    ? "bg-accent text-accent-ink font-semibold shadow-sm"
-                    : "border border-line bg-canvas text-muted hover:bg-canvas-deep hover:text-ink"
-                }`}
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                onClick={() => { setStartDateFilter(yesterdayStr); setEndDateFilter(yesterdayStr); }}
-                className={`rounded-xl px-3.5 py-1.5 text-label font-medium transition-all ${
-                  startDateFilter === yesterdayStr && endDateFilter === yesterdayStr
-                    ? "bg-accent text-accent-ink font-semibold shadow-sm"
-                    : "border border-line bg-canvas text-muted hover:bg-canvas-deep hover:text-ink"
-                }`}
-              >
-                Yesterday
-              </button>
-              <div className="flex items-center gap-1.5">
-                <div className="w-36">
-                  <DatePicker
-                    id="composer-start-date"
-                    label="From"
-                    isLabelHidden
-                    value={startDateFilter}
-                    maxDate={endDateFilter || undefined}
-                    onChange={(newDate) => setStartDateFilter(newDate)}
-                    placeholder="From"
-                    className="!min-h-9 !py-1 !rounded-xl !text-label"
-                    showClear={false}
-                    showToday={false}
-                  />
-                </div>
-                <span className="text-muted text-label">to</span>
-                <div className="w-36">
-                  <DatePicker
-                    id="composer-end-date"
-                    label="To"
-                    isLabelHidden
-                    value={endDateFilter}
-                    minDate={startDateFilter || undefined}
-                    onChange={(newDate) => setEndDateFilter(newDate)}
-                    placeholder="To"
-                    className="!min-h-9 !py-1 !rounded-xl !text-label"
-                    showClear={false}
-                    showToday={false}
-                  />
-                </div>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-label font-semibold text-ink mb-2">
+                Filter by visit date
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setStartDateFilter(""); setEndDateFilter(""); }}
+                  className={`rounded-xl px-3.5 py-1.5 text-label font-medium transition-all ${
+                    startDateFilter === "" && endDateFilter === ""
+                      ? "bg-accent text-accent-ink font-semibold shadow-sm"
+                      : "border border-line bg-canvas text-muted hover:bg-canvas-deep hover:text-ink"
+                  }`}
+                >
+                  Any
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStartDateFilter(todayStr); setEndDateFilter(todayStr); }}
+                  className={`rounded-xl px-3.5 py-1.5 text-label font-medium transition-all ${
+                    startDateFilter === todayStr && endDateFilter === todayStr
+                      ? "bg-accent text-accent-ink font-semibold shadow-sm"
+                      : "border border-line bg-canvas text-muted hover:bg-canvas-deep hover:text-ink"
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStartDateFilter(yesterdayStr); setEndDateFilter(yesterdayStr); }}
+                  className={`rounded-xl px-3.5 py-1.5 text-label font-medium transition-all ${
+                    startDateFilter === yesterdayStr && endDateFilter === yesterdayStr
+                      ? "bg-accent text-accent-ink font-semibold shadow-sm"
+                      : "border border-line bg-canvas text-muted hover:bg-canvas-deep hover:text-ink"
+                  }`}
+                >
+                  Yesterday
+                </button>
+              </div>
+            </div>
+
+            {/* Standard From / To DatePicker controls matching Registrations reference */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <DatePicker
+                  id="composer-filter-from"
+                  label="From"
+                  value={startDateFilter}
+                  maxDate={endDateFilter || undefined}
+                  onChange={(newDate) => {
+                    setStartDateFilter(newDate);
+                    if (endDateFilter && newDate && newDate > endDateFilter) {
+                      setEndDateFilter(newDate);
+                    }
+                  }}
+                  placeholder="Select date"
+                />
+              </div>
+              <div>
+                <DatePicker
+                  id="composer-filter-to"
+                  label="To"
+                  value={endDateFilter}
+                  minDate={startDateFilter || undefined}
+                  onChange={(newDate) => {
+                    setEndDateFilter(newDate);
+                    if (startDateFilter && newDate && newDate < startDateFilter) {
+                      setStartDateFilter(newDate);
+                    }
+                  }}
+                  placeholder="Select date"
+                />
               </div>
             </div>
           </div>

@@ -7,9 +7,8 @@ import {
   X,
 } from "lucide-react";
 import React, {
-  useEffect,
+  useCallback,
   useId,
-  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -18,13 +17,8 @@ import React, {
 import { createPortal } from "react-dom";
 import { cx } from "@/components/ui/cx";
 import { controlClasses, FieldShell } from "@/components/ui/Input";
-import {
-  isDateOnly,
-  todayDateOnly,
-} from "@/lib/dates";
-
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { useFloatingPopover } from "@/components/ui/useFloatingPopover";
+import { isDateOnly, todayDateOnly } from "@/lib/dates";
 
 export interface DatePickerProps {
   id: string;
@@ -45,12 +39,7 @@ export interface DatePickerProps {
   name?: string;
   showClear?: boolean;
   showToday?: boolean;
-}
-
-interface PositionStyle {
-  top: number;
-  left: number;
-  openUpward: boolean;
+  align?: "start" | "end" | "auto";
 }
 
 const MONTH_NAMES = [
@@ -125,6 +114,7 @@ export default function DatePicker({
   name,
   showClear = true,
   showToday = true,
+  align = "auto",
 }: DatePickerProps) {
   const generatedId = useId();
   const pickerId = `${id}-datepicker-${generatedId.replace(/:/g, "")}`;
@@ -138,7 +128,6 @@ export default function DatePicker({
   const activeValue = isControlled ? (value ?? "") : internalValue;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState<PositionStyle | null>(null);
 
   // Current view month & year (0-indexed month)
   const todayStr = todayDateOnly();
@@ -153,128 +142,27 @@ export default function DatePicker({
     return (parseInt(m, 10) || 1) - 1;
   });
 
-  // Coordinate with other popovers across the application
-  useEffect(() => {
-    function handleCloseOthers(e: Event) {
-      const customEvent = e as CustomEvent<{ sourceId: string }>;
-      if (customEvent.detail?.sourceId !== pickerId) {
-        setIsOpen(false);
-      }
+  const handleClose = useCallback((opts?: { restoreFocus?: boolean }) => {
+    setIsOpen(false);
+    if (opts?.restoreFocus) {
+      triggerRef.current?.focus();
     }
+  }, []);
 
-    window.addEventListener("medcare:close-popovers", handleCloseOthers);
-    return () => {
-      window.removeEventListener("medcare:close-popovers", handleCloseOthers);
-    };
-  }, [pickerId]);
-
-  /** Computes fixed position and viewport collision for the floating calendar panel */
-  useIsomorphicLayoutEffect(() => {
-    if (!isOpen) {
-      setPosition(null);
-      return;
-    }
-
-    function updatePosition() {
-      if (!triggerRef.current) return;
-      const triggerRect = triggerRef.current.getBoundingClientRect();
-      if (triggerRect.width === 0 && triggerRect.height === 0) return;
-
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Close if trigger scrolled out of viewport
-      if (triggerRect.bottom < 0 || triggerRect.top > viewportHeight) {
-        setIsOpen(false);
-        return;
-      }
-
-      const panelEl = panelRef.current;
-      const panelHeight = panelEl?.offsetHeight || 340;
-      const panelWidth = panelEl?.offsetWidth || 300;
-
-      const spaceBelow = viewportHeight - triggerRect.bottom - 8;
-      const spaceAbove = triggerRect.top - 8;
-
-      let top: number;
-      let openUpward = false;
-
-      if (spaceBelow < panelHeight && spaceAbove > spaceBelow) {
-        openUpward = true;
-        top = triggerRect.top - 6 - panelHeight;
-        if (top < 8) {
-          top = 8;
-        }
-      } else {
-        top = triggerRect.bottom + 6;
-        if (top + panelHeight > viewportHeight - 8) {
-          top = Math.max(8, viewportHeight - 8 - panelHeight);
-        }
-      }
-
-      let left = triggerRect.left;
-      if (left + panelWidth > viewportWidth - 8) {
-        left = viewportWidth - 8 - panelWidth;
-      }
-      if (left < 8) {
-        left = 8;
-      }
-
-      setPosition({
-        top: Math.round(top),
-        left: Math.round(left),
-        openUpward,
-      });
-    }
-
-    updatePosition();
-    const rafId = requestAnimationFrame(updatePosition);
-
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [isOpen]);
-
-  /** Outside-click dismissal */
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handlePointerDown(e: MouseEvent | TouchEvent) {
-      const target = e.target as Node;
-      if (
-        triggerRef.current?.contains(target) ||
-        panelRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setIsOpen(false);
-    }
-
-    function handleFocusIn(e: FocusEvent) {
-      const target = e.target as Node;
-      if (
-        !triggerRef.current?.contains(target) &&
-        !panelRef.current?.contains(target)
-      ) {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-    document.addEventListener("focusin", handleFocusIn as unknown as EventListener);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-      document.removeEventListener("focusin", handleFocusIn as unknown as EventListener);
-    };
-  }, [isOpen]);
+  const {
+    position,
+    dispatchOpenEvent,
+    shouldIgnoreTriggerClick,
+  } = useFloatingPopover({
+    isOpen,
+    onClose: handleClose,
+    popoverId: pickerId,
+    triggerRef,
+    panelRef,
+    align,
+    defaultWidth: 292,
+    defaultHeight: 340,
+  });
 
   function commitDate(dateStr: string) {
     if (!isControlled) {
@@ -287,15 +175,14 @@ export default function DatePicker({
 
   function handleTriggerClick() {
     if (disabled) return;
+
+    if (shouldIgnoreTriggerClick()) {
+      return;
+    }
+
     const willOpen = !isOpen;
     if (willOpen) {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("medcare:close-popovers", {
-            detail: { sourceId: pickerId },
-          }),
-        );
-      }
+      dispatchOpenEvent();
       if (activeValue && isDateOnly(activeValue)) {
         const [y, m] = activeValue.split("-");
         setViewYear(parseInt(y, 10));

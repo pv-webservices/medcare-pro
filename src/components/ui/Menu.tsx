@@ -1,9 +1,8 @@
 "use client";
 
 import {
-  useEffect,
+  useCallback,
   useId,
-  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -12,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "@/components/ui/cx";
+import { useFloatingPopover } from "@/components/ui/useFloatingPopover";
 
 const emptySubscribe = () => () => {};
 
@@ -22,33 +22,6 @@ function useMounted() {
     () => false,
   );
 }
-
-/**
- * A dropdown: a trigger, and a panel of choices under it.
- *
- * Used by the clinic switcher, the account menu and every row-level "more
- * actions" control, so those three cannot drift into behaving differently.
- *
- * THE KEYBOARD CONTRACT IS THE WHOLE COMPONENT. A menu that only answers the
- * mouse is a menu a front-desk user cannot reach while their hands are on the
- * keyboard: Escape closes and returns focus to the trigger, Tab or a click
- * outside closes, ArrowDown from the trigger opens and lands on the first item,
- * and the arrows move between items once inside. `aria-expanded` and
- * `aria-haspopup` on the trigger say what will happen before it happens.
- *
- * IT IS NOT A `<select>` REPLACEMENT. Where the choice is a form value, use the
- * native select — the OS picker on a tablet beats anything built here. This is
- * for navigation and actions.
- */
-
-interface PositionStyle {
-  top: number;
-  left: number;
-  maxHeight?: number;
-}
-
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface MenuProps {
   /** The control that opens the panel. Receives the open state for its chevron. */
@@ -79,97 +52,37 @@ export default function Menu({
 }: MenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const mounted = useMounted();
-  const [position, setPosition] = useState<PositionStyle | null>(null);
-
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  /** Computes fixed position and collision/flip when usePortal is active. */
-  useIsomorphicLayoutEffect(() => {
-    if (!isOpen || !usePortal) {
-      setPosition(null);
-      return;
+  const handleClose = useCallback((options?: { restoreFocus?: boolean }) => {
+    setIsOpen(false);
+    if (options?.restoreFocus) {
+      triggerRef.current?.focus();
     }
+  }, []);
 
-    function updatePosition() {
-      if (!triggerRef.current) return;
-      const triggerRect = triggerRef.current.getBoundingClientRect();
-      if (triggerRect.width === 0 && triggerRect.height === 0) return;
-
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Close if trigger scrolled out of viewport
-      if (triggerRect.bottom < 0 || triggerRect.top > viewportHeight) {
-        setIsOpen(false);
-        return;
-      }
-
-      const panelEl = panelRef.current;
-      const panelWidth = panelEl?.offsetWidth || 240;
-      const panelHeight = panelEl?.offsetHeight || 160;
-
-      const spaceBelow = viewportHeight - triggerRect.bottom - 8;
-      const spaceAbove = triggerRect.top - 8;
-
-      let top: number;
-      let openUpward = false;
-
-      if (spaceBelow < panelHeight && spaceAbove > spaceBelow) {
-        openUpward = true;
-        top = triggerRect.top - 8 - panelHeight;
-        if (top < 8) {
-          top = 8;
-        }
-      } else {
-        top = triggerRect.bottom + 8;
-        if (top + panelHeight > viewportHeight - 8) {
-          top = Math.max(8, viewportHeight - 8 - panelHeight);
-        }
-      }
-
-      let left: number;
-      if (align === "end") {
-        left = triggerRect.right - panelWidth;
-      } else {
-        left = triggerRect.left;
-      }
-
-      if (left + panelWidth > viewportWidth - 8) {
-        left = viewportWidth - 8 - panelWidth;
-      }
-      if (left < 8) {
-        left = 8;
-      }
-
-      setPosition({
-        top: Math.round(top),
-        left: Math.round(left),
-        maxHeight: Math.floor(Math.max(120, openUpward ? spaceAbove : spaceBelow)),
-      });
-    }
-
-    updatePosition();
-    const rafId = requestAnimationFrame(updatePosition);
-
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [isOpen, usePortal, align]);
+  const {
+    position,
+    dispatchOpenEvent,
+    shouldIgnoreTriggerClick,
+  } = useFloatingPopover({
+    isOpen: isOpen && usePortal,
+    onClose: handleClose,
+    popoverId: panelId,
+    triggerRef,
+    panelRef,
+    align,
+    defaultWidth: 240,
+    defaultHeight: 180,
+  });
 
   /** Anything focusable inside the panel, in DOM order. */
   function items(): HTMLElement[] {
     const panel = panelRef.current;
-    if (!panel) {
-      return [];
-    }
+    if (!panel) return [];
     return Array.from(
       panel.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
@@ -177,71 +90,23 @@ export default function Menu({
     );
   }
 
-  function close(options: { restoreFocus?: boolean } = {}) {
-    setIsOpen(false);
-    if (options.restoreFocus) {
-      triggerRef.current?.focus();
-    }
-  }
-
-  // Listen for global popover closure events so only one menu/dropdown is open at a time
-  useEffect(() => {
-    function handleCloseOthers(e: Event) {
-      const customEvent = e as CustomEvent<{ sourceId: string }>;
-      if (customEvent.detail?.sourceId !== panelId) {
-        setIsOpen(false);
-      }
-    }
-
-    window.addEventListener("medcare:close-popovers", handleCloseOthers);
-    return () => {
-      window.removeEventListener("medcare:close-popovers", handleCloseOthers);
-    };
-  }, [panelId]);
-
-  /** A click or a focus move outside the menu closes it. */
-  useEffect(() => {
-    if (!isOpen) {
+  function handleTriggerClick() {
+    if (shouldIgnoreTriggerClick()) {
       return;
     }
-
-    function handlePointerDown(event: MouseEvent | TouchEvent) {
-      const target = event.target as Node;
-      if (
-        rootRef.current?.contains(target) ||
-        panelRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setIsOpen(false);
+    const next = !isOpen;
+    if (next) {
+      dispatchOpenEvent();
     }
-
-    function handleFocusIn(event: FocusEvent) {
-      const target = event.target as Node;
-      if (
-        !rootRef.current?.contains(target) &&
-        !panelRef.current?.contains(target)
-      ) {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-    document.addEventListener("focusin", handleFocusIn);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-      document.removeEventListener("focusin", handleFocusIn);
-    };
-  }, [isOpen]);
+    setIsOpen(next);
+  }
 
   function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
       if (!isOpen) {
         event.preventDefault();
+        dispatchOpenEvent();
         setIsOpen(true);
-        // The panel has not rendered yet; focus lands on the next frame.
         requestAnimationFrame(() => items()[0]?.focus());
       }
     }
@@ -250,7 +115,7 @@ export default function Menu({
   function handlePanelKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
-      close({ restoreFocus: true });
+      handleClose({ restoreFocus: true });
       return;
     }
 
@@ -260,9 +125,7 @@ export default function Menu({
 
     event.preventDefault();
     const focusable = items();
-    if (focusable.length === 0) {
-      return;
-    }
+    if (focusable.length === 0) return;
     const current = focusable.indexOf(document.activeElement as HTMLElement);
     const step = event.key === "ArrowDown" ? 1 : focusable.length - 1;
     const next = (current + step + focusable.length) % focusable.length;
@@ -281,9 +144,10 @@ export default function Menu({
         usePortal
           ? {
               position: "fixed",
-              top: position ? `${position.top}px` : undefined,
-              left: position ? `${position.left}px` : undefined,
+              top: position?.top ?? 0,
+              left: position?.left ?? 0,
               maxHeight: position?.maxHeight ? `${position.maxHeight}px` : undefined,
+              zIndex: 9999,
               visibility: position ? "visible" : "hidden",
             }
           : undefined
@@ -309,17 +173,7 @@ export default function Menu({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? panelId : undefined}
-        onClick={() => {
-          setIsOpen((current) => {
-            const next = !current;
-            if (next && typeof window !== "undefined") {
-              window.dispatchEvent(
-                new CustomEvent("medcare:close-popovers", { detail: { sourceId: panelId } }),
-              );
-            }
-            return next;
-          });
-        }}
+        onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         className="w-full rounded-2xl text-left"
       >

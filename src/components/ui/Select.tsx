@@ -4,12 +4,11 @@ import { Check, ChevronDown } from "lucide-react";
 import React, {
   Children,
   isValidElement,
+  useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useRef,
   useState,
-  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -18,9 +17,7 @@ import React, {
 import { createPortal } from "react-dom";
 import { cx } from "@/components/ui/cx";
 import { controlClasses, FieldShell } from "@/components/ui/Input";
-
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { useFloatingPopover } from "@/components/ui/useFloatingPopover";
 
 export interface SelectOptionItem {
   value: string;
@@ -40,15 +37,8 @@ export interface SelectProps
   icon?: ReactNode;
   /** Optional small context header inside the dropdown panel (e.g. "Appointments · Admin") */
   contextHeader?: string;
+  align?: "start" | "end" | "auto";
   children: ReactNode;
-}
-
-interface PositionStyle {
-  top: number;
-  left: number;
-  width: number;
-  maxHeight: number;
-  openUpward: boolean;
 }
 
 /** Recursively extracts options from children, handling fragments and optgroups if any */
@@ -124,6 +114,7 @@ export default function Select({
   onFocus,
   name,
   contextHeader,
+  align = "auto",
   ...rest
 }: SelectProps) {
   const generatedId = useId();
@@ -133,7 +124,6 @@ export default function Select({
   const hiddenSelectRef = useRef<HTMLSelectElement>(null);
 
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState<PositionStyle | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
 
   // Extracted option items
@@ -153,140 +143,36 @@ export default function Select({
     options.find((opt) => !opt.disabled) ||
     options[0];
 
+  const handleClose = useCallback(
+    (opts?: { restoreFocus?: boolean }) => {
+      setIsOpen(false);
+      if (opts?.restoreFocus) {
+        triggerRef.current?.focus();
+      }
+    },
+    [],
+  );
+
+  const {
+    position,
+    dispatchOpenEvent,
+    shouldIgnoreTriggerClick,
+  } = useFloatingPopover({
+    isOpen,
+    onClose: handleClose,
+    popoverId: listboxId,
+    triggerRef,
+    panelRef,
+    align,
+    defaultHeight: Math.min(options.length * 44 + 20, 280),
+  });
+
   // Keep hidden select value in sync
   useEffect(() => {
     if (hiddenSelectRef.current && hiddenSelectRef.current.value !== activeValue) {
       hiddenSelectRef.current.value = activeValue;
     }
   }, [activeValue]);
-
-  /** Computes fixed position and collision/flip for floating listbox */
-  useIsomorphicLayoutEffect(() => {
-    if (!isOpen) {
-      setPosition(null);
-      return;
-    }
-
-    function updatePosition() {
-      if (!triggerRef.current) return;
-      const triggerRect = triggerRef.current.getBoundingClientRect();
-      if (triggerRect.width === 0 && triggerRect.height === 0) return;
-
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Close if trigger scrolled entirely out of viewport
-      if (triggerRect.bottom < 0 || triggerRect.top > viewportHeight) {
-        setIsOpen(false);
-        return;
-      }
-
-      const panelEl = panelRef.current;
-      const panelHeight = panelEl?.offsetHeight || Math.min(options.length * 44 + 20, 280);
-
-      const spaceBelow = viewportHeight - triggerRect.bottom - 8;
-      const spaceAbove = triggerRect.top - 8;
-
-      let top: number;
-      let openUpward = false;
-
-      if (spaceBelow < Math.min(panelHeight, 200) && spaceAbove > spaceBelow) {
-        openUpward = true;
-        top = triggerRect.top - 6 - panelHeight;
-        if (top < 8) {
-          top = 8;
-        }
-      } else {
-        top = triggerRect.bottom + 6;
-        if (top + panelHeight > viewportHeight - 8) {
-          top = Math.max(8, viewportHeight - 8 - panelHeight);
-        }
-      }
-
-      let left = triggerRect.left;
-      const minWidth = triggerRect.width;
-      const panelWidth = Math.max(minWidth, panelEl?.offsetWidth || minWidth);
-
-      if (left + panelWidth > viewportWidth - 8) {
-        left = viewportWidth - 8 - panelWidth;
-      }
-      if (left < 8) {
-        left = 8;
-      }
-
-      setPosition({
-        top: Math.round(top),
-        left: Math.round(left),
-        width: Math.round(triggerRect.width),
-        maxHeight: Math.floor(Math.max(140, Math.min(openUpward ? spaceAbove : spaceBelow, 320))),
-        openUpward,
-      });
-    }
-
-    updatePosition();
-    const rafId = requestAnimationFrame(updatePosition);
-
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [isOpen, options.length]);
-
-  // Listen for global popover closure events so only one dropdown is open at a time
-  useEffect(() => {
-    function handleCloseOthers(e: Event) {
-      const customEvent = e as CustomEvent<{ sourceId: string }>;
-      if (customEvent.detail?.sourceId !== listboxId) {
-        setIsOpen(false);
-      }
-    }
-
-    window.addEventListener("medcare:close-popovers", handleCloseOthers);
-    return () => {
-      window.removeEventListener("medcare:close-popovers", handleCloseOthers);
-    };
-  }, [listboxId]);
-
-  /** Close menu on click outside or focus loss outside */
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handlePointerDown(e: MouseEvent | TouchEvent) {
-      const target = e.target as Node;
-      // If clicking inside trigger or panel, do not close here
-      if (
-        triggerRef.current?.contains(target) ||
-        panelRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setIsOpen(false);
-    }
-
-    function handleFocusIn(e: FocusEvent) {
-      const target = e.target as Node;
-      if (
-        !triggerRef.current?.contains(target) &&
-        !panelRef.current?.contains(target)
-      ) {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-    document.addEventListener("focusin", handleFocusIn as unknown as EventListener);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-      document.removeEventListener("focusin", handleFocusIn as unknown as EventListener);
-    };
-  }, [isOpen]);
 
   /** Scroll highlighted item into view when keyboard navigating */
   useEffect(() => {
@@ -296,7 +182,7 @@ export default function Select({
     if (targetItem) {
       targetItem.scrollIntoView({ block: "nearest" });
     }
-  }, [highlightedIndex, isOpen]);
+  }, [highlightedIndex, isOpen, panelRef]);
 
   function commitSelection(newVal: string) {
     if (newVal === activeValue) {
@@ -334,13 +220,14 @@ export default function Select({
   function handleTriggerClick(e: ReactMouseEvent<HTMLButtonElement>) {
     if (disabled) return;
     e.preventDefault();
+
+    if (shouldIgnoreTriggerClick()) {
+      return;
+    }
+
     const willOpen = !isOpen;
     if (willOpen) {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("medcare:close-popovers", { detail: { sourceId: listboxId } }),
-        );
-      }
+      dispatchOpenEvent();
       setIsOpen(true);
       const idx = options.findIndex((opt) => opt.value === activeValue);
       setHighlightedIndex(idx >= 0 ? idx : 0);
@@ -355,6 +242,7 @@ export default function Select({
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!isOpen) {
+        dispatchOpenEvent();
         setIsOpen(true);
         const idx = options.findIndex((opt) => opt.value === activeValue);
         setHighlightedIndex(idx >= 0 ? idx : 0);
@@ -367,6 +255,7 @@ export default function Select({
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       if (!isOpen) {
+        dispatchOpenEvent();
         setIsOpen(true);
         const idx = options.findIndex((opt) => opt.value === activeValue);
         setHighlightedIndex(idx >= 0 ? idx : 0);
@@ -490,14 +379,14 @@ export default function Select({
         </span>
       )}
 
-      {/* Custom styled trigger button matching Screenshot 5 & MEDCARE PRO design */}
+      {/* Custom styled trigger button matching MEDCARE PRO design */}
       <button
         ref={triggerRef}
         type="button"
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        aria-controls={listboxId}
+        aria-controls={isOpen ? listboxId : undefined}
         aria-invalid={isInvalid ? true : undefined}
         aria-describedby={error || hint ? `${id}-message` : undefined}
         aria-label={isLabelHidden ? label : undefined}
@@ -532,7 +421,7 @@ export default function Select({
         </span>
       </button>
 
-      {/* Portal-rendered elevated listbox panel matching Screenshot 5 */}
+      {/* Portal-rendered elevated listbox panel */}
       {typeof document !== "undefined" &&
         isOpen &&
         createPortal(
@@ -651,4 +540,3 @@ export default function Select({
     </FieldShell>
   );
 }
-

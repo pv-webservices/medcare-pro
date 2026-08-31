@@ -43,6 +43,7 @@ export default function DateRangePicker({ current }: DateRangePickerProps) {
         isLabelHidden
         value={current}
         onChange={handleChange}
+        align="end"
         className="min-h-9 py-1 text-meta font-medium text-muted hover:border-line-strong"
       >
         {DASHBOARD_PRESETS.map((preset) => (
