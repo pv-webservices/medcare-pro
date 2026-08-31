@@ -8,6 +8,8 @@ import {
   type DashboardPreset,
 } from "@/lib/dashboardDateRange";
 
+import Select from "@/components/ui/Select";
+
 interface DateRangePickerProps {
   current: DashboardPreset;
 }
@@ -34,17 +36,21 @@ export default function DateRangePicker({ current }: DateRangePickerProps) {
   );
 
   return (
-    <select
-      value={current}
-      onChange={handleChange}
-      aria-label="Date range"
-      className="h-9 w-full cursor-pointer rounded-xl border border-line bg-canvas px-3 text-meta font-medium text-muted shadow-card transition-colors duration-150 hover:border-line-strong focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:w-auto"
-    >
-      {DASHBOARD_PRESETS.map((preset) => (
-        <option key={preset} value={preset}>
-          {PRESET_LABELS[preset]}
-        </option>
-      ))}
-    </select>
+    <div className="w-full sm:w-auto sm:min-w-44">
+      <Select
+        id="dashboard-date-range"
+        label="Date range"
+        isLabelHidden
+        value={current}
+        onChange={handleChange}
+        className="min-h-9 py-1 text-meta font-medium text-muted hover:border-line-strong"
+      >
+        {DASHBOARD_PRESETS.map((preset) => (
+          <option key={preset} value={preset}>
+            {PRESET_LABELS[preset]}
+          </option>
+        ))}
+      </Select>
+    </div>
   );
 }

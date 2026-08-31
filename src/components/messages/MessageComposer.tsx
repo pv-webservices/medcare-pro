@@ -5,7 +5,6 @@ import {
   Building2,
   CheckCheck,
   CheckCircle2,
-  ChevronDown,
   Info,
   Mic,
   MoreVertical,
@@ -21,6 +20,7 @@ import { renderTemplate } from "@/lib/whatsappTemplateText";
 import type { TemplateRecord } from "@/lib/whatsappTemplates";
 import type { RecipientResult, SendMessageResult } from "@/lib/whatsappMessages";
 import Button from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
 import { todayDateOnly } from "@/lib/dates";
 
 interface MessageComposerProps {
@@ -190,32 +190,22 @@ export default function MessageComposer({
           </h2>
 
           {/* Template select */}
-          <div className="space-y-1.5">
-            <label htmlFor="composer-template" className="block text-label font-semibold text-ink">
-              Template
-            </label>
-            <div className="relative">
-              <select
-                id="composer-template"
-                name="templateId"
-                value={templateId}
-                onChange={(event) => {
-                  setTemplateId(event.target.value);
-                  setOutcome(null);
-                }}
-                className="w-full appearance-none rounded-xl border border-line bg-canvas px-3.5 py-2.5 text-body text-ink shadow-sm outline-none transition-colors focus:border-accent"
-              >
-                {templates.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-muted">
-                <ChevronDown className="h-4 w-4" aria-hidden="true" />
-              </div>
-            </div>
-          </div>
+          <Select
+            id="composer-template"
+            name="templateId"
+            label="Template"
+            value={templateId}
+            onChange={(event) => {
+              setTemplateId(event.target.value);
+              setOutcome(null);
+            }}
+          >
+            {templates.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
+            ))}
+          </Select>
 
           {/* Filter by visit date */}
           <div className="space-y-2">

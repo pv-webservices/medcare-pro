@@ -6,6 +6,7 @@ import type {
   FeatureEntitlementView,
   PlanOption,
 } from "@/lib/platform/applications";
+import Select from "@/components/ui/Select";
 import {
   CLINIC_DECISIONS,
   MIN_REASON_LENGTH,
@@ -184,26 +185,20 @@ export default function DecisionPanel({
           )}
 
           <div className="mt-4">
-            <label
-              htmlFor="planKey"
-              className="block text-xs font-medium text-muted"
-            >
-              Plan
-            </label>
-            <select
+            <Select
               id="planKey"
+              label="Plan"
               value={planKey}
               onChange={(event) => setPlanKey(event.target.value)}
-              className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
             >
               {selectablePlans.length === 0 && <option value="">No plans</option>}
               {selectablePlans.map((plan) => (
                 <option key={plan.key} value={plan.key}>
                   {plan.name}
-                  {plan.isActive ? "" : "(retired)"}
+                  {plan.isActive ? "" : " (retired)"}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <fieldset className="mt-5">

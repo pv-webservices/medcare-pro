@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, LayoutGrid, ShieldCheck } from "lucide-react";
+import { LayoutGrid, ShieldCheck } from "lucide-react";
 import DashboardLayoutEditor, { type DashboardWidgetSlot } from "@/components/dashboard/DashboardLayoutEditor";
+import Select from "@/components/ui/Select";
 import { cx } from "@/components/ui";
 import { DASHBOARD_WIDGETS, type DashboardLayoutConfig } from "@/lib/dashboardWidgets";
 import type { RoleDashboardLayoutResult } from "@/lib/dashboardLayouts";
@@ -113,9 +114,11 @@ export default function DashboardSettingsClient({
           <div className="rounded-2xl border border-line bg-canvas p-5 shadow-card">
             <h2 className="text-sm font-bold text-ink">Role</h2>
             <p className="mt-1 text-xs text-muted">Configure the default inherited by users with this single role and no personal override.</p>
-            <div className="relative mt-3 w-full max-w-sm">
-              <select
+            <div className="mt-3 w-full max-w-sm">
+              <Select
                 id="dashboard-role"
+                label="Select Role"
+                isLabelHidden
                 value={roleId}
                 onChange={(event) => {
                   setLoadingRole(true);
@@ -123,15 +126,13 @@ export default function DashboardSettingsClient({
                   setRoleId(event.target.value);
                   setRoleResult(null);
                 }}
-                className="h-10 w-full appearance-none rounded-xl border border-line bg-canvas pl-3.5 pr-10 text-body text-ink shadow-field focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 cursor-pointer"
               >
                 {roles.map((role) => (
                   <option key={role.id} value={role.id}>
                     {role.name}
                   </option>
                 ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+              </Select>
             </div>
           </div>
           {loadingRole && <div className="rounded-2xl border border-line bg-canvas p-8 text-center text-body text-muted">Loading role dashboard…</div>}

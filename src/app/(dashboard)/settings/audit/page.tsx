@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2, Search, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import Select from "@/components/ui/Select";
 import StatusPill from "@/components/ui/StatusPill";
 import { PermissionError } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
@@ -122,19 +123,22 @@ export default async function AuditSettingsPage({ searchParams }: PageProps) {
           />
         </div>
 
-        <select
-          name="category"
-          defaultValue={trail.category ?? ""}
-          aria-label="Category"
-          className="min-h-11 rounded-2xl bg-canvas px-3 text-input text-ink border border-line"
-        >
-          <option value="">Decisions (default)</option>
-          {trail.categories.map((category) => (
-            <option key={category.key} value={category.key}>
-              {category.label}
-            </option>
-          ))}
-        </select>
+        <div className="w-full sm:w-56">
+          <Select
+            id="audit-category"
+            name="category"
+            label="Category"
+            isLabelHidden
+            defaultValue={trail.category ?? ""}
+          >
+            <option value="">Decisions (default)</option>
+            {trail.categories.map((category) => (
+              <option key={category.key} value={category.key}>
+                {category.label}
+              </option>
+            ))}
+          </Select>
+        </div>
 
         <button
           type="submit"

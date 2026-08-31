@@ -49,6 +49,7 @@ import {
   X,
 } from "lucide-react";
 import { Button, cx } from "@/components/ui";
+import Select from "@/components/ui/Select";
 import {
   DASHBOARD_WIDGET_CATEGORIES,
   DASHBOARD_WIDGETS,
@@ -176,17 +177,18 @@ function SortableWidget({
         <span className="mr-auto min-w-0 truncate px-1 text-label font-semibold text-ink">{definition.title}</span>
 
         {definition.allowedSizes.length > 1 && (
-          <label className="sr-only" htmlFor={`widget-size-${item.widgetId}`}>Size for {definition.title}</label>
-        )}
-        {definition.allowedSizes.length > 1 && (
-          <select
-            id={`widget-size-${item.widgetId}`}
-            value={item.size}
-            onChange={(event) => onChangeSize(event.target.value as DashboardWidgetPreference["size"])}
-            className="h-8 rounded-lg border border-line bg-canvas px-2 text-meta font-medium capitalize text-muted"
-          >
-            {definition.allowedSizes.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
+          <div className="w-24">
+            <Select
+              id={`widget-size-${item.widgetId}`}
+              label={`Size for ${definition.title}`}
+              isLabelHidden
+              value={item.size}
+              onChange={(event) => onChangeSize(event.target.value as DashboardWidgetPreference["size"])}
+              className="min-h-8 py-0.5 text-meta font-medium capitalize text-muted"
+            >
+              {definition.allowedSizes.map((size) => <option key={size} value={size}>{size}</option>)}
+            </Select>
+          </div>
         )}
 
         <div className="flex items-center">

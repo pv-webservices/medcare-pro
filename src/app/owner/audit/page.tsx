@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Download, Search } from "lucide-react";
+import Select from "@/components/ui/Select";
 import { requireOwnerPage } from "@/lib/platform/ownerPage";
 import {
   OWNER_AUDIT_PAGE_SIZE,
@@ -116,31 +117,39 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
           />
         </div>
 
-        <select
-          name="tenantId"
-          defaultValue={result.filters.tenantId ?? ""}
-          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
-        >
-          <option value="">Every organisation</option>
-          {result.tenants.map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>
-              {tenant.name}
-            </option>
-          ))}
-        </select>
+        <div className="w-full sm:w-56">
+          <Select
+            id="owner-audit-tenant"
+            name="tenantId"
+            label="Organisation"
+            isLabelHidden
+            defaultValue={result.filters.tenantId ?? ""}
+          >
+            <option value="">Every organisation</option>
+            {result.tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.name}
+              </option>
+            ))}
+          </Select>
+        </div>
 
-        <select
-          name="category"
-          defaultValue={result.filters.category ?? ""}
-          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
-        >
-          <option value="">Every category</option>
-          {result.categories.map((category) => (
-            <option key={category.key} value={category.key}>
-              {category.label}
-            </option>
-          ))}
-        </select>
+        <div className="w-full sm:w-56">
+          <Select
+            id="owner-audit-category"
+            name="category"
+            label="Category"
+            isLabelHidden
+            defaultValue={result.filters.category ?? ""}
+          >
+            <option value="">Every category</option>
+            {result.categories.map((category) => (
+              <option key={category.key} value={category.key}>
+                {category.label}
+              </option>
+            ))}
+          </Select>
+        </div>
 
         <input
           type="date"

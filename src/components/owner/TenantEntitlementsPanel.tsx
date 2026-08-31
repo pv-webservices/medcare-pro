@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
+import Select from "@/components/ui/Select";
 import type { TenantEntitlementView } from "@/lib/platform/entitlements";
 import { MIN_REASON_LENGTH } from "@/lib/platform/entitlementPolicy";
 
@@ -163,23 +164,20 @@ export default function TenantEntitlementsPanel({
       )}
 
       <div className="mt-4">
-        <label htmlFor="tenantPlan" className="block text-xs font-medium text-muted">
-          Plan
-        </label>
-        <select
+        <Select
           id="tenantPlan"
+          label="Plan"
           value={planKey}
           onChange={(event) => setPlanKey(event.target.value)}
-          className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
         >
           {selectablePlans.length === 0 && <option value="">No plans</option>}
           {selectablePlans.map((plan) => (
             <option key={plan.key} value={plan.key}>
               {plan.name}
-              {plan.isActive ? "" : "(retired)"}
+              {plan.isActive ? "" : " (retired)"}
             </option>
           ))}
-        </select>
+        </Select>
         {planChanged && (
           <p className="mt-1.5 text-[11px] text-warn-ink">
             Changing the plan re-evaluates every feature you have not ticked
