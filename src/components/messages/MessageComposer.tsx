@@ -20,6 +20,7 @@ import { renderTemplate } from "@/lib/whatsappTemplateText";
 import type { TemplateRecord } from "@/lib/whatsappTemplates";
 import type { RecipientResult, SendMessageResult } from "@/lib/whatsappMessages";
 import Button from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
 import Select from "@/components/ui/Select";
 import { todayDateOnly } from "@/lib/dates";
 
@@ -247,19 +248,35 @@ export default function MessageComposer({
                 Yesterday
               </button>
               <div className="flex items-center gap-1.5">
-                <input
-                  type="date"
-                  value={startDateFilter}
-                  onChange={(e) => setStartDateFilter(e.target.value)}
-                  className="h-9 rounded-xl border border-line bg-canvas px-2.5 text-label text-ink shadow-sm"
-                />
+                <div className="w-36">
+                  <DatePicker
+                    id="composer-start-date"
+                    label="From"
+                    isLabelHidden
+                    value={startDateFilter}
+                    maxDate={endDateFilter || undefined}
+                    onChange={(newDate) => setStartDateFilter(newDate)}
+                    placeholder="From"
+                    className="!min-h-9 !py-1 !rounded-xl !text-label"
+                    showClear={false}
+                    showToday={false}
+                  />
+                </div>
                 <span className="text-muted text-label">to</span>
-                <input
-                  type="date"
-                  value={endDateFilter}
-                  onChange={(e) => setEndDateFilter(e.target.value)}
-                  className="h-9 rounded-xl border border-line bg-canvas px-2.5 text-label text-ink shadow-sm"
-                />
+                <div className="w-36">
+                  <DatePicker
+                    id="composer-end-date"
+                    label="To"
+                    isLabelHidden
+                    value={endDateFilter}
+                    minDate={startDateFilter || undefined}
+                    onChange={(newDate) => setEndDateFilter(newDate)}
+                    placeholder="To"
+                    className="!min-h-9 !py-1 !rounded-xl !text-label"
+                    showClear={false}
+                    showToday={false}
+                  />
+                </div>
               </div>
             </div>
           </div>

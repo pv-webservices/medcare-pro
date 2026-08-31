@@ -41,18 +41,21 @@ export const MAX_PHONE_LENGTH = 32;
 export const MAX_ADDRESS_LENGTH = 1000;
 export const MAX_EMAIL_LENGTH = 255;
 
-/**
- * Strictly enforce Indian phone numbers for this product.
- * Formats allowed: 9599995599, +919599995599
- */
-const PHONE_ALLOWED = /^(\+91)?[0-9]{10}$/;
+const PHONE_ALLOWED = /^[0-9+() \t.-]{6,32}$/;
 
 const phoneField = z
   .string()
   .trim()
   .min(1, "Phone number is required")
-  .max(13) // max length for +919599995599
-  .regex(PHONE_ALLOWED, "Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599).");
+  .max(MAX_PHONE_LENGTH)
+  .regex(PHONE_ALLOWED, "Enter a valid phone number.")
+  .refine(
+    (val) => {
+      const digits = val.replace(/\D/g, "");
+      return digits.length >= 6 && digits.length <= 15;
+    },
+    "Enter a valid phone number.",
+  );
 
 /**
  * An optional text field. The empty string is what an untouched form input

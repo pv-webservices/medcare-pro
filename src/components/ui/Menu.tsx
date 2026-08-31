@@ -6,11 +6,22 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "@/components/ui/cx";
+
+const emptySubscribe = () => () => {};
+
+function useMounted() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+}
 
 /**
  * A dropdown: a trigger, and a panel of choices under it.
@@ -67,17 +78,13 @@ export default function Menu({
   children,
 }: MenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [position, setPosition] = useState<PositionStyle | null>(null);
 
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   /** Computes fixed position and collision/flip when usePortal is active. */
   useIsomorphicLayoutEffect(() => {
@@ -177,6 +184,21 @@ export default function Menu({
     }
   }
 
+  // Listen for global popover closure events so only one menu/dropdown is open at a time
+  useEffect(() => {
+    function handleCloseOthers(e: Event) {
+      const customEvent = e as CustomEvent<{ sourceId: string }>;
+      if (customEvent.detail?.sourceId !== panelId) {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("medcare:close-popovers", handleCloseOthers);
+    return () => {
+      window.removeEventListener("medcare:close-popovers", handleCloseOthers);
+    };
+  }, [panelId]);
+
   /** A click or a focus move outside the menu closes it. */
   useEffect(() => {
     if (!isOpen) {
@@ -186,11 +208,12 @@ export default function Menu({
     function handlePointerDown(event: MouseEvent | TouchEvent) {
       const target = event.target as Node;
       if (
-        !rootRef.current?.contains(target) &&
-        !panelRef.current?.contains(target)
+        rootRef.current?.contains(target) ||
+        panelRef.current?.contains(target)
       ) {
-        setIsOpen(false);
+        return;
       }
+      setIsOpen(false);
     }
 
     function handleFocusIn(event: FocusEvent) {
@@ -286,7 +309,17 @@ export default function Menu({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? panelId : undefined}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() => {
+          setIsOpen((current) => {
+            const next = !current;
+            if (next && typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("medcare:close-popovers", { detail: { sourceId: panelId } }),
+              );
+            }
+            return next;
+          });
+        }}
         onKeyDown={handleTriggerKeyDown}
         className="w-full rounded-2xl text-left"
       >

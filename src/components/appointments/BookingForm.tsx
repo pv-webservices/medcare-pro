@@ -20,6 +20,7 @@ import SlotPicker from "@/components/appointments/SlotPicker";
 import PatientLookup from "@/components/registration/PatientLookup";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import DatePicker from "@/components/ui/DatePicker";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import StatusPill from "@/components/ui/StatusPill";
@@ -476,13 +477,12 @@ export default function BookingForm({
                 ))}
               </Select>
 
-              <Input
+              <DatePicker
                 id="booking-date"
-                type="date"
                 label="Date"
                 value={values.date}
                 error={errors.date}
-                onChange={(e) => updateQuery("date", e.target.value)}
+                onChange={(newDate) => updateQuery("date", newDate)}
               />
             </div>
 

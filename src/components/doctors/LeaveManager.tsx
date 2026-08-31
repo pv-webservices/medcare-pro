@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { LeaveEntry } from "@/lib/doctors";
 import Button from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
 import Input from "@/components/ui/Input";
 
 /**
@@ -173,24 +174,23 @@ export default function LeaveManager({
           <div className="rounded-2xl border border-line/60 bg-canvas-deep/30 p-4 sm:p-5 space-y-4">
             <form onSubmit={handleAdd} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Input
+                <DatePicker
                   id="leave-start"
                   label="First day away"
-                  type="date"
                   value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    if (e.target.value > endDate) setEndDate(e.target.value);
+                  maxDate={endDate || undefined}
+                  onChange={(newDate) => {
+                    setStartDate(newDate);
+                    if (endDate && newDate > endDate) setEndDate(newDate);
                   }}
                   required
                 />
-                <Input
+                <DatePicker
                   id="leave-end"
                   label="Last day away"
-                  type="date"
                   value={endDate}
-                  min={startDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  minDate={startDate || undefined}
+                  onChange={(newDate) => setEndDate(newDate)}
                   required
                 />
               </div>

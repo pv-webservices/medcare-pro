@@ -6,9 +6,9 @@ import { useState, type FormEvent } from "react";
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_ORDER,
-  formatAppointmentDate,
 } from "@/components/appointments/status";
 import Button from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
 import FilterBar from "@/components/ui/FilterBar";
 import IconButton from "@/components/ui/IconButton";
 import Select from "@/components/ui/Select";
@@ -237,26 +237,18 @@ export default function AppointmentFilters({
             Today
           </Button>
 
-          {/* Accessible native date picker styled with calendar icon */}
-          <div className="relative inline-flex items-center">
-            <div
-              aria-hidden="true"
-              className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-line bg-canvas px-3 text-label font-medium text-ink shadow-card transition-colors duration-150 hover:border-line-strong hover:bg-canvas-deep pointer-events-none"
-            >
-              <Calendar aria-hidden="true" strokeWidth={2} className="h-4 w-4 text-muted" />
-              <span className="tnum">
-                {hasDate ? formatAppointmentDate(values.date) : "Select date"}
-              </span>
-            </div>
-            <label htmlFor="appointment-filter-date" className="sr-only">
-              Jump to date
-            </label>
-            <input
+          {/* Accessible custom DatePicker styled to MEDCARE PRO system */}
+          <div className="w-40 sm:w-44">
+            <DatePicker
               id="appointment-filter-date"
-              type="date"
+              label="Jump to date"
+              isLabelHidden
               value={values.date}
-              onChange={(event) => goToDate(event.target.value)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              onChange={(newDate) => goToDate(newDate)}
+              placeholder="Select date"
+              className="!min-h-9 !py-1.5 !rounded-xl !text-label"
+              showClear={false}
+              showToday={false}
             />
           </div>
 

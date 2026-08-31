@@ -167,6 +167,7 @@ async function main(): Promise<void> {
     clinicId: t.clinicA,
     name: "Sunita Desai",
     mobileNumber: "9800000002",
+    doctorId: t.rao,
     department: "Cardiology",
     amount: 250.5,
     visitDate: "2026-08-12",

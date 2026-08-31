@@ -180,10 +180,20 @@ async function main(): Promise<void> {
   });
 
   // A visit in the OTHER clinic, for the scoping checks below.
+  const doctorB = await prisma.doctor.create({
+    data: {
+      clinicId: t.clinicB,
+      name: "Dr Iyer",
+      department: "Dermatology",
+    },
+    select: { id: true },
+  });
+
   await createRegistration(t.ownerActor, {
     clinicId: t.clinicB,
     name: "Priya Nair",
     mobileNumber: "9800000003",
+    doctorId: doctorB.id,
     department: "Dermatology",
     amount: 1000,
     visitDate: "2026-08-11",

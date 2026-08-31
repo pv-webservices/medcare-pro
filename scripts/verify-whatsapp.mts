@@ -297,6 +297,7 @@ async function build() {
     name: "Sunita Desai",
     // Deliberately unusable: too few digits once punctuation is stripped.
     mobileNumber: "12345",
+    doctorId: doctor.id,
     department: "Cardiology",
     amount: 250,
     visitDate: "2026-08-12",
@@ -307,6 +308,7 @@ async function build() {
     clinicId: clinicB.id,
     name: "Priya Nair",
     mobileNumber: "919800000003",
+    doctorId: doctor.id,
     department: "Dermatology",
     amount: 1000,
     visitDate: "2026-08-11",

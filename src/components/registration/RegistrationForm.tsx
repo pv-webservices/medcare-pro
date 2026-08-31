@@ -118,9 +118,9 @@ function validate(values: RegistrationFormValues): FieldErrors {
     }
   }
 
+  if (!values.doctorId) errors.doctorId = "Choose a doctor.";
   if (values.department.trim().length === 0) {
-    // FR-3.1 marks department as required, unlike the doctor.
-    errors.department = "Department is required.";
+    errors.department = "Choose a doctor to assign a department.";
   }
 
   const amount = Number(values.amount);
@@ -170,7 +170,7 @@ export function emptyRegistration(
 export default function RegistrationForm({
   clinics,
   doctors,
-  departments,
+  departments: _departments,
   today,
   now,
   registrationId,
@@ -257,17 +257,22 @@ export default function RegistrationForm({
     }));
   }
 
-  /** Pre-fill the department from the doctor — it is what they practise. */
+  /** Derive department directly from the selected doctor */
   function handleDoctorChange(doctorId: string) {
     const doctor = doctors.find((entry) => entry.id === doctorId);
 
     setValues((current) => ({
       ...current,
       doctorId,
-      department:
-        doctor && current.department.trim() === ""
-          ? doctor.department
-          : current.department,
+      department: doctor ? doctor.department : "",
+    }));
+    // Mark both fields as touched so validation shows immediately if needed,
+    // but since errors are derived from validate(values), clearing happens
+    // automatically when the value becomes valid.
+    setTouched((current) => ({
+      ...current,
+      doctorId: true,
+      department: true,
     }));
   }
 
@@ -585,9 +590,12 @@ export default function RegistrationForm({
               <div className="grid gap-4 sm:grid-cols-2">
                 <Select
                   id="registration-doctor"
-                  label="Doctor (optional)"
+                  label="Doctor"
+                  required
                   value={values.doctorId}
                   onChange={(e) => handleDoctorChange(e.target.value)}
+                  onBlur={() => touch("doctorId")}
+                  error={errorFor("doctorId")}
                   disabled={!values.clinicId}
                   hint={
                     values.clinicId && clinicDoctors.length === 0
@@ -595,7 +603,7 @@ export default function RegistrationForm({
                       : undefined
                   }
                 >
-                  <option value="">Not assigned yet</option>
+                  <option value="">Choose a doctor</option>
                   {clinicDoctors.map((doctor) => (
                     <option key={doctor.id} value={doctor.id}>
                       {doctor.name} · {doctor.department}
@@ -603,25 +611,17 @@ export default function RegistrationForm({
                   ))}
                 </Select>
 
-                <div>
-                  <Input
-                    id="registration-department"
-                    type="text"
-                    label="Department"
-                    placeholder="Enter department"
-                    list="registration-departments"
-                    autoComplete="off"
-                    value={values.department}
-                    onChange={(e) => update("department", e.target.value)}
-                    onBlur={() => touch("department")}
-                    error={errorFor("department")}
-                  />
-                  <datalist id="registration-departments">
-                    {departments.map((department) => (
-                      <option key={department} value={department} />
-                    ))}
-                  </datalist>
-                </div>
+                <Input
+                  id="registration-department"
+                  type="text"
+                  label="Department"
+                  placeholder={values.doctorId ? "" : "Select a doctor first"}
+                  autoComplete="off"
+                  value={values.department}
+                  readOnly
+                  disabled
+                  error={errorFor("department")}
+                />
               </div>
 
               <Input

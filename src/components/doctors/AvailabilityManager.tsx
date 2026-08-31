@@ -4,8 +4,8 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { AvailabilityEntry } from "@/lib/doctors";
 import Button from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
 import Input from "@/components/ui/Input";
-import Card from "@/components/ui/Card";
 
 /**
  * Doctor availability — PRD §6.4 (FR-4.3): specific dates with time ranges.
@@ -187,12 +187,11 @@ export default function AvailabilityManager({
             onSubmit={handleAdd}
             className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
           >
-            <Input
+            <DatePicker
               id="availability-date"
               label="Date"
-              type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(newDate) => setDate(newDate)}
               required
             />
             <Input

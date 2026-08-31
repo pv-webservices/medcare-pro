@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
+import DatePicker from "@/components/ui/DatePicker";
 
 interface AdminDashboardDatePickerProps {
   current: string;
@@ -37,16 +38,18 @@ export default function AdminDashboardDatePicker({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className="sr-only" htmlFor="admin-dashboard-date">
-        Dashboard date
-      </label>
-      <input
-        id="admin-dashboard-date"
-        type="date"
-        value={current}
-        onChange={(event) => choose(event.target.value || today)}
-        className="h-9 rounded-full border border-line bg-canvas-deep px-3 text-meta font-medium text-muted transition-colors duration-150 hover:border-line-strong focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-      />
+      <div className="w-40 sm:w-44">
+        <DatePicker
+          id="admin-dashboard-date"
+          label="Dashboard date"
+          isLabelHidden
+          value={current}
+          onChange={(newDate) => choose(newDate || today)}
+          className="!min-h-9 !py-1 !rounded-full !text-meta bg-canvas-deep"
+          showClear={false}
+          showToday={false}
+        />
+      </div>
       {current !== today && (
         <button
           type="button"

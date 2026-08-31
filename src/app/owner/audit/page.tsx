@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Download, Search } from "lucide-react";
+import DatePicker from "@/components/ui/DatePicker";
 import Select from "@/components/ui/Select";
 import { requireOwnerPage } from "@/lib/platform/ownerPage";
 import {
@@ -151,19 +152,21 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
           </Select>
         </div>
 
-        <input
-          type="date"
+        <DatePicker
+          id="owner-audit-from"
           name="from"
+          label="From date"
+          isLabelHidden
           defaultValue={result.filters.from ?? ""}
-          aria-label="From date"
-          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
+          placeholder="From date"
         />
-        <input
-          type="date"
+        <DatePicker
+          id="owner-audit-to"
           name="to"
+          label="To date"
+          isLabelHidden
           defaultValue={result.filters.to ?? ""}
-          aria-label="To date"
-          className="rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
+          placeholder="To date"
         />
 
         <button

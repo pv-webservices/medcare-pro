@@ -168,13 +168,14 @@ async function main(): Promise<void> {
     clinicId: a.clinicId,
     name: "Sunita Desai",
     mobileNumber: "9876500000",
+    doctorId: a.otherDoctorId,
     department: "Dermatology",
     amount: 250.5,
     visitDate: "2026-08-12",
     visitTime: "09:05",
   });
   check("second code is sequential", walkIn.patientCode === `PT-${year}-0002`, walkIn.patientCode);
-  check("doctor optional", walkIn.doctorName === null, walkIn.doctorName);
+  check("doctor attached", walkIn.doctorName === "Dr Iyer", walkIn.doctorName);
 
   console.log("\nFR-3.1a return visit reuses the Patient ID");
   const matches = await findPatientsForActor(a.staffActor, a.clinicId, "43210");
@@ -220,6 +221,7 @@ async function main(): Promise<void> {
     patientId: matches[0]!.id,
     name: "Ramesh Kumar",
     mobileNumber: "+91 98765 43211",
+    doctorId: a.doctorId,
     department: "Cardiology",
     amount: 400,
     visitDate: "2026-09-05",
@@ -241,6 +243,7 @@ async function main(): Promise<void> {
         patientId: matches[0]!.id,
         name: "Ramesh Kumar",
         mobileNumber: "9000000001",
+        doctorId: a.otherDoctorId,
         department: "Dermatology",
         amount: 100,
         visitDate: "2026-09-06",
@@ -332,6 +335,7 @@ async function main(): Promise<void> {
         clinicId: a.otherClinicId,
         name: "Out Of Scope",
         mobileNumber: "9999999998",
+        doctorId: a.otherDoctorId,
         department: "Dermatology",
         amount: 100,
         visitDate: "2026-08-12",
@@ -406,6 +410,7 @@ async function main(): Promise<void> {
     clinicId: a.clinicId,
     name: '=cmd|"/c calc"!A1',
     mobileNumber: "9111111111",
+    doctorId: a.doctorId,
     department: "Cardiology",
     amount: 10,
     visitDate: "2026-08-13",

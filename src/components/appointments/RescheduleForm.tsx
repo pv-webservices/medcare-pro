@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import SlotPicker from "@/components/appointments/SlotPicker";
 import Button from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
@@ -231,13 +232,12 @@ export default function RescheduleForm({
             ))}
           </Select>
 
-          <Input
+          <DatePicker
             id="reschedule-date"
-            type="date"
             label="New date"
             value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
+            onChange={(newDate) => {
+              setDate(newDate);
               setSlotStart("");
               setSlotEnd("");
             }}

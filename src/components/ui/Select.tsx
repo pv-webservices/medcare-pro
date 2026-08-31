@@ -236,18 +236,35 @@ export default function Select({
     };
   }, [isOpen, options.length]);
 
+  // Listen for global popover closure events so only one dropdown is open at a time
+  useEffect(() => {
+    function handleCloseOthers(e: Event) {
+      const customEvent = e as CustomEvent<{ sourceId: string }>;
+      if (customEvent.detail?.sourceId !== listboxId) {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("medcare:close-popovers", handleCloseOthers);
+    return () => {
+      window.removeEventListener("medcare:close-popovers", handleCloseOthers);
+    };
+  }, [listboxId]);
+
   /** Close menu on click outside or focus loss outside */
   useEffect(() => {
     if (!isOpen) return;
 
     function handlePointerDown(e: MouseEvent | TouchEvent) {
       const target = e.target as Node;
+      // If clicking inside trigger or panel, do not close here
       if (
-        !triggerRef.current?.contains(target) &&
-        !panelRef.current?.contains(target)
+        triggerRef.current?.contains(target) ||
+        panelRef.current?.contains(target)
       ) {
-        setIsOpen(false);
+        return;
       }
+      setIsOpen(false);
     }
 
     function handleFocusIn(e: FocusEvent) {
@@ -318,10 +335,17 @@ export default function Select({
     if (disabled) return;
     e.preventDefault();
     const willOpen = !isOpen;
-    setIsOpen(willOpen);
     if (willOpen) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("medcare:close-popovers", { detail: { sourceId: listboxId } }),
+        );
+      }
+      setIsOpen(true);
       const idx = options.findIndex((opt) => opt.value === activeValue);
       setHighlightedIndex(idx >= 0 ? idx : 0);
+    } else {
+      setIsOpen(false);
     }
   }
 
@@ -551,6 +575,10 @@ export default function Select({
                     id={`${listboxId}-opt-${idx}`}
                     aria-selected={isSelected}
                     aria-disabled={option.disabled}
+                    onPointerDown={(e) => {
+                      // Prevent trigger blur before click fires
+                      e.preventDefault();
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!option.disabled) {

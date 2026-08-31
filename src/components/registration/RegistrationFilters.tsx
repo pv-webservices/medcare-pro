@@ -4,6 +4,7 @@ import { Download, Search, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 
@@ -148,23 +149,23 @@ export default function RegistrationFilters({
           </Select>
         </div>
 
-        <div className="w-full sm:w-36">
-          <Input
+        <div className="w-full sm:w-44">
+          <DatePicker
             id="registration-filter-from"
-            type="date"
             label="From"
             value={values.from}
-            onChange={(e) => update("from", e.target.value)}
+            maxDate={values.to}
+            onChange={(newDate) => update("from", newDate)}
           />
         </div>
 
-        <div className="w-full sm:w-36">
-          <Input
+        <div className="w-full sm:w-44">
+          <DatePicker
             id="registration-filter-to"
-            type="date"
             label="To"
             value={values.to}
-            onChange={(e) => update("to", e.target.value)}
+            minDate={values.from}
+            onChange={(newDate) => update("to", newDate)}
           />
         </div>
 

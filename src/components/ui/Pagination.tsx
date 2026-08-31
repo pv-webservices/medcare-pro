@@ -42,7 +42,7 @@ function getPageRange(page: number, lastPage: number): number[] {
     return Array.from({ length: lastPage }, (_, i) => i + 1);
   }
   let start = Math.max(1, page - 2);
-  let end = Math.min(lastPage, start + 4);
+  const end = Math.min(lastPage, start + 4);
   if (end - start < 4) {
     start = Math.max(1, end - 4);
   }

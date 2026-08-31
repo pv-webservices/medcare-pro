@@ -26,6 +26,8 @@ export { default as FilterBar } from "@/components/ui/FilterBar";
 export { default as IconButton } from "@/components/ui/IconButton";
 export type { IconButtonSize, IconButtonTone } from "@/components/ui/IconButton";
 export { default as Input, Textarea, FieldShell } from "@/components/ui/Input";
+export { default as DatePicker } from "@/components/ui/DatePicker";
+export type { DatePickerProps } from "@/components/ui/DatePicker";
 
 export {
   default as Menu,

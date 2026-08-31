@@ -125,9 +125,8 @@ export const createRegistrationSchema = z.object({
   address: z.string().trim().max(1000).optional().or(z.literal("")),
   city: z.string().trim().max(255).optional().or(z.literal("")),
 
-  // Visit details — FR-3.1. Department is required; the doctor is not, so a
-  // walk-in can be logged before it is known who will see them.
-  doctorId: z.string().min(1).optional().nullable(),
+  // Visit details — FR-3.1. Doctor is required; Department is auto-derived from doctor.
+  doctorId: z.string().min(1, "Choose a doctor."),
   department: z.string().trim().min(1, "Department is required.").max(255),
   amount: amountSchema,
   visitDate: z.string().refine(isDateOnly, "Choose a valid visit date."),
@@ -145,6 +144,10 @@ export const createRegistrationSchema = z.object({
 export const updateRegistrationSchema = createRegistrationSchema
   .omit({ clinicId: true, patientId: true })
   .partial()
+  // Editing a registration can detach the doctor (set to null), even though
+  // creating one now requires a doctor.  Extend the partial'd doctorId to
+  // accept null so the existing edit flow keeps working.
+  .extend({ doctorId: z.string().min(1).nullable().optional() })
   .refine((value) => Object.keys(value).length > 0, {
     message: "No changes submitted.",
   });

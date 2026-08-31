@@ -3,9 +3,9 @@
 import { Suspense, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Building2, Mail, MapPin, Phone, User as UserIcon, Lock, ArrowRight, ShieldCheck, TrendingUp, Users, Shield, Cloud } from "lucide-react";
+import { Building2, Mail, MapPin, Phone, User as UserIcon, Lock, ShieldCheck, TrendingUp, Users, Shield, Cloud } from "lucide-react";
 import AuthAlert from "@/components/auth/AuthAlert";
-import AuthButton, { authLinkClasses } from "@/components/auth/AuthButton";
+import AuthButton from "@/components/auth/AuthButton";
 import AuthField, { AuthTextarea } from "@/components/auth/AuthField";
 import PasswordField from "@/components/auth/PasswordField";
 import AuthBrandMark from "@/components/auth/AuthBrandMark";
@@ -391,7 +391,7 @@ function SignupContent() {
                         title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
                         value={phone}
                         onChange={(event) => {
-                          let val = event.target.value.replace(/[^0-9+]/g, '');
+                          const val = event.target.value.replace(/[^0-9+]/g, '');
                           if (val.startsWith('+')) {
                             setPhone(val.slice(0, 13));
                           } else {
