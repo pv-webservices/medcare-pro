@@ -1,3 +1,5 @@
+import type { ClinicTelephonyRoutingMode } from "@prisma/client";
+
 export const MAIN_MENU_ROUTES = {
   "1": {
     action: "tomorrow-slots",
@@ -38,4 +40,17 @@ export function resolveMainMenuAction(
   }
 
   return "invalid-input";
+}
+
+export type EffectiveTelephonyRoute = "IVR" | "RECEPTION";
+
+export function resolveEffectiveTelephonyRoute(input: {
+  routingMode: ClinicTelephonyRoutingMode;
+  businessState?: { readonly isOpen: boolean };
+}): EffectiveTelephonyRoute {
+  if (input.routingMode === "OPEN") return "RECEPTION";
+  if (input.routingMode === "AUTO" && input.businessState?.isOpen === true) {
+    return "RECEPTION";
+  }
+  return "IVR";
 }

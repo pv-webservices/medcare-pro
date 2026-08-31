@@ -22,6 +22,7 @@ const resolveClinic = vi.hoisted(() => vi.fn());
 const requireTenantFeatureEntitlement = vi.hoisted(() => vi.fn());
 const buildDoctorMenuForClinic = vi.hoisted(() => vi.fn());
 const beginTelephoneBooking = vi.hoisted(() => vi.fn());
+const buildClinicInformationForClinic = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
@@ -38,6 +39,10 @@ vi.mock("@/lib/telephony/availability", () => ({
 
 vi.mock("@/lib/telephony/booking", () => ({
   beginTelephoneBooking,
+}));
+
+vi.mock("@/lib/telephony/clinicInformation", () => ({
+  buildClinicInformationForClinic,
 }));
 
 const TEST_CLINIC = Object.freeze({
@@ -77,6 +82,10 @@ describe("POST /api/webhooks/plivo/input", () => {
     beginTelephoneBooking.mockResolvedValue(
       "<Response><GetInput><Speak>We found one patient record for this caller number.</Speak></GetInput></Response>",
     );
+    buildClinicInformationForClinic.mockReset();
+    buildClinicInformationForClinic.mockResolvedValue(
+      "<Response><GetInput><Speak>Sunrise Clinic is located at Main Road.</Speak></GetInput></Response>",
+    );
   });
 
   afterEach(() => {
@@ -88,19 +97,22 @@ describe("POST /api/webhooks/plivo/input", () => {
     }
   });
 
-  it("keeps signed digit 4 as the clinic-information placeholder", async () => {
-    const digits = "4";
-    const message = "You selected clinic information.";
-    const { response, xml } = await postDigit(digits);
+  it("opens real clinic information for signed digit 4", async () => {
+    const { response, xml } = await postDigit("4");
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe(
       "application/xml; charset=utf-8",
     );
-    expect(xml).toContain(`<Speak>${message}</Speak>`);
-    expect(xml).not.toContain("<GetInput");
+    expect(xml).toContain("Sunrise Clinic is located at Main Road.");
+    expect(xml).toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain("<Record");
+    expect(buildClinicInformationForClinic).toHaveBeenCalledWith({
+      requestUrl: INPUT_WEBHOOK_URL,
+      clinic: TEST_CLINIC,
+    });
+    expect(requireTenantFeatureEntitlement).not.toHaveBeenCalled();
   });
 
   it("opens emergency guidance and explicit confirmation for signed digit 3 without Dial", async () => {

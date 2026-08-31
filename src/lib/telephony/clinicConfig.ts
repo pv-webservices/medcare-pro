@@ -1,15 +1,13 @@
-import type { ClinicTelephonyConfig } from "@prisma/client";
+import type {
+  ClinicTelephonyConfig,
+  ClinicTelephonyRoutingMode,
+} from "@prisma/client";
 import { z } from "zod";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
 import { BadRequestError, ConflictError } from "@/lib/apiHandler";
 import { prisma } from "@/lib/prisma";
-import {
-  assertClinicInTenant,
-  can,
-  requirePermission,
-  ScopeError,
-  type ActorContext,
-} from "@/lib/rbac";
+import type { ActorContext } from "@/lib/rbac";
+import { assertActorCanManageTelephony } from "@/lib/telephony/access";
 import {
   ianaTimezoneSchema,
   normalizePlivoDestinationNumber,
@@ -17,6 +15,12 @@ import {
 } from "@/lib/telephony/phoneNumber";
 
 export const DEFAULT_CLINIC_TIMEZONE = "Asia/Kolkata";
+export const DEFAULT_CLINIC_TELEPHONY_ROUTING_MODE = "AFTER_HOURS" as const;
+export const CLINIC_TELEPHONY_ROUTING_MODES = [
+  "AUTO",
+  "OPEN",
+  "AFTER_HOURS",
+] as const satisfies readonly ClinicTelephonyRoutingMode[];
 
 export const updateClinicTelephonyConfigSchema = z
   .object({
@@ -26,6 +30,7 @@ export const updateClinicTelephonyConfigSchema = z
     receptionPhoneNumber: optionalConfiguredPhoneNumberSchema.optional(),
     urgentPhoneNumber: optionalConfiguredPhoneNumberSchema.optional(),
     timezone: ianaTimezoneSchema.optional(),
+    routingMode: z.enum(CLINIC_TELEPHONY_ROUTING_MODES).optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {
@@ -44,6 +49,7 @@ export interface ClinicTelephonyConfigView {
   receptionPhoneNumber: string | null;
   urgentPhoneNumber: string | null;
   timezone: string;
+  routingMode: ClinicTelephonyRoutingMode;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -52,7 +58,10 @@ export interface InboundClinicContext {
   readonly clinicId: string;
   readonly tenantId: string;
   readonly clinicName: string;
+  readonly clinicAddress?: string | null;
+  readonly clinicCity?: string | null;
   readonly timezone: string;
+  readonly routingMode?: ClinicTelephonyRoutingMode;
   readonly publicPhoneNumber: string | null;
   readonly receptionPhoneNumber: string | null;
   readonly urgentPhoneNumber: string | null;
@@ -61,10 +70,17 @@ export interface InboundClinicContext {
 interface InboundConfigRow {
   enabled: boolean;
   timezone: string;
+  routingMode?: ClinicTelephonyRoutingMode;
   publicPhoneNumber: string | null;
   receptionPhoneNumber: string | null;
   urgentPhoneNumber: string | null;
-  clinic: { id: string; tenantId: string; name: string };
+  clinic: {
+    id: string;
+    tenantId: string;
+    name: string;
+    address?: string | null;
+    city?: string | null;
+  };
 }
 
 export type InboundClinicLookup = (
@@ -80,6 +96,7 @@ function defaultView(clinicId: string): ClinicTelephonyConfigView {
     receptionPhoneNumber: null,
     urgentPhoneNumber: null,
     timezone: DEFAULT_CLINIC_TIMEZONE,
+    routingMode: DEFAULT_CLINIC_TELEPHONY_ROUTING_MODE,
     createdAt: null,
     updatedAt: null,
   };
@@ -94,20 +111,11 @@ function toView(config: ClinicTelephonyConfig): ClinicTelephonyConfigView {
     receptionPhoneNumber: config.receptionPhoneNumber,
     urgentPhoneNumber: config.urgentPhoneNumber,
     timezone: config.timezone,
+    routingMode:
+      config.routingMode ?? DEFAULT_CLINIC_TELEPHONY_ROUTING_MODE,
     createdAt: config.createdAt,
     updatedAt: config.updatedAt,
   };
-}
-
-async function assertActorCanManage(
-  actor: ActorContext,
-  clinicId: string,
-): Promise<void> {
-  await assertClinicInTenant(actor.tenantId, clinicId);
-  if (!(await can(actor, "clinic:read", clinicId))) {
-    throw new ScopeError();
-  }
-  await requirePermission(actor, "clinic:edit", clinicId);
 }
 
 type ConfigState = Pick<
@@ -118,6 +126,7 @@ type ConfigState = Pick<
   | "receptionPhoneNumber"
   | "urgentPhoneNumber"
   | "timezone"
+  | "routingMode"
 >;
 
 export function validateClinicTelephonyConfigState(state: ConfigState): void {
@@ -148,7 +157,7 @@ export async function getClinicTelephonyConfigForActor(
   actor: ActorContext,
   clinicId: string,
 ): Promise<ClinicTelephonyConfigView> {
-  await assertActorCanManage(actor, clinicId);
+  await assertActorCanManageTelephony(actor, clinicId);
   const config = await prisma.clinicTelephonyConfig.findUnique({
     where: { clinicId },
   });
@@ -169,7 +178,7 @@ export async function updateClinicTelephonyConfigForActor(
   clinicId: string,
   input: UpdateClinicTelephonyConfigInput,
 ): Promise<ClinicTelephonyConfigView> {
-  await assertActorCanManage(actor, clinicId);
+  await assertActorCanManageTelephony(actor, clinicId);
   const existing = await prisma.clinicTelephonyConfig.findUnique({
     where: { clinicId },
   });
@@ -191,6 +200,7 @@ export async function updateClinicTelephonyConfigForActor(
         ? current.urgentPhoneNumber
         : input.urgentPhoneNumber,
     timezone: input.timezone ?? current.timezone,
+    routingMode: input.routingMode ?? current.routingMode,
   };
   validateClinicTelephonyConfigState(next);
 
@@ -234,10 +244,19 @@ const lookupInboundClinic: InboundClinicLookup = async (plivoNumber) =>
     select: {
       enabled: true,
       timezone: true,
+      routingMode: true,
       publicPhoneNumber: true,
       receptionPhoneNumber: true,
       urgentPhoneNumber: true,
-      clinic: { select: { id: true, tenantId: true, name: true } },
+      clinic: {
+        select: {
+          id: true,
+          tenantId: true,
+          name: true,
+          address: true,
+          city: true,
+        },
+      },
     },
   });
 
@@ -266,7 +285,11 @@ export async function resolveInboundClinicByPlivoNumber(
     clinicId: config.clinic.id,
     tenantId: config.clinic.tenantId,
     clinicName: config.clinic.name,
+    clinicAddress: config.clinic.address ?? null,
+    clinicCity: config.clinic.city ?? null,
     timezone: config.timezone,
+    routingMode:
+      config.routingMode ?? DEFAULT_CLINIC_TELEPHONY_ROUTING_MODE,
     publicPhoneNumber: config.publicPhoneNumber,
     receptionPhoneNumber: config.receptionPhoneNumber,
     urgentPhoneNumber: config.urgentPhoneNumber,

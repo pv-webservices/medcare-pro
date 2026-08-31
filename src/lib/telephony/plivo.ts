@@ -36,7 +36,12 @@ export const PLIVO_URGENT_CONFIRM_WEBHOOK_PATH =
   "/api/webhooks/plivo/urgent/confirm";
 export const PLIVO_URGENT_STATUS_WEBHOOK_PATH =
   "/api/webhooks/plivo/urgent/status";
+export const PLIVO_RECEPTION_STATUS_WEBHOOK_PATH =
+  "/api/webhooks/plivo/reception/status";
+export const PLIVO_INFORMATION_WEBHOOK_PATH =
+  "/api/webhooks/plivo/information";
 export const URGENT_DIAL_TIMEOUT_SECONDS = 25;
+export const RECEPTION_DIAL_TIMEOUT_SECONDS = URGENT_DIAL_TIMEOUT_SECONDS;
 
 type PlivoResponse = ReturnType<typeof createPlivoResponse>;
 type PlivoGetInputElement = {
@@ -224,6 +229,54 @@ export function buildUrgentTransferFailureXml(): string {
 
 export function buildUrgentTransferCompletedXml(): string {
   return createPlivoResponse().toXML();
+}
+
+export function buildReceptionTransferXml(input: {
+  actionUrl: string;
+  callerId: string;
+  destination: string;
+}): string {
+  const response = createPlivoResponse();
+  response.addSpeak("Please hold while we connect you to the clinic.", {});
+  const addDial = response.addDial as unknown as AddDial;
+  const dial = addDial.call(response, {
+    action: input.actionUrl,
+    method: "POST",
+    timeout: RECEPTION_DIAL_TIMEOUT_SECONDS,
+    callerId: input.callerId,
+    redirect: true,
+  }) as PlivoDialElement;
+  dial.addNumber(input.destination);
+  return response.toXML();
+}
+
+export function buildReceptionTransferCompletedXml(): string {
+  return createPlivoResponse().toXML();
+}
+
+export function buildReceptionFailureThenMainMenuXml(
+  inputActionUrl: string,
+  clinicName: string,
+): string {
+  return buildMessageThenMainMenuXml(
+    "We could not connect you to reception. You can continue using our automated telephone service.",
+    inputActionUrl,
+    clinicName,
+  );
+}
+
+export function buildClinicInformationMenuXml(input: {
+  actionUrl: string;
+  prompt: string;
+  invalidSelection?: boolean;
+}): string {
+  const response = createPlivoResponse();
+  if (input.invalidSelection) {
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+  }
+  addDtmfMenu(response, input.actionUrl, input.prompt);
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  return response.toXML();
 }
 
 export function buildDoctorSelectionXml(input: {

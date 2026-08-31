@@ -403,6 +403,7 @@ model Clinic {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   telephonyConfig ClinicTelephonyConfig?
+  businessHours   ClinicBusinessHours[]
 
   doctors          Doctor[]
   patients         Patient[]
@@ -422,23 +423,58 @@ model Clinic {
   @@map("clinics")
 }
 
+enum ClinicTelephonyRoutingMode {
+  AUTO
+  OPEN
+  AFTER_HOURS
+}
+
+enum ClinicBusinessWeekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 /// Optional per-clinic voice routing configuration. Provider credentials stay
 /// deployment-level; the destination number is the only inbound routing key.
 model ClinicTelephonyConfig {
-  id                   String   @id @default(cuid())
-  clinicId             String   @unique @map("clinic_id")
-  plivoNumber          String?  @unique @map("plivo_number") @db.VarChar(16)
-  publicPhoneNumber    String?  @map("public_phone_number") @db.VarChar(16)
-  receptionPhoneNumber String?  @map("reception_phone_number") @db.VarChar(16)
-  urgentPhoneNumber    String?  @map("urgent_phone_number") @db.VarChar(16)
-  timezone             String   @default("Asia/Kolkata") @db.VarChar(64)
-  enabled              Boolean  @default(false)
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                   String                      @id @default(cuid())
+  clinicId             String                      @unique @map("clinic_id")
+  plivoNumber          String?                     @unique @map("plivo_number") @db.VarChar(16)
+  publicPhoneNumber    String?                     @map("public_phone_number") @db.VarChar(16)
+  receptionPhoneNumber String?                     @map("reception_phone_number") @db.VarChar(16)
+  urgentPhoneNumber    String?                     @map("urgent_phone_number") @db.VarChar(16)
+  timezone             String                      @default("Asia/Kolkata") @db.VarChar(64)
+  routingMode          ClinicTelephonyRoutingMode @default(AFTER_HOURS) @map("routing_mode")
+  enabled              Boolean                     @default(false)
+  createdAt            DateTime                    @default(now()) @map("created_at")
+  updatedAt            DateTime                    @updatedAt @map("updated_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
   @@map("clinic_telephony_configs")
+}
+
+/// One continuous clinic-local wall-clock interval per regular weekday.
+/// Special/holiday closures use ClinicTelephonyConfig.routingMode in V1.
+model ClinicBusinessHours {
+  id        String                 @id @default(cuid())
+  clinicId  String                 @map("clinic_id")
+  dayOfWeek ClinicBusinessWeekday  @map("day_of_week")
+  isClosed  Boolean                @default(true) @map("is_closed")
+  openTime  String?                @map("open_time") @db.VarChar(5)
+  closeTime String?                @map("close_time") @db.VarChar(5)
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicId, dayOfWeek], map: "clinic_business_hours_clinic_day_key")
+  @@map("clinic_business_hours")
 }
 
 enum TelephonyBookingRequestReason {

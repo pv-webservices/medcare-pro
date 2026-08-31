@@ -178,6 +178,13 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "organisation",
   },
+  [AUDIT_ACTIONS.CLINIC_TELEPHONY_HOURS_UPDATED]: {
+    label: "Clinic telephone hours changed",
+    detail:
+      "An administrator changed this clinic's regular telephone business hours.",
+    side: "tenant",
+    category: "organisation",
+  },
   [AUDIT_ACTIONS.TENANT_ENTITLEMENTS_SET]: {
     label: "Plan or features changed",
     detail:
