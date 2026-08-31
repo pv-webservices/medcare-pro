@@ -88,10 +88,9 @@ describe("POST /api/webhooks/plivo/input", () => {
     }
   });
 
-  it.each([
-    ["3", "You selected urgent assistance."],
-    ["4", "You selected clinic information."],
-  ] as const)("acknowledges signed digit %s", async (digits, message) => {
+  it("keeps signed digit 4 as the clinic-information placeholder", async () => {
+    const digits = "4";
+    const message = "You selected clinic information.";
     const { response, xml } = await postDigit(digits);
 
     expect(response.status).toBe(200);
@@ -102,6 +101,28 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).not.toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain("<Record");
+  });
+
+  it("opens emergency guidance and explicit confirmation for signed digit 3 without Dial", async () => {
+    const { response, xml } = await postDigit("3");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe(
+      "application/xml; charset=utf-8",
+    );
+    expect(xml).toContain("life-threatening emergency");
+    expect(xml).toContain("call 112 now");
+    expect(xml).toContain("<GetInput");
+    expect(xml).toContain(
+      'action="https://medcare-tunnel.example/api/webhooks/plivo/urgent/confirm"',
+    );
+    expect(xml).toContain("press 1 to connect");
+    expect(xml).toContain("Press 9 to return to the main menu");
+    expect(xml).not.toContain("<Dial");
+    expect(xml).not.toContain("<Record");
+    expect(requireTenantFeatureEntitlement).not.toHaveBeenCalled();
+    expect(buildDoctorMenuForClinic).not.toHaveBeenCalled();
+    expect(beginTelephoneBooking).not.toHaveBeenCalled();
   });
 
   it("opens the doctor menu for signed digit 1 after tenant entitlement", async () => {

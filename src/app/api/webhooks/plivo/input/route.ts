@@ -14,6 +14,7 @@ import {
 } from "@/lib/features";
 import { resolveMainMenuAction } from "@/lib/telephony/routing";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
+import { buildUrgentMenuForClinic } from "@/lib/telephony/urgent";
 
 export const runtime = "nodejs";
 
@@ -76,6 +77,9 @@ export async function POST(request: Request): Promise<Response> {
           digits,
         }),
       );
+    }
+    if (action === "urgent-assistance") {
+      return xmlResponse(buildUrgentMenuForClinic(request.url));
     }
     return new Response(
       buildClinicSelectionXml(action, inputActionUrl, clinic.clinicName),

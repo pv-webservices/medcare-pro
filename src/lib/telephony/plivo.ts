@@ -7,6 +7,7 @@ import {
   buildBookingSlotPagePrompt,
   buildFinalBookingConfirmationPrompt,
   buildPatientConfirmationPrompt,
+  buildUrgentAssistancePrompt,
   getStage2Acknowledgement,
   type IvrNamedOption,
   STAGE_2_INVALID_SELECTION_MESSAGE,
@@ -31,11 +32,22 @@ export const PLIVO_BOOKING_SLOTS_WEBHOOK_PATH =
   "/api/webhooks/plivo/booking/slots";
 export const PLIVO_BOOKING_CONFIRM_WEBHOOK_PATH =
   "/api/webhooks/plivo/booking/confirm";
+export const PLIVO_URGENT_CONFIRM_WEBHOOK_PATH =
+  "/api/webhooks/plivo/urgent/confirm";
+export const PLIVO_URGENT_STATUS_WEBHOOK_PATH =
+  "/api/webhooks/plivo/urgent/status";
+export const URGENT_DIAL_TIMEOUT_SECONDS = 25;
 
 type PlivoResponse = ReturnType<typeof createPlivoResponse>;
 type PlivoGetInputElement = {
   addSpeak: (body: string, attributes: Record<string, never>) => object;
 };
+type PlivoDialElement = {
+  addNumber: (body: string) => object;
+};
+type AddDial = (
+  attributes: Readonly<Record<string, string | number | boolean>>,
+) => object;
 
 export function buildPlivoInputActionUrl(requestUrl: string): string {
   const requestedUrl = new URL(requestUrl);
@@ -147,6 +159,71 @@ export function buildMessageThenMainMenuXml(
   addMainMenu(response, inputActionUrl, clinicName);
   response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
   return response.toXML();
+}
+
+export function buildUrgentAssistanceMenuXml(input: {
+  actionUrl: string;
+  invalidSelection?: boolean;
+}): string {
+  const response = createPlivoResponse();
+  if (input.invalidSelection) {
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+  }
+  addDtmfMenu(response, input.actionUrl, buildUrgentAssistancePrompt());
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  return response.toXML();
+}
+
+export function buildUrgentTransferXml(input: {
+  actionUrl: string;
+  callerId: string;
+  destination: string;
+}): string {
+  const response = createPlivoResponse();
+  response.addSpeak("Connecting you to urgent clinic assistance.", {});
+  // Plivo 4.75.1's declaration misspells this documented XML attribute as
+  // callerID. The runtime builder and current XML docs both require callerId.
+  const addDial = response.addDial as unknown as AddDial;
+  const dial = addDial.call(response, {
+    action: input.actionUrl,
+    method: "POST",
+    timeout: URGENT_DIAL_TIMEOUT_SECONDS,
+    callerId: input.callerId,
+    redirect: true,
+  }) as PlivoDialElement;
+  dial.addNumber(input.destination);
+  return response.toXML();
+}
+
+export function buildUrgentTransferNotConfiguredXml(): string {
+  const response = createPlivoResponse();
+  response.addSpeak(
+    "Urgent telephone transfer is not currently configured for this clinic. If this is a life-threatening emergency, call 112.",
+    {},
+  );
+  return response.toXML();
+}
+
+export function buildUrgentTransferTemporarilyUnavailableXml(): string {
+  const response = createPlivoResponse();
+  response.addSpeak(
+    "Urgent telephone transfer is temporarily unavailable.",
+    {},
+  );
+  return response.toXML();
+}
+
+export function buildUrgentTransferFailureXml(): string {
+  const response = createPlivoResponse();
+  response.addSpeak(
+    "We could not connect you to urgent clinic assistance. If this is a life-threatening emergency, call 112.",
+    {},
+  );
+  return response.toXML();
+}
+
+export function buildUrgentTransferCompletedXml(): string {
+  return createPlivoResponse().toXML();
 }
 
 export function buildDoctorSelectionXml(input: {

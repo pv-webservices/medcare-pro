@@ -36,6 +36,11 @@ export function normalizePlivoCallerNumber(value: unknown): string | null {
   }
 }
 
+/** India domestic voice routes require a canonical +91 ten-digit number. */
+export function isCanonicalIndianPhoneNumber(value: string): boolean {
+  return /^\+91[1-9]\d{9}$/.test(value);
+}
+
 /**
  * Patient.mobileNumber currently permits these two exact Indian forms. We do
  * not strip punctuation or guess a country for a local-looking caller value.

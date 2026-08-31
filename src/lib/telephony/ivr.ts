@@ -7,6 +7,8 @@ export const STAGE_2_PLATFORM_NAME = "MedCare Pro";
 export const STAGE_2_INVALID_SELECTION_MESSAGE =
   "That selection was not recognized.";
 export const STAGE_2_NO_INPUT_MESSAGE = "We did not receive any input.";
+export const URGENT_EMERGENCY_GUIDANCE =
+  "If this is a life-threatening emergency, hang up and call 112 now.";
 export const IVR_LIST_PAGE_SIZE = 7;
 export const IVR_SLOT_PAGE_SIZE = 6;
 
@@ -50,6 +52,14 @@ export function getStage2Acknowledgement(
   action: Stage2AcknowledgementAction,
 ): string {
   return STAGE_2_ACKNOWLEDGEMENTS[action];
+}
+
+export function buildUrgentAssistancePrompt(): string {
+  return [
+    URGENT_EMERGENCY_GUIDANCE,
+    "For urgent assistance from the clinic, press 1 to connect to the clinic's urgent support number.",
+    "Press 9 to return to the main menu.",
+  ].join(" ");
 }
 
 export interface IvrNamedOption {
