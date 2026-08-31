@@ -165,6 +165,7 @@ export default function Select({
     panelRef,
     align,
     defaultHeight: Math.min(options.length * 44 + 20, 280),
+    matchTriggerWidth: true,
   });
 
   // Keep hidden select value in sync
@@ -436,7 +437,7 @@ export default function Select({
               position: "fixed",
               top: position?.top ?? 0,
               left: position?.left ?? 0,
-              minWidth: position?.width ? `${position.width}px` : undefined,
+              width: position?.width ? `${position.width}px` : undefined,
               maxHeight: position?.maxHeight ? `${position.maxHeight}px` : "280px",
               zIndex: 9999,
               visibility: position ? "visible" : "hidden",

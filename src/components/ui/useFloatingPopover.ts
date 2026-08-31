@@ -30,6 +30,26 @@ export interface UseFloatingPopoverOptions {
   offset?: number;
   defaultWidth?: number;
   defaultHeight?: number;
+  /** Keep the floating panel exactly as wide as its trigger. */
+  matchTriggerWidth?: boolean;
+}
+
+export function resolveFloatingPanelWidth({
+  triggerWidth,
+  measuredPanelWidth,
+  defaultWidth,
+  matchTriggerWidth,
+}: {
+  triggerWidth: number;
+  measuredPanelWidth?: number;
+  defaultWidth?: number;
+  matchTriggerWidth?: boolean;
+}) {
+  if (matchTriggerWidth) {
+    return triggerWidth;
+  }
+
+  return measuredPanelWidth || defaultWidth || Math.max(triggerWidth, 240);
 }
 
 export function useFloatingPopover({
@@ -42,6 +62,7 @@ export function useFloatingPopover({
   offset = 6,
   defaultWidth,
   defaultHeight,
+  matchTriggerWidth = false,
 }: UseFloatingPopoverOptions) {
   const [position, setPosition] = useState<FloatingPosition | null>(null);
   const ignoreNextTriggerClickRef = useRef<number>(0);
@@ -64,8 +85,12 @@ export function useFloatingPopover({
     }
 
     const panelEl = panelRef.current;
-    const panelWidth =
-      panelEl?.offsetWidth || defaultWidth || Math.max(triggerRect.width, 240);
+    const panelWidth = resolveFloatingPanelWidth({
+      triggerWidth: triggerRect.width,
+      measuredPanelWidth: panelEl?.offsetWidth,
+      defaultWidth,
+      matchTriggerWidth,
+    });
     const panelHeight =
       panelEl?.offsetHeight || defaultHeight || 280;
 
@@ -118,7 +143,16 @@ export function useFloatingPopover({
       ),
       openUpward,
     });
-  }, [align, defaultHeight, defaultWidth, offset, onClose, panelRef, triggerRef]);
+  }, [
+    align,
+    defaultHeight,
+    defaultWidth,
+    matchTriggerWidth,
+    offset,
+    onClose,
+    panelRef,
+    triggerRef,
+  ]);
 
   // Synchronize position when open and attach resize/scroll/mutation observers
   useIsomorphicLayoutEffect(() => {
