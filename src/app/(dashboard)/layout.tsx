@@ -110,12 +110,24 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       resolveModulesForActor(actor),
       prisma.user.findFirst({
         where: { id: actor.userId, tenantId: actor.tenantId },
-        select: { name: true },
+        select: { name: true, email: true },
       }),
       resolveRoleNameAtTime(actor, selectedClinicId ?? undefined),
     ]);
 
   const userName = currentUser?.name ?? "Admin User";
+
+  // If the user corresponds to a registered doctor in the tenant, retrieve their gender profile
+  const userDoctor = currentUser?.name
+    ? await prisma.doctor.findFirst({
+        where: {
+          clinic: { tenantId: actor.tenantId },
+          name: currentUser.name,
+        },
+        select: { gender: true },
+      })
+    : null;
+  const userGender = userDoctor?.gender ?? null;
 
   // Tabs the user's roles cannot reach are dropped here rather than rendered
   // and refused, and Stage 8 adds the same courtesy for a module the
@@ -206,6 +218,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
               selectedClinicId={selectedClinicId}
               userName={userName}
               roleName={roleName}
+              gender={userGender}
             />
 
             <BrandMark isCompact showAction={false} className="lg:hidden" />
@@ -269,7 +282,12 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
                 )}
               </Link>
 
-              <UserMenu name={userName} role={roleName} scopeLabel={scopeLabel} />
+              <UserMenu
+                name={userName}
+                role={roleName}
+                scopeLabel={scopeLabel}
+                gender={userGender}
+              />
             </div>
           </div>
 

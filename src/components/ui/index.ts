@@ -16,6 +16,12 @@
 export { default as Avatar } from "@/components/ui/Avatar";
 export type { AvatarSize } from "@/components/ui/Avatar";
 
+export { default as UserAvatar } from "@/components/ui/UserAvatar";
+export type { UserAvatarSize, UserAvatarProps } from "@/components/ui/UserAvatar";
+
+export { default as ClinicLogo } from "@/components/ui/ClinicLogo";
+export type { ClinicLogoProps } from "@/components/ui/ClinicLogo";
+
 export { default as Button, buttonClasses } from "@/components/ui/Button";
 export type { ButtonSize, ButtonVariant } from "@/components/ui/Button";
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, Settings, UserRound } from "lucide-react";
 import {
-  Avatar,
+  UserAvatar,
   Menu,
   MenuSeparator,
   menuItemClasses,
@@ -17,6 +17,8 @@ interface UserMenuProps {
   role: string;
   /** "Clinic A" or "All clinics" — the scope the app is currently showing. */
   scopeLabel: string;
+  photoUrl?: string | null;
+  gender?: string | null;
   className?: string;
 }
 
@@ -24,6 +26,8 @@ export default function UserMenu({
   name,
   role,
   scopeLabel,
+  photoUrl,
+  gender,
   className,
 }: UserMenuProps) {
   return (
@@ -41,9 +45,12 @@ export default function UserMenu({
               : "border-transparent hover:border-slate-200 hover:bg-slate-50",
           )}
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-semibold text-white shadow-2xs">
-            <Avatar name={name} size="sm" className="bg-transparent text-white font-semibold" />
-          </span>
+          <UserAvatar
+            name={name}
+            photoUrl={photoUrl}
+            gender={gender}
+            size="sm"
+          />
           <span className="hidden min-w-0 text-left sm:block">
             <span className="block max-w-[9rem] truncate text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
               {name}
@@ -64,9 +71,12 @@ export default function UserMenu({
       )}
     >
       <div className="flex items-center gap-3 px-3.5 py-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-semibold text-white shadow-xs">
-          <Avatar name={name} className="bg-transparent text-white font-semibold" />
-        </span>
+        <UserAvatar
+          name={name}
+          photoUrl={photoUrl}
+          gender={gender}
+          size="md"
+        />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900">{name}</p>
           <p className="truncate text-xs capitalize text-slate-500">

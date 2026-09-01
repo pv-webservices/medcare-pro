@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Building2, Check, ChevronDown, Layers } from "lucide-react";
-import { Menu, MenuLabel, MenuSeparator, menuItemClasses, cx } from "@/components/ui";
+import { Check, ChevronDown } from "lucide-react";
+import { ClinicLogo, Menu, MenuLabel, MenuSeparator, menuItemClasses, cx } from "@/components/ui";
 import { SELECTED_CLINIC_COOKIE } from "@/lib/cookieNames";
 
 export interface ClinicOption {
@@ -23,65 +23,6 @@ interface ClinicSwitcherProps {
 }
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
-
-function ClinicMark({
-  clinic,
-  variant = "topbar",
-  className,
-}: {
-  clinic: ClinicOption | null;
-  variant?: "topbar" | "sidebar";
-  className?: string;
-}) {
-  if (clinic?.logoUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={clinic.logoUrl}
-        alt=""
-        className={cx(
-          "h-8 w-8 shrink-0 rounded-xl border object-cover",
-          variant === "sidebar" ? "border-slate-700" : "border-slate-200",
-          className,
-        )}
-      />
-    );
-  }
-
-  if (variant === "sidebar") {
-    return (
-      <span
-        aria-hidden="true"
-        className={cx(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-950/80 text-indigo-400 shadow-sm",
-          className,
-        )}
-      >
-        {clinic ? (
-          <Building2 strokeWidth={2} className="h-4 w-4" />
-        ) : (
-          <Layers strokeWidth={2} className="h-4 w-4" />
-        )}
-      </span>
-    );
-  }
-
-  return (
-    <span
-      aria-hidden="true"
-      className={cx(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs",
-        className,
-      )}
-    >
-      {clinic ? (
-        <Building2 strokeWidth={2} className="h-4.5 w-4.5" />
-      ) : (
-        <Layers strokeWidth={2} className="h-4.5 w-4.5" />
-      )}
-    </span>
-  );
-}
 
 export default function ClinicSwitcher({
   clinics,
@@ -112,7 +53,7 @@ export default function ClinicSwitcher({
             className,
           )}
         >
-          <ClinicMark clinic={only} variant="sidebar" />
+          <ClinicLogo clinic={only} variant="sidebar" />
           <div className="min-w-0 flex-1 text-left">
             <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
               Viewing
@@ -132,7 +73,7 @@ export default function ClinicSwitcher({
           className,
         )}
       >
-        <ClinicMark clinic={only} variant="topbar" />
+        <ClinicLogo clinic={only} variant="topbar" />
         <div className="min-w-0">
           <p className="truncate text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
             {only?.name ?? "All clinics"}
@@ -170,7 +111,7 @@ export default function ClinicSwitcher({
                 : "border-slate-700/60 hover:border-slate-600",
             )}
           >
-            <ClinicMark clinic={active} variant="sidebar" />
+            <ClinicLogo clinic={active} variant="sidebar" />
             <span className="min-w-0 flex-1 text-left">
               <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
                 Viewing
@@ -198,7 +139,7 @@ export default function ClinicSwitcher({
                 : "border-slate-200 hover:border-slate-300",
             )}
           >
-            <ClinicMark clinic={active} variant="topbar" />
+            <ClinicLogo clinic={active} variant="topbar" />
             <span className="min-w-0 flex-1 text-left">
               <span className="block truncate text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
                 {active?.name ?? "All clinics"}
@@ -235,7 +176,7 @@ export default function ClinicSwitcher({
           isSidebar && "text-slate-300 hover:bg-slate-800/60 hover:text-white",
         )}
       >
-        <ClinicMark clinic={null} variant={variant} />
+        <ClinicLogo clinic={null} variant={variant} />
         <span className="min-w-0 flex-1">
           <span className="block truncate">All clinics</span>
           <span
@@ -274,7 +215,7 @@ export default function ClinicSwitcher({
                   "text-slate-300 hover:bg-slate-800/60 hover:text-white",
               )}
             >
-              <ClinicMark clinic={clinic} variant={variant} />
+              <ClinicLogo clinic={clinic} variant={variant} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate">{clinic.name}</span>
                 {clinic.city && (

@@ -9,28 +9,8 @@ import ClinicSwitcher, {
 } from "@/components/dashboard/ClinicSwitcher";
 import SignOutButton from "@/components/dashboard/SignOutButton";
 import BrandMark from "@/components/dashboard/BrandMark";
-import { Avatar, IconButton } from "@/components/ui";
+import { IconButton, UserAvatar } from "@/components/ui";
 import type { NavLink } from "@/lib/navigation";
-
-/**
- * Navigation for viewports below `lg`.
- *
- * THE BUG THIS ORIGINALLY FIXED, still worth knowing: the sidebar is
- * `hidden lg:flex`, and it was once the only navigation in the signed-in app.
- * Under 1024px every module became unreachable. A front desk runs this on a
- * shared tablet, so that is not an edge case — it is one of the primary devices
- * named in the PRD.
- *
- * ONE SLIDE-OVER, NOT A BOTTOM BAR. The module list is permission-dependent and
- * runs from four entries to ten, which a fixed five-slot tab bar cannot hold
- * without hiding exactly the module a given role lives in. The drawer carries
- * the same list as the sidebar, in the same order, with the clinic switcher at
- * the top where scope is decided.
- *
- * The link list is NOT rebuilt here. It arrives already filtered by permission
- * and feature from the layout, and is handed to the same <DashboardNav /> the
- * sidebar uses, so the two can never drift apart or disagree.
- */
 
 interface MobileNavProps {
   links: readonly NavLink[];
@@ -39,6 +19,8 @@ interface MobileNavProps {
   selectedClinicId: string | null;
   userName: string;
   roleName: string;
+  photoUrl?: string | null;
+  gender?: string | null;
 }
 
 export default function MobileNav({
@@ -48,6 +30,8 @@ export default function MobileNav({
   selectedClinicId,
   userName,
   roleName,
+  photoUrl,
+  gender,
 }: MobileNavProps) {
   const pathname = usePathname();
   const panelId = useId();
@@ -179,9 +163,12 @@ export default function MobileNav({
 
             <div className="border-t border-slate-800/80 px-3.5 py-3.5">
               <div className="mb-3 flex items-center gap-2.5 px-1">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-semibold text-white shadow-2xs">
-                  <Avatar name={userName} size="sm" className="bg-transparent text-white font-semibold" />
-                </span>
+                <UserAvatar
+                  name={userName}
+                  photoUrl={photoUrl}
+                  gender={gender}
+                  size="sm"
+                />
                 <div className="min-w-0">
                   <p className="truncate text-xs sm:text-sm font-semibold text-white">
                     {userName}
