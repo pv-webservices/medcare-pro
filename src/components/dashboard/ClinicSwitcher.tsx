@@ -2,29 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Building2, Check, ChevronsUpDown, Layers } from "lucide-react";
+import { Building2, Check, ChevronDown, Layers } from "lucide-react";
 import { Menu, MenuLabel, MenuSeparator, menuItemClasses, cx } from "@/components/ui";
 import { SELECTED_CLINIC_COOKIE } from "@/lib/cookieNames";
-
-/**
- * Clinic switcher — FR-2.3. Every module is scoped by clinic, so this control
- * changes what every number on every screen means. It is treated accordingly:
- * it sits in the header, it shows what is selected without being opened, and it
- * marks the current choice inside the menu.
- *
- * THE COOKIE IS A CONVENIENCE ONLY and is trivially editable by the user. Any
- * page or route that reads it must pass it through `resolveSelectedClinicId()`,
- * which re-checks the id against the actor's own clinic scope. Never query on
- * this value directly.
- *
- * IT ONLY EVER LISTS WHAT THE ACTOR CAN REACH. The array arrives from
- * `listClinicsForActor` in the layout, which is already scoped by
- * `clinic:read`; nothing is filtered here, and nothing may be added here.
- *
- * "All clinics" means account-wide. It is the absence of a selection rather
- * than a value, which is why it posts an empty string — the same thing
- * `resolveSelectedClinicId` reads as "no clinic chosen".
- */
 
 export interface ClinicOption {
   id: string;
@@ -36,19 +16,21 @@ export interface ClinicOption {
 interface ClinicSwitcherProps {
   clinics: readonly ClinicOption[];
   selectedClinicId: string | null;
+  variant?: "topbar" | "sidebar";
   /** Compact drops the caption line — for the mobile drawer. */
   isCompact?: boolean;
   className?: string;
 }
 
-/** One year. The selection is a preference, not a credential. */
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 function ClinicMark({
   clinic,
+  variant = "topbar",
   className,
 }: {
   clinic: ClinicOption | null;
+  variant?: "topbar" | "sidebar";
   className?: string;
 }) {
   if (clinic?.logoUrl) {
@@ -57,8 +39,30 @@ function ClinicMark({
       <img
         src={clinic.logoUrl}
         alt=""
-        className={cx("h-8 w-8 shrink-0 rounded-xl border border-line object-cover", className)}
+        className={cx(
+          "h-8 w-8 shrink-0 rounded-xl border object-cover",
+          variant === "sidebar" ? "border-slate-700" : "border-slate-200",
+          className,
+        )}
       />
+    );
+  }
+
+  if (variant === "sidebar") {
+    return (
+      <span
+        aria-hidden="true"
+        className={cx(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-950/80 text-indigo-400 shadow-sm",
+          className,
+        )}
+      >
+        {clinic ? (
+          <Building2 strokeWidth={2} className="h-4 w-4" />
+        ) : (
+          <Layers strokeWidth={2} className="h-4 w-4" />
+        )}
+      </span>
     );
   }
 
@@ -66,14 +70,14 @@ function ClinicMark({
     <span
       aria-hidden="true"
       className={cx(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink",
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs",
         className,
       )}
     >
       {clinic ? (
-        <Building2 strokeWidth={2} className="h-4 w-4" />
+        <Building2 strokeWidth={2} className="h-4.5 w-4.5" />
       ) : (
-        <Layers strokeWidth={2} className="h-4 w-4" />
+        <Layers strokeWidth={2} className="h-4.5 w-4.5" />
       )}
     </span>
   );
@@ -82,6 +86,7 @@ function ClinicMark({
 export default function ClinicSwitcher({
   clinics,
   selectedClinicId,
+  variant = "topbar",
   isCompact = false,
   className,
 }: ClinicSwitcherProps) {
@@ -96,25 +101,44 @@ export default function ClinicSwitcher({
     router.refresh();
   }
 
-  // Nothing to switch between: state the scope, do not offer a menu that has
-  // one entry and no consequence.
   if (clinics.length < 2) {
     const only = clinics[0] ?? null;
+
+    if (variant === "sidebar") {
+      return (
+        <div
+          className={cx(
+            "flex min-w-0 items-center gap-3 rounded-2xl border border-slate-700/60 bg-[#0f152d] px-3.5 py-2.5 shadow-md",
+            className,
+          )}
+        >
+          <ClinicMark clinic={only} variant="sidebar" />
+          <div className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
+              Viewing
+            </span>
+            <span className="block truncate text-xs font-semibold text-white leading-tight mt-0.5">
+              {only?.name ?? "All clinics"}
+            </span>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div
         className={cx(
-          "flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-canvas px-3 py-2 shadow-card",
+          "flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 shadow-xs",
           className,
         )}
       >
-        <ClinicMark clinic={only} />
+        <ClinicMark clinic={only} variant="topbar" />
         <div className="min-w-0">
-          <p className="truncate text-label font-semibold text-ink">
+          <p className="truncate text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
             {only?.name ?? "All clinics"}
           </p>
           {!isCompact && (
-            <p className="truncate text-meta text-muted">
+            <p className="truncate text-[11px] text-slate-500 leading-tight mt-0.5">
               {only?.city ?? "Account-wide view"}
             </p>
           )}
@@ -123,51 +147,103 @@ export default function ClinicSwitcher({
     );
   }
 
+  const isSidebar = variant === "sidebar";
+
   return (
     <Menu
       label="Switch clinic"
       className={cx("min-w-0", className)}
-      panelClassName="w-[19rem]"
-      trigger={({ isOpen }) => (
-        <span
-          className={cx(
-            "flex min-w-0 items-center gap-2.5 rounded-xl border bg-canvas px-3 py-2 shadow-card",
-            "transition-colors duration-150",
-            isOpen ? "border-line-strong" : "border-line hover:border-line-strong",
-          )}
-        >
-          <ClinicMark clinic={active} />
-          <span className="min-w-0 flex-1 text-left">
-            <span className="block truncate text-label font-semibold text-ink">
-              {active?.name ?? "All clinics"}
-            </span>
-            {!isCompact && (
-              <span className="block truncate text-meta text-muted">
-                {active ? (active.city ?? "Clinic") : "Account-wide view"}
-              </span>
-            )}
-          </span>
-          <ChevronsUpDown
-            aria-hidden="true"
-            strokeWidth={2}
-            className="h-4 w-4 shrink-0 text-faint"
-          />
-        </span>
+      panelClassName={cx(
+        "w-[19rem]",
+        isSidebar
+          ? "bg-[#0d1427]/95 border-slate-700 text-white shadow-2xl backdrop-blur-xl"
+          : "bg-white border-slate-200 shadow-xl",
       )}
+      trigger={({ isOpen }) =>
+        isSidebar ? (
+          <span
+            className={cx(
+              "flex min-w-0 items-center gap-3 rounded-2xl border bg-[#0f152d] px-3.5 py-2.5 shadow-md cursor-pointer",
+              "transition-colors duration-150",
+              isOpen
+                ? "border-indigo-500/50"
+                : "border-slate-700/60 hover:border-slate-600",
+            )}
+          >
+            <ClinicMark clinic={active} variant="sidebar" />
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
+                Viewing
+              </span>
+              <span className="block truncate text-xs font-semibold text-white leading-tight mt-0.5">
+                {active?.name ?? "All clinics"}
+              </span>
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              strokeWidth={2}
+              className={cx(
+                "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-150 ml-auto",
+                isOpen && "rotate-180 text-indigo-400",
+              )}
+            />
+          </span>
+        ) : (
+          <span
+            className={cx(
+              "flex min-w-0 items-center gap-3 rounded-2xl border bg-white px-3.5 py-2 shadow-xs cursor-pointer",
+              "transition-colors duration-150",
+              isOpen
+                ? "border-slate-300 ring-2 ring-indigo-500/20"
+                : "border-slate-200 hover:border-slate-300",
+            )}
+          >
+            <ClinicMark clinic={active} variant="topbar" />
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block truncate text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
+                {active?.name ?? "All clinics"}
+              </span>
+              {!isCompact && (
+                <span className="block truncate text-[11px] text-slate-500 leading-tight mt-0.5">
+                  {active ? (active.city ?? "Clinic") : "Account-wide view"}
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              strokeWidth={2}
+              className={cx(
+                "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-150 ml-1.5",
+                isOpen && "rotate-180 text-indigo-600",
+              )}
+            />
+          </span>
+        )
+      }
     >
-      <MenuLabel>Viewing</MenuLabel>
+      <MenuLabel className={isSidebar ? "text-slate-400" : undefined}>
+        Viewing
+      </MenuLabel>
 
       <button
         type="button"
         role="menuitemradio"
         aria-checked={selected === ""}
         onClick={() => choose("")}
-        className={menuItemClasses(selected === "")}
+        className={cx(
+          menuItemClasses(selected === ""),
+          isSidebar && "text-slate-300 hover:bg-slate-800/60 hover:text-white",
+        )}
       >
-        <ClinicMark clinic={null} />
+        <ClinicMark clinic={null} variant={variant} />
         <span className="min-w-0 flex-1">
           <span className="block truncate">All clinics</span>
-          <span className="block truncate text-meta font-normal text-muted">
+          <span
+            className={cx(
+              "block truncate text-meta font-normal",
+              isSidebar ? "text-slate-400" : "text-muted",
+            )}
+          >
             Everything in this account
           </span>
         </span>
@@ -176,8 +252,10 @@ export default function ClinicSwitcher({
         )}
       </button>
 
-      <MenuSeparator />
-      <MenuLabel>Clinics</MenuLabel>
+      <MenuSeparator className={isSidebar ? "border-slate-700/80" : undefined} />
+      <MenuLabel className={isSidebar ? "text-slate-400" : undefined}>
+        Clinics
+      </MenuLabel>
 
       <div className="max-h-72 overflow-y-auto">
         {clinics.map((clinic) => {
@@ -190,13 +268,22 @@ export default function ClinicSwitcher({
               role="menuitemradio"
               aria-checked={isCurrent}
               onClick={() => choose(clinic.id)}
-              className={menuItemClasses(isCurrent)}
+              className={cx(
+                menuItemClasses(isCurrent),
+                isSidebar &&
+                  "text-slate-300 hover:bg-slate-800/60 hover:text-white",
+              )}
             >
-              <ClinicMark clinic={clinic} />
+              <ClinicMark clinic={clinic} variant={variant} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate">{clinic.name}</span>
                 {clinic.city && (
-                  <span className="block truncate text-meta font-normal text-muted">
+                  <span
+                    className={cx(
+                      "block truncate text-meta font-normal",
+                      isSidebar ? "text-slate-400" : "text-muted",
+                    )}
+                  >
                     {clinic.city}
                   </span>
                 )}

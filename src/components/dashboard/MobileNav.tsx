@@ -124,29 +124,21 @@ export default function MobileNav({
         className="relative"
       >
         <MenuIcon aria-hidden="true" strokeWidth={2} className="h-5 w-5" />
-        {/*
-          Mirrors the sidebar's unread badge. Without it, the one signal that
-          there is something to look at is hidden inside a closed drawer.
-        */}
         {unreadNotifications > 0 && (
           <span
             aria-hidden="true"
-            className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent ring-2 ring-canvas"
+            className="absolute right-2 top-2 h-2 w-2 rounded-full bg-indigo-600 ring-2 ring-white"
           />
         )}
       </IconButton>
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex">
-          {/*
-            The scrim is a real button rather than a div with onClick, so
-            "dismiss" is reachable by keyboard and announced, not mouse-only.
-          */}
           <button
             type="button"
             aria-label="Close navigation menu"
             onClick={closeDrawer}
-            className="overlay-in absolute inset-0 h-full w-full cursor-default bg-[rgb(12_16_28/0.45)]"
+            className="overlay-in absolute inset-0 h-full w-full cursor-default bg-black/70 backdrop-blur-xs"
           />
 
           <div
@@ -154,15 +146,16 @@ export default function MobileNav({
             role="dialog"
             aria-modal="true"
             aria-label="Main navigation"
-            className="panel-in relative flex h-full w-[290px] max-w-[86vw] flex-col border-r border-line bg-canvas shadow-float"
+            className="panel-in relative flex h-full w-[290px] max-w-[86vw] flex-col border-r border-slate-800 bg-[#090e23] text-white shadow-2xl"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5">
-              <BrandMark />
+            <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 px-4 py-3.5">
+              <BrandMark isCompact={false} showAction={false} />
               <IconButton
                 ref={closeButtonRef}
                 label="Close navigation menu"
                 size="sm"
                 onClick={closeDrawer}
+                className="text-slate-400 hover:text-white hover:bg-slate-800"
               >
                 <X aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
               </IconButton>
@@ -173,16 +166,10 @@ export default function MobileNav({
                 <ClinicSwitcher
                   clinics={clinics}
                   selectedClinicId={selectedClinicId}
+                  variant="sidebar"
                 />
               </div>
 
-              {/*
-                Closes on any click inside the nav, which covers the one case the
-                path-derived state above cannot: tapping the link for the page
-                you are ALREADY on. The route never changes, so `openedOnPath`
-                would still match and the drawer would stay open on top of the
-                page the user just asked for.
-              */}
               <DashboardNav
                 links={links}
                 unreadNotifications={unreadNotifications}
@@ -190,19 +177,24 @@ export default function MobileNav({
               />
             </div>
 
-            <div className="border-t border-line px-3 py-3">
+            <div className="border-t border-slate-800/80 px-3.5 py-3.5">
               <div className="mb-3 flex items-center gap-2.5 px-1">
-                <Avatar name={userName} size="sm" />
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-semibold text-white shadow-2xs">
+                  <Avatar name={userName} size="sm" className="bg-transparent text-white font-semibold" />
+                </span>
                 <div className="min-w-0">
-                  <p className="truncate text-label font-semibold text-ink">
+                  <p className="truncate text-xs sm:text-sm font-semibold text-white">
                     {userName}
                   </p>
-                  <p className="truncate text-meta capitalize text-muted">
+                  <p className="truncate text-[11px] capitalize text-slate-400">
                     {roleName}
                   </p>
                 </div>
               </div>
-              <SignOutButton appearance="button" />
+              <SignOutButton
+                appearance="button"
+                className="border-slate-700/60 bg-slate-900/60 text-slate-300 hover:bg-rose-950/30 hover:text-rose-300"
+              />
             </div>
           </div>
         </div>

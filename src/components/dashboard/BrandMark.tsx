@@ -2,45 +2,47 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { cx } from "@/components/ui/cx";
 
-/**
- * The MedCare Pro lockup in the signed-in shell.
- *
- * THE PLATFORM'S BRAND, NOT THE TENANT'S. A clinic's own logo and colour appear
- * where that clinic's data appears — the clinic switcher, the row rails, the
- * branding preview — and never here. Someone covering two clinics needs one
- * fixed point on the screen that does not change when they switch scope, and
- * this is it.
- *
- * It links to /dashboard: a wordmark in the top-left corner of a web
- * application is expected to go home, and a user who has followed three
- * detail pages deep looks for it before they look for the nav.
- */
 export default function BrandMark({
   className,
   isCompact = false,
+  showAction = true,
 }: {
   className?: string;
   isCompact?: boolean;
+  showAction?: boolean;
 }) {
   return (
-    <Link
-      href="/dashboard"
-      className={cx("flex min-w-0 items-center gap-2.5 rounded-xl", className)}
-    >
-      <span
-        aria-hidden="true"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink shadow-cta"
+    <div className={cx("flex items-center justify-between gap-3 w-full", className)}>
+      <Link
+        href="/dashboard"
+        className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
       >
-        <Plus strokeWidth={3} className="h-[18px] w-[18px]" />
-      </span>
-      <span className={cx("min-w-0", isCompact && "hidden")}>
-        <span className="block truncate text-section font-semibold leading-none tracking-[-0.01em] text-ink">
-          MedCare Pro
+        <span
+          aria-hidden="true"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-600/30"
+        >
+          <Plus strokeWidth={2.5} className="h-5 w-5" />
         </span>
-        <span className="mt-1 block truncate text-micro font-semibold uppercase text-faint">
-          Clinic operations
+        <span className={cx("min-w-0", isCompact && "hidden")}>
+          <span className="block truncate text-base font-bold tracking-tight text-white">
+            MedCare Pro
+          </span>
+          <span className="mt-0.5 block truncate text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            Clinic operations
+          </span>
         </span>
-      </span>
-    </Link>
+      </Link>
+
+      {!isCompact && showAction && (
+        <Link
+          href="/appointments/new"
+          aria-label="New appointment"
+          title="New appointment"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-600/30 text-indigo-300 transition-colors hover:bg-indigo-600 hover:text-white"
+        >
+          <Plus strokeWidth={2.5} className="h-4 w-4" />
+        </Link>
+      )}
+    </div>
   );
 }

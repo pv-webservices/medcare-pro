@@ -151,11 +151,15 @@ export default function CommandPalette({ links, actions }: CommandPaletteProps) 
           openerRef.current = event.currentTarget;
           setIsOpen(true);
         }}
-        className="flex h-10 w-full max-w-sm items-center gap-2.5 rounded-xl border border-line bg-canvas px-3 text-left text-label text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
+        className="flex h-10 w-full max-w-md items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 text-left text-xs text-slate-500 shadow-2xs transition-all duration-150 hover:border-slate-300 hover:bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
       >
-        <Search aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0" />
-        <span className="flex-1 truncate">Search MedCare Pro</span>
-        <kbd className="hidden shrink-0 rounded-md border border-line bg-canvas-deep px-1.5 py-0.5 font-sans text-meta font-medium text-muted lg:block">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <Search aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="truncate text-xs sm:text-sm font-normal text-slate-400">
+            Search MedCare Pro
+          </span>
+        </div>
+        <kbd className="hidden shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-0.5 font-sans text-[10px] font-medium text-slate-500 shadow-2xs sm:block ml-2">
           Ctrl K
         </kbd>
       </button>

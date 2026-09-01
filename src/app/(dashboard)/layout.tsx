@@ -173,36 +173,32 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   return (
     <div className="flex min-h-screen bg-app">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[236px] shrink-0 flex-col border-r border-line bg-canvas lg:flex">
-        <div className="px-4 py-[18px]">
+      {/* Desktop Dark Left Sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 shrink-0 flex-col border-r border-slate-800/70 bg-[#090e23] text-white lg:flex">
+        <div className="border-b border-slate-800/60 px-4 py-4">
           <BrandMark />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-4">
           <DashboardNav links={links} unreadNotifications={unreadNotifications} />
         </div>
 
-        {/*
-          A quiet reminder of the scope the sidebar's links will open into. The
-          switcher itself is in the header; repeating the control here would give
-          the reader two places to change one thing.
-        */}
-        <div className="border-t border-line px-4 py-4">
-          <p className="text-micro font-semibold uppercase text-faint">Viewing</p>
-          <p className="mt-1 truncate text-label font-medium text-ink">
-            {scopeLabel}
-          </p>
+        {/* Sidebar Viewing Scope Card */}
+        <div className="border-t border-slate-800/60 p-3.5 mt-auto">
+          <ClinicSwitcher
+            clinics={switcherClinics}
+            selectedClinicId={selectedClinicId}
+            variant="sidebar"
+          />
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-[236px]">
-        <header className="sticky top-0 z-20 border-b border-line bg-canvas">
-          <div className="mx-auto flex h-16 w-full max-w-[1560px] items-center gap-2.5 px-3 sm:px-4 md:px-6 xl:px-7">
-            {/*
-              Below `lg` the sidebar is not on screen, so the drawer and the
-              wordmark stand in for it. They take the same already-filtered
-              `links`, so the two surfaces cannot offer different tabs.
-            */}
+      {/* Main Content Area */}
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+        {/* Top Bar */}
+        <header className="sticky top-0 z-20 border-b border-slate-200/90 bg-white shadow-xs">
+          <div className="mx-auto flex h-18 w-full max-w-[1560px] items-center gap-3 px-3 sm:px-4 md:px-6 xl:px-7">
+            {/* Mobile Nav Trigger & Brand */}
             <MobileNav
               links={links}
               unreadNotifications={unreadNotifications}
@@ -212,26 +208,30 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
               roleName={roleName}
             />
 
-            <BrandMark isCompact className="lg:hidden" />
+            <BrandMark isCompact showAction={false} className="lg:hidden" />
 
-            <div className="hidden min-w-0 flex-1 sm:block lg:max-w-[16.5rem]">
+            {/* Left: Clinic Selector */}
+            <div className="hidden min-w-0 flex-1 sm:block lg:max-w-[17rem]">
               <ClinicSwitcher
                 clinics={switcherClinics}
                 selectedClinicId={selectedClinicId}
+                variant="topbar"
               />
             </div>
 
+            {/* Center: Global Search */}
             <div className="ml-auto hidden flex-1 justify-center md:flex">
               <CommandPalette links={links} actions={quickActions} />
             </div>
 
-            <div className="ml-auto flex shrink-0 items-center gap-1.5 md:ml-0">
+            {/* Right-side Action Buttons & User Profile */}
+            <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
               {quickActions.length > 0 && (
                 <Link
                   href={quickActions[0]!.href}
                   aria-label={quickActions[0]!.label}
                   title={quickActions[0]!.label}
-                  className="hidden h-10 w-10 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink xl:flex"
+                  className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-xs transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 xl:flex"
                 >
                   {quickActions[0]!.href === "/appointments/new" ? (
                     <CalendarPlus aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
@@ -245,7 +245,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
                 <Link
                   href="/messages"
                   aria-label="Messages"
-                  className="hidden h-10 w-10 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink sm:flex"
+                  className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-xs transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 sm:flex"
                 >
                   <MessageSquare aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
                 </Link>
@@ -258,13 +258,13 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
                     ? `Notifications, ${unreadNotifications} unread`
                     : "Notifications"
                 }
-                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-canvas text-muted shadow-card transition-colors duration-150 hover:border-line-strong hover:text-ink"
+                className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-xs transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
               >
                 <Bell aria-hidden="true" strokeWidth={2} className="h-[18px] w-[18px]" />
                 {unreadNotifications > 0 && (
                   <span
                     aria-hidden="true"
-                    className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent ring-2 ring-canvas"
+                    className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-indigo-600 ring-2 ring-white"
                   />
                 )}
               </Link>
@@ -273,10 +273,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
             </div>
           </div>
 
-          <div className="grid gap-2 border-t border-line px-3 py-3 sm:hidden">
+          <div className="grid gap-2 border-t border-slate-100 bg-slate-50/50 px-3 py-3 sm:hidden">
             <ClinicSwitcher
               clinics={switcherClinics}
               selectedClinicId={selectedClinicId}
+              variant="topbar"
             />
             <CommandPalette links={links} actions={quickActions} />
           </div>

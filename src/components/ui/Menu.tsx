@@ -210,16 +210,27 @@ export default function Menu({
 }
 
 /** A caption above a group of items. Not focusable, not a heading. */
-export function MenuLabel({ children }: { children: ReactNode }) {
+export function MenuLabel({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <p className="px-3 pb-1.5 pt-2 text-micro font-semibold uppercase text-faint">
+    <p
+      className={cx(
+        "px-3 pb-1.5 pt-2 text-micro font-semibold uppercase text-faint",
+        className,
+      )}
+    >
       {children}
     </p>
   );
 }
 
-export function MenuSeparator() {
-  return <hr className="my-1.5 border-0 border-t border-line" />;
+export function MenuSeparator({ className }: { className?: string } = {}) {
+  return <hr className={cx("my-1.5 border-0 border-t border-line", className)} />;
 }
 
 /**

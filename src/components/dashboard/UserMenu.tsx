@@ -11,25 +11,6 @@ import {
 } from "@/components/ui";
 import SignOutButton from "@/components/dashboard/SignOutButton";
 
-/**
- * The account menu: who am I signed in as, in what role, over what scope, and
- * how do I leave.
- *
- * IT ANSWERS "WHOSE SESSION IS THIS" FIRST. A shared front-desk machine is the
- * normal case in a clinic, so the name, the role and the current clinic scope
- * are all stated in the panel rather than being something the user has to infer
- * from what the app will let them do.
- *
- * IT OFFERS ONLY WHAT EXISTS. Settings, team and sign out — no profile
- * page, no account preferences, no billing, because this application has none
- * of those and a menu item that 404s is worse than an absent one.
- *
- * The Settings link is shown to everyone who can see this menu. The Settings
- * screens run their own permission checks and show what the reader may open;
- * hiding the entry here would not add security, and would leave an admin
- * hunting for a URL.
- */
-
 interface UserMenuProps {
   name: string;
   /** The role held in the current scope, already resolved by the layout. */
@@ -49,39 +30,46 @@ export default function UserMenu({
     <Menu
       label="Account"
       align="end"
-      panelClassName="w-[17rem]"
+      panelClassName="w-[18rem] bg-white border-slate-200 shadow-xl rounded-2xl"
       className={cx("w-auto", className)}
       trigger={({ isOpen }) => (
         <span
           className={cx(
-            "flex items-center gap-2 rounded-xl border py-1.5 pl-1.5 pr-2 transition-colors duration-150",
+            "flex items-center gap-2.5 rounded-2xl border py-1 pl-1 pr-2 transition-all duration-150 cursor-pointer",
             isOpen
-              ? "border-line-strong bg-canvas-deep"
-              : "border-transparent hover:border-line hover:bg-canvas-deep",
+              ? "border-slate-300 bg-slate-100/80"
+              : "border-transparent hover:border-slate-200 hover:bg-slate-50",
           )}
         >
-          <Avatar name={name} size="sm" />
-          <span className="hidden min-w-0 text-left md:block">
-            <span className="block max-w-[10rem] truncate text-label font-semibold text-ink">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-semibold text-white shadow-2xs">
+            <Avatar name={name} size="sm" className="bg-transparent text-white font-semibold" />
+          </span>
+          <span className="hidden min-w-0 text-left sm:block">
+            <span className="block max-w-[9rem] truncate text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
               {name}
             </span>
-            <span className="block max-w-[10rem] truncate text-meta capitalize text-muted">
+            <span className="block max-w-[9rem] truncate text-[11px] text-slate-500 capitalize leading-tight mt-0.5">
               {role}
             </span>
           </span>
           <ChevronDown
             aria-hidden="true"
             strokeWidth={2}
-            className="h-4 w-4 shrink-0 text-faint"
+            className={cx(
+              "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-150 ml-0.5",
+              isOpen && "rotate-180 text-indigo-600",
+            )}
           />
         </span>
       )}
     >
-      <div className="flex items-center gap-3 px-3 py-2.5">
-        <Avatar name={name} />
+      <div className="flex items-center gap-3 px-3.5 py-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-semibold text-white shadow-xs">
+          <Avatar name={name} className="bg-transparent text-white font-semibold" />
+        </span>
         <div className="min-w-0">
-          <p className="truncate text-body font-semibold text-ink">{name}</p>
-          <p className="truncate text-meta capitalize text-muted">
+          <p className="truncate text-sm font-semibold text-slate-900">{name}</p>
+          <p className="truncate text-xs capitalize text-slate-500">
             {role} &middot; {scopeLabel}
           </p>
         </div>
@@ -89,13 +77,21 @@ export default function UserMenu({
 
       <MenuSeparator />
 
-      <Link href="/settings" role="menuitem" className={menuItemClasses()}>
-        <Settings aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0" />
+      <Link
+        href="/settings"
+        role="menuitem"
+        className={cx(menuItemClasses(), "text-slate-700 hover:text-slate-900")}
+      >
+        <Settings aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0 text-slate-400" />
         Settings
       </Link>
 
-      <Link href="/team" role="menuitem" className={menuItemClasses()}>
-        <UserRound aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0" />
+      <Link
+        href="/team"
+        role="menuitem"
+        className={cx(menuItemClasses(), "text-slate-700 hover:text-slate-900")}
+      >
+        <UserRound aria-hidden="true" strokeWidth={2} className="h-4 w-4 shrink-0 text-slate-400" />
         Team
       </Link>
 
