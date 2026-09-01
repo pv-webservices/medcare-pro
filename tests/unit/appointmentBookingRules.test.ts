@@ -10,6 +10,7 @@ import {
 } from "@/lib/appointmentRules";
 import {
   appointmentFilterSchema,
+  appointmentIndicatorsQuerySchema,
   createAppointmentSchema,
   resolveListStatuses,
   type AppointmentFilters,
@@ -479,4 +480,40 @@ describe("appointmentFilterSchema", () => {
     expect(() => appointmentFilterSchema.parse({ page: "1.5" })).toThrow();
     expect(() => appointmentFilterSchema.parse({ page: "10001" })).toThrow();
   });
+
+  it("accepts valid view modes ('day' and 'upcoming')", () => {
+    expect(appointmentFilterSchema.parse({ view: "day" }).view).toBe("day");
+    expect(appointmentFilterSchema.parse({ view: "upcoming" }).view).toBe("upcoming");
+    expect(appointmentFilterSchema.parse({}).view).toBeUndefined();
+    expect(() => appointmentFilterSchema.parse({ view: "month" })).toThrow();
+  });
 });
+
+describe("appointmentIndicatorsQuerySchema", () => {
+  it("accepts valid query parameters", () => {
+    const parsed = appointmentIndicatorsQuerySchema.parse({
+      clinicId: "clinic-1",
+      doctorId: "doctor-1",
+      status: "CONFIRMED",
+      includeHistory: "true",
+      dateFrom: "2026-09-01",
+      dateTo: "2026-09-30",
+    });
+    expect(parsed.clinicId).toBe("clinic-1");
+    expect(parsed.doctorId).toBe("doctor-1");
+    expect(parsed.status).toBe("CONFIRMED");
+    expect(parsed.includeHistory).toBe(true);
+    expect(parsed.dateFrom).toBe("2026-09-01");
+    expect(parsed.dateTo).toBe("2026-09-30");
+  });
+
+  it("treats empty string dateFrom and dateTo as valid", () => {
+    const parsed = appointmentIndicatorsQuerySchema.parse({
+      dateFrom: "",
+      dateTo: "",
+    });
+    expect(parsed.dateFrom).toBe("");
+    expect(parsed.dateTo).toBe("");
+  });
+});
+

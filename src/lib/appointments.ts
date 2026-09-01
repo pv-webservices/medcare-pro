@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   resolveListStatuses,
   type AppointmentFilters,
+  type AppointmentIndicatorsQuery,
   type CreateAppointmentInput,
 } from "@/lib/appointmentInput";
 import {
@@ -15,7 +16,9 @@ import {
   formatClockTime,
   formatDateOnly,
   isDateOnly,
+  nowClockTime,
   parseDateTime,
+  todayDateOnly,
 } from "@/lib/dates";
 import { MODULE_FEATURES, requireModule } from "@/lib/features";
 import { prisma } from "@/lib/prisma";
@@ -63,9 +66,11 @@ import {
 
 export {
   appointmentFilterSchema,
+  appointmentIndicatorsQuerySchema,
   createAppointmentSchema,
   resolveListStatuses,
   type AppointmentFilters,
+  type AppointmentIndicatorsQuery,
   type CreateAppointmentInput,
 } from "@/lib/appointmentInput";
 
@@ -102,7 +107,6 @@ export type {
   AppointmentSlotView,
   AppointmentSlotsResult,
 } from "@/lib/appointmentAvailability";
-
 // ---------------------------------------------------------------------------
 // The read
 // ---------------------------------------------------------------------------
@@ -350,6 +354,8 @@ export async function listAppointments(
       doctorName: row.doctor.name,
       appointmentTypeId: row.appointmentTypeId,
       appointmentTypeName: row.appointmentType.name,
+
+
       patientId: row.patientId,
       name: row.name,
       mobileNumber: row.mobileNumber,
@@ -379,6 +385,17 @@ export async function listAppointments(
 function slotWindowFilter(
   filters: AppointmentFilters,
 ): Prisma.AppointmentWhereInput {
+  if (filters.view === "upcoming") {
+    const now = parseDateTime(todayDateOnly(), nowClockTime());
+    const window: Prisma.DateTimeFilter = { gte: now };
+    if (filters.dateTo?.trim()) {
+      window.lt = new Date(
+        parseDateTime(filters.dateTo.trim(), "00:00").getTime() + DAY_MS,
+      );
+    }
+    return { slotStart: window };
+  }
+
   const exact = filters.date?.trim();
 
   if (exact) {
@@ -409,3 +426,76 @@ function slotWindowFilter(
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface AppointmentDateIndicator {
+  count: number;
+}
+
+/**
+ * Returns appointment counts grouped by calendar date for the date picker.
+ *
+ * Bounded query: scoped to tenant/clinic/doctor/status, querying only slotStart
+ * for upcoming dates (or a bounded date window) to provide date indicator dots.
+ */
+export async function getAppointmentDateIndicators(
+  actor: ActorContext,
+  query: AppointmentIndicatorsQuery = {},
+): Promise<Record<string, AppointmentDateIndicator>> {
+  await requireModule(actor, MODULE_FEATURES.appointments);
+
+  const clinicWhere = await clinicWhereForActor(
+    actor,
+    "appointment:read",
+    query.clinicId,
+  );
+
+  if (!clinicWhere) {
+    return {};
+  }
+
+  const now = parseDateTime(todayDateOnly(), nowClockTime());
+  const statuses = resolveListStatuses({
+    status: query.status,
+    includeHistory: query.includeHistory,
+  });
+
+  const fromInstant = query.dateFrom?.trim()
+    ? parseDateTime(query.dateFrom.trim(), "00:00")
+    : now;
+  const effectiveGte = query.includeHistory
+    ? fromInstant
+    : fromInstant > now
+      ? fromInstant
+      : now;
+
+  const window: Prisma.DateTimeFilter = { gte: effectiveGte };
+  if (query.dateTo?.trim()) {
+    window.lt = new Date(
+      parseDateTime(query.dateTo.trim(), "00:00").getTime() + DAY_MS,
+    );
+  }
+
+  const where: Prisma.AppointmentWhereInput = {
+    tenantId: actor.tenantId,
+    clinic: clinicWhere,
+    status: { in: [...statuses] },
+    slotStart: window,
+    ...(query.doctorId?.trim() ? { doctorId: query.doctorId.trim() } : {}),
+  };
+
+  const rows = await prisma.appointment.findMany({
+    where,
+    select: { slotStart: true },
+  });
+
+  const result: Record<string, AppointmentDateIndicator> = {};
+  for (const row of rows) {
+    const dateKey = formatDateOnly(row.slotStart);
+    if (!result[dateKey]) {
+      result[dateKey] = { count: 0 };
+    }
+    result[dateKey].count += 1;
+  }
+
+  return result;
+}

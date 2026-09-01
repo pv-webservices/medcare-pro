@@ -20,6 +20,12 @@ import { controlClasses, FieldShell } from "@/components/ui/Input";
 import { useFloatingPopover } from "@/components/ui/useFloatingPopover";
 import { isDateOnly, todayDateOnly } from "@/lib/dates";
 
+export interface DateIndicatorInfo {
+  count?: number;
+  label?: string;
+  hasAppointments?: boolean;
+}
+
 export interface DatePickerProps {
   id: string;
   label: string;
@@ -40,6 +46,8 @@ export interface DatePickerProps {
   showClear?: boolean;
   showToday?: boolean;
   align?: "start" | "end" | "auto";
+  dateIndicators?: Record<string, DateIndicatorInfo | boolean>;
+  onMonthChange?: (year: number, month: number) => void;
 }
 
 const MONTH_NAMES = [
@@ -115,6 +123,8 @@ export default function DatePicker({
   showClear = true,
   showToday = true,
   align = "auto",
+  dateIndicators,
+  onMonthChange,
 }: DatePickerProps) {
   const generatedId = useId();
   const pickerId = `${id}-datepicker-${generatedId.replace(/:/g, "")}`;
@@ -183,15 +193,20 @@ export default function DatePicker({
     const willOpen = !isOpen;
     if (willOpen) {
       dispatchOpenEvent();
+      let yr: number;
+      let mo: number;
       if (activeValue && isDateOnly(activeValue)) {
         const [y, m] = activeValue.split("-");
-        setViewYear(parseInt(y, 10));
-        setViewMonth(parseInt(m, 10) - 1);
+        yr = parseInt(y, 10) || new Date().getFullYear();
+        mo = (parseInt(m, 10) || 1) - 1;
       } else {
         const [y, m] = todayStr.split("-");
-        setViewYear(parseInt(y, 10));
-        setViewMonth(parseInt(m, 10) - 1);
+        yr = parseInt(y, 10) || new Date().getFullYear();
+        mo = (parseInt(m, 10) || 1) - 1;
       }
+      setViewYear(yr);
+      setViewMonth(mo);
+      onMonthChange?.(yr, mo + 1);
       setIsOpen(true);
     } else {
       setIsOpen(false);
@@ -199,21 +214,33 @@ export default function DatePicker({
   }
 
   function handlePrevMonth() {
+    let nextMonth: number;
+    let nextYear: number;
     if (viewMonth === 0) {
-      setViewMonth(11);
-      setViewYear((y) => y - 1);
+      nextMonth = 11;
+      nextYear = viewYear - 1;
     } else {
-      setViewMonth((m) => m - 1);
+      nextMonth = viewMonth - 1;
+      nextYear = viewYear;
     }
+    setViewMonth(nextMonth);
+    setViewYear(nextYear);
+    onMonthChange?.(nextYear, nextMonth + 1);
   }
 
   function handleNextMonth() {
+    let nextMonth: number;
+    let nextYear: number;
     if (viewMonth === 11) {
-      setViewMonth(0);
-      setViewYear((y) => y + 1);
+      nextMonth = 0;
+      nextYear = viewYear + 1;
     } else {
-      setViewMonth((m) => m + 1);
+      nextMonth = viewMonth + 1;
+      nextYear = viewYear;
     }
+    setViewMonth(nextMonth);
+    setViewYear(nextYear);
+    onMonthChange?.(nextYear, nextMonth + 1);
   }
 
   function handleKeyDown(e: KeyboardEvent) {
@@ -430,11 +457,37 @@ export default function DatePicker({
             {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
               {cells.map((cell) => {
+                const indicator = dateIndicators?.[cell.dateStr];
+                const hasIndicator = Boolean(indicator);
+                const count =
+                  typeof indicator === "object" && indicator !== null
+                    ? indicator.count
+                    : undefined;
+
+                const dayDateStr = cell.dateStr;
+                let cellAriaLabel = formatDisplayDate(dayDateStr);
+                if (cell.isToday) cellAriaLabel += ", Today";
+                if (hasIndicator) {
+                  if (count && count > 0) {
+                    cellAriaLabel += `, ${count} ${count === 1 ? "appointment" : "appointments"}`;
+                  } else {
+                    cellAriaLabel += ", has appointments";
+                  }
+                }
+
                 return (
                   <button
                     key={cell.dateStr}
                     type="button"
                     disabled={cell.isDisabled}
+                    aria-label={cellAriaLabel}
+                    title={
+                      hasIndicator
+                        ? count && count > 0
+                          ? `${count} ${count === 1 ? "appointment" : "appointments"}`
+                          : "Has appointments"
+                        : undefined
+                    }
                     onPointerDown={(e) => e.preventDefault()}
                     onClick={() => {
                       if (!cell.isDisabled) {
@@ -442,7 +495,7 @@ export default function DatePicker({
                       }
                     }}
                     className={cx(
-                      "flex h-8 w-8 items-center justify-center rounded-xl text-input font-medium transition-colors duration-100",
+                      "relative flex h-8 w-8 items-center justify-center rounded-xl text-input font-medium transition-colors duration-100",
                       cell.isDisabled
                         ? "cursor-not-allowed opacity-30 text-muted"
                         : "cursor-pointer",
@@ -455,7 +508,16 @@ export default function DatePicker({
                             : "text-muted/50 hover:bg-canvas-deep",
                     )}
                   >
-                    {cell.dayNum}
+                    <span>{cell.dayNum}</span>
+                    {hasIndicator && !cell.isDisabled && (
+                      <span
+                        className={cx(
+                          "absolute bottom-0.5 h-1 w-1 rounded-full",
+                          cell.isSelected ? "bg-accent-ink" : "bg-accent",
+                        )}
+                        aria-hidden="true"
+                      />
+                    )}
                   </button>
                 );
               })}

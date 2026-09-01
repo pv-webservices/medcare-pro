@@ -1,5 +1,3 @@
-import Skeleton, { TableSkeleton } from "@/components/ui/Skeleton";
-
 /**
  * What appointments looks like while it loads.
  *
@@ -32,19 +30,20 @@ export default function Loading() {
       </div>
 
       {/* 2. Date / View Toolbar Skeleton */}
-      <div className="flex flex-col gap-3 rounded-3xl border border-line bg-canvas p-3 shadow-card sm:flex-row sm:items-center sm:justify-between lg:p-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 rounded-3xl border border-line bg-canvas p-3 shadow-card md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center lg:p-4">
+        <div className="flex items-center gap-3 justify-self-start">
           <span aria-hidden="true" className="skeleton block h-9 w-9 rounded-xl" />
           <div className="space-y-1.5">
             <span aria-hidden="true" className="skeleton block h-4 w-36 rounded" />
             <span aria-hidden="true" className="skeleton block h-3 w-16 rounded" />
           </div>
         </div>
-        <span aria-hidden="true" className="skeleton block h-10 w-44 rounded-2xl" />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center justify-self-center">
+          <span aria-hidden="true" className="skeleton block h-10 w-44 rounded-2xl" />
+        </div>
+        <div className="flex items-center gap-2 justify-self-end">
           <span aria-hidden="true" className="skeleton block h-9 w-16 rounded-xl" />
-          <span aria-hidden="true" className="skeleton block h-9 w-32 rounded-xl" />
-          <span aria-hidden="true" className="skeleton block h-9 w-20 rounded-xl" />
+          <span aria-hidden="true" className="skeleton block h-9 w-40 rounded-xl" />
           <span aria-hidden="true" className="skeleton block h-9 w-9 rounded-xl" />
         </div>
       </div>

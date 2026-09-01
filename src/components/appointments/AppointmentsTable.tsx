@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import Link from "next/link";
 import AppointmentActions from "@/components/appointments/AppointmentActions";
 import {
@@ -7,7 +7,6 @@ import {
   formatAppointmentDate,
 } from "@/components/appointments/status";
 import { buttonClasses } from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import StatusPill from "@/components/ui/StatusPill";
 import Table, { TBody, TD, TH, THead, TR } from "@/components/ui/Table";
@@ -50,6 +49,7 @@ interface AppointmentsTableProps {
   isFiltered: boolean;
   /** Optional view context to render truthful headings and empty states */
   dateView?: {
+    view?: "day" | "upcoming";
     date: string;
     isToday: boolean;
   };
@@ -85,21 +85,19 @@ export default function AppointmentsTable({
   dateView,
   permissions,
 }: AppointmentsTableProps) {
-  const scheduleTitle = dateView
-    ? dateView.date !== ""
-      ? dateView.isToday
-        ? "Today's schedule"
-        : "Day's schedule"
-      : "Upcoming schedule"
-    : "Today's schedule";
+  const isUpcoming = dateView?.view === "upcoming" || dateView?.date === "";
 
-  const scheduleSubtitle = dateView
-    ? dateView.date !== ""
-      ? dateView.isToday
-        ? "Appointments scheduled for today."
-        : "Appointments scheduled for this day."
-      : "Upcoming appointments across available days."
-    : "Appointments scheduled for today.";
+  const scheduleTitle = isUpcoming
+    ? "Upcoming schedule"
+    : dateView?.isToday
+      ? "Today's schedule"
+      : "Day's schedule";
+
+  const scheduleSubtitle = isUpcoming
+    ? "Upcoming appointments across available days."
+    : dateView?.isToday
+      ? "Appointments scheduled for today."
+      : "Appointments scheduled for this day.";
 
   if (appointments.length === 0) {
     return (
@@ -116,14 +114,16 @@ export default function AppointmentsTable({
             title={
               isFiltered
                 ? "No appointments match these filters"
-                : dateView && dateView.date === ""
+                : isUpcoming
                   ? "No upcoming appointments"
-                  : "Nothing booked for this day"
+                  : dateView?.isToday
+                    ? "Nothing booked for today"
+                    : "Nothing booked for this day"
             }
             guidance={
               isFiltered
                 ? "Try another doctor, status, or adjust the history filter."
-                : dateView && dateView.date === ""
+                : isUpcoming
                   ? "Book a patient into a doctor's slot to schedule visits."
                   : "Book a patient into a doctor's slot to start filling the day."
             }

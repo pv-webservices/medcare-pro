@@ -260,6 +260,7 @@ export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
 export const appointmentFilterSchema = z.object({
   clinicId: z.string().trim().max(64).optional(),
   doctorId: z.string().trim().max(64).optional(),
+  view: z.enum(["day", "upcoming"]).optional(),
   /** One exact day. Takes precedence over the range if both are given. */
   date: optionalDateSchema,
   dateFrom: optionalDateSchema,
@@ -277,6 +278,26 @@ export const appointmentFilterSchema = z.object({
 });
 
 export type AppointmentFilters = z.infer<typeof appointmentFilterSchema>;
+
+export const appointmentIndicatorsQuerySchema = z.object({
+  clinicId: z.string().trim().max(64).optional(),
+  doctorId: z.string().trim().max(64).optional(),
+  status: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || isAppointmentStatus(value),
+      "Choose a valid appointment status.",
+    )
+    .optional(),
+  includeHistory: flagSchema,
+  dateFrom: optionalDateSchema,
+  dateTo: optionalDateSchema,
+});
+
+export type AppointmentIndicatorsQuery = z.infer<
+  typeof appointmentIndicatorsQuerySchema
+>;
 
 /**
  * The statuses a board shows unless history is asked for.

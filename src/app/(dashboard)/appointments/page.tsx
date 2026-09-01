@@ -9,6 +9,7 @@ import PageHeader, { Count } from "@/components/ui/PageHeader";
 import Pagination from "@/components/ui/Pagination";
 import {
   appointmentFilterSchema,
+  getAppointmentDateIndicators,
   listAppointments,
   type AppointmentFilters as Filters,
 } from "@/lib/appointments";
@@ -89,21 +90,23 @@ export default async function AppointmentBoardPage({
   const selectedClinicId = await resolveSelectedClinicId(actor);
   const today = todayDateOnly();
 
-  // A date is only absent when the reader has cleared it on purpose; a first
-  // visit to the page gets today.
-  const requestedDate = "date" in params ? single(params.date) : today;
+  const requestedView = single(params.view);
+  const isUpcomingMode = requestedView === "upcoming";
+  const requestedDate = "date" in params ? single(params.date) : (isUpcomingMode ? "" : today);
 
   let filters: Filters;
   try {
     filters = appointmentFilterSchema.parse({
       ...params,
-      date: requestedDate,
+      view: isUpcomingMode ? "upcoming" : "day",
+      date: isUpcomingMode ? "" : (requestedDate || today),
       clinicId: selectedClinicId ?? undefined,
     });
   } catch {
     // A hand-edited or stale URL should narrow nothing, not break the board.
     filters = {
-      date: today,
+      view: isUpcomingMode ? "upcoming" : "day",
+      date: isUpcomingMode ? "" : today,
       clinicId: selectedClinicId ?? undefined,
     } as Filters;
   }
@@ -112,6 +115,7 @@ export default async function AppointmentBoardPage({
     result,
     clinics,
     doctors,
+    indicators,
     canCreate,
     canCheckIn,
     canConvert,
@@ -121,6 +125,12 @@ export default async function AppointmentBoardPage({
     listAppointments(actor, filters),
     listClinicsForActor(actor),
     listDoctorsForActor(actor, { clinicId: selectedClinicId }),
+    getAppointmentDateIndicators(actor, {
+      clinicId: selectedClinicId ?? undefined,
+      doctorId: filters.doctorId ?? undefined,
+      status: filters.status ?? undefined,
+      includeHistory: filters.includeHistory ?? false,
+    }),
     can(actor, "appointment:create", selectedClinicId ?? undefined),
     can(actor, "appointment:checkin", selectedClinicId ?? undefined),
     can(actor, "appointment:convert", selectedClinicId ?? undefined),
@@ -152,11 +162,13 @@ export default async function AppointmentBoardPage({
           <>
             <Count>{result.total}</Count>{" "}
             {result.total === 1 ? "appointment" : "appointments"}
-            {appliedDate
-              ? appliedDate === today
+            {filters.view === "upcoming"
+              ? " upcoming"
+              : appliedDate === today
                 ? " today"
-                : ` on ${formatAppointmentDate(appliedDate)}`
-              : " upcoming"}
+                : appliedDate
+                  ? ` on ${formatAppointmentDate(appliedDate)}`
+                  : " upcoming"}
             {selectedClinic ? ` at ${selectedClinic.name}` : " across all clinics"}
             .
           </>
@@ -190,8 +202,11 @@ export default async function AppointmentBoardPage({
       <AppointmentFilters
         doctors={doctors.map(({ id, name }) => ({ id, name }))}
         today={today}
+        initialIndicators={indicators}
+        clinicId={selectedClinicId ?? undefined}
         initial={{
-          date: appliedDate,
+          view: filters.view === "upcoming" ? "upcoming" : "day",
+          date: filters.view === "upcoming" ? "" : appliedDate,
           doctorId: filters.doctorId ?? "",
           status: filters.status ?? "",
           includeHistory: filters.includeHistory ?? false,
@@ -201,11 +216,12 @@ export default async function AppointmentBoardPage({
       <AppointmentsTable
         appointments={result.rows}
         showClinic={!selectedClinic}
-        showDate={appliedDate === ""}
+        showDate={filters.view === "upcoming" || appliedDate === ""}
         isFiltered={isFiltered}
         dateView={{
-          date: appliedDate,
-          isToday: appliedDate === today,
+          view: filters.view === "upcoming" ? "upcoming" : "day",
+          date: filters.view === "upcoming" ? "" : appliedDate,
+          isToday: filters.view !== "upcoming" && appliedDate === today,
         }}
         permissions={{ canCheckIn, canConvert, canCancel, canConfirm, canCreate }}
       />

@@ -2,7 +2,7 @@
 
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_ORDER,
@@ -43,6 +43,7 @@ export interface DoctorFilterOption {
 }
 
 export interface AppointmentFilterValues {
+  view: "day" | "upcoming";
   date: string;
   doctorId: string;
   status: string;
@@ -54,13 +55,21 @@ interface AppointmentFiltersProps {
   initial: AppointmentFilterValues;
   /** Offered as the one-click way back to the day in front of the desk. */
   today: string;
+  initialIndicators?: Record<string, { count: number }>;
+  clinicId?: string;
 }
 
 /** Blank values are left out entirely, so the URL shows only what is applied. */
 function toQueryString(values: AppointmentFilterValues): string {
   const params = new URLSearchParams();
 
-  if (values.date.trim() !== "") params.set("date", values.date.trim());
+  if (values.view === "upcoming") {
+    params.set("view", "upcoming");
+  } else {
+    params.set("view", "day");
+    if (values.date.trim() !== "") params.set("date", values.date.trim());
+  }
+
   if (values.doctorId.trim() !== "") params.set("doctorId", values.doctorId.trim());
   if (values.status.trim() !== "") params.set("status", values.status.trim());
   if (values.includeHistory) params.set("includeHistory", "true");
@@ -102,9 +111,47 @@ export default function AppointmentFilters({
   doctors,
   initial,
   today,
+  initialIndicators,
+  clinicId,
 }: AppointmentFiltersProps) {
   const router = useRouter();
   const [values, setValues] = useState<AppointmentFilterValues>(initial);
+  const [indicators, setIndicators] = useState<
+    Record<string, { count: number }>
+  >(initialIndicators ?? {});
+
+  const fetchMonthIndicators = useCallback(
+    async (year: number, month: number) => {
+      try {
+        const monthStr = String(month).padStart(2, "0");
+        const lastDay = new Date(year, month, 0).getDate();
+        const dateFrom = `${year}-${monthStr}-01`;
+        const dateTo = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+
+        const params = new URLSearchParams({
+          dateFrom,
+          dateTo,
+        });
+        if (clinicId) params.set("clinicId", clinicId);
+        if (values.doctorId) params.set("doctorId", values.doctorId);
+        if (values.status) params.set("status", values.status);
+        if (values.includeHistory) params.set("includeHistory", "true");
+
+        const res = await fetch(
+          `/api/appointments/indicators?${params.toString()}`,
+        );
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            setIndicators((prev) => ({ ...prev, ...json.data }));
+          }
+        }
+      } catch {
+        // Non-critical background enhancement
+      }
+    },
+    [clinicId, values.doctorId, values.status, values.includeHistory],
+  );
 
   const activeCount =
     (initial.doctorId !== "" ? 1 : 0) +
@@ -124,13 +171,29 @@ export default function AppointmentFilters({
 
   /** The day strip navigates immediately — it is a view change, not a filter. */
   function goToDate(date: string) {
-    const next = { ...values, date };
+    const next: AppointmentFilterValues = {
+      ...values,
+      view: "day",
+      date,
+    };
+    setValues(next);
+    go(next);
+  }
+
+  function goToView(view: "day" | "upcoming") {
+    const targetDate = values.date || today;
+    const next: AppointmentFilterValues = {
+      ...values,
+      view,
+      date: view === "day" ? targetDate : "",
+    };
     setValues(next);
     go(next);
   }
 
   function handleClear() {
     const next: AppointmentFilterValues = {
+      view: "day",
       date: today,
       doctorId: "",
       status: "",
@@ -140,21 +203,22 @@ export default function AppointmentFilters({
     go(next);
   }
 
-  const isToday = values.date === today;
-  const hasDate = values.date !== "";
+  const isUpcoming = values.view === "upcoming";
+  const isToday = !isUpcoming && values.date === today;
+  const currentDayForShift = values.date || today;
 
   return (
     <div className="space-y-4">
       {/* 2. DATE / VIEW TOOLBAR */}
-      <div className="flex flex-col gap-3 rounded-3xl border border-line bg-canvas p-3 shadow-card sm:flex-row sm:items-center sm:justify-between lg:p-4">
+      <div className="flex flex-col gap-3 rounded-3xl border border-line bg-canvas p-3 shadow-card md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center lg:p-4">
         {/* Left: Previous day button + Date display */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0 justify-self-start">
           <IconButton
             label="Previous day"
             size="sm"
             isOutlined
-            disabled={!hasDate}
-            onClick={() => goToDate(shiftDate(values.date, -1))}
+            disabled={isUpcoming}
+            onClick={() => goToDate(shiftDate(currentDayForShift, -1))}
           >
             <ChevronLeft aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
           </IconButton>
@@ -167,26 +231,28 @@ export default function AppointmentFilters({
             />
             <div className="min-w-0">
               <p className="truncate text-body font-semibold text-ink leading-tight">
-                {hasDate ? formatDayWithWeekday(values.date) : "All upcoming days"}
+                {isUpcoming
+                  ? "All upcoming days"
+                  : formatDayWithWeekday(values.date || today)}
               </p>
               <p
                 className={cx(
                   "truncate text-meta font-medium leading-tight mt-0.5",
-                  isToday ? "text-accent font-semibold" : "text-muted",
+                  !isUpcoming && isToday ? "text-accent font-semibold" : "text-muted",
                 )}
               >
-                {hasDate
-                  ? isToday
+                {isUpcoming
+                  ? "Every scheduled appointment"
+                  : isToday
                     ? "Today"
-                    : "Selected day"
-                  : "Every scheduled appointment"}
+                    : "Selected day"}
               </p>
             </div>
           </div>
         </div>
 
         {/* Center: Day | Upcoming segmented control */}
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center justify-self-center">
           <div
             role="tablist"
             aria-label="View range"
@@ -195,15 +261,13 @@ export default function AppointmentFilters({
             <button
               type="button"
               role="tab"
-              aria-selected={hasDate}
-              onClick={() => {
-                if (!hasDate) goToDate(today);
-              }}
+              aria-selected={!isUpcoming}
+              onClick={() => goToView("day")}
               className={cx(
-                "min-h-9 rounded-xl px-4 text-label font-semibold transition-all duration-150",
-                hasDate
-                  ? "bg-canvas text-ink shadow-card"
-                  : "text-muted hover:text-ink",
+                "min-h-9 rounded-xl px-4 text-label font-semibold transition-all duration-150 border",
+                !isUpcoming
+                  ? "bg-canvas text-ink shadow-card border-line/40"
+                  : "border-transparent text-muted hover:text-ink",
               )}
             >
               Day
@@ -211,15 +275,13 @@ export default function AppointmentFilters({
             <button
               type="button"
               role="tab"
-              aria-selected={!hasDate}
-              onClick={() => {
-                if (hasDate) goToDate("");
-              }}
+              aria-selected={isUpcoming}
+              onClick={() => goToView("upcoming")}
               className={cx(
-                "min-h-9 rounded-xl px-4 text-label font-semibold transition-all duration-150",
-                !hasDate
-                  ? "bg-canvas text-ink shadow-card"
-                  : "text-muted hover:text-ink",
+                "min-h-9 rounded-xl px-4 text-label font-semibold transition-all duration-150 border",
+                isUpcoming
+                  ? "bg-canvas text-ink shadow-card border-line/40"
+                  : "border-transparent text-muted hover:text-ink",
               )}
             >
               Upcoming
@@ -227,11 +289,11 @@ export default function AppointmentFilters({
           </div>
         </div>
 
-        {/* Right: Today, Date Picker, All days, Next day button */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Right: Today, Date Picker, Next day button */}
+        <div className="flex flex-wrap items-center gap-2 justify-self-end">
           <Button
             size="sm"
-            variant={isToday ? "primary" : "secondary"}
+            variant={!isUpcoming && isToday ? "primary" : "secondary"}
             onClick={() => goToDate(today)}
           >
             Today
@@ -243,28 +305,24 @@ export default function AppointmentFilters({
               id="appointment-filter-date"
               label="Jump to date"
               isLabelHidden
-              value={values.date}
+              value={isUpcoming ? "" : values.date}
               onChange={(newDate) => goToDate(newDate)}
               placeholder="Select date"
               className="!min-h-9 !py-1.5 !rounded-xl !text-label"
               showClear={false}
               showToday={false}
               align="end"
+              dateIndicators={indicators}
+              onMonthChange={fetchMonthIndicators}
             />
           </div>
-
-          {hasDate && (
-            <Button size="sm" variant="secondary" onClick={() => goToDate("")}>
-              All days
-            </Button>
-          )}
 
           <IconButton
             label="Next day"
             size="sm"
             isOutlined
-            disabled={!hasDate}
-            onClick={() => goToDate(shiftDate(values.date, 1))}
+            disabled={isUpcoming}
+            onClick={() => goToDate(shiftDate(currentDayForShift, 1))}
           >
             <ChevronRight aria-hidden="true" strokeWidth={2} className="h-4 w-4" />
           </IconButton>
