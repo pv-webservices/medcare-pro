@@ -1,4 +1,8 @@
 import type { ReactNode } from "react";
+import { resolveLiveSession } from "@/lib/session";
+import { evaluatePlatformAccess, OWNER_PLATFORM_ROLE } from "@/lib/platform/context";
+import { prisma } from "@/lib/prisma";
+import OwnerShell from "@/components/owner/OwnerShell";
 
 interface OwnerLayoutProps {
   children: ReactNode;
@@ -7,29 +11,48 @@ interface OwnerLayoutProps {
 /**
  * Shell for the platform surface — Stage 2.
  *
- * Deliberately does NO authorization. `/owner/login` has to render without a
- * session, so the gate lives in each page instead: `/owner/dashboard` calls
- * `requirePlatformOwner()`. Putting it here would either lock the login page
- * out or tempt a later page into relying on a check it cannot see.
- *
- * WHY data-theme IS PINNED HERE. This surface has always been dark — it is the
- * platform operator's console, visually separate from any tenant's clinic so
- * that nobody confuses "our records" with "everyone's records". It used to get
- * that from its own hand-rolled slate ramp, which meant a second, unmaintained
- * palette living beside the real one.
- *
- * Scoping the dark theme to this subtree instead means the owner panel is the
+ * Scoping the dark theme to this subtree means the owner panel is the
  * same design system in its other mode: one set of tokens, one depth
- * vocabulary, and the dark theme is now exercised by a screen someone actually
- * uses rather than existing only behind a toggle. Custom properties cascade, so
- * the attribute works on a div exactly as it does on <html> — and it overrides
- * whatever next-themes has set above it, which is the point: an operator who
- * prefers the butter theme still gets the dark console.
+ * vocabulary.
  */
-export default function OwnerLayout({ children }: OwnerLayoutProps) {
+export default async function OwnerLayout({ children }: OwnerLayoutProps) {
+  const session = await resolveLiveSession();
+  const context = session?.context;
+
+  const isOwner =
+    context !== null &&
+    context !== undefined &&
+    evaluatePlatformAccess({
+      sessionValid: true,
+      platformRole: context.user.platformRole ?? null,
+      accountStatus: context.user.accountStatus ?? "PENDING",
+      required: OWNER_PLATFORM_ROLE,
+    }).allowed;
+
+  if (!isOwner || !context) {
+    return (
+      <main data-theme="dark" className="min-h-screen bg-[#070d1d] text-ink">
+        {children}
+      </main>
+    );
+  }
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: context.user.id },
+    select: { name: true, email: true },
+  });
+
   return (
-    <main data-theme="dark" className="min-h-screen bg-canvas text-ink">
-      {children}
-    </main>
+    <div data-theme="dark" className="min-h-screen bg-[#060b17] text-white">
+      <OwnerShell
+        user={{
+          name: currentUser?.name || "Superadmin",
+          email: currentUser?.email || null,
+          platformRole: "Superadmin",
+        }}
+      >
+        {children}
+      </OwnerShell>
+    </div>
   );
 }
