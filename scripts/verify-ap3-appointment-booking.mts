@@ -108,8 +108,8 @@ const PII = {
   mobileNumber: "9876500099",
   address: "42 Disclosure Drive",
   city: "Leakstown",
-  gender: "female",
-  age: 918273,
+  gender: "Female" as const,
+  age: 42,
 };
 
 // ---------------------------------------------------------------------------
@@ -746,6 +746,10 @@ const booking = (f: Fixture, typeId: string, start: string, end: string) => ({
   appointmentTypeId: typeId,
   name: "Ravi Kumar",
   mobileNumber: "9876500123",
+  age: 30,
+  gender: "Male" as const,
+  city: "Bengaluru",
+  address: "123 Test St",
   slotStart: iso(DAY, start),
   slotEnd: iso(DAY, end),
 });

@@ -3,11 +3,15 @@ import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features
 import type { InboundClinicContext } from "@/lib/telephony/clinicConfig";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import {
-  buildMessageThenMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
+import {
+  getClinicIvrRuntimeMenuForTrustedClinic,
+  type ClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
 
 export interface ValidatedBookingWebhookInput {
   requestUrl: string;
@@ -15,6 +19,7 @@ export interface ValidatedBookingWebhookInput {
   from: unknown;
   callUuid: unknown;
   digits?: string;
+  runtimeMenu: ClinicIvrRuntimeMenu;
 }
 
 export async function processBookingWebhook(
@@ -34,6 +39,7 @@ export async function processBookingWebhook(
   try {
     const clinic = await resolveInboundClinicByPlivoNumber(verification.params.To);
     if (!clinic) return xmlResponse(buildTelephonyUnavailableXml());
+    const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     try {
       await requireTenantFeatureEntitlement(
         clinic.tenantId,
@@ -42,11 +48,13 @@ export async function processBookingWebhook(
     } catch (error: unknown) {
       if (!(error instanceof FeatureError)) throw error;
       return xmlResponse(
-        buildMessageThenMainMenuXml(
-          "Telephone appointment booking is not available for this clinic.",
-          buildPlivoInputActionUrl(request.url),
-          clinic.clinicName,
-        ),
+        buildEffectiveClinicMainMenuXml({
+          message:
+            "Telephone appointment booking is not available for this clinic.",
+          inputActionUrl: buildPlivoInputActionUrl(request.url),
+          clinicName: clinic.clinicName,
+          runtimeMenu,
+        }),
       );
     }
     const digitsValue = verification.params.Digits;
@@ -57,6 +65,7 @@ export async function processBookingWebhook(
         from: verification.params.From,
         callUuid: verification.params.CallUUID,
         digits: typeof digitsValue === "string" ? digitsValue : undefined,
+        runtimeMenu,
       }),
     );
   } catch {

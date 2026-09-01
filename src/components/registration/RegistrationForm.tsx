@@ -93,30 +93,21 @@ interface RegistrationFormProps {
   onCancel?: () => void;
 }
 
-/** Free text in the database — this list is a shortcut, not a constraint. */
-const GENDERS = ["Female", "Male", "Other"] as const;
+import {
+  GENDER_OPTIONS,
+  normalizeGender,
+  validatePatientDetails,
+} from "@/lib/patientValidation";
 
-const MOBILE = /^(\+91)?[0-9]{10}$/;
 const MAX_AMOUNT = 99_999_999.99;
 
 type FieldErrors = Partial<Record<keyof RegistrationFormValues, string>>;
 
 function validate(values: RegistrationFormValues): FieldErrors {
-  const errors: FieldErrors = {};
+  const patientErrors = validatePatientDetails(values);
+  const errors: FieldErrors = { ...patientErrors };
 
   if (!values.clinicId) errors.clinicId = "Choose a clinic.";
-  if (values.name.trim().length === 0) errors.name = "Enter the patient's name.";
-
-  if (!MOBILE.test(values.mobileNumber.trim())) {
-    errors.mobileNumber = "Mobile number must be a valid 10-digit Indian number.";
-  }
-
-  if (values.age.trim()) {
-    const age = Number(values.age);
-    if (!Number.isInteger(age) || age < 0 || age > 150) {
-      errors.age = "Enter an age between 0 and 150.";
-    }
-  }
 
   if (!values.doctorId) errors.doctorId = "Choose a doctor.";
   if (values.department.trim().length === 0) {
@@ -233,7 +224,7 @@ export default function RegistrationForm({
       patientCode: patient.patientCode,
       name: patient.name,
       age: patient.age === null ? "" : String(patient.age),
-      gender: patient.gender ?? "",
+      gender: normalizeGender(patient.gender),
       mobileNumber: patient.mobileNumber,
       address: patient.address ?? "",
       city: patient.city ?? "",
@@ -504,8 +495,9 @@ export default function RegistrationForm({
                   inputMode="numeric"
                   min={0}
                   max={150}
-                  label="Age (optional)"
+                  label="Age"
                   placeholder="Enter age"
+                  required
                   value={values.age}
                   onChange={(e) => update("age", e.target.value)}
                   onBlur={() => touch("age")}
@@ -515,11 +507,14 @@ export default function RegistrationForm({
                 <Select
                   id="registration-gender"
                   label="Gender"
+                  required
                   value={values.gender}
                   onChange={(e) => update("gender", e.target.value)}
+                  onBlur={() => touch("gender")}
+                  error={errorFor("gender")}
                 >
-                  <option value="">Not recorded</option>
-                  {GENDERS.map((gender) => (
+                  <option value="">Select gender…</option>
+                  {GENDER_OPTIONS.map((gender) => (
                     <option key={gender} value={gender}>
                       {gender}
                     </option>
@@ -530,21 +525,27 @@ export default function RegistrationForm({
               <Input
                 id="registration-city"
                 type="text"
-                label="City (optional)"
+                label="City"
                 placeholder="Enter city"
                 autoComplete="off"
+                required
                 value={values.city}
                 onChange={(e) => update("city", e.target.value)}
+                onBlur={() => touch("city")}
+                error={errorFor("city")}
               />
 
               <Input
                 id="registration-address"
                 type="text"
-                label="Address (optional)"
+                label="Address"
                 placeholder="Enter address"
                 autoComplete="off"
+                required
                 value={values.address}
                 onChange={(e) => update("address", e.target.value)}
+                onBlur={() => touch("address")}
+                error={errorFor("address")}
               />
             </div>
           </div>

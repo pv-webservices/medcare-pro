@@ -118,8 +118,8 @@ const PII = {
   mobileNumber: "9876500044",
   address: "44 Disclosure Drive",
   city: "Leakstown",
-  gender: "female",
-  age: 918274,
+  gender: "Female" as const,
+  age: 44,
 };
 
 const SLOT_TAKEN = "This time slot was just booked. Please select another slot.";

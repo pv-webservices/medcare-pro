@@ -46,7 +46,7 @@ export default function Panel({
     <section
       aria-label={title}
       className={cx(
-        "overflow-hidden rounded-2xl border border-line bg-canvas shadow-card",
+        "overflow-hidden rounded-2xl border border-line bg-canvas shadow-card dashboard-card-hover",
         className,
       )}
     >

@@ -74,15 +74,25 @@ describe("Phase 2A IVR profile Prisma foundation", () => {
   });
 });
 
-describe("Phase 2A live-runtime isolation", () => {
+describe("Phase 2B static fallback and management isolation", () => {
+  it("retains the original deterministic prompt and routing infrastructure", () => {
+    expect(liveIvr).toContain("buildMainMenuPrompt");
+    expect(liveIvr).toContain("MAIN_MENU_ROUTES");
+    expect(liveRouting).toContain("export const MAIN_MENU_ROUTES");
+    expect(liveRouting).toContain("export function resolveMainMenuAction");
+  });
+
   it.each([
     ["answer webhook", answerWebhook],
     ["input webhook", inputWebhook],
-    ["live prompt builder", liveIvr],
-    ["live static routing", liveRouting],
-  ])("does not connect the new profile service to %s", (_name, source) => {
-    expect(source).not.toContain("ivrProfile");
-    expect(source).not.toContain("ClinicIvrProfile");
-    expect(source).not.toContain("ClinicIvrMenuItem");
+  ])("never calls the actor management API from the %s", (_name, source) => {
+    expect(source).not.toContain("getClinicIvrProfileForActor");
+    expect(source).not.toContain("/telephony/ivr-profile");
+    expect(source).not.toContain("ActorContext");
+  });
+
+  it("does not persist a runtime revision or add a Phase 2B schema field", () => {
+    expect(schema).not.toContain("ivrRevision");
+    expect(schema).not.toContain("ivr_revision");
   });
 });

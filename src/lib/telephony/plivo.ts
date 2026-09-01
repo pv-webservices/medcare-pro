@@ -14,6 +14,10 @@ import {
   STAGE_2_NO_INPUT_MESSAGE,
 } from "@/lib/telephony/ivr";
 import type { MainMenuAction } from "@/lib/telephony/routing";
+import {
+  IVR_REVISION_QUERY_PARAM,
+  type ClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
 import { resolvePlivoPublicWebhookUrl } from "@/lib/telephony/publicUrl";
 
 export const PLIVO_INPUT_WEBHOOK_PATH = "/api/webhooks/plivo/input";
@@ -46,7 +50,7 @@ export const RECEPTION_DIAL_TIMEOUT_SECONDS = URGENT_DIAL_TIMEOUT_SECONDS;
 
 type PlivoResponse = ReturnType<typeof createPlivoResponse>;
 type PlivoGetInputElement = {
-  addSpeak: (body: string, attributes: Record<string, never>) => object;
+  addSpeak: (body: string, attributes: Readonly<Record<string, string>>) => object;
 };
 type PlivoDialElement = {
   addNumber: (body: string) => object;
@@ -78,6 +82,7 @@ function addDtmfMenu(
   response: PlivoResponse,
   actionUrl: string,
   prompt: string,
+  speakAttributes: Readonly<Record<string, string>> = {},
 ): void {
   const getInput = response.addGetInput({
     action: actionUrl,
@@ -88,7 +93,7 @@ function addDtmfMenu(
     executionTimeout: 10,
     redirect: true,
   }) as PlivoGetInputElement;
-  getInput.addSpeak(prompt, {});
+  getInput.addSpeak(prompt, speakAttributes);
 }
 
 function addMainMenu(
@@ -157,6 +162,62 @@ export function buildMessageThenMainMenuXml(
   const response = createPlivoResponse();
   response.addSpeak(message, {});
   addMainMenu(response, inputActionUrl, clinicName);
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  return response.toXML();
+}
+
+function inputActionUrlForRuntime(
+  inputActionUrl: string,
+  runtimeMenu: ClinicIvrRuntimeMenu,
+): string {
+  if (runtimeMenu.source === "default") return inputActionUrl;
+  const actionUrl = new URL(inputActionUrl);
+  actionUrl.searchParams.set(IVR_REVISION_QUERY_PARAM, runtimeMenu.revision);
+  return actionUrl.toString();
+}
+
+/**
+ * Uses the byte-stable legacy builders for the default menu and a narrow
+ * dynamic builder only for a validated custom runtime menu.
+ */
+export function buildEffectiveClinicMainMenuXml(input: {
+  inputActionUrl: string;
+  clinicName: string;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
+  message?: string;
+  invalidSelection?: boolean;
+}): string {
+  if (!input.runtimeMenu || input.runtimeMenu.source === "default") {
+    if (input.message) {
+      return buildMessageThenMainMenuXml(
+        input.message,
+        input.inputActionUrl,
+        input.clinicName,
+      );
+    }
+    return input.invalidSelection
+      ? buildClinicSelectionXml(
+          "invalid-input",
+          input.inputActionUrl,
+          input.clinicName,
+        )
+      : buildClinicMainMenuXml(input.inputActionUrl, input.clinicName);
+  }
+
+  const response = createPlivoResponse();
+  if (input.message) response.addSpeak(input.message, {});
+  if (input.invalidSelection) {
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+  }
+  addDtmfMenu(
+    response,
+    inputActionUrlForRuntime(input.inputActionUrl, input.runtimeMenu),
+    input.runtimeMenu.prompt,
+    {
+      language: input.runtimeMenu.language,
+      voice: input.runtimeMenu.voice,
+    },
+  );
   response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
   return response.toXML();
 }

@@ -3,11 +3,12 @@ import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features
 import { handleSlotMenuInput } from "@/lib/telephony/availability";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import {
-  buildMessageThenMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
+import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,7 @@ export async function POST(request: Request): Promise<Response> {
       verification.params.To,
     );
     if (!clinic) return xmlResponse(buildTelephonyUnavailableXml());
+    const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     try {
       await requireTenantFeatureEntitlement(
         clinic.tenantId,
@@ -34,17 +36,24 @@ export async function POST(request: Request): Promise<Response> {
     } catch (error: unknown) {
       if (!(error instanceof FeatureError)) throw error;
       return xmlResponse(
-        buildMessageThenMainMenuXml(
-          "Telephone appointment availability is not available for this clinic.",
-          buildPlivoInputActionUrl(request.url),
-          clinic.clinicName,
-        ),
+        buildEffectiveClinicMainMenuXml({
+          message:
+            "Telephone appointment availability is not available for this clinic.",
+          inputActionUrl: buildPlivoInputActionUrl(request.url),
+          clinicName: clinic.clinicName,
+          runtimeMenu,
+        }),
       );
     }
     const value = verification.params.Digits;
     const digits = typeof value === "string" ? value : undefined;
     return xmlResponse(
-      await handleSlotMenuInput({ requestUrl: request.url, clinic, digits }),
+      await handleSlotMenuInput({
+        requestUrl: request.url,
+        clinic,
+        digits,
+        runtimeMenu,
+      }),
     );
   } catch {
     console.error("Could not process the Plivo slot-page callback.");

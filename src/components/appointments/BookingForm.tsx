@@ -108,9 +108,14 @@ interface FormValues {
   city: string;
 }
 
-type FieldErrors = Partial<Record<keyof FormValues, string>>;
+import {
+  GENDER_OPTIONS,
+  normalizeGender,
+  validatePatientDetails,
+  type GenderOption,
+} from "@/lib/patientValidation";
 
-const GENDERS = ["Female", "Male", "Other"] as const;
+type FieldErrors = Partial<Record<keyof FormValues, string>>;
 
 /** Mirrors mobileSchema in lib/appointmentInput.ts. */
 const MOBILE = /^(\+91)?[0-9]{10}$/;
@@ -281,7 +286,7 @@ export default function BookingForm({
       name: patient.name,
       mobileNumber: patient.mobileNumber,
       age: patient.age === null ? "" : String(patient.age),
-      gender: patient.gender ?? "",
+      gender: normalizeGender(patient.gender),
       address: patient.address ?? "",
       city: patient.city ?? "",
     }));
@@ -309,16 +314,9 @@ export default function BookingForm({
     if (!values.appointmentTypeId) next.appointmentTypeId = "Choose a service.";
     if (!values.date) next.date = "Choose a date.";
     if (!values.slotStart) next.slotStart = "Choose a slot.";
-    if (values.name.trim() === "") next.name = "Enter the patient's name.";
-    if (!MOBILE.test(values.mobileNumber.trim())) {
-      next.mobileNumber = "Mobile number must be a valid 10-digit Indian number.";
-    }
-    if (values.age !== "") {
-      const age = Number(values.age);
-      if (!Number.isInteger(age) || age < 0 || age > 150) {
-        next.age = "Enter an age between 0 and 150.";
-      }
-    }
+
+    const patientErrors = validatePatientDetails(values);
+    Object.assign(next, patientErrors);
 
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -397,7 +395,11 @@ export default function BookingForm({
     values.date &&
     values.slotStart &&
     values.name.trim() &&
-    MOBILE.test(values.mobileNumber.trim()),
+    MOBILE.test(values.mobileNumber.trim()) &&
+    values.age.trim() &&
+    GENDER_OPTIONS.includes(values.gender as GenderOption) &&
+    values.city.trim() &&
+    values.address.trim(),
   );
 
   return (
@@ -414,37 +416,42 @@ export default function BookingForm({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
         {/* Main Column */}
         <div className="space-y-6 lg:col-span-7 xl:col-span-8">
-          {/* 1. Choose the slot */}
+          {/* 1. Doctor and Service */}
           <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
-            <div className="mb-6">
-              <h2 className="text-lg font-bold tracking-tight text-ink">
-                1. Choose the slot
-              </h2>
-              <p className="mt-0.5 text-label text-muted">
-                Doctor, service, date and an available time.
-              </p>
+            <div className="mb-5 flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                <Stethoscope className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink">
+                  1. Doctor and service
+                </h2>
+                <p className="mt-0.5 text-label text-muted">
+                  Pick the practitioner and appointment type first so available slots can load.
+                </p>
+              </div>
             </div>
 
-            {clinics.length > 1 && (
-              <div className="mb-4">
-                <Select
-                  id="booking-clinic"
-                  label="Clinic"
-                  value={values.clinicId}
-                  error={errors.clinicId}
-                  onChange={(e) => updateQuery("clinicId", e.target.value)}
-                >
-                  <option value="">Choose a clinic</option>
-                  {clinics.map((clinic) => (
-                    <option key={clinic.id} value={clinic.id}>
-                      {clinic.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {clinics.length > 1 && (
+                <div className="sm:col-span-2">
+                  <Select
+                    id="booking-clinic"
+                    label="Clinic"
+                    value={values.clinicId}
+                    error={errors.clinicId}
+                    onChange={(e) => updateQuery("clinicId", e.target.value)}
+                  >
+                    <option value="">Choose a clinic…</option>
+                    {clinics.map((clinic) => (
+                      <option key={clinic.id} value={clinic.id}>
+                        {clinic.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
 
-            <div className="grid gap-4 sm:grid-cols-3">
               <Select
                 id="booking-doctor"
                 label="Doctor"
@@ -453,10 +460,12 @@ export default function BookingForm({
                 disabled={!values.clinicId}
                 onChange={(e) => updateQuery("doctorId", e.target.value)}
               >
-                <option value="">Choose a doctor</option>
+                <option value="">
+                  {values.clinicId ? "Choose a doctor…" : "Choose a clinic first"}
+                </option>
                 {clinicDoctors.map((doctor) => (
                   <option key={doctor.id} value={doctor.id}>
-                    {doctor.name} — {doctor.department}
+                    {doctor.name} ({doctor.department})
                   </option>
                 ))}
               </Select>
@@ -469,35 +478,46 @@ export default function BookingForm({
                 disabled={!values.clinicId}
                 onChange={(e) => updateQuery("appointmentTypeId", e.target.value)}
               >
-                <option value="">Choose a service</option>
-                {clinicServices.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name} — {option.durationMinutes} min
+                <option value="">
+                  {values.clinicId ? "Choose a service…" : "Choose a clinic first"}
+                </option>
+                {clinicServices.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name} ({entry.durationMinutes} min · {formatRupees(entry.defaultAmount)})
                   </option>
                 ))}
               </Select>
-
-              <DatePicker
-                id="booking-date"
-                label="Date"
-                value={values.date}
-                error={errors.date}
-                onChange={(newDate) => updateQuery("date", newDate)}
-              />
             </div>
+          </section>
 
-            {service && (
-              <div className="mt-4 flex items-center gap-2.5 rounded-2xl border border-accent/15 bg-accent-soft/35 px-4 py-3 text-body text-ink">
-                <Info className="h-4 w-4 text-accent shrink-0" aria-hidden="true" />
-                <p className="text-body">
-                  <span className="font-semibold">{service.name}</span> runs{" "}
-                  <span className="font-semibold">{service.durationMinutes} minutes</span> and is quoted at{" "}
-                  <span className="font-semibold">{formatRupees(service.defaultAmount)}</span>.
+          {/* 2. Date and Slot */}
+          <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
+            <div className="mb-5 flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                <Clock className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink">
+                  2. Date and time
+                </h2>
+                <p className="mt-0.5 text-label text-muted">
+                  Choose an available slot. Times match the clinic&apos;s local schedule.
                 </p>
               </div>
-            )}
+            </div>
 
-            <div className="mt-6 border-t border-line/60 pt-6">
+            <div className="space-y-4">
+              <div className="max-w-xs">
+                <DatePicker
+                  id="booking-date"
+                  label="Date"
+                  value={values.date}
+                  minDate={today}
+                  error={errors.date}
+                  onChange={(newDate) => updateQuery("date", newDate)}
+                />
+              </div>
+
               <SlotPicker
                 result={slots}
                 isLoading={isLoadingSlots}
@@ -505,37 +525,43 @@ export default function BookingForm({
                 selected={values.slotStart}
                 onSelect={handleSlot}
               />
+
               {errors.slotStart && (
-                <p role="alert" className="mt-2 text-body font-medium text-alert-ink">
-                  {errors.slotStart}
-                </p>
+                <p className="text-meta text-alert-ink">{errors.slotStart}</p>
               )}
             </div>
           </section>
 
-          {/* 2. Patient details */}
+          {/* 3. Patient Details */}
           <section className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
-            <div className="mb-6">
-              <h2 className="text-lg font-bold tracking-tight text-ink">
-                2. Patient details
-              </h2>
-              <p className="mt-0.5 text-label text-muted">
-                Search first to link a returning patient; otherwise enter the booking details.
-              </p>
+            <div className="mb-5 flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                <User className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink">
+                  3. Patient details
+                </h2>
+                <p className="mt-0.5 text-label text-muted">
+                  Search first to link a returning patient; otherwise enter the booking details.
+                </p>
+              </div>
             </div>
 
-            {values.clinicId && values.patientId === null && (
-              <div className="mb-5">
-                <PatientLookup
-                  clinicId={values.clinicId}
-                  onSelect={handlePatientSelect}
-                />
-              </div>
-            )}
+            {/* Returning patient lookup */}
+            <div className="mb-5">
+              <PatientLookup
+                clinicId={values.clinicId}
+                onSelect={handlePatientSelect}
+              />
+            </div>
 
-            {values.patientId !== null && (
-              <Card isFlush className="mb-5 border-accent/30 bg-accent-soft p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+            {values.patientId && (
+              <Card
+                isFlush
+                className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-accent-soft bg-accent-soft p-4"
+              >
+                <div className="flex items-center justify-between w-full">
                   <p className="flex items-center gap-2 text-body text-ink">
                     <UserRoundCheck
                       aria-hidden="true"
@@ -558,7 +584,9 @@ export default function BookingForm({
               <Input
                 id="booking-name"
                 label="Patient name"
+                placeholder="Enter patient name"
                 autoComplete="off"
+                required
                 value={values.name}
                 error={errors.name}
                 onChange={(e) => update("name", e.target.value)}
@@ -569,7 +597,9 @@ export default function BookingForm({
                 type="tel"
                 inputMode="numeric"
                 label="Mobile number"
+                placeholder="Enter mobile number"
                 autoComplete="off"
+                required
                 maxLength={13}
                 pattern="^(\+91)?[0-9]{10}$"
                 title="Enter a valid 10-digit Indian phone number (e.g. 9599995599 or +919599995599)"
@@ -591,7 +621,8 @@ export default function BookingForm({
                 type="number"
                 inputMode="numeric"
                 label="Age"
-                hint="Optional"
+                placeholder="Enter age"
+                required
                 min={0}
                 max={150}
                 value={values.age}
@@ -602,12 +633,13 @@ export default function BookingForm({
               <Select
                 id="booking-gender"
                 label="Gender"
-                hint="Optional"
+                required
                 value={values.gender}
+                error={errors.gender}
                 onChange={(e) => update("gender", e.target.value)}
               >
-                <option value="">Not recorded</option>
-                {GENDERS.map((gender) => (
+                <option value="">Select gender…</option>
+                {GENDER_OPTIONS.map((gender) => (
                   <option key={gender} value={gender}>
                     {gender}
                   </option>
@@ -617,9 +649,11 @@ export default function BookingForm({
               <Input
                 id="booking-city"
                 label="City"
-                hint="Optional"
+                placeholder="Enter city"
                 autoComplete="off"
+                required
                 value={values.city}
+                error={errors.city}
                 onChange={(e) => update("city", e.target.value)}
               />
 
@@ -629,9 +663,11 @@ export default function BookingForm({
                 <Input
                   id="booking-address"
                   label="Address"
-                  hint="Optional"
+                  placeholder="Enter address"
                   autoComplete="off"
+                  required
                   value={values.address}
+                  error={errors.address}
                   onChange={(e) => update("address", e.target.value)}
                 />
               </div>

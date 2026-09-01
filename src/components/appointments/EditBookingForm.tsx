@@ -3,38 +3,11 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import Input, { Textarea } from "@/components/ui/Input";
+import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { updateAppointmentSchema } from "@/lib/appointmentInput";
-
-/**
- * Correcting a booking's details — AP-9, over PATCH /api/appointments/[id].
- *
- * WHAT IS NOT ON THIS FORM IS THE POINT, and it is the same list the endpoint
- * refuses to have vocabulary for: no date, no time, no doctor, no service, no
- * clinic, no patient link and no status. Moving a booking is the reschedule
- * form further down the same page, which picks a real free slot; this only
- * corrects what the desk wrote down about the person.
- *
- * VALIDATION IS THE SERVER'S OWN SCHEMA, IMPORTED — the AP-7 pattern, for the
- * same reason: the strongest form of mirroring the server's rules is not
- * writing a second copy. `updateAppointmentSchema` lives in the pure
- * lib/appointmentInput.ts, so a client component may import it while
- * lib/appointmentEdit.ts, which sits beside Prisma, stays server-only.
- *
- * TWO RULES ARE THE FORM'S OWN, because the server cannot see them by the time
- * it has JSON:
- *
- *   - A blank AMOUNT would go through `z.coerce.number()` as 0, which is a
- *     legitimate price for a free follow-up. Blank means "I cleared the field",
- *     not "make it free", so it is refused here.
- *   - A blank AGE is genuinely "not recorded", so it is sent as an explicit
- *     null rather than the 0 that coercion would produce — a newborn is 0 and
- *     the two must not collide.
- */
-
-const GENDERS = ["Female", "Male", "Other"] as const;
+import { GENDER_OPTIONS } from "@/lib/patientValidation";
 
 export interface EditBookingValues {
   name: string;
@@ -242,7 +215,7 @@ export default function EditBookingForm({
           onChange={(event) => update("gender", event.target.value)}
         >
           <option value="">Not recorded</option>
-          {GENDERS.map((gender) => (
+          {GENDER_OPTIONS.map((gender) => (
             <option key={gender} value={gender}>
               {gender}
             </option>

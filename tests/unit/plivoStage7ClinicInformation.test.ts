@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   resolveClinic: vi.fn(),
   getHours: vi.fn(),
   resolveBusinessState: vi.fn(),
+  getRuntimeMenu: vi.fn(),
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => {
@@ -20,6 +21,14 @@ vi.mock("@/lib/telephony/businessHours", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/ivrRuntime")>();
+  return {
+    ...actual,
+    getClinicIvrRuntimeMenuForTrustedClinic: mocks.getRuntimeMenu,
+  };
+});
+
 import { POST as informationPOST } from "@/app/api/webhooks/plivo/information/route";
 import {
   buildClinicInformationForClinic,
@@ -27,6 +36,10 @@ import {
 } from "@/lib/telephony/clinicInformation";
 import type { ClinicBusinessState } from "@/lib/telephony/businessHours";
 import type { InboundClinicContext } from "@/lib/telephony/clinicConfig";
+import {
+  compileCustomClinicIvrRuntimeMenu,
+  defaultClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
 import {
   buildSignedPlivoWebhookRequest,
   TEST_PLIVO_AUTH_TOKEN,
@@ -226,6 +239,9 @@ describe("Stage 7 clinic-information webhook controls and V3 security", () => {
     mocks.resolveClinic.mockResolvedValue(BASE_CLINIC);
     mocks.getHours.mockResolvedValue([]);
     mocks.resolveBusinessState.mockReturnValue(state());
+    mocks.getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(BASE_CLINIC.clinicName),
+    );
   });
 
   afterEach(() => {
@@ -238,6 +254,28 @@ describe("Stage 7 clinic-information webhook controls and V3 security", () => {
     const xml = await (await informationPOST(signedInformation("9"))).text();
     expect(xml).toContain("Welcome to Sunrise Clinic.");
     expect(xml).toContain("/api/webhooks/plivo/input");
+    expect(mocks.getHours).not.toHaveBeenCalled();
+  });
+
+  it("returns to a valid custom main menu on signed digit 9", async () => {
+    const menu = compileCustomClinicIvrRuntimeMenu(BASE_CLINIC.clinicName, {
+      greetingTemplate: "Custom information return for {clinicName}.",
+      language: "en-US",
+      voice: "WOMAN",
+      items: [
+        {
+          digit: 4,
+          label: "clinic information",
+          action: "CLINIC_INFORMATION",
+          position: 0,
+          enabled: true,
+        },
+      ],
+    });
+    mocks.getRuntimeMenu.mockResolvedValueOnce(menu);
+    const xml = await (await informationPOST(signedInformation("9"))).text();
+    expect(xml).toContain("Custom information return for Sunrise Clinic.");
+    expect(xml).toContain(`ivrRev=${menu.revision}`);
     expect(mocks.getHours).not.toHaveBeenCalled();
   });
 

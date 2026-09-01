@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   resolveClinic: vi.fn(),
   getHours: vi.fn(),
   resolveBusinessState: vi.fn(),
+  getRuntimeMenu: vi.fn(),
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
@@ -15,9 +16,21 @@ vi.mock("@/lib/telephony/businessHours", () => ({
   resolveClinicBusinessState: mocks.resolveBusinessState,
 }));
 
+vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/ivrRuntime")>();
+  return {
+    ...actual,
+    getClinicIvrRuntimeMenuForTrustedClinic: mocks.getRuntimeMenu,
+  };
+});
+
 import { POST as answerPOST } from "@/app/api/webhooks/plivo/answer/route";
 import { POST as statusPOST } from "@/app/api/webhooks/plivo/reception/status/route";
 import { RECEPTION_DIAL_TIMEOUT_SECONDS } from "@/lib/telephony/plivo";
+import {
+  compileCustomClinicIvrRuntimeMenu,
+  defaultClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
 import {
   buildSignedPlivoWebhookRequest,
   TEST_PLIVO_AUTH_TOKEN,
@@ -43,6 +56,24 @@ const BASE_CLINIC = Object.freeze({
   receptionPhoneNumber: RECEPTION_NUMBER,
   urgentPhoneNumber: "+919000000005",
 });
+
+const CUSTOM_RUNTIME_MENU = compileCustomClinicIvrRuntimeMenu(
+  BASE_CLINIC.clinicName,
+  {
+    greetingTemplate: "Custom greeting for {clinicName}.",
+    language: "en-US",
+    voice: "WOMAN",
+    items: [
+      {
+        digit: 4,
+        label: "clinic information",
+        action: "CLINIC_INFORMATION",
+        position: 0,
+        enabled: true,
+      },
+    ],
+  },
+);
 
 async function answer(overrides: Record<string, string> = {}) {
   const response = await answerPOST(
@@ -82,6 +113,9 @@ describe("Stage 7 /answer effective routing", () => {
     mocks.resolveClinic.mockResolvedValue(BASE_CLINIC);
     mocks.getHours.mockResolvedValue([]);
     mocks.resolveBusinessState.mockReturnValue({ isOpen: false });
+    mocks.getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(BASE_CLINIC.clinicName),
+    );
   });
 
   afterEach(() => {
@@ -117,6 +151,7 @@ describe("Stage 7 /answer effective routing", () => {
     });
     expect(xml).toContain("<Dial");
     expect(xml).toContain(`<Number>${RECEPTION_NUMBER}</Number>`);
+    expect(mocks.getRuntimeMenu).not.toHaveBeenCalled();
     expect(xml).toContain(`callerId="${PROVIDER_NUMBER}"`);
     expect(xml).toContain(`timeout="${RECEPTION_DIAL_TIMEOUT_SECONDS}"`);
     expect(xml).toContain('method="POST"');
@@ -153,6 +188,18 @@ describe("Stage 7 /answer effective routing", () => {
     expect(xml).not.toContain("<Dial");
   });
 
+  it("uses a valid custom profile when AUTO-closed routes to IVR", async () => {
+    mocks.resolveClinic.mockResolvedValueOnce({
+      ...BASE_CLINIC,
+      routingMode: "AUTO",
+    });
+    mocks.getRuntimeMenu.mockResolvedValueOnce(CUSTOM_RUNTIME_MENU);
+    const { xml } = await answer();
+    expect(xml).toContain("Custom greeting for Sunrise Clinic.");
+    expect(xml).toContain(`ivrRev=${CUSTOM_RUNTIME_MENU.revision}`);
+    expect(xml).not.toContain("Press 1 for tomorrow slots.");
+  });
+
   it("falls back to IVR when reception is missing without using urgent", async () => {
     mocks.resolveClinic.mockResolvedValueOnce({
       ...BASE_CLINIC,
@@ -163,6 +210,18 @@ describe("Stage 7 /answer effective routing", () => {
     expect(xml).toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain(BASE_CLINIC.urgentPhoneNumber);
+  });
+
+  it("uses a valid custom menu for an unsafe reception fallback", async () => {
+    mocks.resolveClinic.mockResolvedValueOnce({
+      ...BASE_CLINIC,
+      routingMode: "OPEN",
+      receptionPhoneNumber: null,
+    });
+    mocks.getRuntimeMenu.mockResolvedValueOnce(CUSTOM_RUNTIME_MENU);
+    const { xml } = await answer();
+    expect(xml).toContain("Custom greeting for Sunrise Clinic.");
+    expect(xml).toContain(`ivrRev=${CUSTOM_RUNTIME_MENU.revision}`);
   });
 
   it.each([
@@ -212,6 +271,10 @@ describe("Stage 7 reception Dial action callback", () => {
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
     mocks.resolveClinic.mockReset();
     mocks.resolveClinic.mockResolvedValue(BASE_CLINIC);
+    mocks.getRuntimeMenu.mockReset();
+    mocks.getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(BASE_CLINIC.clinicName),
+    );
   });
 
   afterEach(() => {
@@ -230,6 +293,15 @@ describe("Stage 7 reception Dial action callback", () => {
     expect(xml).toContain("<Response");
     expect(xml).not.toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
+    expect(mocks.getRuntimeMenu).not.toHaveBeenCalled();
+  });
+
+  it("uses a valid custom profile after a failed reception transfer", async () => {
+    mocks.getRuntimeMenu.mockResolvedValueOnce(CUSTOM_RUNTIME_MENU);
+    const xml = await (await statusPOST(signedStatus("failed"))).text();
+    expect(xml).toContain("We could not connect you to reception.");
+    expect(xml).toContain("Custom greeting for Sunrise Clinic.");
+    expect(xml).toContain(`ivrRev=${CUSTOM_RUNTIME_MENU.revision}`);
   });
 
   it.each([

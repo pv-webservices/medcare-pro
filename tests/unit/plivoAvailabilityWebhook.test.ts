@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   handleDoctor: vi.fn(),
   handleType: vi.fn(),
   handleSlots: vi.fn(),
+  getRuntimeMenu: vi.fn(),
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
@@ -31,6 +32,19 @@ vi.mock("@/lib/telephony/availability", () => ({
   handleSlotMenuInput: mocks.handleSlots,
 }));
 
+vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/ivrRuntime")>();
+  return {
+    ...actual,
+    getClinicIvrRuntimeMenuForTrustedClinic: mocks.getRuntimeMenu,
+  };
+});
+
+import {
+  compileCustomClinicIvrRuntimeMenu,
+  defaultClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
+
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const CLINIC = Object.freeze({
   clinicId: "clinic-a",
@@ -42,6 +56,20 @@ const CLINIC = Object.freeze({
   urgentPhoneNumber: null,
 });
 const XML = "<Response><Speak>Stage 4 menu.</Speak></Response>";
+const CUSTOM_RUNTIME_MENU = compileCustomClinicIvrRuntimeMenu(CLINIC.clinicName, {
+  greetingTemplate: "Custom availability return for {clinicName}.",
+  language: "en-US",
+  voice: "WOMAN",
+  items: [
+    {
+      digit: 4,
+      label: "clinic information",
+      action: "CLINIC_INFORMATION",
+      position: 0,
+      enabled: true,
+    },
+  ],
+});
 
 const routes = [
   {
@@ -79,6 +107,9 @@ describe.each(routes)("POST Stage 4 $label webhook", (route) => {
     mocks.handleDoctor.mockResolvedValue(XML);
     mocks.handleType.mockResolvedValue(XML);
     mocks.handleSlots.mockResolvedValue(XML);
+    mocks.getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(CLINIC.clinicName),
+    );
   });
 
   afterEach(() => {
@@ -118,6 +149,7 @@ describe.each(routes)("POST Stage 4 $label webhook", (route) => {
       requestUrl: route.url,
       clinic: CLINIC,
       digits: "1",
+      runtimeMenu: expect.objectContaining({ source: "default" }),
     });
   });
 
@@ -176,6 +208,7 @@ describe.each(routes)("POST Stage 4 $label webhook", (route) => {
   });
 
   it("returns a safe menu when tenant appointment entitlement is denied", async () => {
+    mocks.getRuntimeMenu.mockResolvedValueOnce(CUSTOM_RUNTIME_MENU);
     mocks.requireEntitlement.mockRejectedValueOnce(
       new FeatureError("appointments", "entitlement"),
     );
@@ -187,7 +220,8 @@ describe.each(routes)("POST Stage 4 $label webhook", (route) => {
     expect(xml).toContain(
       "Telephone appointment availability is not available for this clinic.",
     );
-    expect(xml).toContain("Welcome to Sunrise Clinic.");
+    expect(xml).toContain("Custom availability return for Sunrise Clinic.");
+    expect(xml).toContain(`ivrRev=${CUSTOM_RUNTIME_MENU.revision}`);
     expect(route.handler).not.toHaveBeenCalled();
   });
 

@@ -128,8 +128,8 @@ const PII = {
   mobileNumber: "9876500055",
   address: "55 Disclosure Drive",
   city: "Leakstown",
-  gender: "female",
-  age: 918275,
+  gender: "Female" as const,
+  age: 55,
 };
 
 const DEPARTMENT = "AP-5 Cardiology";
@@ -1502,7 +1502,7 @@ async function checkInvariants(f: Fixture, types: TypeIds): Promise<void> {
     name: "AP-5 Walk-in",
     mobileNumber: "9876500099",
     age: 41,
-    gender: "male",
+    gender: "Male",
     address: "1 Walk-in Way",
     city: "Townsville",
     doctorId: f.doctor.id,

@@ -2,6 +2,7 @@ import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig"
 import { buildTelephonyUnavailableXml } from "@/lib/telephony/plivo";
 import { buildReceptionDialOutcomeXml } from "@/lib/telephony/reception";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
+import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
 
 export const runtime = "nodejs";
 
@@ -25,12 +26,17 @@ export async function POST(request: Request): Promise<Response> {
     const clinic = await resolveInboundClinicByPlivoNumber(sourceNumbers[0]);
     if (!clinic) return xmlResponse(buildTelephonyUnavailableXml());
 
-    const status = verification.params.DialStatus;
+    const statusValue = verification.params.DialStatus;
+    const status = typeof statusValue === "string" ? statusValue : undefined;
     return xmlResponse(
       buildReceptionDialOutcomeXml({
         requestUrl: request.url,
         clinic,
-        status: typeof status === "string" ? status : undefined,
+        status,
+        runtimeMenu:
+          status === "completed"
+            ? undefined
+            : await getClinicIvrRuntimeMenuForTrustedClinic(clinic),
       }),
     );
   } catch {

@@ -123,8 +123,8 @@ const PII = {
   mobileNumber: "9876500099",
   address: "99 Disclosure Drive",
   city: "Leakstown",
-  gender: "female",
-  age: 918299,
+  gender: "Female" as const,
+  age: 49,
 };
 
 /** What a correction changes them to. Equally distinctive, for the same reason. */

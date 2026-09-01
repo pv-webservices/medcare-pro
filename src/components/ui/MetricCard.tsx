@@ -63,7 +63,7 @@ export default function MetricCard({
   return (
     <div
       className={cx(
-        "h-full min-h-[116px] rounded-2xl border border-line bg-canvas p-4 shadow-card sm:p-5",
+        "h-full min-h-[116px] rounded-2xl border border-line bg-canvas p-4 shadow-card sm:p-5 dashboard-card-hover",
         className,
       )}
     >

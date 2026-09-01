@@ -4,14 +4,14 @@ import {
   normalizePlivoDestinationNumber,
 } from "@/lib/telephony/phoneNumber";
 import {
-  buildClinicMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoActionUrl,
   buildPlivoInputActionUrl,
-  buildReceptionFailureThenMainMenuXml,
   buildReceptionTransferCompletedXml,
   buildReceptionTransferXml,
   PLIVO_RECEPTION_STATUS_WEBHOOK_PATH,
 } from "@/lib/telephony/plivo";
+import type { ClinicIvrRuntimeMenu } from "@/lib/telephony/ivrRuntime";
 
 function canonicalNumber(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -45,17 +45,25 @@ export function isReceptionDestinationAvailable(input: {
   );
 }
 
-function mainMenu(requestUrl: string, clinicName: string): string {
-  return buildClinicMainMenuXml(
-    buildPlivoInputActionUrl(requestUrl),
+function mainMenu(
+  requestUrl: string,
+  clinicName: string,
+  runtimeMenu?: ClinicIvrRuntimeMenu,
+  message?: string,
+): string {
+  return buildEffectiveClinicMainMenuXml({
+    inputActionUrl: buildPlivoInputActionUrl(requestUrl),
     clinicName,
-  );
+    runtimeMenu,
+    message,
+  });
 }
 
 export function buildReceptionRouteXml(input: {
   requestUrl: string;
   clinic: InboundClinicContext;
   providerNumber: unknown;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const providerNumber = canonicalNumber(input.providerNumber);
   const receptionNumber = canonicalNumber(input.clinic.receptionPhoneNumber);
@@ -68,7 +76,11 @@ export function buildReceptionRouteXml(input: {
     providerNumber === null ||
     receptionNumber === null
   ) {
-    return mainMenu(input.requestUrl, input.clinic.clinicName);
+    return mainMenu(
+      input.requestUrl,
+      input.clinic.clinicName,
+      input.runtimeMenu,
+    );
   }
 
   return buildReceptionTransferXml({
@@ -86,12 +98,15 @@ export function buildReceptionDialOutcomeXml(input: {
   requestUrl: string;
   clinic: InboundClinicContext;
   status: unknown;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   if (input.status === "completed") {
     return buildReceptionTransferCompletedXml();
   }
-  return buildReceptionFailureThenMainMenuXml(
-    buildPlivoInputActionUrl(input.requestUrl),
+  return mainMenu(
+    input.requestUrl,
     input.clinic.clinicName,
+    input.runtimeMenu,
+    "We could not connect you to reception. You can continue using our automated telephone service.",
   );
 }

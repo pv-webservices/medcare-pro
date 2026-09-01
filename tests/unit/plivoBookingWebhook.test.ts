@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FeatureError } from "@/lib/featureResolution";
 import {
   buildSignedPlivoWebhookRequest,
   TEST_PLIVO_AUTH_TOKEN,
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   type: vi.fn(),
   slots: vi.fn(),
   confirm: vi.fn(),
+  getRuntimeMenu: vi.fn(),
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
@@ -28,12 +30,23 @@ vi.mock("@/lib/telephony/booking", () => ({
   handleBookingSlotInput: mocks.slots,
   handleBookingConfirmationInput: mocks.confirm,
 }));
+vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/ivrRuntime")>();
+  return {
+    ...actual,
+    getClinicIvrRuntimeMenuForTrustedClinic: mocks.getRuntimeMenu,
+  };
+});
 
 import { POST as identityPost } from "@/app/api/webhooks/plivo/booking/identity/route";
 import { POST as doctorPost } from "@/app/api/webhooks/plivo/booking/doctor/route";
 import { POST as typePost } from "@/app/api/webhooks/plivo/booking/type/route";
 import { POST as slotsPost } from "@/app/api/webhooks/plivo/booking/slots/route";
 import { POST as confirmPost } from "@/app/api/webhooks/plivo/booking/confirm/route";
+import {
+  compileCustomClinicIvrRuntimeMenu,
+  defaultClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
 
 const originalToken = process.env.PLIVO_AUTH_TOKEN;
 const clinic = Object.freeze({
@@ -44,6 +57,20 @@ const clinic = Object.freeze({
   publicPhoneNumber: null,
   receptionPhoneNumber: null,
   urgentPhoneNumber: null,
+});
+const customRuntimeMenu = compileCustomClinicIvrRuntimeMenu(clinic.clinicName, {
+  greetingTemplate: "Custom booking return for {clinicName}.",
+  language: "en-US",
+  voice: "WOMAN",
+  items: [
+    {
+      digit: 4,
+      label: "clinic information",
+      action: "CLINIC_INFORMATION",
+      position: 0,
+      enabled: true,
+    },
+  ],
 });
 const routes = [
   ["identity", identityPost, mocks.identity],
@@ -66,6 +93,9 @@ describe("every Stage 5 booking webhook", () => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.resolveClinic.mockResolvedValue(clinic);
     mocks.requireEntitlement.mockResolvedValue(undefined);
+    mocks.getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(clinic.clinicName),
+    );
     for (const handler of [mocks.identity, mocks.doctor, mocks.type, mocks.slots, mocks.confirm]) {
       handler.mockResolvedValue("<Response><Speak>Safe booking response.</Speak></Response>");
     }
@@ -127,6 +157,22 @@ describe("every Stage 5 booking webhook", () => {
     expect(await response.text()).toContain("not configured for this number");
     expect(handler).not.toHaveBeenCalled();
   });
+
+  it.each(routes)(
+    "%s preserves a valid custom menu when booking entitlement is denied",
+    async (path, post, handler) => {
+      mocks.getRuntimeMenu.mockResolvedValueOnce(customRuntimeMenu);
+      mocks.requireEntitlement.mockRejectedValueOnce(
+        new FeatureError("appointments", "entitlement"),
+      );
+      const response = await post(requestFor(path));
+      const xml = await response.text();
+      expect(response.status).toBe(200);
+      expect(handler).not.toHaveBeenCalled();
+      expect(xml).toContain("Custom booking return for Sunrise Clinic.");
+      expect(xml).toContain(`ivrRev=${customRuntimeMenu.revision}`);
+    },
+  );
 
   it.each([
     ["doctor", doctorPost, "page", "0", "1"],

@@ -1,6 +1,5 @@
 import {
-  buildClinicSelectionXml,
-  buildMessageThenMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
@@ -13,11 +12,32 @@ import {
   requireTenantFeatureEntitlement,
 } from "@/lib/features";
 import { resolveMainMenuAction } from "@/lib/telephony/routing";
+import {
+  getClinicIvrRuntimeMenuForTrustedClinic,
+  IVR_MENU_CHANGED_MESSAGE,
+  IVR_REVISION_QUERY_PARAM,
+  resolveRuntimeMainMenuAction,
+  type ClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import { buildUrgentMenuForClinic } from "@/lib/telephony/urgent";
 import { buildClinicInformationForClinic } from "@/lib/telephony/clinicInformation";
 
 export const runtime = "nodejs";
+
+function revisionMatchesCurrentMenu(
+  requestUrl: string,
+  runtimeMenu: ClinicIvrRuntimeMenu,
+): boolean {
+  const supplied = new URL(requestUrl).searchParams.getAll(
+    IVR_REVISION_QUERY_PARAM,
+  );
+  // Legacy/default menus intentionally have no revision. If a custom menu is
+  // active, a missing revision means the caller may have heard the old static
+  // mapping, so replay instead of dispatching their digit.
+  if (supplied.length === 0) return runtimeMenu.source === "default";
+  return supplied.length === 1 && supplied[0] === runtimeMenu.revision;
+}
 
 export async function POST(request: Request): Promise<Response> {
   const verification = await verifyPlivoV3Webhook(request);
@@ -45,11 +65,26 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
 
+    const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
+    const inputActionUrl = buildPlivoInputActionUrl(request.url);
+    if (!revisionMatchesCurrentMenu(request.url, runtimeMenu)) {
+      return xmlResponse(
+        buildEffectiveClinicMainMenuXml({
+          inputActionUrl,
+          clinicName: clinic.clinicName,
+          runtimeMenu,
+          message: IVR_MENU_CHANGED_MESSAGE,
+        }),
+      );
+    }
+
     const validatedDigits = verification.params.Digits;
     const digits =
       typeof validatedDigits === "string" ? validatedDigits : undefined;
-    const action = resolveMainMenuAction(digits);
-    const inputActionUrl = buildPlivoInputActionUrl(request.url);
+    const action =
+      runtimeMenu.source === "default"
+        ? resolveMainMenuAction(digits)
+        : resolveRuntimeMainMenuAction(runtimeMenu, digits);
     if (action === "tomorrow-slots" || action === "appointment-booking") {
       try {
         await requireTenantFeatureEntitlement(
@@ -59,15 +94,19 @@ export async function POST(request: Request): Promise<Response> {
       } catch (error: unknown) {
         if (!(error instanceof FeatureError)) throw error;
         return xmlResponse(
-          buildMessageThenMainMenuXml(
-            "Telephone appointment availability is not available for this clinic.",
+          buildEffectiveClinicMainMenuXml({
+            message:
+              "Telephone appointment availability is not available for this clinic.",
             inputActionUrl,
-            clinic.clinicName,
-          ),
+            clinicName: clinic.clinicName,
+            runtimeMenu,
+          }),
         );
       }
       if (action === "tomorrow-slots") {
-        return xmlResponse(await buildDoctorMenuForClinic(request.url, clinic));
+        return xmlResponse(
+          await buildDoctorMenuForClinic(request.url, clinic, 0, false, runtimeMenu),
+        );
       }
       return xmlResponse(
         await beginTelephoneBooking({
@@ -76,6 +115,7 @@ export async function POST(request: Request): Promise<Response> {
           from: verification.params.From,
           callUuid: verification.params.CallUUID,
           digits,
+          runtimeMenu,
         }),
       );
     }
@@ -90,15 +130,13 @@ export async function POST(request: Request): Promise<Response> {
         }),
       );
     }
-    return new Response(
-      buildClinicSelectionXml(action, inputActionUrl, clinic.clinicName),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/xml; charset=utf-8",
-          "Cache-Control": "no-store",
-        },
-      },
+    return xmlResponse(
+      buildEffectiveClinicMainMenuXml({
+        inputActionUrl,
+        clinicName: clinic.clinicName,
+        runtimeMenu,
+        invalidSelection: action === "invalid-input",
+      }),
     );
   } catch {
     console.error("Could not resolve or generate the Plivo input XML.");

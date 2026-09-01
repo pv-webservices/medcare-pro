@@ -107,8 +107,8 @@ const PII = {
   mobileNumber: "9876500077",
   address: "77 Disclosure Drive",
   city: "Leakstown",
-  gender: "female",
-  age: 918277,
+  gender: "Female" as const,
+  age: 47,
 };
 
 const QUOTED_AMOUNT = 600;

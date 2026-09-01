@@ -370,15 +370,22 @@ function registrationInputFrom(
   appointment: AppointmentRow,
   department: string,
 ): CreateRegistrationInput {
+  const gender =
+    appointment.gender === "Male" ||
+    appointment.gender === "Female" ||
+    appointment.gender === "Other"
+      ? appointment.gender
+      : "Other";
+
   return {
     clinicId: appointment.clinicId,
     patientId: appointment.patientId,
     name: appointment.name,
-    age: appointment.age,
-    gender: appointment.gender ?? undefined,
+    age: appointment.age ?? 0,
+    gender,
     mobileNumber: appointment.mobileNumber,
-    address: appointment.address ?? undefined,
-    city: appointment.city ?? undefined,
+    address: appointment.address ?? "",
+    city: appointment.city ?? "",
     doctorId: appointment.doctorId,
     department,
     amount: appointment.amount.toNumber(),

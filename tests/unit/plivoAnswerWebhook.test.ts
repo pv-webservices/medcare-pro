@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/webhooks/plivo/answer/route";
 import { buildMainMenuPrompt } from "@/lib/telephony/ivr";
 import {
+  compileCustomClinicIvrRuntimeMenu,
+  defaultClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
+import {
   buildPlivoWebhookRequest,
   buildSignedPlivoWebhookRequest,
   createPlivoTestNonce,
@@ -13,10 +17,19 @@ import {
 const WEBHOOK_URL = "https://medcare-tunnel.example/api/webhooks/plivo/answer";
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
+const getRuntimeMenu = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
 }));
+
+vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/ivrRuntime")>();
+  return {
+    ...actual,
+    getClinicIvrRuntimeMenuForTrustedClinic: getRuntimeMenu,
+  };
+});
 
 const TEST_CLINIC = Object.freeze({
   clinicId: "clinic-a",
@@ -33,6 +46,10 @@ describe("POST /api/webhooks/plivo/answer", () => {
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
     resolveClinic.mockReset();
     resolveClinic.mockResolvedValue(TEST_CLINIC);
+    getRuntimeMenu.mockReset();
+    getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(TEST_CLINIC.clinicName),
+    );
   });
 
   afterEach(() => {
@@ -80,6 +97,7 @@ describe("POST /api/webhooks/plivo/answer", () => {
 
     expect(response.status).toBe(403);
     expect(await response.text()).not.toContain("MedCare Pro");
+    expect(getRuntimeMenu).not.toHaveBeenCalled();
   });
 
   it("rejects a request with no Plivo signature", async () => {
@@ -209,6 +227,45 @@ describe("POST /api/webhooks/plivo/answer", () => {
     expect(xml).not.toContain("<Record");
   });
 
+  it("uses a valid custom top-level menu with revision and Speak attributes", async () => {
+    const runtimeMenu = compileCustomClinicIvrRuntimeMenu("Sunrise Clinic", {
+      greetingTemplate: "Thank you for calling {clinicName}.",
+      language: "en-GB",
+      voice: "MAN",
+      items: [
+        {
+          digit: 6,
+          label: "appointment booking",
+          action: "APPOINTMENT_BOOKING",
+          position: 0,
+          enabled: true,
+        },
+        {
+          digit: 2,
+          label: "clinic information",
+          action: "CLINIC_INFORMATION",
+          position: 1,
+          enabled: true,
+        },
+      ],
+    });
+    getRuntimeMenu.mockResolvedValueOnce(runtimeMenu);
+
+    const response = await POST(
+      buildSignedPlivoWebhookRequest({ url: WEBHOOK_URL }),
+    );
+    const xml = await response.text();
+
+    expect(getRuntimeMenu).toHaveBeenCalledWith(TEST_CLINIC);
+    expect(xml).toContain("Thank you for calling Sunrise Clinic.");
+    expect(xml).toContain("Press 6 for appointment booking.");
+    expect(xml).toContain("Press 2 for clinic information.");
+    expect(xml).not.toContain("Press 1 for tomorrow slots.");
+    expect(xml).toContain(`ivrRev=${runtimeMenu.revision}`);
+    expect(xml).toContain('language="en-GB"');
+    expect(xml).toContain('voice="MAN"');
+  });
+
   it("builds the input action from the signed public origin only", async () => {
     const publicUrl =
       "https://voice.medcare.example:8443/api/webhooks/plivo/answer?source=provider";
@@ -281,6 +338,7 @@ describe("POST /api/webhooks/plivo/answer", () => {
     expect(xml).toContain("Telephone assistance is not configured for this number.");
     expect(xml).not.toContain("<GetInput");
     expect(xml).not.toContain("Clinic");
+    expect(getRuntimeMenu).not.toHaveBeenCalled();
   });
 
   it("ignores signed tenant and clinic identifiers when resolving", async () => {

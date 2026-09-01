@@ -1,11 +1,12 @@
 import { buildClinicInformationForClinic } from "@/lib/telephony/clinicInformation";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import {
-  buildClinicMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
+import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
 
 export const runtime = "nodejs";
 
@@ -27,11 +28,13 @@ export async function POST(request: Request): Promise<Response> {
 
     const digits = verification.params.Digits;
     if (digits === "9") {
+      const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
       return xmlResponse(
-        buildClinicMainMenuXml(
-          buildPlivoInputActionUrl(request.url),
-          clinic.clinicName,
-        ),
+        buildEffectiveClinicMainMenuXml({
+          inputActionUrl: buildPlivoInputActionUrl(request.url),
+          clinicName: clinic.clinicName,
+          runtimeMenu,
+        }),
       );
     }
     return xmlResponse(

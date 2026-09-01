@@ -37,15 +37,23 @@ const validBooking = {
   appointmentTypeId: "type-1",
   name: "Asha Menon",
   mobileNumber: "9876500011",
+  age: 34,
+  gender: "Female" as const,
+  address: "12 Residency Road",
+  city: "Bengaluru",
   slotStart: `${DAY}T09:00:00.000Z`,
   slotEnd: `${DAY}T09:30:00.000Z`,
 };
 
 describe("createAppointmentSchema — what a client may say", () => {
-  it("accepts a minimal booking for someone who is not a patient yet", () => {
+  it("accepts a booking for someone who is not a patient yet", () => {
     const parsed = createAppointmentSchema.parse(validBooking);
     expect(parsed.name).toBe("Asha Menon");
     expect(parsed.patientId).toBeUndefined();
+    expect(parsed.age).toBe(34);
+    expect(parsed.gender).toBe("Female");
+    expect(parsed.city).toBe("Bengaluru");
+    expect(parsed.address).toBe("12 Residency Road");
   });
 
   it("accepts a booking for an existing patient", () => {
@@ -55,17 +63,28 @@ describe("createAppointmentSchema — what a client may say", () => {
     ).toBe("patient-1");
   });
 
-  it("accepts the optional demographic snapshot", () => {
-    const parsed = createAppointmentSchema.parse({
-      ...validBooking,
-      age: 34,
-      gender: "female",
-      address: "12 Residency Road",
-      city: "Bengaluru",
-    });
+  it("requires all mandatory patient fields", () => {
+    for (const field of ["name", "mobileNumber", "age", "gender", "city", "address"]) {
+      const invalid: Record<string, unknown> = { ...validBooking };
+      delete invalid[field];
+      expect(() => createAppointmentSchema.parse(invalid)).toThrow();
+    }
+  });
 
-    expect(parsed.age).toBe(34);
-    expect(parsed.city).toBe("Bengaluru");
+  it("enforces gender to be Male, Female, or Other", () => {
+    for (const gender of ["Male", "Female", "Other"] as const) {
+      expect(
+        createAppointmentSchema.parse({ ...validBooking, gender }).gender,
+      ).toBe(gender);
+    }
+    for (const invalidGender of ["", "not_recorded", "Unknown", "invalid"]) {
+      expect(() =>
+        createAppointmentSchema.parse({
+          ...validBooking,
+          gender: invalidGender as "Male",
+        }),
+      ).toThrow();
+    }
   });
 
   it("requires a clinic, a doctor and a type", () => {
@@ -76,7 +95,7 @@ describe("createAppointmentSchema — what a client may say", () => {
     }
   });
 
-  it("requires a name", () => {
+  it("requires a non-empty name", () => {
     expect(() =>
       createAppointmentSchema.parse({ ...validBooking, name: "   " }),
     ).toThrow();

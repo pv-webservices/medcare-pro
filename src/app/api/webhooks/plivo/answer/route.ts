@@ -1,5 +1,5 @@
 import {
-  buildClinicMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
@@ -10,7 +10,11 @@ import {
   resolveClinicBusinessState,
 } from "@/lib/telephony/businessHours";
 import { resolveEffectiveTelephonyRoute } from "@/lib/telephony/routing";
-import { buildReceptionRouteXml } from "@/lib/telephony/reception";
+import {
+  buildReceptionRouteXml,
+  isReceptionDestinationAvailable,
+} from "@/lib/telephony/reception";
+import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
 
 export const runtime = "nodejs";
 
@@ -56,18 +60,31 @@ export async function POST(request: Request): Promise<Response> {
       businessState,
     });
     if (effectiveRoute === "RECEPTION") {
+      const receptionAvailable = isReceptionDestinationAvailable({
+        providerNumber: verification.params.To,
+        publicPhoneNumber: clinic.publicPhoneNumber,
+        receptionPhoneNumber: clinic.receptionPhoneNumber,
+      });
       return xmlResponse(
         buildReceptionRouteXml({
           requestUrl: request.url,
           clinic,
           providerNumber: verification.params.To,
+          runtimeMenu: receptionAvailable
+            ? undefined
+            : await getClinicIvrRuntimeMenuForTrustedClinic(clinic),
         }),
       );
     }
 
+    const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
     return new Response(
-      buildClinicMainMenuXml(inputActionUrl, clinic.clinicName),
+      buildEffectiveClinicMainMenuXml({
+        inputActionUrl,
+        clinicName: clinic.clinicName,
+        runtimeMenu,
+      }),
       {
         status: 200,
         headers: {

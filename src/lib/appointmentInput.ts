@@ -222,6 +222,15 @@ const mobileSchema = z
  * new booking, the occupancy sentinel from the status, and the booker and tenant
  * from the session.
  */
+import {
+  patientAddressSchema,
+  patientAgeSchema,
+  patientCitySchema,
+  patientGenderSchema,
+  patientMobileSchema,
+  patientNameSchema,
+} from "@/lib/patientValidation";
+
 export const createAppointmentSchema = z.object({
   clinicId: z.string().trim().min(1, "Choose a clinic."),
   doctorId: z.string().trim().min(1, "Choose a doctor."),
@@ -230,14 +239,13 @@ export const createAppointmentSchema = z.object({
   /** An existing patient here. Absent = someone who is not a patient yet. */
   patientId: z.string().trim().min(1).nullish(),
 
-  // Named exactly as on `patients`, matching the Appointment columns, so AP-5
-  // can copy the snapshot across without a translation layer.
-  name: z.string().trim().min(1, "Enter the patient's name.").max(255),
-  mobileNumber: mobileSchema,
-  age: z.coerce.number().int().min(0).max(150).nullish(),
-  gender: z.string().trim().max(50).optional().or(z.literal("")),
-  address: z.string().trim().max(1000).optional().or(z.literal("")),
-  city: z.string().trim().max(255).optional().or(z.literal("")),
+  // Patient details — all 6 fields mandatory.
+  name: patientNameSchema,
+  mobileNumber: patientMobileSchema,
+  age: patientAgeSchema,
+  gender: patientGenderSchema,
+  address: patientAddressSchema,
+  city: patientCitySchema,
 
   slotStart: slotInstantSchema,
   slotEnd: slotInstantSchema,

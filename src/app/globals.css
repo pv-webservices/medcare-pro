@@ -575,6 +575,52 @@ body {
 }
 
 /*
+ * Polished hover treatment for Dashboard cards and visual surfaces.
+ * Smooth 180ms transition, slightly stronger border, elevated shadow,
+ * and subtle translateY(-1.5px) without layout shift.
+ */
+@utility dashboard-card-hover {
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    border-color 180ms ease;
+
+  &:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-raised);
+    transform: translateY(-1.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-card-hover:hover {
+    transform: none;
+  }
+}
+
+/*
+ * Subtle hover treatment for inner stat tiles, summary mini-cards, and detail rows.
+ */
+@utility dashboard-tile-hover {
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    border-color 180ms ease;
+
+  &:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px -2px var(--shade-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-tile-hover:hover {
+    transform: none;
+  }
+}
+
+/*
  * The skeleton shimmer. One animation for every loading placeholder in the app,
  * so a loading screen reads as one thing happening rather than six.
  */

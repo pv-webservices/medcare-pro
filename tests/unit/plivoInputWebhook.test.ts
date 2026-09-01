@@ -6,6 +6,11 @@ import {
 } from "@/lib/telephony/ivr";
 import { FeatureError } from "@/lib/featureResolution";
 import {
+  compileCustomClinicIvrRuntimeMenu,
+  defaultClinicIvrRuntimeMenu,
+  IVR_MENU_CHANGED_MESSAGE,
+} from "@/lib/telephony/ivrRuntime";
+import {
   buildPlivoWebhookRequest,
   buildSignedPlivoWebhookRequest,
   createPlivoTestNonce,
@@ -23,6 +28,7 @@ const requireTenantFeatureEntitlement = vi.hoisted(() => vi.fn());
 const buildDoctorMenuForClinic = vi.hoisted(() => vi.fn());
 const beginTelephoneBooking = vi.hoisted(() => vi.fn());
 const buildClinicInformationForClinic = vi.hoisted(() => vi.fn());
+const getRuntimeMenu = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
@@ -45,6 +51,14 @@ vi.mock("@/lib/telephony/clinicInformation", () => ({
   buildClinicInformationForClinic,
 }));
 
+vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/ivrRuntime")>();
+  return {
+    ...actual,
+    getClinicIvrRuntimeMenuForTrustedClinic: getRuntimeMenu,
+  };
+});
+
 const TEST_CLINIC = Object.freeze({
   clinicId: "clinic-a",
   tenantId: "tenant-a",
@@ -55,12 +69,50 @@ const TEST_CLINIC = Object.freeze({
   urgentPhoneNumber: null,
 });
 
-async function postDigit(digits?: string): Promise<{
+function customRuntimeMenu(greeting = "Welcome to {clinicName}.") {
+  return compileCustomClinicIvrRuntimeMenu(TEST_CLINIC.clinicName, {
+    greetingTemplate: greeting,
+    language: "en-US",
+    voice: "WOMAN",
+    items: [
+      {
+        digit: 7,
+        label: "tomorrow slots",
+        action: "TOMORROW_SLOTS",
+        position: 0,
+        enabled: true,
+      },
+      {
+        digit: 6,
+        label: "appointment booking",
+        action: "APPOINTMENT_BOOKING",
+        position: 1,
+        enabled: true,
+      },
+      {
+        digit: 3,
+        label: "urgent assistance",
+        action: "URGENT_ASSISTANCE",
+        position: 2,
+        enabled: true,
+      },
+      {
+        digit: 2,
+        label: "clinic information",
+        action: "CLINIC_INFORMATION",
+        position: 3,
+        enabled: true,
+      },
+    ],
+  });
+}
+
+async function postDigit(digits?: string, url = INPUT_WEBHOOK_URL): Promise<{
   response: Response;
   xml: string;
 }> {
   const request = buildSignedPlivoWebhookRequest({
-    url: INPUT_WEBHOOK_URL,
+    url,
     paramOverrides: digits === undefined ? {} : { Digits: digits },
   });
   const response = await POST(request);
@@ -85,6 +137,10 @@ describe("POST /api/webhooks/plivo/input", () => {
     buildClinicInformationForClinic.mockReset();
     buildClinicInformationForClinic.mockResolvedValue(
       "<Response><GetInput><Speak>Sunrise Clinic is located at Main Road.</Speak></GetInput></Response>",
+    );
+    getRuntimeMenu.mockReset();
+    getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(TEST_CLINIC.clinicName),
     );
   });
 
@@ -148,6 +204,9 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(buildDoctorMenuForClinic).toHaveBeenCalledWith(
       INPUT_WEBHOOK_URL,
       TEST_CLINIC,
+      0,
+      false,
+      expect.objectContaining({ source: "default" }),
     );
     expect(xml).toContain("Select a doctor.");
     expect(xml).not.toContain("You selected tomorrow appointment availability.");
@@ -213,6 +272,107 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).toContain("one patient record");
   });
 
+  it.each([
+    ["7", "tomorrow", buildDoctorMenuForClinic],
+    ["6", "booking", beginTelephoneBooking],
+    ["3", "urgent", null],
+    ["2", "information", buildClinicInformationForClinic],
+  ] as const)(
+    "dispatches a custom digit to the existing %s action flow",
+    async (digit, _label, expectedHandler) => {
+      const menu = customRuntimeMenu();
+      getRuntimeMenu.mockResolvedValueOnce(menu);
+
+      const { response, xml } = await postDigit(
+        digit,
+        `${INPUT_WEBHOOK_URL}?ivrRev=${menu.revision}`,
+      );
+
+      expect(response.status).toBe(200);
+      if (expectedHandler) expect(expectedHandler).toHaveBeenCalledOnce();
+      if (digit === "3") expect(xml).toContain("life-threatening emergency");
+    },
+  );
+
+  it("keeps appointment entitlement attached to a remapped action", async () => {
+    const menu = customRuntimeMenu();
+    getRuntimeMenu.mockResolvedValueOnce(menu);
+    requireTenantFeatureEntitlement.mockRejectedValueOnce(
+      new FeatureError("appointments", "entitlement"),
+    );
+
+    const { xml } = await postDigit(
+      "6",
+      `${INPUT_WEBHOOK_URL}?ivrRev=${menu.revision}`,
+    );
+
+    expect(requireTenantFeatureEntitlement).toHaveBeenCalledWith(
+      "tenant-a",
+      "appointments",
+    );
+    expect(beginTelephoneBooking).not.toHaveBeenCalled();
+    expect(xml).toContain(
+      "Telephone appointment availability is not available for this clinic.",
+    );
+    expect(xml).toContain(`ivrRev=${menu.revision}`);
+  });
+
+  it("dispatches when the supplied revision still matches the menu heard", async () => {
+    const menu = customRuntimeMenu();
+    getRuntimeMenu.mockResolvedValueOnce(menu);
+
+    await postDigit("6", `${INPUT_WEBHOOK_URL}?ivrRev=${menu.revision}`);
+
+    expect(beginTelephoneBooking).toHaveBeenCalledOnce();
+  });
+
+  it("does not dispatch a stale digit and replays the current revised menu", async () => {
+    const heardMenu = customRuntimeMenu();
+    const currentMenu = customRuntimeMenu(
+      "Our updated options at {clinicName} are ready.",
+    );
+    getRuntimeMenu.mockResolvedValueOnce(currentMenu);
+
+    const { xml } = await postDigit(
+      "6",
+      `${INPUT_WEBHOOK_URL}?ivrRev=${heardMenu.revision}`,
+    );
+
+    expect(beginTelephoneBooking).not.toHaveBeenCalled();
+    expect(buildDoctorMenuForClinic).not.toHaveBeenCalled();
+    expect(buildClinicInformationForClinic).not.toHaveBeenCalled();
+    expect(xml).toContain(IVR_MENU_CHANGED_MESSAGE);
+    expect(xml).toContain("Our updated options at Sunrise Clinic are ready.");
+    expect(xml).toContain(`ivrRev=${currentMenu.revision}`);
+    expect(xml).not.toContain(`ivrRev=${heardMenu.revision}`);
+  });
+
+  it("safely replays a current custom menu when a legacy callback has no revision", async () => {
+    const menu = customRuntimeMenu();
+    getRuntimeMenu.mockResolvedValueOnce(menu);
+
+    const { xml } = await postDigit("6");
+
+    expect(beginTelephoneBooking).not.toHaveBeenCalled();
+    expect(xml).toContain(IVR_MENU_CHANGED_MESSAGE);
+    expect(xml).toContain(`ivrRev=${menu.revision}`);
+  });
+
+  it("treats a forged revision only as stale state and never as scope or action", async () => {
+    const menu = customRuntimeMenu();
+    getRuntimeMenu.mockResolvedValueOnce(menu);
+
+    const { xml } = await postDigit(
+      "6",
+      `${INPUT_WEBHOOK_URL}?ivrRev=${"0".repeat(32)}&clinicId=clinic-attacker&action=urgent-assistance`,
+    );
+
+    expect(resolveClinic).toHaveBeenCalledWith("14155550199");
+    expect(beginTelephoneBooking).not.toHaveBeenCalled();
+    expect(xml).toContain(IVR_MENU_CHANGED_MESSAGE);
+    expect(xml).not.toContain("clinic-attacker");
+  });
+
   it("returns the invalid message and menu when Digits is missing", async () => {
     const { response, xml } = await postDigit();
 
@@ -231,6 +391,7 @@ describe("POST /api/webhooks/plivo/input", () => {
 
     expect(response.status).toBe(403);
     expect(await response.text()).not.toContain("tomorrow appointment");
+    expect(getRuntimeMenu).not.toHaveBeenCalled();
   });
 
   it("rejects a missing signature", async () => {
@@ -380,6 +541,7 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).toContain("Telephone assistance is not configured for this number.");
     expect(xml).not.toContain("tomorrow appointment");
     expect(xml).not.toContain("<GetInput");
+    expect(getRuntimeMenu).not.toHaveBeenCalled();
   });
 
   it("ignores signed scope fields and From when selecting the clinic", async () => {

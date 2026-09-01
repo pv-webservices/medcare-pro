@@ -27,10 +27,24 @@ const STATUS_URL = `${new URL(PLIVO_URGENT_STATUS_WEBHOOK_PATH, "https://voice.m
 
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
+const getRuntimeMenu = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
 }));
+
+vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/ivrRuntime")>();
+  return {
+    ...actual,
+    getClinicIvrRuntimeMenuForTrustedClinic: getRuntimeMenu,
+  };
+});
+
+import {
+  compileCustomClinicIvrRuntimeMenu,
+  defaultClinicIvrRuntimeMenu,
+} from "@/lib/telephony/ivrRuntime";
 
 const TEST_CLINIC = Object.freeze({
   clinicId: "clinic-a",
@@ -84,6 +98,10 @@ describe("POST /api/webhooks/plivo/urgent/confirm", () => {
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
     resolveClinic.mockReset();
     resolveClinic.mockResolvedValue(TEST_CLINIC);
+    getRuntimeMenu.mockReset();
+    getRuntimeMenu.mockResolvedValue(
+      defaultClinicIvrRuntimeMenu(TEST_CLINIC.clinicName),
+    );
   });
 
   afterEach(() => {
@@ -221,6 +239,28 @@ describe("POST /api/webhooks/plivo/urgent/confirm", () => {
 
     expect(xml).toContain("Welcome to A &amp; B &lt;Clinic&gt;.");
     expect(xml).toContain("/api/webhooks/plivo/input");
+    expect(xml).not.toContain("<Dial");
+  });
+
+  it("returns digit 9 to the current valid custom main menu", async () => {
+    const menu = compileCustomClinicIvrRuntimeMenu(TEST_CLINIC.clinicName, {
+      greetingTemplate: "Custom urgent return for {clinicName}.",
+      language: "en-US",
+      voice: "WOMAN",
+      items: [
+        {
+          digit: 4,
+          label: "clinic information",
+          action: "CLINIC_INFORMATION",
+          position: 0,
+          enabled: true,
+        },
+      ],
+    });
+    getRuntimeMenu.mockResolvedValueOnce(menu);
+    const xml = await body(await confirmPOST(signedConfirm("9")));
+    expect(xml).toContain("Custom urgent return for Sunrise Clinic.");
+    expect(xml).toContain(`ivrRev=${menu.revision}`);
     expect(xml).not.toContain("<Dial");
   });
 

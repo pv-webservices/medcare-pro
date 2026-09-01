@@ -15,9 +15,8 @@ import {
 } from "@/lib/telephony/ivr";
 import {
   buildAppointmentTypeSelectionXml,
-  buildClinicMainMenuXml,
   buildDoctorSelectionXml,
-  buildMessageThenMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoActionUrl,
   buildPlivoInputActionUrl,
   buildSlotSelectionXml,
@@ -25,6 +24,7 @@ import {
   PLIVO_SLOTS_WEBHOOK_PATH,
   PLIVO_TYPE_WEBHOOK_PATH,
 } from "@/lib/telephony/plivo";
+import type { ClinicIvrRuntimeMenu } from "@/lib/telephony/ivrRuntime";
 
 const MAX_QUERY_INDEX = 10_000;
 const MAX_STATE_ID_LENGTH = 191;
@@ -48,23 +48,30 @@ function selectedIndex(digits: string | undefined): number | null {
   return digits && /^[1-7]$/.test(digits) ? Number(digits) - 1 : null;
 }
 
-function mainMenu(requestUrl: string, clinic: InboundClinicContext): string {
-  return buildClinicMainMenuXml(
-    buildPlivoInputActionUrl(requestUrl),
-    clinic.clinicName,
-  );
+function mainMenu(
+  requestUrl: string,
+  clinic: InboundClinicContext,
+  runtimeMenu?: ClinicIvrRuntimeMenu,
+): string {
+  return buildEffectiveClinicMainMenuXml({
+    inputActionUrl: buildPlivoInputActionUrl(requestUrl),
+    clinicName: clinic.clinicName,
+    runtimeMenu,
+  });
 }
 
 function messageThenMainMenu(
   message: string,
   requestUrl: string,
   clinic: InboundClinicContext,
+  runtimeMenu?: ClinicIvrRuntimeMenu,
 ): string {
-  return buildMessageThenMainMenuXml(
+  return buildEffectiveClinicMainMenuXml({
     message,
-    buildPlivoInputActionUrl(requestUrl),
-    clinic.clinicName,
-  );
+    inputActionUrl: buildPlivoInputActionUrl(requestUrl),
+    clinicName: clinic.clinicName,
+    runtimeMenu,
+  });
 }
 
 export async function buildDoctorMenuForClinic(
@@ -72,6 +79,7 @@ export async function buildDoctorMenuForClinic(
   clinic: InboundClinicContext,
   page = 0,
   invalidSelection = false,
+  runtimeMenu?: ClinicIvrRuntimeMenu,
 ): Promise<string> {
   const doctors = await listAppointmentDoctorsForClinic(clinic);
   if (doctors.length === 0) {
@@ -79,6 +87,7 @@ export async function buildDoctorMenuForClinic(
       "No doctors are currently available for telephone appointment lookup.",
       requestUrl,
       clinic,
+      runtimeMenu,
     );
   }
   const current = paginateIvrItems(doctors, page, IVR_LIST_PAGE_SIZE);
@@ -98,9 +107,12 @@ export async function handleDoctorMenuInput(input: {
   requestUrl: string;
   clinic: InboundClinicContext;
   digits?: string;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): Promise<string> {
   const page = parseSignedPageState(input.requestUrl, "page");
-  if (input.digits === "9") return mainMenu(input.requestUrl, input.clinic);
+  if (input.digits === "9") {
+    return mainMenu(input.requestUrl, input.clinic, input.runtimeMenu);
+  }
 
   const doctors = await listAppointmentDoctorsForClinic(input.clinic);
   if (doctors.length === 0) {
@@ -108,6 +120,7 @@ export async function handleDoctorMenuInput(input: {
       "No doctors are currently available for telephone appointment lookup.",
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   const current = paginateIvrItems(doctors, page, IVR_LIST_PAGE_SIZE);
@@ -116,6 +129,8 @@ export async function handleDoctorMenuInput(input: {
       input.requestUrl,
       input.clinic,
       current.page + 1,
+      false,
+      input.runtimeMenu,
     );
   }
 
@@ -127,6 +142,7 @@ export async function handleDoctorMenuInput(input: {
       input.clinic,
       current.page,
       true,
+      input.runtimeMenu,
     );
   }
 
@@ -136,6 +152,7 @@ export async function handleDoctorMenuInput(input: {
       "No appointment types are currently available for telephone scheduling.",
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   const typePage = paginateIvrItems(
@@ -159,8 +176,11 @@ export async function handleAppointmentTypeMenuInput(input: {
   clinic: InboundClinicContext;
   digits?: string;
   now?: Date;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): Promise<string> {
-  if (input.digits === "9") return mainMenu(input.requestUrl, input.clinic);
+  if (input.digits === "9") {
+    return mainMenu(input.requestUrl, input.clinic, input.runtimeMenu);
+  }
 
   const doctorId = parseSignedIdState(input.requestUrl, "doctorId");
   if (!doctorId) {
@@ -168,6 +188,7 @@ export async function handleAppointmentTypeMenuInput(input: {
       "That doctor is no longer available for telephone scheduling.",
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   const doctor = await getAppointmentDoctorForScope({
@@ -179,6 +200,7 @@ export async function handleAppointmentTypeMenuInput(input: {
       "That doctor is no longer available for telephone scheduling.",
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
 
@@ -188,6 +210,7 @@ export async function handleAppointmentTypeMenuInput(input: {
       "No appointment types are currently available for telephone scheduling.",
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   const page = parseSignedPageState(input.requestUrl, "page");
@@ -245,6 +268,7 @@ export async function handleAppointmentTypeMenuInput(input: {
       clinic: input.clinic,
       result,
       offset: 0,
+      runtimeMenu: input.runtimeMenu,
     });
   } catch (error: unknown) {
     if (error instanceof ScopeError) {
@@ -252,6 +276,7 @@ export async function handleAppointmentTypeMenuInput(input: {
         "That scheduling selection is no longer available for telephone scheduling.",
         input.requestUrl,
         input.clinic,
+        input.runtimeMenu,
       );
     }
     throw error;
@@ -264,6 +289,7 @@ function renderSlotResult(input: {
   result: AppointmentSlotsResult;
   offset: number;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const { result } = input;
   if (result.outcome === "invalid-date") {
@@ -274,6 +300,7 @@ function renderSlotResult(input: {
       `${result.doctorName} is unavailable tomorrow.`,
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   if (result.outcome === "no-availability") {
@@ -281,6 +308,7 @@ function renderSlotResult(input: {
       `${result.doctorName} has no availability configured for tomorrow.`,
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   if (result.outcome === "invalid-duration") {
@@ -288,6 +316,7 @@ function renderSlotResult(input: {
       "This appointment type is temporarily unavailable for telephone scheduling.",
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
 
@@ -297,6 +326,7 @@ function renderSlotResult(input: {
       `No appointment slots are available tomorrow for ${result.doctorName} for ${result.appointmentTypeName}.`,
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   const safeOffset =
@@ -330,8 +360,11 @@ export async function handleSlotMenuInput(input: {
   clinic: InboundClinicContext;
   digits?: string;
   now?: Date;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): Promise<string> {
-  if (input.digits === "9") return mainMenu(input.requestUrl, input.clinic);
+  if (input.digits === "9") {
+    return mainMenu(input.requestUrl, input.clinic, input.runtimeMenu);
+  }
 
   const doctorId = parseSignedIdState(input.requestUrl, "doctorId");
   const appointmentTypeId = parseSignedIdState(
@@ -343,6 +376,7 @@ export async function handleSlotMenuInput(input: {
       "That scheduling selection is no longer available for telephone scheduling.",
       input.requestUrl,
       input.clinic,
+      input.runtimeMenu,
     );
   }
   const tomorrow = tomorrowDateOnlyInTimeZone(
@@ -373,6 +407,7 @@ export async function handleSlotMenuInput(input: {
       result,
       offset: nextOffset,
       invalidSelection: input.digits !== "8" || !hasNext,
+      runtimeMenu: input.runtimeMenu,
     });
   } catch (error: unknown) {
     if (error instanceof ScopeError) {
@@ -380,6 +415,7 @@ export async function handleSlotMenuInput(input: {
         "That scheduling selection is no longer available for telephone scheduling.",
         input.requestUrl,
         input.clinic,
+        input.runtimeMenu,
       );
     }
     throw error;

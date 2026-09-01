@@ -4,7 +4,7 @@ import {
   normalizePlivoDestinationNumber,
 } from "@/lib/telephony/phoneNumber";
 import {
-  buildClinicMainMenuXml,
+  buildEffectiveClinicMainMenuXml,
   buildPlivoActionUrl,
   buildPlivoInputActionUrl,
   buildUrgentAssistanceMenuXml,
@@ -16,6 +16,7 @@ import {
   PLIVO_URGENT_CONFIRM_WEBHOOK_PATH,
   PLIVO_URGENT_STATUS_WEBHOOK_PATH,
 } from "@/lib/telephony/plivo";
+import type { ClinicIvrRuntimeMenu } from "@/lib/telephony/ivrRuntime";
 
 export const DOCUMENTED_DIAL_STATUSES = Object.freeze([
   "completed",
@@ -55,12 +56,14 @@ export function handleUrgentConfirmation(input: {
   clinic: InboundClinicContext;
   providerNumber: unknown;
   digits: string | undefined;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   if (input.digits === "9") {
-    return buildClinicMainMenuXml(
-      buildPlivoInputActionUrl(input.requestUrl),
-      input.clinic.clinicName,
-    );
+    return buildEffectiveClinicMainMenuXml({
+      inputActionUrl: buildPlivoInputActionUrl(input.requestUrl),
+      clinicName: input.clinic.clinicName,
+      runtimeMenu: input.runtimeMenu,
+    });
   }
   if (input.digits !== "1") {
     return buildUrgentMenuForClinic(input.requestUrl, true);

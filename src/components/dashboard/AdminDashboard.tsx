@@ -100,7 +100,7 @@ const MINI_TONES: Record<MiniTone, string> = {
 
 function MiniStat({ label, value, tone = "default" }: { label: string; value: string | number; tone?: MiniTone }) {
   return (
-    <div className={`rounded-xl border border-line/80 px-3 py-2.5 ${MINI_TONES[tone]}`}>
+    <div className={`rounded-xl border border-line/80 px-3 py-2.5 dashboard-tile-hover ${MINI_TONES[tone]}`}>
       <p className="text-meta font-medium text-muted">{label}</p>
       <p className="tnum mt-0.5 text-section font-semibold text-current">{typeof value === "number" ? value.toLocaleString("en-IN") : value}</p>
     </div>
@@ -178,7 +178,7 @@ export default function AdminDashboard({ data, layout, callHandling, now = new D
 function DeferredWidget({ widgetId }: { widgetId: DashboardWidgetId }) {
   const widget = DASHBOARD_WIDGETS.get(widgetId)!;
   return (
-    <div className="flex min-h-[116px] items-center justify-center rounded-2xl border border-line bg-canvas p-5 text-center shadow-card">
+    <div className="flex min-h-[116px] items-center justify-center rounded-2xl border border-line bg-canvas p-5 text-center shadow-card dashboard-card-hover">
       <div><p className="text-label font-semibold text-ink">{widget.title}</p><p className="mt-1 text-meta text-muted">Save the layout to load this widget&apos;s current data.</p></div>
     </div>
   );
@@ -280,7 +280,7 @@ function RevenueSummaryPanel({ data }: { data: AdminDashboardData }) {
   const revenue = data.revenue!;
   return <Panel title="Revenue summary" description="Current collection checkpoints" className="h-full">
     <div className="grid grid-cols-2 gap-3"><MiniStat label="Today" value={formatRupeesCompact(revenue.today)} /><MiniStat label="This week" value={formatRupeesCompact(revenue.thisWeek)} /><MiniStat label="This month" value={formatRupeesCompact(revenue.thisMonth)} /><MiniStat label="Previous month" value={formatRupeesCompact(revenue.previousMonth)} /></div>
-    <div className="mt-4 flex items-center justify-between rounded-xl border border-line px-4 py-3"><span className="text-body text-muted">Average per visit</span><span className="tnum font-semibold text-ink">{formatRupees(revenue.averagePerVisit)}</span></div>
+    <div className="mt-4 flex items-center justify-between rounded-xl border border-line px-4 py-3 dashboard-tile-hover"><span className="text-body text-muted">Average per visit</span><span className="tnum font-semibold text-ink">{formatRupees(revenue.averagePerVisit)}</span></div>
   </Panel>;
 }
 
@@ -343,7 +343,7 @@ function DoctorPanel({ data }: { data: AdminDashboardData }) {
               <div key={row.doctorId} className="py-3.5">
                 <p className="font-semibold text-ink">{row.doctorName}</p>
                 <p className="mt-0.5 text-meta text-muted">{row.clinicName}</p>
-                <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-canvas-deep p-3 text-meta">
+                <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-canvas-deep p-3 text-meta dashboard-tile-hover">
                   <div><dt className="text-muted">Appointments</dt><dd className="tnum mt-0.5 font-semibold text-ink">{row.appointments}</dd></div>
                   <div><dt className="text-muted">Seen</dt><dd className="tnum mt-0.5 font-semibold text-ink">{row.patients}</dd></div>
                   {row.revenue !== undefined && <div className="text-right"><dt className="text-muted">Revenue</dt><dd className="tnum mt-0.5 font-semibold text-ink">{formatRupeesCompact(row.revenue)}</dd></div>}

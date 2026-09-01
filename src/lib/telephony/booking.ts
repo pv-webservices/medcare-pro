@@ -31,10 +31,9 @@ import {
 import {
   buildAppointmentTypeSelectionXml,
   buildBookingSlotSelectionXml,
-  buildClinicMainMenuXml,
   buildDoctorSelectionXml,
+  buildEffectiveClinicMainMenuXml,
   buildFinalBookingConfirmationXml,
-  buildMessageThenMainMenuXml,
   buildPatientConfirmationXml,
   buildPlivoActionUrl,
   buildPlivoInputActionUrl,
@@ -45,6 +44,7 @@ import {
   PLIVO_BOOKING_TYPE_WEBHOOK_PATH,
 } from "@/lib/telephony/plivo";
 import { parseSignedIdState, parseSignedPageState } from "@/lib/telephony/availability";
+import type { ClinicIvrRuntimeMenu } from "@/lib/telephony/ivrRuntime";
 
 interface BookingCallInput {
   requestUrl: string;
@@ -53,24 +53,29 @@ interface BookingCallInput {
   callUuid: unknown;
   digits?: string;
   now?: Date;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }
 
-function mainMenu(input: Pick<BookingCallInput, "requestUrl" | "clinic">): string {
-  return buildClinicMainMenuXml(
-    buildPlivoInputActionUrl(input.requestUrl),
-    input.clinic.clinicName,
-  );
+function mainMenu(
+  input: Pick<BookingCallInput, "requestUrl" | "clinic" | "runtimeMenu">,
+): string {
+  return buildEffectiveClinicMainMenuXml({
+    inputActionUrl: buildPlivoInputActionUrl(input.requestUrl),
+    clinicName: input.clinic.clinicName,
+    runtimeMenu: input.runtimeMenu,
+  });
 }
 
 function messageThenMainMenu(
   message: string,
-  input: Pick<BookingCallInput, "requestUrl" | "clinic">,
+  input: Pick<BookingCallInput, "requestUrl" | "clinic" | "runtimeMenu">,
 ): string {
-  return buildMessageThenMainMenuXml(
+  return buildEffectiveClinicMainMenuXml({
     message,
-    buildPlivoInputActionUrl(input.requestUrl),
-    input.clinic.clinicName,
-  );
+    inputActionUrl: buildPlivoInputActionUrl(input.requestUrl),
+    clinicName: input.clinic.clinicName,
+    runtimeMenu: input.runtimeMenu,
+  });
 }
 
 function patientConfirmation(input: BookingCallInput, invalid = false): string {

@@ -128,8 +128,8 @@ const PII = {
   mobileNumber: SAFE_UNSENDABLE_NUMBER,
   address: "88 Disclosure Drive",
   city: "Leakstown",
-  gender: "female",
-  age: 918288,
+  gender: "Female" as const,
+  age: 48,
 };
 
 const PATIENT_NAME = "Zzyzx Ap8 Patient";

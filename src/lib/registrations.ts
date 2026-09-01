@@ -90,17 +90,20 @@ export const MAX_PATIENT_CODE_ATTEMPTS = 5;
 // Schemas
 // ---------------------------------------------------------------------------
 
-const mobileSchema = z
-  .string()
-  .trim()
-  .regex(/^(\+91)?[0-9]{10}$/, "Enter a valid 10-digit Indian mobile number.")
-  .max(13);
-
 /** Bounded by the `Decimal(10, 2)` column — a larger number would be truncated. */
 const amountSchema = z.coerce
   .number()
   .min(0, "The amount cannot be negative.")
   .max(99_999_999.99, "That amount is too large.");
+
+import {
+  patientAddressSchema,
+  patientAgeSchema,
+  patientCitySchema,
+  patientGenderSchema,
+  patientMobileSchema,
+  patientNameSchema,
+} from "@/lib/patientValidation";
 
 export const createRegistrationSchema = z.object({
   clinicId: z.string().min(1, "Choose a clinic."),
@@ -115,15 +118,13 @@ export const createRegistrationSchema = z.object({
    */
   patientId: z.string().min(1).optional().nullable(),
 
-  // Patient details — FR-3.1. The Patient ID is deliberately absent: it is
-  // generated server-side and accepting one from the client would let a caller
-  // choose their own.
-  name: z.string().trim().min(1, "Enter the patient's name.").max(255),
-  age: z.coerce.number().int().min(0).max(150).optional().nullable(),
-  gender: z.string().trim().max(50).optional().or(z.literal("")),
-  mobileNumber: mobileSchema,
-  address: z.string().trim().max(1000).optional().or(z.literal("")),
-  city: z.string().trim().max(255).optional().or(z.literal("")),
+  // Patient details — all 6 fields mandatory.
+  name: patientNameSchema,
+  age: patientAgeSchema,
+  gender: patientGenderSchema,
+  mobileNumber: patientMobileSchema,
+  address: patientAddressSchema,
+  city: patientCitySchema,
 
   // Visit details — FR-3.1. Doctor is required; Department is auto-derived from doctor.
   doctorId: z.string().min(1, "Choose a doctor."),
