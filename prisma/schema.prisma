@@ -404,6 +404,7 @@ model Clinic {
 
   telephonyConfig ClinicTelephonyConfig?
   businessHours   ClinicBusinessHours[]
+  ivrProfile      ClinicIvrProfile?
 
   doctors          Doctor[]
   patients         Patient[]
@@ -437,6 +438,13 @@ enum ClinicBusinessWeekday {
   FRIDAY
   SATURDAY
   SUNDAY
+}
+
+enum ClinicIvrMenuAction {
+  TOMORROW_SLOTS
+  APPOINTMENT_BOOKING
+  URGENT_ASSISTANCE
+  CLINIC_INFORMATION
 }
 
 /// Optional per-clinic voice routing configuration. Provider credentials stay
@@ -475,6 +483,42 @@ model ClinicBusinessHours {
 
   @@unique([clinicId, dayOfWeek], map: "clinic_business_hours_clinic_day_key")
   @@map("clinic_business_hours")
+}
+
+/// Optional dormant IVR configuration for a future runtime adapter. Phase 2A
+/// management never changes the deterministic production menu.
+model ClinicIvrProfile {
+  id               String   @id @default(cuid())
+  clinicId         String   @unique @map("clinic_id")
+  greetingTemplate String   @map("greeting_template") @db.VarChar(500)
+  language         String   @db.VarChar(16)
+  voice            String   @db.VarChar(16)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  items  ClinicIvrMenuItem[]
+
+  @@map("clinic_ivr_profiles")
+}
+
+model ClinicIvrMenuItem {
+  id        String              @id @default(cuid())
+  profileId String              @map("profile_id")
+  digit     Int
+  label     String              @db.VarChar(80)
+  action    ClinicIvrMenuAction
+  position  Int
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  profile ClinicIvrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, digit])
+  @@unique([profileId, position])
+  @@unique([profileId, action])
+  @@map("clinic_ivr_menu_items")
 }
 
 enum TelephonyBookingRequestReason {

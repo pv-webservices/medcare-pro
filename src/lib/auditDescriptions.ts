@@ -185,6 +185,20 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "organisation",
   },
+  [AUDIT_ACTIONS.CLINIC_IVR_PROFILE_UPDATED]: {
+    label: "Clinic IVR profile changed",
+    detail:
+      "An administrator replaced this clinic's dormant IVR configuration.",
+    side: "tenant",
+    category: "organisation",
+  },
+  [AUDIT_ACTIONS.CLINIC_IVR_PROFILE_RESET]: {
+    label: "Clinic IVR profile reset",
+    detail:
+      "An administrator removed this clinic's custom IVR configuration so system defaults apply.",
+    side: "tenant",
+    category: "organisation",
+  },
   [AUDIT_ACTIONS.TENANT_ENTITLEMENTS_SET]: {
     label: "Plan or features changed",
     detail:
