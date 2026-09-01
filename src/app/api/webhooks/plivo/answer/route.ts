@@ -18,8 +18,8 @@ export async function POST(request: Request): Promise<Response> {
   const verification = await verifyPlivoV3Webhook(request);
 
   if (!verification.ok) {
+    console.error(`Plivo Answer webhook rejected: ${verification.reason}`);
     if (verification.reason === "missing-configuration") {
-      console.error("Plivo webhook validation is not configured.");
       return new Response("Service unavailable.", { status: 503 });
     }
 

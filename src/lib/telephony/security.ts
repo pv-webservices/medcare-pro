@@ -1,4 +1,5 @@
 import { validateV3Signature } from "plivo";
+import { resolvePlivoPublicWebhookUrl } from "@/lib/telephony/publicUrl";
 
 const SIGNATURE_HEADER = "x-plivo-signature-v3";
 const NONCE_HEADER = "x-plivo-signature-v3-nonce";
@@ -79,6 +80,13 @@ export async function verifyPlivoV3Webhook(
     return { ok: false, reason: "missing-nonce" };
   }
 
+  let verificationUrl: string;
+  try {
+    verificationUrl = resolvePlivoPublicWebhookUrl(request.url);
+  } catch {
+    return { ok: false, reason: "missing-configuration" };
+  }
+
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -94,7 +102,7 @@ export async function verifyPlivoV3Webhook(
   try {
     const valid = validateV3Signature(
       request.method,
-      request.url,
+      verificationUrl,
       nonce,
       token,
       signature,

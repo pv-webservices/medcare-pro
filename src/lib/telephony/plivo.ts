@@ -14,6 +14,7 @@ import {
   STAGE_2_NO_INPUT_MESSAGE,
 } from "@/lib/telephony/ivr";
 import type { MainMenuAction } from "@/lib/telephony/routing";
+import { resolvePlivoPublicWebhookUrl } from "@/lib/telephony/publicUrl";
 
 export const PLIVO_INPUT_WEBHOOK_PATH = "/api/webhooks/plivo/input";
 export const PLIVO_DOCTOR_WEBHOOK_PATH =
@@ -55,12 +56,10 @@ type AddDial = (
 ) => object;
 
 export function buildPlivoInputActionUrl(requestUrl: string): string {
-  const requestedUrl = new URL(requestUrl);
-  if (!["http:", "https:"].includes(requestedUrl.protocol)) {
-    throw new Error("Plivo webhook URLs must use HTTP or HTTPS.");
-  }
-
-  return new URL(PLIVO_INPUT_WEBHOOK_PATH, requestedUrl.origin).toString();
+  return new URL(
+    PLIVO_INPUT_WEBHOOK_PATH,
+    resolvePlivoPublicWebhookUrl(requestUrl),
+  ).toString();
 }
 
 export function buildPlivoActionUrl(
@@ -68,11 +67,7 @@ export function buildPlivoActionUrl(
   path: string,
   state: Readonly<Record<string, string | number>> = {},
 ): string {
-  const requestedUrl = new URL(requestUrl);
-  if (!["http:", "https:"].includes(requestedUrl.protocol)) {
-    throw new Error("Plivo webhook URLs must use HTTP or HTTPS.");
-  }
-  const actionUrl = new URL(path, requestedUrl.origin);
+  const actionUrl = new URL(path, resolvePlivoPublicWebhookUrl(requestUrl));
   for (const [key, value] of Object.entries(state)) {
     actionUrl.searchParams.set(key, String(value));
   }
