@@ -168,15 +168,15 @@ export default async function OwnerDashboardPage() {
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-7">
       {/* Header Banner */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/20 to-purple-600/30 text-indigo-400 shadow-md shadow-indigo-500/10">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-600/30 border border-indigo-500/30 text-indigo-400 shadow-md shadow-indigo-500/10">
             <ShieldPulseIcon className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
               Platform overview
             </h1>
             <p className="mt-0.5 text-xs text-slate-400 sm:text-sm">
@@ -189,7 +189,7 @@ export default async function OwnerDashboardPage() {
         <div>
           <Link
             href="/owner/applications?status=PENDING"
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 px-4.5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition-all duration-150 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.99]"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition-all duration-150 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.99]"
           >
             <span>Review clinic applications</span>
             <ArrowRight className="h-4 w-4" />
@@ -207,34 +207,35 @@ export default async function OwnerDashboardPage() {
             <Link
               key={kpi.label}
               href={`/owner/applications?status=${kpi.status}`}
-              className="group relative overflow-hidden rounded-2xl border border-slate-800/80 bg-[#0d1427]/80 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700/80"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700"
             >
               <div
                 aria-hidden="true"
                 className={`pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-gradient-to-b ${kpi.cardGlow} to-transparent blur-xl`}
               />
 
-              <div className="flex items-start justify-between">
-                <div
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${kpi.tileClass} shadow-sm transition-transform duration-150 group-hover:scale-105`}
-                >
-                  <Icon className="h-5 w-5" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${kpi.tileClass} shadow-sm transition-transform duration-150 group-hover:scale-105`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold tabular-nums text-white">
+                    {kpi.value}
+                  </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-600 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-slate-400" />
               </div>
 
               <div className="mt-4">
-                <div className="text-2xl font-bold tabular-nums text-white sm:text-3xl">
-                  {kpi.value}
-                </div>
-                <div className="mt-0.5 text-xs font-medium text-slate-400">
+                <div className="text-xs font-medium text-slate-300">
                   {kpi.label}
                 </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400">
-                <span className={`h-2 w-2 rounded-full ${kpi.dotClass}`} />
-                <span>{percentage}% of total</span>
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <span className={`h-2 w-2 rounded-full ${kpi.dotClass}`} />
+                  <span>{percentage}% of total</span>
+                </div>
               </div>
             </Link>
           );
@@ -246,7 +247,7 @@ export default async function OwnerDashboardPage() {
         {/* Platform Features */}
         <Link
           href="/owner/features"
-          className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-[#0d1427]/80 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700/80"
+          className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700"
         >
           <div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-950/60 text-indigo-400 shadow-sm transition-transform duration-150 group-hover:scale-105">
@@ -268,7 +269,7 @@ export default async function OwnerDashboardPage() {
         {/* Plans */}
         <Link
           href="/owner/plans"
-          className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-[#0d1427]/80 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700/80"
+          className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700"
         >
           <div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-950/60 text-blue-400 shadow-sm transition-transform duration-150 group-hover:scale-105">
@@ -281,7 +282,7 @@ export default async function OwnerDashboardPage() {
               What each plan includes, and who follows it. Layer 2.
             </p>
           </div>
-          <div className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-blue-400 transition-colors group-hover:text-blue-300">
+          <div className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 transition-colors group-hover:text-indigo-300">
             <span>Manage plans</span>
             <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
           </div>
@@ -290,7 +291,7 @@ export default async function OwnerDashboardPage() {
         {/* Activity Log */}
         <Link
           href="/owner/audit"
-          className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-[#0d1427]/80 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700/80"
+          className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 shadow-lg backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-700"
         >
           <div>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-purple-500/20 bg-purple-950/60 text-purple-400 shadow-sm transition-transform duration-150 group-hover:scale-105">
@@ -303,7 +304,7 @@ export default async function OwnerDashboardPage() {
               Every decision taken on the platform. Append-only, exportable.
             </p>
           </div>
-          <div className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-purple-400 transition-colors group-hover:text-purple-300">
+          <div className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 transition-colors group-hover:text-indigo-300">
             <span>View activity log</span>
             <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
           </div>
@@ -313,7 +314,7 @@ export default async function OwnerDashboardPage() {
       {/* Lower Analytics Section: Real Recent Applications & Real Plan Distribution */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Recent Clinic Applications */}
-        <div className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/80 p-5 shadow-lg backdrop-blur-md lg:col-span-6 flex flex-col justify-between">
+        <div className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 shadow-lg backdrop-blur-md lg:col-span-7 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
               <h2 className="text-sm sm:text-base font-semibold text-white">
@@ -333,7 +334,7 @@ export default async function OwnerDashboardPage() {
                 No clinic applications received yet.
               </div>
             ) : (
-              <div className="divide-y divide-slate-800/50">
+              <div className="divide-y divide-slate-800/50 mt-1">
                 {recentApplications.map((app) => {
                   const badge =
                     STATUS_BADGE_CONFIG[app.status] || STATUS_BADGE_CONFIG.PENDING;
@@ -341,10 +342,10 @@ export default async function OwnerDashboardPage() {
                     <Link
                       key={app.id}
                       href={`/owner/applications/${app.id}`}
-                      className="group flex items-center justify-between gap-3 py-3.5 transition-colors hover:bg-slate-800/20 px-1 rounded-xl"
+                      className="group flex items-center justify-between gap-3 py-3 transition-colors hover:bg-slate-800/30 px-2 rounded-xl"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-950/50 text-xs font-bold text-indigo-300">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-950/60 text-xs font-bold text-indigo-300">
                           {getInitials(app.clinicName)}
                         </div>
                         <div className="min-w-0">
@@ -366,7 +367,7 @@ export default async function OwnerDashboardPage() {
                         <span className="text-[11px] tabular-nums text-slate-500">
                           {formatShortTimeAgo(app.createdAt)}
                         </span>
-                        <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-slate-400" />
+                        <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-slate-400 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </Link>
                   );
@@ -374,10 +375,16 @@ export default async function OwnerDashboardPage() {
               </div>
             )}
           </div>
+
+          {applicationsData.total > 0 && (
+            <div className="mt-4 pt-3 border-t border-slate-800/50 text-center text-xs text-slate-500">
+              Showing {recentApplications.length} of {applicationsData.total}
+            </div>
+          )}
         </div>
 
         {/* Real Plan Distribution */}
-        <div className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/80 p-5 shadow-lg backdrop-blur-md lg:col-span-6 flex flex-col justify-between">
+        <div className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 shadow-lg backdrop-blur-md lg:col-span-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
               <h2 className="text-sm sm:text-base font-semibold text-white">
@@ -392,17 +399,17 @@ export default async function OwnerDashboardPage() {
               </Link>
             </div>
 
-            <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-12 items-center">
+            <div className="mt-5 flex flex-col gap-6 items-center">
               {/* SVG Donut Chart */}
-              <div className="relative mx-auto flex h-36 w-36 items-center justify-center sm:col-span-5">
+              <div className="relative mx-auto flex h-36 w-36 items-center justify-center">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
                   {/* Background Track */}
                   <circle
                     cx="50"
                     cy="50"
-                    r="40"
-                    stroke="#1e293b"
-                    strokeWidth="12"
+                    r="38"
+                    stroke="#182240"
+                    strokeWidth="14"
                     fill="none"
                   />
                   {/* Plan Segments */}
@@ -412,19 +419,20 @@ export default async function OwnerDashboardPage() {
                         key={idx}
                         cx="50"
                         cy="50"
-                        r="40"
+                        r="38"
                         stroke={item.stroke}
-                        strokeWidth="12"
+                        strokeWidth="14"
                         strokeDasharray={item.strokeDasharray}
                         strokeDashoffset={item.strokeDashoffset}
                         fill="none"
+                        strokeLinecap="round"
                       />
                     ))}
                 </svg>
 
                 {/* Center Content */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-xl font-bold text-white tabular-nums">
+                  <span className="text-2xl font-bold text-white tabular-nums">
                     {total}
                   </span>
                   <span className="text-[10px] text-slate-400">Total clinics</span>
@@ -432,18 +440,18 @@ export default async function OwnerDashboardPage() {
               </div>
 
               {/* Breakdown Legend Table */}
-              <div className="space-y-3 sm:col-span-7">
+              <div className="w-full space-y-3.5">
                 {planDistribution.length === 0 ? (
                   <div className="py-6 text-center text-xs text-slate-500">
                     No plans configured yet.
                   </div>
                 ) : (
                   planDistribution.map((item, idx) => (
-                    <div key={idx} className="space-y-1">
+                    <div key={idx} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className={`h-2 w-2 rounded-full ${item.dotClass}`} />
-                          <span className="font-medium text-slate-300">{item.name}</span>
+                          <span className="font-medium text-slate-200">{item.name}</span>
                         </div>
                         <div className="flex items-center gap-3 tabular-nums">
                           <span className="text-slate-400 font-medium">{item.count}</span>
@@ -452,7 +460,7 @@ export default async function OwnerDashboardPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden">
+                      <div className="h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
                         <div
                           className={`h-full rounded-full ${item.barClass}`}
                           style={{ width: `${item.percentage}%` }}

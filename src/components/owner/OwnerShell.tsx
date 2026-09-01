@@ -4,11 +4,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   Building2,
+  Calendar,
   LayoutGrid,
   Layers,
   LogOut,
   Menu as MenuIcon,
+  MessageSquare,
   ScrollText,
   Shield,
   ToggleLeft,
@@ -129,12 +132,12 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
           href="/owner/dashboard"
           className="flex items-center gap-3 px-1 py-1 transition-opacity hover:opacity-90"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-gradient-to-br from-indigo-500/20 to-purple-600/30 text-indigo-400 shadow-md shadow-indigo-500/10">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-600/30">
             <ShieldPulseIcon className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-base font-bold tracking-wide text-white">
-              MEDCARE <span className="text-indigo-400">PRO</span>
+            <div className="text-base font-bold tracking-tight text-white">
+              MEDCARE PRO
             </div>
             <div className="text-[11px] font-medium text-slate-400">
               Healthcare. Simplified.
@@ -195,16 +198,23 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
       {/* Sidebar Bottom Section */}
       <div className="mt-8 space-y-3">
         {/* Informational Security Card */}
-        <div className="flex items-start gap-3 rounded-2xl border border-indigo-500/20 bg-indigo-950/30 p-3.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-900/50 text-indigo-400">
-            <Shield className="h-4 w-4" />
-          </div>
-          <div>
+        <div className="flex flex-col gap-2 rounded-2xl border border-indigo-500/20 bg-[#0c1226]/90 p-4 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-indigo-500/30 bg-indigo-950/80 text-indigo-400">
+              <Shield className="h-4 w-4" />
+            </div>
             <div className="text-xs font-semibold text-white">Secure &amp; trusted</div>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
-              Enterprise-grade security protecting your data and clinics.
-            </p>
           </div>
+          <p className="text-[11px] leading-relaxed text-slate-400">
+            Enterprise-grade security protecting your data and clinics.
+          </p>
+          <Link
+            href="/owner/audit"
+            className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            <span>Learn more</span>
+            <span aria-hidden="true">&rarr;</span>
+          </Link>
         </div>
 
         {/* Sidebar Sign Out */}
@@ -212,7 +222,7 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
           type="button"
           onClick={handleSignOut}
           disabled={isSigningOut}
-          className="flex w-full items-center gap-2.5 rounded-xl border border-slate-800/80 bg-slate-900/50 px-3.5 py-2.5 text-xs font-medium text-slate-400 transition-colors hover:border-slate-700 hover:bg-rose-950/30 hover:text-rose-300 disabled:opacity-60"
+          className="flex w-full items-center gap-2.5 rounded-xl border border-slate-800/80 bg-slate-900/50 px-4 py-2.5 text-xs font-medium text-slate-400 transition-colors hover:border-slate-700 hover:bg-rose-950/30 hover:text-rose-300 disabled:opacity-60"
         >
           <LogOut className="h-3.5 w-3.5 shrink-0" />
           <span>{isSigningOut ? "Signing out…" : "Log out"}</span>
@@ -271,15 +281,43 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
             >
               <MenuIcon className="h-5 w-5" />
             </button>
-            <div className="hidden sm:block">
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-950/40 px-2.5 py-1 text-xs font-semibold text-indigo-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-xl border border-slate-800/80 bg-[#0c1226]/80 px-3.5 py-1.5 text-xs font-medium text-slate-300 shadow-xs">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 Platform Console
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Right-side Quick Actions & Profile */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <Link
+              href="/owner/dashboard"
+              aria-label="Calendar overview"
+              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-800/80 bg-[#0c1226]/80 text-slate-400 shadow-xs transition-colors hover:border-slate-700 hover:bg-slate-800 hover:text-white md:flex"
+            >
+              <Calendar className="h-4 w-4" />
+            </Link>
+
+            <Link
+              href="/owner/audit"
+              aria-label="Activity messages"
+              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-800/80 bg-[#0c1226]/80 text-slate-400 shadow-xs transition-colors hover:border-slate-700 hover:bg-slate-800 hover:text-white md:flex"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Link>
+
+            <Link
+              href="/owner/applications"
+              aria-label="Applications notifications"
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-800/80 bg-[#0c1226]/80 text-slate-400 shadow-xs transition-colors hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+            >
+              <Bell className="h-4 w-4" />
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-purple-600 px-1 text-[10px] font-bold text-white shadow-xs">
+                !
+              </span>
+            </Link>
+
             <OwnerUserMenu user={user} />
           </div>
         </header>
@@ -290,8 +328,9 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
         {/* Footer */}
         <footer className="border-t border-slate-800/60 bg-[#070c1b]/60 px-4 py-4 text-xs text-slate-500 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>&copy; {new Date().getFullYear()} MEDCARE PRO. All rights reserved.</div>
-          <div className="text-[11px] text-slate-400">
-            Platform Operator Console &middot; Protected Superadmin Surface
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+            <span>Platform Operator Console &middot; Protected Superadmin Surface</span>
+            <Shield className="h-3.5 w-3.5 text-indigo-400" />
           </div>
         </footer>
       </div>
