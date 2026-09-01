@@ -22,6 +22,29 @@ function canonicalNumber(value: unknown): string | null {
   }
 }
 
+export function isReceptionDestinationAvailable(input: {
+  providerNumber: unknown;
+  publicPhoneNumber: unknown;
+  receptionPhoneNumber: unknown;
+}): boolean {
+  const providerNumber = canonicalNumber(input.providerNumber);
+  const receptionNumber = canonicalNumber(input.receptionPhoneNumber);
+  if (
+    providerNumber === null ||
+    receptionNumber === null ||
+    !isCanonicalIndianPhoneNumber(providerNumber) ||
+    !isCanonicalIndianPhoneNumber(receptionNumber)
+  ) {
+    return false;
+  }
+
+  const publicNumber = canonicalNumber(input.publicPhoneNumber);
+  return (
+    receptionNumber !== providerNumber &&
+    (publicNumber === null || receptionNumber !== publicNumber)
+  );
+}
+
 function mainMenu(requestUrl: string, clinicName: string): string {
   return buildClinicMainMenuXml(
     buildPlivoInputActionUrl(requestUrl),
@@ -37,18 +60,13 @@ export function buildReceptionRouteXml(input: {
   const providerNumber = canonicalNumber(input.providerNumber);
   const receptionNumber = canonicalNumber(input.clinic.receptionPhoneNumber);
   if (
+    !isReceptionDestinationAvailable({
+      providerNumber: input.providerNumber,
+      publicPhoneNumber: input.clinic.publicPhoneNumber,
+      receptionPhoneNumber: input.clinic.receptionPhoneNumber,
+    }) ||
     providerNumber === null ||
-    receptionNumber === null ||
-    !isCanonicalIndianPhoneNumber(providerNumber) ||
-    !isCanonicalIndianPhoneNumber(receptionNumber)
-  ) {
-    return mainMenu(input.requestUrl, input.clinic.clinicName);
-  }
-
-  const publicNumber = canonicalNumber(input.clinic.publicPhoneNumber);
-  if (
-    receptionNumber === providerNumber ||
-    (publicNumber !== null && receptionNumber === publicNumber)
+    receptionNumber === null
   ) {
     return mainMenu(input.requestUrl, input.clinic.clinicName);
   }

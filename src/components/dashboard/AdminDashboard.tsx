@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONES } from "@/components/appointments/status";
 import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
+import CallHandlingPanel from "@/components/dashboard/CallHandlingPanel";
 import DashboardLayoutEditor, { type DashboardWidgetSlot } from "@/components/dashboard/DashboardLayoutEditor";
 import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import {
@@ -37,10 +38,12 @@ import type { AdminDashboardData, DashboardTrendPoint } from "@/lib/adminDashboa
 import type { EffectiveDashboardLayout } from "@/lib/dashboardLayouts";
 import { DASHBOARD_WIDGETS, type DashboardWidgetId } from "@/lib/dashboardWidgets";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
+import type { DashboardCallHandlingModel } from "@/lib/telephony/dashboardCallHandling";
 
 interface Props {
   data: AdminDashboardData;
   layout: EffectiveDashboardLayout;
+  callHandling: DashboardCallHandlingModel | null;
   now?: Date;
 }
 
@@ -118,7 +121,7 @@ function NoData({ title, guidance, icon }: { title: string; guidance: string; ic
   return <EmptyState isBare icon={icon} title={title} guidance={guidance} />;
 }
 
-export default function AdminDashboard({ data, layout, now = new Date() }: Props) {
+export default function AdminDashboard({ data, layout, callHandling, now = new Date() }: Props) {
   const scopeLabel = data.scope.clinicName ?? (data.scope.clinicCount > 1 ? "All accessible clinics" : "Accessible clinic");
   const slots = layout.layout.widgets.map((preference): DashboardWidgetSlot => ({
     id: preference.widgetId,
@@ -146,6 +149,12 @@ export default function AdminDashboard({ data, layout, now = new Date() }: Props
             <div className="col-span-2 sm:col-span-1"><Suspense><DateRangePicker current={data.period} /></Suspense></div>
           </div>
         }
+      />
+
+      <CallHandlingPanel
+        key={callHandling?.clinicId ?? "all-clinics"}
+        model={callHandling}
+        clinicName={data.scope.clinicName}
       />
 
       {layout.layout.widgets.length === 0 ? (

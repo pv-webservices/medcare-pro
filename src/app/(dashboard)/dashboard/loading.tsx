@@ -29,6 +29,25 @@ export default function Loading() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-line bg-canvas p-4 shadow-card sm:p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Skeleton className="w-28" />
+            <Skeleton className="mt-2 h-3 w-64 max-w-full" />
+          </div>
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl border border-line bg-canvas-deep p-1">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-11 w-full" />
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-[82px] w-full rounded-xl" />
+          <Skeleton className="h-[82px] w-full rounded-xl" />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 7 }).map((_, index) => (
           <div key={index} className={`min-h-[116px] rounded-2xl border border-line bg-canvas p-4 shadow-card ${index === 6 ? "xl:col-span-2" : ""}`}>

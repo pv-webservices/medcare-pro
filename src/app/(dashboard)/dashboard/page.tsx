@@ -5,6 +5,7 @@ import { visibleDashboardWidgetIds } from "@/lib/dashboardWidgets";
 import { parsePreset } from "@/lib/dashboardDateRange";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor } from "@/lib/session";
+import { getDashboardCallHandlingForActor } from "@/lib/telephony/dashboardCallHandling";
 
 /**
  * One permission-driven dashboard path for every tenant user, including the
@@ -19,13 +20,25 @@ export default async function DashboardPage(props: {
   const period = parsePreset(typeof params.range === "string" ? params.range : undefined);
   const now = new Date();
   const layout = await getEffectiveDashboardLayout(actor);
-  const data = await getAdminDashboardData(
-    actor,
-    selectedClinicId,
-    period,
-    now,
-    visibleDashboardWidgetIds(layout.layout),
-  );
+  const [data, callHandling] = await Promise.all([
+    getAdminDashboardData(
+      actor,
+      selectedClinicId,
+      period,
+      now,
+      visibleDashboardWidgetIds(layout.layout),
+    ),
+    selectedClinicId === null
+      ? Promise.resolve(null)
+      : getDashboardCallHandlingForActor(actor, selectedClinicId, now),
+  ]);
 
-  return <AdminDashboard data={data} layout={layout} now={now} />;
+  return (
+    <AdminDashboard
+      data={data}
+      layout={layout}
+      callHandling={callHandling}
+      now={now}
+    />
+  );
 }
