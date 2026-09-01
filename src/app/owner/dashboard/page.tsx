@@ -168,7 +168,7 @@ export default async function OwnerDashboardPage() {
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-7">
+    <div className="w-full px-4 py-7 sm:px-6 md:px-8 lg:px-10 space-y-6">
       {/* Header Banner */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
@@ -198,7 +198,7 @@ export default async function OwnerDashboardPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           const percentage = total > 0 ? Math.round((kpi.value / total) * 100) : 0;
@@ -243,7 +243,7 @@ export default async function OwnerDashboardPage() {
       </div>
 
       {/* Management Navigation Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         {/* Platform Features */}
         <Link
           href="/owner/features"
@@ -312,7 +312,7 @@ export default async function OwnerDashboardPage() {
       </div>
 
       {/* Lower Analytics Section: Real Recent Applications & Real Plan Distribution */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* Recent Clinic Applications */}
         <div className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 shadow-lg backdrop-blur-md lg:col-span-7 flex flex-col justify-between">
           <div>

@@ -6,12 +6,10 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   Building2,
-  Calendar,
   LayoutGrid,
   Layers,
   LogOut,
   Menu as MenuIcon,
-  MessageSquare,
   ScrollText,
   Shield,
   ToggleLeft,
@@ -271,7 +269,7 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
       {/* Main Column */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-800/70 bg-[#070c1b]/85 px-4 backdrop-blur-md sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-800/70 bg-[#070c1b]/85 px-4 backdrop-blur-md sm:px-6 md:px-8 lg:px-10">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -289,24 +287,8 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
             </div>
           </div>
 
-          {/* Right-side Quick Actions & Profile */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            <Link
-              href="/owner/dashboard"
-              aria-label="Calendar overview"
-              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-800/80 bg-[#0c1226]/80 text-slate-400 shadow-xs transition-colors hover:border-slate-700 hover:bg-slate-800 hover:text-white md:flex"
-            >
-              <Calendar className="h-4 w-4" />
-            </Link>
-
-            <Link
-              href="/owner/audit"
-              aria-label="Activity messages"
-              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-800/80 bg-[#0c1226]/80 text-slate-400 shadow-xs transition-colors hover:border-slate-700 hover:bg-slate-800 hover:text-white md:flex"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </Link>
-
+          {/* Right-side Notification & Profile */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <Link
               href="/owner/applications"
               aria-label="Applications notifications"
@@ -326,7 +308,7 @@ export default function OwnerShell({ user, children }: OwnerShellProps) {
         <main className="flex-1 bg-[#060b17]">{children}</main>
 
         {/* Footer */}
-        <footer className="border-t border-slate-800/60 bg-[#070c1b]/60 px-4 py-4 text-xs text-slate-500 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <footer className="border-t border-slate-800/60 bg-[#070c1b]/60 px-4 py-4 text-xs text-slate-500 sm:px-6 md:px-8 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>&copy; {new Date().getFullYear()} MEDCARE PRO. All rights reserved.</div>
           <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
             <span>Platform Operator Console &middot; Protected Superadmin Surface</span>
