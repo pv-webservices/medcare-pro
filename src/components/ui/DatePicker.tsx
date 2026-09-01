@@ -161,6 +161,8 @@ export default function DatePicker({
 
   const {
     position,
+    setPosition,
+    getImmediatePosition,
     dispatchOpenEvent,
     shouldIgnoreTriggerClick,
   } = useFloatingPopover({
@@ -193,6 +195,10 @@ export default function DatePicker({
     const willOpen = !isOpen;
     if (willOpen) {
       dispatchOpenEvent();
+      const pos = getImmediatePosition();
+      if (pos) {
+        setPosition(pos);
+      }
       let yr: number;
       let mo: number;
       if (activeValue && isDateOnly(activeValue)) {
@@ -399,6 +405,7 @@ export default function DatePicker({
       {/* Floating Calendar Popup */}
       {typeof document !== "undefined" &&
         isOpen &&
+        position &&
         createPortal(
           <div
             ref={panelRef}
@@ -409,14 +416,14 @@ export default function DatePicker({
             onKeyDown={handleKeyDown}
             style={{
               position: "fixed",
-              top: position?.top ?? 0,
-              left: position?.left ?? 0,
+              top: position.top,
+              left: position.left,
+              transformOrigin: position.transformOrigin,
               zIndex: 9999,
-              visibility: position ? "visible" : "hidden",
             }}
             className={cx(
               "w-[292px] rounded-2xl border border-line bg-canvas p-3.5 shadow-float outline-none select-none",
-              "animate-in fade-in-0 zoom-in-95 duration-100",
+              position.openUpward ? "dropdown-in-up" : "dropdown-in-down",
             )}
           >
             {/* Header: Month Year + Prev / Next navigation */}

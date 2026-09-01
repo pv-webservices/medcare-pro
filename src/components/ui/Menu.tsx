@@ -66,6 +66,8 @@ export default function Menu({
 
   const {
     position,
+    setPosition,
+    getImmediatePosition,
     dispatchOpenEvent,
     shouldIgnoreTriggerClick,
   } = useFloatingPopover({
@@ -97,6 +99,12 @@ export default function Menu({
     const next = !isOpen;
     if (next) {
       dispatchOpenEvent();
+      if (usePortal) {
+        const pos = getImmediatePosition();
+        if (pos) {
+          setPosition(pos);
+        }
+      }
     }
     setIsOpen(next);
   }
@@ -106,6 +114,12 @@ export default function Menu({
       if (!isOpen) {
         event.preventDefault();
         dispatchOpenEvent();
+        if (usePortal) {
+          const pos = getImmediatePosition();
+          if (pos) {
+            setPosition(pos);
+          }
+        }
         setIsOpen(true);
         requestAnimationFrame(() => items()[0]?.focus());
       }
@@ -147,14 +161,19 @@ export default function Menu({
               top: position?.top ?? 0,
               left: position?.left ?? 0,
               maxHeight: position?.maxHeight ? `${position.maxHeight}px` : undefined,
+              transformOrigin: position?.transformOrigin ?? (align === "end" ? "top right" : "top left"),
               zIndex: 9999,
-              visibility: position ? "visible" : "hidden",
             }
-          : undefined
+          : {
+              transformOrigin: align === "end" ? "top right" : "top left",
+            }
       }
       className={cx(
-        "panel-in z-50 min-w-[15rem] overflow-y-auto rounded-2xl",
-        "border border-line bg-canvas p-1.5 shadow-float",
+        usePortal
+          ? (position?.openUpward ? "dropdown-in-up" : "dropdown-in-down")
+          : "dropdown-in-down",
+        "z-50 min-w-[15rem] overflow-y-auto rounded-2xl",
+        "border border-line bg-canvas p-1.5 shadow-float outline-none",
         usePortal
           ? ""
           : cx("absolute mt-2", align === "end" ? "right-0" : "left-0"),
@@ -181,8 +200,10 @@ export default function Menu({
       </button>
 
       {isOpen &&
-        (usePortal && mounted && typeof document !== "undefined"
-          ? createPortal(panelElement, document.body)
+        (usePortal
+          ? mounted && position && typeof document !== "undefined"
+            ? createPortal(panelElement, document.body)
+            : null
           : panelElement)}
     </div>
   );

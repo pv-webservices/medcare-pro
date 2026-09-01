@@ -18,6 +18,7 @@ export interface FloatingPosition {
   width: number;
   maxHeight: number;
   openUpward: boolean;
+  transformOrigin: "top left" | "top right" | "bottom left" | "bottom right";
 }
 
 export interface UseFloatingPopoverOptions {
@@ -52,6 +53,110 @@ export function resolveFloatingPanelWidth({
   return measuredPanelWidth || defaultWidth || Math.max(triggerWidth, 240);
 }
 
+export function computeFloatingPosition({
+  triggerEl,
+  panelEl,
+  align = "auto",
+  offset = 6,
+  defaultWidth,
+  defaultHeight,
+  matchTriggerWidth = false,
+  viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1024,
+  viewportHeight = typeof window !== "undefined" ? window.innerHeight : 768,
+}: {
+  triggerEl: {
+    getBoundingClientRect(): {
+      top: number;
+      left: number;
+      bottom: number;
+      right: number;
+      width: number;
+      height: number;
+    };
+  };
+  panelEl?: { offsetWidth?: number; offsetHeight?: number } | null;
+  align?: "start" | "end" | "auto";
+  offset?: number;
+  defaultWidth?: number;
+  defaultHeight?: number;
+  matchTriggerWidth?: boolean;
+  viewportWidth?: number;
+  viewportHeight?: number;
+}): FloatingPosition | null {
+  const triggerRect = triggerEl.getBoundingClientRect();
+
+  // Trigger is hidden or unmounted
+  if (triggerRect.width === 0 && triggerRect.height === 0) return null;
+
+  const panelWidth = resolveFloatingPanelWidth({
+    triggerWidth: triggerRect.width,
+    measuredPanelWidth: panelEl?.offsetWidth,
+    defaultWidth,
+    matchTriggerWidth,
+  });
+  const panelHeight = panelEl?.offsetHeight || defaultHeight || 280;
+
+  const spaceBelow = viewportHeight - triggerRect.bottom - offset - 8;
+  const spaceAbove = triggerRect.top - offset - 8;
+
+  let top: number;
+  let openUpward = false;
+
+  if (spaceBelow < Math.min(panelHeight, 180) && spaceAbove > spaceBelow) {
+    openUpward = true;
+    top = triggerRect.top - offset - panelHeight;
+    if (top < 8) top = 8;
+  } else {
+    top = triggerRect.bottom + offset;
+    if (top + panelHeight > viewportHeight - 8) {
+      top = Math.max(8, viewportHeight - 8 - panelHeight);
+    }
+  }
+
+  let left: number;
+  const effectiveAlign =
+    align === "auto"
+      ? triggerRect.left + panelWidth > viewportWidth - 8 &&
+        triggerRect.right - panelWidth >= 8
+        ? "end"
+        : "start"
+      : align;
+
+  if (effectiveAlign === "end") {
+    left = triggerRect.right - panelWidth;
+  } else {
+    left = triggerRect.left;
+  }
+
+  // Viewport collision clamping
+  if (left + panelWidth > viewportWidth - 8) {
+    left = Math.max(8, viewportWidth - 8 - panelWidth);
+  }
+  if (left < 8) {
+    left = 8;
+  }
+
+  const transformOrigin: "top left" | "top right" | "bottom left" | "bottom right" =
+    openUpward
+      ? effectiveAlign === "end"
+        ? "bottom right"
+        : "bottom left"
+      : effectiveAlign === "end"
+        ? "top right"
+        : "top left";
+
+  return {
+    top: Math.round(top),
+    left: Math.round(left),
+    width: Math.round(triggerRect.width),
+    maxHeight: Math.floor(
+      Math.max(140, Math.min(openUpward ? spaceAbove : spaceBelow, 360)),
+    ),
+    openUpward,
+    transformOrigin,
+  };
+}
+
 export function useFloatingPopover({
   isOpen,
   onClose,
@@ -67,81 +172,16 @@ export function useFloatingPopover({
   const [position, setPosition] = useState<FloatingPosition | null>(null);
   const ignoreNextTriggerClickRef = useRef<number>(0);
 
-  const updatePosition = useCallback(() => {
-    if (!triggerRef.current) return;
-    const triggerEl = triggerRef.current;
-    const triggerRect = triggerEl.getBoundingClientRect();
-
-    // Trigger is hidden or unmounted
-    if (triggerRect.width === 0 && triggerRect.height === 0) return;
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // Trigger scrolled out of viewport
-    if (triggerRect.bottom < 0 || triggerRect.top > viewportHeight) {
-      onClose();
-      return;
-    }
-
-    const panelEl = panelRef.current;
-    const panelWidth = resolveFloatingPanelWidth({
-      triggerWidth: triggerRect.width,
-      measuredPanelWidth: panelEl?.offsetWidth,
+  const getImmediatePosition = useCallback(() => {
+    if (!triggerRef.current) return null;
+    return computeFloatingPosition({
+      triggerEl: triggerRef.current,
+      panelEl: panelRef.current,
+      align,
+      offset,
       defaultWidth,
+      defaultHeight,
       matchTriggerWidth,
-    });
-    const panelHeight =
-      panelEl?.offsetHeight || defaultHeight || 280;
-
-    const spaceBelow = viewportHeight - triggerRect.bottom - offset - 8;
-    const spaceAbove = triggerRect.top - offset - 8;
-
-    let top: number;
-    let openUpward = false;
-
-    if (spaceBelow < Math.min(panelHeight, 180) && spaceAbove > spaceBelow) {
-      openUpward = true;
-      top = triggerRect.top - offset - panelHeight;
-      if (top < 8) top = 8;
-    } else {
-      top = triggerRect.bottom + offset;
-      if (top + panelHeight > viewportHeight - 8) {
-        top = Math.max(8, viewportHeight - 8 - panelHeight);
-      }
-    }
-
-    let left: number;
-    const effectiveAlign =
-      align === "auto"
-        ? triggerRect.left + panelWidth > viewportWidth - 8 &&
-          triggerRect.right - panelWidth >= 8
-          ? "end"
-          : "start"
-        : align;
-
-    if (effectiveAlign === "end") {
-      left = triggerRect.right - panelWidth;
-    } else {
-      left = triggerRect.left;
-    }
-
-    // Viewport collision clamping
-    if (left + panelWidth > viewportWidth - 8) {
-      left = viewportWidth - 8 - panelWidth;
-    }
-    if (left < 8) {
-      left = 8;
-    }
-
-    setPosition({
-      top: Math.round(top),
-      left: Math.round(left),
-      width: Math.round(triggerRect.width),
-      maxHeight: Math.floor(
-        Math.max(140, Math.min(openUpward ? spaceAbove : spaceBelow, 360)),
-      ),
-      openUpward,
     });
   }, [
     align,
@@ -149,10 +189,17 @@ export function useFloatingPopover({
     defaultWidth,
     matchTriggerWidth,
     offset,
-    onClose,
     panelRef,
     triggerRef,
   ]);
+
+  const updatePosition = useCallback(() => {
+    const nextPos = getImmediatePosition();
+    if (nextPos) {
+      setPosition(nextPos);
+    }
+    return nextPos;
+  }, [getImmediatePosition]);
 
   // Synchronize position when open and attach resize/scroll/mutation observers
   useIsomorphicLayoutEffect(() => {
@@ -283,6 +330,8 @@ export function useFloatingPopover({
 
   return {
     position,
+    setPosition,
+    getImmediatePosition,
     dispatchOpenEvent,
     shouldIgnoreTriggerClick,
   };

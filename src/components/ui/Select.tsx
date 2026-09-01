@@ -155,6 +155,8 @@ export default function Select({
 
   const {
     position,
+    setPosition,
+    getImmediatePosition,
     dispatchOpenEvent,
     shouldIgnoreTriggerClick,
   } = useFloatingPopover({
@@ -229,6 +231,10 @@ export default function Select({
     const willOpen = !isOpen;
     if (willOpen) {
       dispatchOpenEvent();
+      const pos = getImmediatePosition();
+      if (pos) {
+        setPosition(pos);
+      }
       setIsOpen(true);
       const idx = options.findIndex((opt) => opt.value === activeValue);
       setHighlightedIndex(idx >= 0 ? idx : 0);
@@ -244,6 +250,10 @@ export default function Select({
       e.preventDefault();
       if (!isOpen) {
         dispatchOpenEvent();
+        const pos = getImmediatePosition();
+        if (pos) {
+          setPosition(pos);
+        }
         setIsOpen(true);
         const idx = options.findIndex((opt) => opt.value === activeValue);
         setHighlightedIndex(idx >= 0 ? idx : 0);
@@ -257,6 +267,10 @@ export default function Select({
       e.preventDefault();
       if (!isOpen) {
         dispatchOpenEvent();
+        const pos = getImmediatePosition();
+        if (pos) {
+          setPosition(pos);
+        }
         setIsOpen(true);
         const idx = options.findIndex((opt) => opt.value === activeValue);
         setHighlightedIndex(idx >= 0 ? idx : 0);
@@ -425,6 +439,7 @@ export default function Select({
       {/* Portal-rendered elevated listbox panel */}
       {typeof document !== "undefined" &&
         isOpen &&
+        position &&
         createPortal(
           <div
             ref={panelRef}
@@ -435,16 +450,16 @@ export default function Select({
             onKeyDown={handlePanelKeyDown}
             style={{
               position: "fixed",
-              top: position?.top ?? 0,
-              left: position?.left ?? 0,
-              width: position?.width ? `${position.width}px` : undefined,
-              maxHeight: position?.maxHeight ? `${position.maxHeight}px` : "280px",
+              top: position.top,
+              left: position.left,
+              width: position.width ? `${position.width}px` : undefined,
+              maxHeight: position.maxHeight ? `${position.maxHeight}px` : "280px",
+              transformOrigin: position.transformOrigin,
               zIndex: 9999,
-              visibility: position ? "visible" : "hidden",
             }}
             className={cx(
               "overflow-hidden rounded-2xl border border-line bg-canvas p-1.5 shadow-float outline-none",
-              "animate-in fade-in-0 zoom-in-95 duration-100",
+              position.openUpward ? "dropdown-in-up" : "dropdown-in-down",
             )}
           >
             {contextHeader && (
