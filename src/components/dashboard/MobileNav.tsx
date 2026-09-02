@@ -133,7 +133,7 @@ export default function MobileNav({
             className="panel-in relative flex h-full w-[290px] max-w-[86vw] flex-col border-r border-slate-800 bg-[#090e23] text-white shadow-2xl"
           >
             <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 px-4 py-3.5">
-              <BrandMark isCompact={false} showAction={false} />
+              <BrandMark isCompact={false} />
               <IconButton
                 ref={closeButtonRef}
                 label="Close navigation menu"

@@ -5,14 +5,12 @@ import { cx } from "@/components/ui/cx";
 export default function BrandMark({
   className,
   isCompact = false,
-  showAction = true,
 }: {
   className?: string;
   isCompact?: boolean;
-  showAction?: boolean;
 }) {
   return (
-    <div className={cx("flex items-center justify-between gap-3 w-full", className)}>
+    <div className={cx("flex items-center gap-3 w-full", className)}>
       <Link
         href="/dashboard"
         className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90"
@@ -32,17 +30,7 @@ export default function BrandMark({
           </span>
         </span>
       </Link>
-
-      {!isCompact && showAction && (
-        <Link
-          href="/appointments/new"
-          aria-label="New appointment"
-          title="New appointment"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-600/30 text-indigo-300 transition-colors hover:bg-indigo-600 hover:text-white"
-        >
-          <Plus strokeWidth={2.5} className="h-4 w-4" />
-        </Link>
-      )}
     </div>
   );
 }
+

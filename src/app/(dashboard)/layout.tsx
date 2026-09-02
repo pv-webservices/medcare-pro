@@ -221,7 +221,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
               gender={userGender}
             />
 
-            <BrandMark isCompact showAction={false} className="lg:hidden" />
+            <BrandMark isCompact className="lg:hidden" />
 
             {/* Left: Clinic Selector */}
             <div className="hidden min-w-0 flex-1 sm:block lg:max-w-[17rem]">
