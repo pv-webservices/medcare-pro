@@ -1,8 +1,6 @@
 import type { InboundClinicContext } from "@/lib/telephony/clinicConfig";
-import {
-  isCanonicalIndianPhoneNumber,
-  normalizePlivoDestinationNumber,
-} from "@/lib/telephony/phoneNumber";
+import { isCallTransferDestinationAvailable } from "@/lib/telephony/destinationSafety";
+import { normalizePlivoDestinationNumber } from "@/lib/telephony/phoneNumber";
 import {
   buildEffectiveClinicMainMenuXml,
   buildPlivoActionUrl,
@@ -27,22 +25,11 @@ export function isReceptionDestinationAvailable(input: {
   publicPhoneNumber: unknown;
   receptionPhoneNumber: unknown;
 }): boolean {
-  const providerNumber = canonicalNumber(input.providerNumber);
-  const receptionNumber = canonicalNumber(input.receptionPhoneNumber);
-  if (
-    providerNumber === null ||
-    receptionNumber === null ||
-    !isCanonicalIndianPhoneNumber(providerNumber) ||
-    !isCanonicalIndianPhoneNumber(receptionNumber)
-  ) {
-    return false;
-  }
-
-  const publicNumber = canonicalNumber(input.publicPhoneNumber);
-  return (
-    receptionNumber !== providerNumber &&
-    (publicNumber === null || receptionNumber !== publicNumber)
-  );
+  return isCallTransferDestinationAvailable({
+    providerNumber: input.providerNumber,
+    publicPhoneNumber: input.publicPhoneNumber,
+    destinationPhoneNumber: input.receptionPhoneNumber,
+  });
 }
 
 function mainMenu(

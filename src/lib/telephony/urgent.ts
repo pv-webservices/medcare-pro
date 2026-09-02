@@ -1,8 +1,6 @@
 import type { InboundClinicContext } from "@/lib/telephony/clinicConfig";
-import {
-  isCanonicalIndianPhoneNumber,
-  normalizePlivoDestinationNumber,
-} from "@/lib/telephony/phoneNumber";
+import { isCallTransferDestinationAvailable } from "@/lib/telephony/destinationSafety";
+import { normalizePlivoDestinationNumber } from "@/lib/telephony/phoneNumber";
 import {
   buildEffectiveClinicMainMenuXml,
   buildPlivoActionUrl,
@@ -78,16 +76,11 @@ export function handleUrgentConfirmation(input: {
   if (
     providerNumber === null ||
     urgentNumber === null ||
-    !isCanonicalIndianPhoneNumber(providerNumber) ||
-    !isCanonicalIndianPhoneNumber(urgentNumber)
-  ) {
-    return buildUrgentTransferTemporarilyUnavailableXml();
-  }
-
-  const publicNumber = canonicalNumber(input.clinic.publicPhoneNumber);
-  if (
-    urgentNumber === providerNumber ||
-    (publicNumber !== null && urgentNumber === publicNumber)
+    !isCallTransferDestinationAvailable({
+      providerNumber: input.providerNumber,
+      publicPhoneNumber: input.clinic.publicPhoneNumber,
+      destinationPhoneNumber: input.clinic.urgentPhoneNumber,
+    })
   ) {
     return buildUrgentTransferTemporarilyUnavailableXml();
   }

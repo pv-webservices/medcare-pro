@@ -83,6 +83,11 @@ describe("SETTINGS_SECTIONS", () => {
       SETTINGS_SECTIONS.find((section) => section.href === "/settings/phone-menu")
         ?.viewPermissions,
     ).toEqual(["clinic:edit"]);
+    expect(
+      SETTINGS_SECTIONS.find(
+        (section) => section.href === "/settings/phone-settings",
+      )?.viewPermissions,
+    ).toEqual(["clinic:edit"]);
   });
 
   it("describes every section without a placeholder", () => {
@@ -125,7 +130,10 @@ describe("who reaches what", () => {
 
   it("keeps view and change apart on every section", () => {
     for (const section of SETTINGS_SECTIONS.filter(
-      (candidate) => candidate.href !== "/settings/phone-menu",
+      (candidate) =>
+        !["/settings/phone-menu", "/settings/phone-settings"].includes(
+          candidate.href,
+        ),
     )) {
       const viewerOnly = holder(...section.viewPermissions.filter(
         (permission) => !section.managePermissions.includes(permission),
@@ -146,6 +154,21 @@ describe("who reaches what", () => {
     expect(canManageSection(phoneMenu, holder("clinic:edit"))).toBe(true);
     for (const permission of ["settings:view", "settings:manage", "clinic:read"]) {
       expect(visibleSettingsSections(holder(permission))).not.toContain(phoneMenu);
+    }
+  });
+
+  it("advertises Phone settings only at the existing telephony-management boundary", () => {
+    const phoneSettings = SETTINGS_SECTIONS.find(
+      (section) => section.href === "/settings/phone-settings",
+    )!;
+    expect(visibleSettingsSections(holder("clinic:edit"))).toContain(
+      phoneSettings,
+    );
+    expect(canManageSection(phoneSettings, holder("clinic:edit"))).toBe(true);
+    for (const permission of ["settings:view", "settings:manage", "clinic:read"]) {
+      expect(visibleSettingsSections(holder(permission))).not.toContain(
+        phoneSettings,
+      );
     }
   });
 });

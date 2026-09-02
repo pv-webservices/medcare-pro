@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   ArrowRight,
   Building2,
+  Clock3,
   History,
   LayoutDashboard,
   Lock,
@@ -82,6 +83,13 @@ const SECTION_STYLES: Record<string, SectionStyle> = {
     iconColor: "text-[#0f8f83] dark:text-ok-mark",
     displayDescription:
       "Customize the automated greeting and keypad options callers hear.",
+  },
+  "/settings/phone-settings": {
+    icon: Clock3,
+    iconBg: "bg-[#fff1df] dark:bg-warn-bg",
+    iconColor: "text-[#c66a13] dark:text-warn-mark",
+    displayDescription:
+      "Configure call destinations, timezone, and automatic business hours.",
   },
 };
 

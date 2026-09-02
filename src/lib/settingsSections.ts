@@ -106,6 +106,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     managePermissions: ["settings:manage", "clinic:edit"],
   },
   {
+    href: "/settings/phone-settings",
+    title: "Phone settings",
+    description:
+      "Configure reception, urgent-call routing, timezone, and the business hours used by automatic call handling.",
+    viewPermissions: ["clinic:edit"],
+    managePermissions: ["clinic:edit"],
+  },
+  {
     href: "/settings/phone-menu",
     title: "Phone menu",
     description:
