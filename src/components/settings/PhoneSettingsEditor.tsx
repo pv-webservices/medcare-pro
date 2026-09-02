@@ -586,76 +586,9 @@ export default function PhoneSettingsEditor({
       aria-busy={pending !== null || testPending || undefined}
       className="space-y-5"
     >
-      <ReadinessOverview
-        readiness={settings.readiness}
-        routingMode={settings.routingMode}
-        effectiveRoute={settings.effectiveRoute}
-      />
-
-      <Panel
-        title="Test phone menu"
-        description="Place a controlled test call to the configured QA number and hear this clinic's current phone menu."
-        actions={
-          <StatusPill tone={testCall.available ? "ok" : "neutral"}>
-            {testCall.available ? "Test calls available" : "Test calls unavailable"}
-          </StatusPill>
-        }
-      >
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="min-w-0 rounded-2xl border border-line bg-canvas-deep px-4 py-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <span
-                aria-hidden="true"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
-              >
-                <PhoneForwarded className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-label font-semibold text-ink">
-                  {testCall.destinationLabel ?? "QA destination not configured"}
-                </p>
-                <p className="mt-1 text-meta leading-relaxed text-muted">
-                  {testCall.unavailableReason ??
-                    "The call is limited to two minutes and cannot perform clinic actions."}
-                </p>
-              </div>
-            </div>
-          </div>
-          <Button
-            variant="primary"
-            disabled={
-              !testCall.available || pending !== null || testPending
-            }
-            onClick={() => setConfirmTestCall(true)}
-          >
-            <PhoneCall aria-hidden="true" className="h-4 w-4" />
-            Start test call
-          </Button>
-        </div>
-
-        {testCall.latestAttempt && (
-          <div
-            aria-live="polite"
-            className="mt-4 flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3.5"
-          >
-            <div className="min-w-0">
-              <p className="text-label font-semibold text-ink">Latest test</p>
-              <p className="mt-1 text-meta leading-relaxed text-muted">
-                {testCall.latestAttempt.message}
-              </p>
-            </div>
-            <StatusPill tone={testStatusTone(testCall.latestAttempt.status)}>
-              {TEST_STATUS_LABELS[testCall.latestAttempt.status]}
-            </StatusPill>
-          </div>
-        )}
-      </Panel>
-
-      <PhoneDiagnosticsPanel diagnostics={initialDiagnostics} />
-
-      {/* Two-Column Balanced Grid: Call destinations (45%) & Business hours (55%) */}
+      {/* 1. Call destinations & Business hours (Two-Column Balanced Grid) */}
       <div className="grid min-w-0 gap-5 lg:grid-cols-12 lg:items-start">
-        {/* 1. Call Destinations Card (~45%, lg:col-span-5) */}
+        {/* Call Destinations Card (~45%, lg:col-span-5) */}
         <section className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-card space-y-5 lg:col-span-5">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
@@ -933,7 +866,7 @@ export default function PhoneSettingsEditor({
           </div>
         </section>
 
-        {/* 2. Business Hours Card (~55%, lg:col-span-7) */}
+        {/* Business Hours Card (~55%, lg:col-span-7) */}
         <section className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-card space-y-4 lg:col-span-7">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
@@ -1130,7 +1063,7 @@ export default function PhoneSettingsEditor({
         </section>
       </div>
 
-      {/* 3. Related Controls Card */}
+      {/* 2. Related Controls Card */}
       <section className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-card space-y-4">
         <div>
           <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
@@ -1195,6 +1128,76 @@ export default function PhoneSettingsEditor({
           </span>
         </div>
       </section>
+
+      {/* 3. Phone readiness */}
+      <ReadinessOverview
+        readiness={settings.readiness}
+        routingMode={settings.routingMode}
+        effectiveRoute={settings.effectiveRoute}
+      />
+
+      {/* 4. Test phone menu */}
+      <Panel
+        title="Test phone menu"
+        description="Place a controlled test call to the configured QA number and hear this clinic's current phone menu."
+        actions={
+          <StatusPill tone={testCall.available ? "ok" : "neutral"}>
+            {testCall.available ? "Test calls available" : "Test calls unavailable"}
+          </StatusPill>
+        }
+      >
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="min-w-0 rounded-2xl border border-line bg-canvas-deep px-4 py-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span
+                aria-hidden="true"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+              >
+                <PhoneForwarded className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-label font-semibold text-ink">
+                  {testCall.destinationLabel ?? "QA destination not configured"}
+                </p>
+                <p className="mt-1 text-meta leading-relaxed text-muted">
+                  {testCall.unavailableReason ??
+                    "The call is limited to two minutes and cannot perform clinic actions."}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            disabled={
+              !testCall.available || pending !== null || testPending
+            }
+            onClick={() => setConfirmTestCall(true)}
+          >
+            <PhoneCall aria-hidden="true" className="h-4 w-4" />
+            Start test call
+          </Button>
+        </div>
+
+        {testCall.latestAttempt && (
+          <div
+            aria-live="polite"
+            className="mt-4 flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3.5"
+          >
+            <div className="min-w-0">
+              <p className="text-label font-semibold text-ink">Latest test</p>
+              <p className="mt-1 text-meta leading-relaxed text-muted">
+                {testCall.latestAttempt.message}
+              </p>
+            </div>
+            <StatusPill tone={testStatusTone(testCall.latestAttempt.status)}>
+              {TEST_STATUS_LABELS[testCall.latestAttempt.status]}
+            </StatusPill>
+          </div>
+        )}
+      </Panel>
+
+      {/* 5. Phone diagnostics */}
+      <PhoneDiagnosticsPanel diagnostics={initialDiagnostics} />
 
       <ConfirmDialog
         isOpen={confirmTestCall}

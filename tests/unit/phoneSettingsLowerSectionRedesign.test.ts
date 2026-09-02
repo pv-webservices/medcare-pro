@@ -49,4 +49,19 @@ describe("Phone settings lower section redesign", () => {
     expect(componentSource).toContain("Manage call handling mode and monitor performance.");
     expect(componentSource).toContain("Controlled menu tests use only the deployment-approved QA number");
   });
+
+  it("arranges cards in the exact requested vertical order: Call destinations & Business hours, Related controls, Phone readiness, Test phone menu, Phone diagnostics", () => {
+    const callDestinationsIndex = componentSource.indexOf("Call destinations");
+    const businessHoursIndex = componentSource.indexOf("Business hours");
+    const relatedControlsIndex = componentSource.indexOf("Related controls");
+    const phoneReadinessIndex = componentSource.indexOf("<ReadinessOverview");
+    const testPhoneMenuIndex = componentSource.indexOf('title="Test phone menu"');
+    const phoneDiagnosticsIndex = componentSource.indexOf("<PhoneDiagnosticsPanel");
+
+    expect(callDestinationsIndex).toBeLessThan(relatedControlsIndex);
+    expect(businessHoursIndex).toBeLessThan(relatedControlsIndex);
+    expect(relatedControlsIndex).toBeLessThan(phoneReadinessIndex);
+    expect(phoneReadinessIndex).toBeLessThan(testPhoneMenuIndex);
+    expect(testPhoneMenuIndex).toBeLessThan(phoneDiagnosticsIndex);
+  });
 });
