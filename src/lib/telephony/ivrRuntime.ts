@@ -246,3 +246,19 @@ export function resolveRuntimeMainMenuAction(
   if (digits === "9") return "repeat-menu";
   return digits ? (menu.actionByDigit[digits] ?? "invalid-input") : "invalid-input";
 }
+
+/**
+ * Binds a digit callback to the exact effective menu the caller heard.
+ * Default menus intentionally carry no revision, matching the original
+ * production callback contract.
+ */
+export function doesIvrRevisionMatchRuntimeMenu(
+  requestUrl: string,
+  runtimeMenu: ClinicIvrRuntimeMenu,
+): boolean {
+  const supplied = new URL(requestUrl).searchParams.getAll(
+    IVR_REVISION_QUERY_PARAM,
+  );
+  if (supplied.length === 0) return runtimeMenu.source === "default";
+  return supplied.length === 1 && supplied[0] === runtimeMenu.revision;
+}

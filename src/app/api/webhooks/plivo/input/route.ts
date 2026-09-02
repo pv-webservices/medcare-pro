@@ -14,30 +14,15 @@ import {
 import { resolveMainMenuAction } from "@/lib/telephony/routing";
 import {
   getClinicIvrRuntimeMenuForTrustedClinic,
+  doesIvrRevisionMatchRuntimeMenu,
   IVR_MENU_CHANGED_MESSAGE,
-  IVR_REVISION_QUERY_PARAM,
   resolveRuntimeMainMenuAction,
-  type ClinicIvrRuntimeMenu,
 } from "@/lib/telephony/ivrRuntime";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import { buildUrgentMenuForClinic } from "@/lib/telephony/urgent";
 import { buildClinicInformationForClinic } from "@/lib/telephony/clinicInformation";
 
 export const runtime = "nodejs";
-
-function revisionMatchesCurrentMenu(
-  requestUrl: string,
-  runtimeMenu: ClinicIvrRuntimeMenu,
-): boolean {
-  const supplied = new URL(requestUrl).searchParams.getAll(
-    IVR_REVISION_QUERY_PARAM,
-  );
-  // Legacy/default menus intentionally have no revision. If a custom menu is
-  // active, a missing revision means the caller may have heard the old static
-  // mapping, so replay instead of dispatching their digit.
-  if (supplied.length === 0) return runtimeMenu.source === "default";
-  return supplied.length === 1 && supplied[0] === runtimeMenu.revision;
-}
 
 export async function POST(request: Request): Promise<Response> {
   const verification = await verifyPlivoV3Webhook(request);
@@ -67,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
-    if (!revisionMatchesCurrentMenu(request.url, runtimeMenu)) {
+    if (!doesIvrRevisionMatchRuntimeMenu(request.url, runtimeMenu)) {
       return xmlResponse(
         buildEffectiveClinicMainMenuXml({
           inputActionUrl,

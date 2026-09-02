@@ -199,6 +199,13 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "organisation",
   },
+  [AUDIT_ACTIONS.CLINIC_TELEPHONY_TEST_CALL_STARTED]: {
+    label: "Clinic phone menu test started",
+    detail:
+      "An administrator started a controlled call to verify this clinic's current phone menu.",
+    side: "tenant",
+    category: "organisation",
+  },
   [AUDIT_ACTIONS.TENANT_ENTITLEMENTS_SET]: {
     label: "Plan or features changed",
     detail:

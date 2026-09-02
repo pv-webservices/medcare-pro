@@ -75,12 +75,38 @@ describe("Phone settings clinic-facing page", () => {
     expect(component).toContain("min-w-0");
   });
 
-  it("provides readiness and contextual links without routing controls or test calls", () => {
+  it("provides readiness, controlled testing, and contextual links without routing controls", () => {
     expect(component).toContain("Phone readiness");
+    expect(component).toContain("Test phone menu");
+    expect(component).toContain("Start test call");
     expect(component).toContain('href="/settings/phone-menu"');
     expect(component).toContain('href="/dashboard"');
     expect(component).not.toContain("changeRoutingMode");
-    expect(component).not.toMatch(/Call me|Test call|speechSynthesis/);
+    expect(component).not.toMatch(/Call me|speechSynthesis/);
+  });
+
+  it("keeps the controlled test panel masked, confirmed, pending-safe, and clinic-keyed", () => {
+    expect(page).toContain("getTelephonyTestCallPanelForActor(actor, clinicId)");
+    expect(page).toContain("initialTestCall={testCall}");
+    expect(page).toContain("key={clinic.id}");
+    expect(component).toContain("testCall.destinationLabel");
+    expect(component).toContain("<ConfirmDialog");
+    expect(component).toContain('isBusy={testPending}');
+    expect(component).toContain("isActiveTelephonyTestCallStatus");
+    expect(component).toContain("lg:grid-cols-[minmax(0,1fr)_auto]");
+    expect(component).not.toMatch(/plivoNumber|providerCallUuid|providerRequestUuid/);
+  });
+
+  it("renders unavailable, active, terminal, permission, and safe failure states", () => {
+    expect(component).toContain("testCall.unavailableReason");
+    expect(component).toContain("!testCall.available || pending !== null || testPending");
+    expect(component).toContain('REQUESTED: "Starting…"');
+    expect(component).toContain('RINGING: "Ringing…"');
+    expect(component).toContain('ANSWERED: "Answered…"');
+    expect(component).toContain('COMPLETED: "Completed"');
+    expect(component).toContain('FAILED: "Failed"');
+    expect(component).toContain("You don't have permission to test this clinic's phone menu.");
+    expect(component).toContain("The test call could not be started. Try again later.");
   });
 
   it("provides a labeled loading state", () => {
@@ -88,4 +114,3 @@ describe("Phone settings clinic-facing page", () => {
     expect(loading).toContain('aria-label="Loading phone settings"');
   });
 });
-

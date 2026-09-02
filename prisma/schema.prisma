@@ -222,10 +222,11 @@ model User {
   invitationsRevoked  Invitation[] @relation("InvitationRevokedBy")
   invitationsAccepted Invitation[] @relation("InvitationAcceptedBy")
 
-  rolesAssigned          UserRole[]              @relation("UserRoleAssignedBy")
-  featureFlagsChanged    Feature[]               @relation("FeatureGlobalChangedBy")
-  tenantOverridesChanged TenantFeatureOverride[] @relation("TenantOverrideChangedBy")
+  rolesAssigned          UserRole[]                @relation("UserRoleAssignedBy")
+  featureFlagsChanged    Feature[]                 @relation("FeatureGlobalChangedBy")
+  tenantOverridesChanged TenantFeatureOverride[]   @relation("TenantOverrideChangedBy")
   auditLogs              AuditLog[]
+  telephonyTestCalls     ClinicTelephonyTestCall[] @relation("ClinicTelephonyTestCallRequester")
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   /// Restrict on the owning side, matching Registration.creator: the person who
@@ -418,6 +419,7 @@ model Clinic {
   appointments             Appointment[]
   appointmentTypes         AppointmentType[]
   telephonyBookingRequests TelephonyBookingRequest[]
+  telephonyTestCalls       ClinicTelephonyTestCall[]
   tasks                    Task[]
 
   @@index([tenantId])
@@ -447,20 +449,35 @@ enum ClinicIvrMenuAction {
   CLINIC_INFORMATION
 }
 
+enum ClinicTelephonyTestCallStatus {
+  REQUESTED
+  RINGING
+  ANSWERED
+  COMPLETED
+  FAILED
+}
+
+enum ClinicTelephonyTestCallFailureCategory {
+  NO_ANSWER
+  BUSY
+  PROVIDER_ERROR
+  UNKNOWN
+}
+
 /// Optional per-clinic voice routing configuration. Provider credentials stay
 /// deployment-level; the destination number is the only inbound routing key.
 model ClinicTelephonyConfig {
-  id                   String                      @id @default(cuid())
-  clinicId             String                      @unique @map("clinic_id")
-  plivoNumber          String?                     @unique @map("plivo_number") @db.VarChar(16)
-  publicPhoneNumber    String?                     @map("public_phone_number") @db.VarChar(16)
-  receptionPhoneNumber String?                     @map("reception_phone_number") @db.VarChar(16)
-  urgentPhoneNumber    String?                     @map("urgent_phone_number") @db.VarChar(16)
-  timezone             String                      @default("Asia/Kolkata") @db.VarChar(64)
+  id                   String                     @id @default(cuid())
+  clinicId             String                     @unique @map("clinic_id")
+  plivoNumber          String?                    @unique @map("plivo_number") @db.VarChar(16)
+  publicPhoneNumber    String?                    @map("public_phone_number") @db.VarChar(16)
+  receptionPhoneNumber String?                    @map("reception_phone_number") @db.VarChar(16)
+  urgentPhoneNumber    String?                    @map("urgent_phone_number") @db.VarChar(16)
+  timezone             String                     @default("Asia/Kolkata") @db.VarChar(64)
   routingMode          ClinicTelephonyRoutingMode @default(AFTER_HOURS) @map("routing_mode")
-  enabled              Boolean                     @default(false)
-  createdAt            DateTime                    @default(now()) @map("created_at")
-  updatedAt            DateTime                    @updatedAt @map("updated_at")
+  enabled              Boolean                    @default(false)
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
@@ -470,14 +487,14 @@ model ClinicTelephonyConfig {
 /// One continuous clinic-local wall-clock interval per regular weekday.
 /// Special/holiday closures use ClinicTelephonyConfig.routingMode in V1.
 model ClinicBusinessHours {
-  id        String                 @id @default(cuid())
-  clinicId  String                 @map("clinic_id")
-  dayOfWeek ClinicBusinessWeekday  @map("day_of_week")
-  isClosed  Boolean                @default(true) @map("is_closed")
-  openTime  String?                @map("open_time") @db.VarChar(5)
-  closeTime String?                @map("close_time") @db.VarChar(5)
-  createdAt DateTime               @default(now()) @map("created_at")
-  updatedAt DateTime               @updatedAt @map("updated_at")
+  id        String                @id @default(cuid())
+  clinicId  String                @map("clinic_id")
+  dayOfWeek ClinicBusinessWeekday @map("day_of_week")
+  isClosed  Boolean               @default(true) @map("is_closed")
+  openTime  String?               @map("open_time") @db.VarChar(5)
+  closeTime String?               @map("close_time") @db.VarChar(5)
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
@@ -519,6 +536,36 @@ model ClinicIvrMenuItem {
   @@unique([profileId, position])
   @@unique([profileId, action])
   @@map("clinic_ivr_menu_items")
+}
+
+/// One tightly bounded outbound IVR verification attempt. The full QA
+/// destination, clinic provider number, credentials, callback bodies and DTMF
+/// history are deliberately never stored here.
+model ClinicTelephonyTestCall {
+  id                  String                                  @id @default(cuid())
+  clinicId            String                                  @map("clinic_id")
+  requestedByUserId   String                                  @map("requested_by_user_id")
+  status              ClinicTelephonyTestCallStatus           @default(REQUESTED)
+  providerRequestUuid String?                                 @map("provider_request_uuid") @db.VarChar(128)
+  providerCallUuid    String?                                 @map("provider_call_uuid") @db.VarChar(128)
+  destinationLast4    String?                                 @map("destination_last_4") @db.Char(4)
+  /// Equals clinicId only while active. MySQL permits many NULL values under
+  /// a UNIQUE key, so this is the database backstop for one active call/clinic.
+  activeClinicId      String?                                 @unique(map: "clinic_test_calls_active_clinic_key") @map("active_clinic_id")
+  expiresAt           DateTime                                @map("expires_at")
+  answeredAt          DateTime?                               @map("answered_at")
+  completedAt         DateTime?                               @map("completed_at")
+  failureCategory     ClinicTelephonyTestCallFailureCategory? @map("failure_category")
+  createdAt           DateTime                                @default(now()) @map("created_at")
+  updatedAt           DateTime                                @updatedAt @map("updated_at")
+
+  clinic      Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("ClinicTelephonyTestCallRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([clinicId, createdAt], map: "clinic_test_calls_clinic_created_idx")
+  @@index([requestedByUserId, createdAt], map: "clinic_test_calls_requester_created_idx")
+  @@index([status, expiresAt], map: "clinic_test_calls_status_expiry_idx")
+  @@map("clinic_telephony_test_calls")
 }
 
 enum TelephonyBookingRequestReason {

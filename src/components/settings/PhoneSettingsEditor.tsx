@@ -9,14 +9,16 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  PhoneForwarded,
   PhoneCall,
   Save,
   ShieldCheck,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Button, { buttonClasses } from "@/components/ui/Button";
 import Input, { controlClasses, FieldShell } from "@/components/ui/Input";
 import Panel from "@/components/ui/Panel";
+import { ConfirmDialog } from "@/components/ui/Modal";
 import StatusPill, { type StatusTone } from "@/components/ui/StatusPill";
 import Toggle from "@/components/ui/Toggle";
 import { useToast } from "@/components/ui/Toast";
@@ -46,12 +48,19 @@ import {
   type PhoneCallSettingsDraft,
 } from "@/lib/telephony/phoneSettingsEditor";
 import type { ApiResponse } from "@/lib/utils";
+import {
+  isActiveTelephonyTestCallStatus,
+  type TelephonyTestCallPanelView,
+  type TelephonyTestCallStatus,
+  type TelephonyTestCallView,
+} from "@/lib/telephony/testCallContract";
 
 interface PhoneSettingsEditorProps {
   clinicId: string;
   clinicName: string;
   initialSettings: ClinicPhoneSettingsView;
   initialHours: readonly ClinicBusinessHoursDay[];
+  initialTestCall: TelephonyTestCallPanelView;
   timezoneOptions: readonly string[];
 }
 
@@ -70,6 +79,20 @@ const ROUTING_LABELS = {
   OPEN: "Reception",
   AFTER_HOURS: "Phone menu",
 } as const;
+
+const TEST_STATUS_LABELS: Record<TelephonyTestCallStatus, string> = {
+  REQUESTED: "Starting…",
+  RINGING: "Ringing…",
+  ANSWERED: "Answered…",
+  COMPLETED: "Completed",
+  FAILED: "Failed",
+};
+
+function testStatusTone(status: TelephonyTestCallStatus): StatusTone {
+  if (status === "COMPLETED") return "ok";
+  if (status === "FAILED") return "alert";
+  return "warn";
+}
 
 function statusPresentation(status: PhoneReadinessStatus): {
   label: string;
@@ -181,6 +204,7 @@ export default function PhoneSettingsEditor({
   clinicName,
   initialSettings,
   initialHours,
+  initialTestCall,
   timezoneOptions,
 }: PhoneSettingsEditorProps) {
   const router = useRouter();
@@ -196,6 +220,54 @@ export default function PhoneSettingsEditor({
     businessHoursToDraft(initialHours),
   );
   const [pending, setPending] = useState<"call" | "hours" | null>(null);
+  const [testCall, setTestCall] = useState(initialTestCall);
+  const [testPending, setTestPending] = useState(false);
+  const [confirmTestCall, setConfirmTestCall] = useState(false);
+
+  useEffect(() => {
+    const attempt = testCall.latestAttempt;
+    if (!attempt || !isActiveTelephonyTestCallStatus(attempt.status)) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const response = await fetch(
+          `/api/clinics/${encodeURIComponent(clinicId)}/telephony/test-call/${encodeURIComponent(attempt.id)}`,
+          { method: "GET", cache: "no-store" },
+        );
+        const body = await readApiResponse<TelephonyTestCallView>(response);
+        if (cancelled || !response.ok || !body.success || !body.data) return;
+        setTestCall((current) => ({ ...current, latestAttempt: body.data! }));
+        if (isActiveTelephonyTestCallStatus(body.data.status)) {
+          timer = setTimeout(poll, 2_000);
+        } else {
+          const panelResponse = await fetch(
+            `/api/clinics/${encodeURIComponent(clinicId)}/telephony/test-call`,
+            { method: "GET", cache: "no-store" },
+          );
+          const panelBody = await readApiResponse<TelephonyTestCallPanelView>(
+            panelResponse,
+          );
+          if (
+            !cancelled &&
+            panelResponse.ok &&
+            panelBody.success &&
+            panelBody.data
+          ) {
+            setTestCall(panelBody.data);
+          }
+        }
+      } catch {
+        if (!cancelled) timer = setTimeout(poll, 4_000);
+      }
+    };
+    timer = setTimeout(poll, 2_000);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [clinicId, testCall.latestAttempt]);
 
   const callValidation = useMemo(
     () => validatePhoneCallSettingsDraft(callDraft),
@@ -304,13 +376,118 @@ export default function PhoneSettingsEditor({
     }
   }
 
+  async function startTestCall() {
+    if (testPending || pending !== null || !testCall.available) return;
+    setTestPending(true);
+    try {
+      const response = await fetch(
+        `/api/clinics/${encodeURIComponent(clinicId)}/telephony/test-call`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      const body = await readApiResponse<TelephonyTestCallView>(response);
+      if (!response.ok || !body.success || !body.data) {
+        showToast({
+          tone: "alert",
+          title: "Test call not started",
+          detail:
+            response.status === 403
+              ? "You don't have permission to test this clinic's phone menu."
+              : body.error ?? "The test call could not be started. Try again later.",
+        });
+        return;
+      }
+      setTestCall((current) => ({
+        ...current,
+        available: false,
+        unavailableReason: "A test call is already in progress for this clinic.",
+        latestAttempt: body.data!,
+      }));
+      setConfirmTestCall(false);
+      showToast({ tone: "ok", title: "Controlled test call started." });
+    } catch {
+      showToast({
+        tone: "alert",
+        title: "Test call not started",
+        detail: "Check your connection and try again.",
+      });
+    } finally {
+      setTestPending(false);
+    }
+  }
+
   return (
-    <div aria-busy={pending !== null || undefined} className="space-y-5">
+    <div
+      aria-busy={pending !== null || testPending || undefined}
+      className="space-y-5"
+    >
       <ReadinessOverview
         readiness={settings.readiness}
         routingMode={settings.routingMode}
         effectiveRoute={settings.effectiveRoute}
       />
+
+      <Panel
+        title="Test phone menu"
+        description="Place a controlled test call to the configured QA number and hear this clinic's current phone menu."
+        actions={
+          <StatusPill tone={testCall.available ? "ok" : "neutral"}>
+            {testCall.available ? "Test calls available" : "Test calls unavailable"}
+          </StatusPill>
+        }
+      >
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="min-w-0 rounded-2xl border border-line bg-canvas-deep px-4 py-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span
+                aria-hidden="true"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+              >
+                <PhoneForwarded className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-label font-semibold text-ink">
+                  {testCall.destinationLabel ?? "QA destination not configured"}
+                </p>
+                <p className="mt-1 text-meta leading-relaxed text-muted">
+                  {testCall.unavailableReason ??
+                    "The call is limited to two minutes and cannot perform clinic actions."}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            disabled={
+              !testCall.available || pending !== null || testPending
+            }
+            onClick={() => setConfirmTestCall(true)}
+          >
+            <PhoneCall aria-hidden="true" className="h-4 w-4" />
+            Start test call
+          </Button>
+        </div>
+
+        {testCall.latestAttempt && (
+          <div
+            aria-live="polite"
+            className="mt-4 flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3.5"
+          >
+            <div className="min-w-0">
+              <p className="text-label font-semibold text-ink">Latest test</p>
+              <p className="mt-1 text-meta leading-relaxed text-muted">
+                {testCall.latestAttempt.message}
+              </p>
+            </div>
+            <StatusPill tone={testStatusTone(testCall.latestAttempt.status)}>
+              {TEST_STATUS_LABELS[testCall.latestAttempt.status]}
+            </StatusPill>
+          </div>
+        )}
+      </Panel>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-2 lg:items-start">
         <Panel
@@ -537,10 +714,21 @@ export default function PhoneSettingsEditor({
         </div>
         <p className="mt-4 flex items-start gap-2 text-meta leading-relaxed text-muted">
           <ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-          This screen never starts a call. Saved details are used only when the existing call-handling rules need them.
+          Controlled menu tests use only the deployment-approved QA number and never book appointments or transfer callers.
         </p>
       </Panel>
+
+      <ConfirmDialog
+        isOpen={confirmTestCall}
+        onCancel={() => setConfirmTestCall(false)}
+        onConfirm={startTestCall}
+        title="Start phone menu test?"
+        body={`Start a test call to ${testCall.destinationLabel ?? "the configured QA number"}? The call will play this clinic's current phone menu but will not book appointments or transfer callers.`}
+        confirmLabel="Start test call"
+        tone="primary"
+        isBusy={testPending}
+        busyLabel="Starting test call"
+      />
     </div>
   );
 }
-
