@@ -638,8 +638,14 @@ export default function PhoneSettingsEditor({
                   inputMode="tel"
                   autoComplete="tel"
                   placeholder="+919876543210"
+                  maxLength={
+                    callDraft.publicPhoneNumber.startsWith("+") ? 14 : 13
+                  }
                   value={callDraft.publicPhoneNumber}
                   disabled={pending !== null}
+                  aria-invalid={
+                    callValidation.errors.publicPhoneNumber ? true : undefined
+                  }
                   onChange={(event) =>
                     changeCallField("publicPhoneNumber", event.target.value)
                   }
@@ -679,8 +685,14 @@ export default function PhoneSettingsEditor({
                   inputMode="tel"
                   autoComplete="tel"
                   placeholder="+919876543210"
+                  maxLength={
+                    callDraft.receptionPhoneNumber.startsWith("+") ? 14 : 13
+                  }
                   value={callDraft.receptionPhoneNumber}
                   disabled={pending !== null}
+                  aria-invalid={
+                    callValidation.errors.receptionPhoneNumber ? true : undefined
+                  }
                   onChange={(event) =>
                     changeCallField("receptionPhoneNumber", event.target.value)
                   }
@@ -720,8 +732,14 @@ export default function PhoneSettingsEditor({
                   inputMode="tel"
                   autoComplete="tel"
                   placeholder="+919876543210"
+                  maxLength={
+                    callDraft.urgentPhoneNumber.startsWith("+") ? 14 : 13
+                  }
                   value={callDraft.urgentPhoneNumber}
                   disabled={pending !== null}
+                  aria-invalid={
+                    callValidation.errors.urgentPhoneNumber ? true : undefined
+                  }
                   onChange={(event) =>
                     changeCallField("urgentPhoneNumber", event.target.value)
                   }
