@@ -15,14 +15,13 @@ import {
   PhoneCall,
   Save,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import Button, { buttonClasses } from "@/components/ui/Button";
-import Input, { controlClasses, FieldShell } from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
 import Panel from "@/components/ui/Panel";
 import { ConfirmDialog } from "@/components/ui/Modal";
 import StatusPill, { type StatusTone } from "@/components/ui/StatusPill";
-import Toggle from "@/components/ui/Toggle";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import type {
@@ -654,234 +653,548 @@ export default function PhoneSettingsEditor({
 
       <PhoneDiagnosticsPanel diagnostics={initialDiagnostics} />
 
-      <div className="grid min-w-0 gap-5 lg:grid-cols-2 lg:items-start">
-        <Panel
-          title="Call destinations"
-          description={`Operational contact numbers for ${clinicName}.`}
-          actions={
-            <StatusPill tone={callDirty ? "warn" : "neutral"}>
-              {callDirty ? "Unsaved" : "Saved"}
-            </StatusPill>
-          }
-        >
-          <div className="space-y-4">
-            <Input
-              id="clinic-public-phone"
-              label="Clinic public phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+919876543210"
-              value={callDraft.publicPhoneNumber}
-              disabled={pending !== null}
-              error={callValidation.errors.publicPhoneNumber}
-              hint="The clinic's normal public contact number. Use international format."
-              onChange={(event) =>
-                changeCallField("publicPhoneNumber", event.target.value)
-              }
-            />
-            <Input
-              id="clinic-reception-phone"
-              label="Reception phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+919876543210"
-              value={callDraft.receptionPhoneNumber}
-              disabled={pending !== null}
-              error={callValidation.errors.receptionPhoneNumber}
-              hint="Calls routed to Reception are connected here."
-              onChange={(event) =>
-                changeCallField("receptionPhoneNumber", event.target.value)
-              }
-            />
-            <Input
-              id="clinic-urgent-phone"
-              label="Urgent phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+919876543210"
-              value={callDraft.urgentPhoneNumber}
-              disabled={pending !== null}
-              error={callValidation.errors.urgentPhoneNumber}
-              hint="Confirmed urgent-assistance calls are connected here."
-              onChange={(event) =>
-                changeCallField("urgentPhoneNumber", event.target.value)
-              }
-            />
-            <FieldShell
-              id="clinic-phone-timezone"
-              label="Timezone"
-              error={callValidation.errors.timezone}
-              hint="Automatic call routing evaluates business hours in this timezone."
+      {/* Two-Column Balanced Grid: Call destinations (45%) & Business hours (55%) */}
+      <div className="grid min-w-0 gap-5 lg:grid-cols-12 lg:items-start">
+        {/* 1. Call Destinations Card (~45%, lg:col-span-5) */}
+        <section className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-card space-y-5 lg:col-span-5">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                Call destinations
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Operational contact numbers for {clinicName}.
+              </p>
+            </div>
+            <span
+              className={cx(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                callDirty
+                  ? "border border-amber-200/80 bg-amber-50 text-amber-700"
+                  : "border border-emerald-200/80 bg-emerald-50 text-emerald-700",
+              )}
             >
-              <input
-                id="clinic-phone-timezone"
-                list="clinic-phone-timezone-options"
-                value={callDraft.timezone}
-                disabled={pending !== null}
-                autoComplete="off"
-                spellCheck={false}
-                aria-invalid={callValidation.errors.timezone ? true : undefined}
-                aria-describedby="clinic-phone-timezone-message"
-                onChange={(event) => changeCallField("timezone", event.target.value)}
-                className={controlClasses(
-                  Boolean(callValidation.errors.timezone),
-                  "min-h-11 px-3.5",
+              <span
+                className={cx(
+                  "h-1.5 w-1.5 rounded-full",
+                  callDirty ? "bg-amber-500" : "bg-emerald-500",
                 )}
               />
-              <datalist id="clinic-phone-timezone-options">
-                {timezoneOptions.map((timezone) => <option key={timezone} value={timezone} />)}
-              </datalist>
-            </FieldShell>
+              {callDirty ? "Unsaved" : "Saved"}
+            </span>
+          </div>
+
+          {/* Form Fields */}
+          <div className="space-y-4">
+            {/* Field 1: Clinic public phone */}
+            <div className="space-y-1">
+              <label
+                htmlFor="clinic-public-phone"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Clinic public phone
+              </label>
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50/80 text-indigo-600">
+                  <PhoneCall className="h-4 w-4" />
+                </div>
+                <input
+                  id="clinic-public-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="+919876543210"
+                  value={callDraft.publicPhoneNumber}
+                  disabled={pending !== null}
+                  onChange={(event) =>
+                    changeCallField("publicPhoneNumber", event.target.value)
+                  }
+                  className={cx(
+                    "h-9 w-full rounded-xl border bg-white px-3 text-xs sm:text-sm text-slate-900 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30",
+                    callValidation.errors.publicPhoneNumber
+                      ? "border-rose-400"
+                      : "border-slate-200",
+                  )}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 pl-11.5">
+                The clinic&apos;s normal public contact number. Use international format.
+              </p>
+              {callValidation.errors.publicPhoneNumber && (
+                <p className="text-[11px] text-rose-600 pl-11.5">
+                  {callValidation.errors.publicPhoneNumber}
+                </p>
+              )}
+            </div>
+
+            {/* Field 2: Reception phone */}
+            <div className="space-y-1">
+              <label
+                htmlFor="clinic-reception-phone"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Reception phone
+              </label>
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50/80 text-indigo-600">
+                  <Users className="h-4 w-4" />
+                </div>
+                <input
+                  id="clinic-reception-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="+919876543210"
+                  value={callDraft.receptionPhoneNumber}
+                  disabled={pending !== null}
+                  onChange={(event) =>
+                    changeCallField("receptionPhoneNumber", event.target.value)
+                  }
+                  className={cx(
+                    "h-9 w-full rounded-xl border bg-white px-3 text-xs sm:text-sm text-slate-900 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30",
+                    callValidation.errors.receptionPhoneNumber
+                      ? "border-rose-400"
+                      : "border-slate-200",
+                  )}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 pl-11.5">
+                Calls routed to Reception are connected here.
+              </p>
+              {callValidation.errors.receptionPhoneNumber && (
+                <p className="text-[11px] text-rose-600 pl-11.5">
+                  {callValidation.errors.receptionPhoneNumber}
+                </p>
+              )}
+            </div>
+
+            {/* Field 3: Urgent phone */}
+            <div className="space-y-1">
+              <label
+                htmlFor="clinic-urgent-phone"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Urgent phone
+              </label>
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50/80 text-indigo-600">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
+                <input
+                  id="clinic-urgent-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="+919876543210"
+                  value={callDraft.urgentPhoneNumber}
+                  disabled={pending !== null}
+                  onChange={(event) =>
+                    changeCallField("urgentPhoneNumber", event.target.value)
+                  }
+                  className={cx(
+                    "h-9 w-full rounded-xl border bg-white px-3 text-xs sm:text-sm text-slate-900 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30",
+                    callValidation.errors.urgentPhoneNumber
+                      ? "border-rose-400"
+                      : "border-slate-200",
+                  )}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 pl-11.5">
+                Confirmed urgent-assistance calls are connected here.
+              </p>
+              {callValidation.errors.urgentPhoneNumber && (
+                <p className="text-[11px] text-rose-600 pl-11.5">
+                  {callValidation.errors.urgentPhoneNumber}
+                </p>
+              )}
+            </div>
+
+            {/* Field 4: Timezone */}
+            <div className="space-y-1">
+              <label
+                htmlFor="clinic-phone-timezone"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Timezone
+              </label>
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50/80 text-indigo-600">
+                  <Clock3 className="h-4 w-4" />
+                </div>
+                <div className="relative w-full">
+                  <input
+                    id="clinic-phone-timezone"
+                    list="clinic-phone-timezone-options"
+                    value={callDraft.timezone}
+                    disabled={pending !== null}
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={
+                      callValidation.errors.timezone ? true : undefined
+                    }
+                    onChange={(event) =>
+                      changeCallField("timezone", event.target.value)
+                    }
+                    className={cx(
+                      "h-9 w-full rounded-xl border bg-white px-3 text-xs sm:text-sm text-slate-900 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30",
+                      callValidation.errors.timezone
+                        ? "border-rose-400"
+                        : "border-slate-200",
+                    )}
+                  />
+                  <datalist id="clinic-phone-timezone-options">
+                    {timezoneOptions.map((timezone) => (
+                      <option key={timezone} value={timezone} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 pl-11.5">
+                Automatic call routing evaluates business hours in this timezone.
+              </p>
+              {callValidation.errors.timezone && (
+                <p className="text-[11px] text-rose-600 pl-11.5">
+                  {callValidation.errors.timezone}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Routing Summary */}
+          <div className="rounded-xl border border-indigo-100/90 bg-gradient-to-br from-indigo-50/60 via-purple-50/30 to-slate-50/40 p-3.5 space-y-2">
+            <div>
+              <h3 className="text-xs font-bold text-slate-900">
+                Routing summary
+              </h3>
+              <p className="text-[11px] text-slate-600 mt-0.5 leading-normal">
+                {settings.effectiveRoute === "IVR"
+                  ? "Phone menu is active. Calls are routed based on business hours and caller selection."
+                  : "Reception is active. Calls are routed directly to reception during hours."}
+              </p>
+            </div>
+
+            {/* 4-Step Flow Tile Diagram */}
+            <div className="grid grid-cols-4 items-center gap-1 pt-1.5">
+              {/* Step 1 */}
+              <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white border border-indigo-100/80 shadow-2xs text-center min-h-[58px]">
+                <PhoneIncoming className="h-3.5 w-3.5 text-indigo-600 mb-1" />
+                <span className="text-[9px] text-slate-600 font-medium leading-tight">
+                  Caller dials clinic number
+                </span>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white border border-indigo-100/80 shadow-2xs text-center min-h-[58px]">
+                <PhoneCall className="h-3.5 w-3.5 text-indigo-600 mb-1" />
+                <span className="text-[9px] text-slate-600 font-medium leading-tight">
+                  IVR / Phone menu
+                </span>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white border border-indigo-100/80 shadow-2xs text-center min-h-[58px]">
+                <Clock3 className="h-3.5 w-3.5 text-indigo-600 mb-1" />
+                <span className="text-[9px] text-slate-600 font-medium leading-tight">
+                  Business hours or selection
+                </span>
+              </div>
+
+              {/* Step 4 */}
+              <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white border border-indigo-100/80 shadow-2xs text-center min-h-[58px]">
+                <PhoneForwarded className="h-3.5 w-3.5 text-indigo-600 mb-1" />
+                <span className="text-[9px] text-slate-600 font-medium leading-tight">
+                  Routed to target number
+                </span>
+              </div>
+            </div>
           </div>
 
           {callValidation.formError && (
-            <p role="alert" className="mt-4 rounded-xl border border-alert-line bg-alert-bg px-4 py-3 text-label text-alert-ink">
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+            >
               {callValidation.formError}
             </p>
           )}
-          <div className="mt-5 flex justify-end border-t border-line pt-4">
-            <Button
-              variant="primary"
-              isBusy={pending === "call"}
-              busyLabel="Saving call settings"
+
+          {/* Action Row */}
+          <div className="flex justify-end pt-2 border-t border-slate-100">
+            <button
+              type="button"
               disabled={!callDirty || !callValidation.valid || pending !== null}
               onClick={saveCallSettings}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:from-indigo-700 hover:to-purple-700 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save aria-hidden="true" className="h-4 w-4" />
-              Save call settings
-            </Button>
+              <Save className="h-3.5 w-3.5" />
+              <span>{pending === "call" ? "Saving…" : "Save call settings"}</span>
+            </button>
           </div>
-        </Panel>
+        </section>
 
-        <Panel
-          title="Business hours"
-          description="The regular weekly schedule used when call handling is Automatic."
-          actions={
-            <StatusPill tone={hoursDirty ? "warn" : "neutral"}>
+        {/* 2. Business Hours Card (~55%, lg:col-span-7) */}
+        <section className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-card space-y-4 lg:col-span-7">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                Business hours
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                The regular weekly schedule used when call handling is Automatic.
+              </p>
+            </div>
+            <span
+              className={cx(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                hoursDirty
+                  ? "border border-amber-200/80 bg-amber-50 text-amber-700"
+                  : "border border-emerald-200/80 bg-emerald-50 text-emerald-700",
+              )}
+            >
+              <span
+                className={cx(
+                  "h-1.5 w-1.5 rounded-full",
+                  hoursDirty ? "bg-amber-500" : "bg-emerald-500",
+                )}
+              />
               {hoursDirty ? "Unsaved" : "Saved"}
-            </StatusPill>
-          }
-        >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-canvas-deep px-4 py-3">
-            <p className="text-label text-muted">No overnight schedules. Closing time must be later than opening time.</p>
-            <Button
-              size="sm"
-              variant="secondary"
+            </span>
+          </div>
+
+          {/* Utility Row */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl bg-slate-50/80 border border-slate-100 p-2.5">
+            <p className="text-[11px] text-slate-500 leading-normal">
+              No overnight schedules. Closing time must be later than opening time.
+            </p>
+            <button
+              type="button"
               disabled={pending !== null}
-              onClick={() => setHoursDraft((current) => copyMondayToWeekdays(current))}
+              onClick={() =>
+                setHoursDraft((current) => copyMondayToWeekdays(current))
+              }
+              className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold px-2.5 py-1 shadow-xs transition-colors shrink-0"
             >
               Copy Monday to weekdays
-            </Button>
+            </button>
           </div>
 
-          <div className="space-y-3">
-            {hoursDraft.map((day, index) => {
-              const openError = hoursValidation.errors[`hours.${index}.openTime`];
-              const closeError = hoursValidation.errors[`hours.${index}.closeTime`];
-              return (
-                <article key={day.dayOfWeek} className="rounded-2xl border border-line bg-canvas px-4 py-3.5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-body font-semibold text-ink">{DAY_LABELS[day.dayOfWeek]}</h3>
-                      <p className="mt-0.5 text-meta text-muted">{day.isClosed ? "Closed all day" : `${day.openTime}–${day.closeTime}`}</p>
+          {/* Schedule Table */}
+          <div className="space-y-2">
+            {/* Table Header */}
+            <div className="grid grid-cols-12 gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 px-1">
+              <div className="col-span-3">Day</div>
+              <div className="col-span-3">Status</div>
+              <div className="col-span-3">Open time</div>
+              <div className="col-span-3">Close time</div>
+            </div>
+
+            {/* Day Rows */}
+            <div className="divide-y divide-slate-100">
+              {hoursDraft.map((day, index) => {
+                const openError =
+                  hoursValidation.errors[`hours.${index}.openTime`];
+                const closeError =
+                  hoursValidation.errors[`hours.${index}.closeTime`];
+
+                return (
+                  <div
+                    key={day.dayOfWeek}
+                    className="grid grid-cols-12 gap-2 items-center py-2.5 px-1"
+                  >
+                    {/* Day Name */}
+                    <div className="col-span-3">
+                      <span className="text-xs font-semibold text-slate-800">
+                        {DAY_LABELS[day.dayOfWeek]}
+                      </span>
                     </div>
-                    <Toggle
-                      id={`phone-hours-closed-${day.dayOfWeek}`}
-                      label="Closed"
-                      checked={day.isClosed}
-                      disabled={pending !== null}
-                      onChange={(isClosed) =>
-                        setHoursDraft((current) =>
-                          updateBusinessHoursDay(current, day.dayOfWeek, { isClosed }),
-                        )
-                      }
-                    />
+
+                    {/* Status Toggle label="Closed" */}
+                    <div className="col-span-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        role="switch"
+                        id={`phone-hours-closed-${day.dayOfWeek}`}
+                        aria-checked={!day.isClosed}
+                        aria-label={day.isClosed ? "Closed" : "Open"}
+                        disabled={pending !== null}
+                        onClick={() =>
+                          setHoursDraft((current) =>
+                            updateBusinessHoursDay(current, day.dayOfWeek, {
+                              isClosed: !day.isClosed,
+                            }),
+                          )
+                        }
+                        className={cx(
+                          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2",
+                          !day.isClosed ? "bg-indigo-600" : "bg-slate-200",
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cx(
+                            "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                            !day.isClosed ? "translate-x-4" : "translate-x-0",
+                          )}
+                        />
+                      </button>
+                      <span
+                        className={cx(
+                          "text-xs font-medium",
+                          !day.isClosed ? "text-slate-700" : "text-slate-400",
+                        )}
+                      >
+                        {!day.isClosed ? "Open" : "Closed"}
+                      </span>
+                    </div>
+
+                    {/* Open Time Input */}
+                    <div className="col-span-3">
+                      <input
+                        type="time"
+                        value={day.openTime}
+                        disabled={day.isClosed || pending !== null}
+                        aria-label={`${DAY_LABELS[day.dayOfWeek]} open time`}
+                        onChange={(event) =>
+                          setHoursDraft((current) =>
+                            updateBusinessHoursDay(current, day.dayOfWeek, {
+                              openTime: event.target.value,
+                            }),
+                          )
+                        }
+                        className={cx(
+                          "w-full h-8 rounded-lg border px-2 text-xs transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30",
+                          openError
+                            ? "border-rose-400 text-rose-700 bg-rose-50/50"
+                            : day.isClosed
+                              ? "border-slate-200/60 bg-slate-50 text-slate-400 opacity-60 cursor-not-allowed"
+                              : "border-slate-200 bg-white text-slate-800",
+                        )}
+                      />
+                    </div>
+
+                    {/* Close Time Input */}
+                    <div className="col-span-3">
+                      <input
+                        type="time"
+                        value={day.closeTime}
+                        disabled={day.isClosed || pending !== null}
+                        aria-label={`${DAY_LABELS[day.dayOfWeek]} close time`}
+                        onChange={(event) =>
+                          setHoursDraft((current) =>
+                            updateBusinessHoursDay(current, day.dayOfWeek, {
+                              closeTime: event.target.value,
+                            }),
+                          )
+                        }
+                        className={cx(
+                          "w-full h-8 rounded-lg border px-2 text-xs transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30",
+                          closeError
+                            ? "border-rose-400 text-rose-700 bg-rose-50/50"
+                            : day.isClosed
+                              ? "border-slate-200/60 bg-slate-50 text-slate-400 opacity-60 cursor-not-allowed"
+                              : "border-slate-200 bg-white text-slate-800",
+                        )}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Input
-                      id={`phone-hours-open-${day.dayOfWeek}`}
-                      label="Open time"
-                      type="time"
-                      value={day.openTime}
-                      disabled={day.isClosed || pending !== null}
-                      error={openError}
-                      onChange={(event) =>
-                        setHoursDraft((current) =>
-                          updateBusinessHoursDay(current, day.dayOfWeek, {
-                            openTime: event.target.value,
-                          }),
-                        )
-                      }
-                    />
-                    <Input
-                      id={`phone-hours-close-${day.dayOfWeek}`}
-                      label="Close time"
-                      type="time"
-                      value={day.closeTime}
-                      disabled={day.isClosed || pending !== null}
-                      error={closeError}
-                      onChange={(event) =>
-                        setHoursDraft((current) =>
-                          updateBusinessHoursDay(current, day.dayOfWeek, {
-                            closeTime: event.target.value,
-                          }),
-                        )
-                      }
-                    />
-                  </div>
-                </article>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           {hoursValidation.formError && (
-            <p role="alert" className="mt-4 rounded-xl border border-alert-line bg-alert-bg px-4 py-3 text-label text-alert-ink">
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+            >
               {hoursValidation.formError}
             </p>
           )}
-          <div className="mt-5 flex justify-end border-t border-line pt-4">
-            <Button
-              variant="secondary"
-              isBusy={pending === "hours"}
-              busyLabel="Saving business hours"
+
+          {/* Action Row */}
+          <div className="flex justify-end pt-2 border-t border-slate-100">
+            <button
+              type="button"
               disabled={!hoursDirty || !hoursValidation.valid || pending !== null}
               onClick={saveBusinessHours}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:from-indigo-700 hover:to-purple-700 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <CalendarDays aria-hidden="true" className="h-4 w-4" />
-              Save business hours
-            </Button>
+              <CalendarDays className="h-3.5 w-3.5" />
+              <span>
+                {pending === "hours" ? "Saving…" : "Save business hours"}
+              </span>
+            </button>
           </div>
-        </Panel>
+        </section>
       </div>
 
-      <Panel
-        title="Related controls"
-        description="Phone content and live routing stay in their dedicated screens."
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link href="/settings/phone-menu" className={buttonClasses("secondary", "md", "min-w-0 justify-between whitespace-normal text-left") }>
-            <span className="flex min-w-0 items-center gap-3">
-              <PhoneCall aria-hidden="true" className="h-4 w-4 shrink-0 text-accent" />
-              Configure phone menu
-            </span>
-            <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+      {/* 3. Related Controls Card */}
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-card space-y-4">
+        <div>
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+            Related controls
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Phone content and live routing stay in their dedicated screens.
+          </p>
+        </div>
+
+        {/* 2 Equal Action Tiles */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Tile 1: Configure phone menu */}
+          <Link
+            href="/settings/phone-menu"
+            className="group flex items-center justify-between gap-3 p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-indigo-300 hover:shadow-md transition-all"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50/80 text-indigo-600">
+                <PhoneCall className="h-4.5 w-4.5" />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                  Configure phone menu
+                </span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  Edit IVR prompts, options, and destination mapping.
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
-          <Link href="/dashboard" className={buttonClasses("secondary", "md", "min-w-0 justify-between whitespace-normal text-left") }>
-            <span className="flex min-w-0 items-center gap-3">
-              <Clock3 aria-hidden="true" className="h-4 w-4 shrink-0 text-accent" />
-              Dashboard Call Handling
-            </span>
-            <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+
+          {/* Tile 2: Dashboard Call Handling */}
+          <Link
+            href="/dashboard"
+            className="group flex items-center justify-between gap-3 p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-indigo-300 hover:shadow-md transition-all"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50/80 text-indigo-600">
+                <Clock3 className="h-4.5 w-4.5" />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                  Dashboard Call Handling
+                </span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  Manage call handling mode and monitor performance.
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
         </div>
-        <p className="mt-4 flex items-start gap-2 text-meta leading-relaxed text-muted">
-          <ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-          Controlled menu tests use only the deployment-approved QA number and never book appointments or transfer callers.
-        </p>
-      </Panel>
+
+        {/* Informational QA Note */}
+        <div className="flex items-start gap-2 text-xs text-slate-500 pt-1">
+          <ShieldCheck className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
+          <span>
+            Controlled menu tests use only the deployment-approved QA number and
+            never book appointments or transfer callers.
+          </span>
+        </div>
+      </section>
 
       <ConfirmDialog
         isOpen={confirmTestCall}
