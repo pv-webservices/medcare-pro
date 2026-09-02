@@ -2,6 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  PauseCircle,
+  RotateCcw,
+  Scale,
+  ShieldCheck,
+  XCircle,
+} from "lucide-react";
 import type {
   FeatureEntitlementView,
   PlanOption,
@@ -10,20 +20,11 @@ import Select from "@/components/ui/Select";
 import {
   CLINIC_DECISIONS,
   MIN_REASON_LENGTH,
+  MAX_REASON_LENGTH,
   type ClinicDecision,
 } from "@/lib/platform/decisionPolicy";
 import type { TenantStatus } from "@prisma/client";
-
-/**
- * The Owner's decision controls — Stage 3 items 6 to 9.
- *
- * A convenience layer over the API and nothing more. Every rule it enforces —
- * which decisions a status allows, that a rejection needs a reason, that an
- * off-plan feature needs one too — is enforced again server-side in
- * src/lib/platform/decisionPolicy.ts, which is the copy that counts. Disabling a
- * button here stops a mistake; it does not stop an attacker, and is not relied
- * on to.
- */
+import { cx } from "@/components/ui";
 
 interface DecisionPanelProps {
   tenantId: string;
@@ -46,9 +47,16 @@ export default function DecisionPanel({
 }: DecisionPanelProps) {
   const router = useRouter();
 
-  const selectablePlans = plans.filter(
-    (plan) => plan.isActive || plan.key === currentPlanKey,
+  const selectablePlans = useMemo(
+    () => plans.filter((plan) => plan.isActive || plan.key === currentPlanKey),
+    [plans, currentPlanKey],
   );
+
+  const [selectedChoice, setSelectedChoice] = useState<ClinicDecision>(() => {
+    if (status === "ACTIVE") return CLINIC_DECISIONS.SUSPEND;
+    if (status === "SUSPENDED") return CLINIC_DECISIONS.REACTIVATE;
+    return CLINIC_DECISIONS.APPROVE;
+  });
 
   const [planKey, setPlanKey] = useState<string>(
     currentPlanKey ?? selectablePlans[0]?.key ?? "",
@@ -66,12 +74,6 @@ export default function DecisionPanel({
     return new Map((plan?.features ?? []).map((row) => [row.key, row.enabled]));
   }, [plans, planKey]);
 
-  /**
-   * A feature is on if the Owner has ticked it this session; otherwise it falls
-   * back to the tenant's existing override, and then to the selected plan. Held
-   * as a sparse map of deviations rather than a full copy, so switching plan
-   * updates every untouched row automatically.
-   */
   function isEnabled(feature: FeatureEntitlementView): boolean {
     if (feature.key in overrides) {
       return overrides[feature.key];
@@ -141,230 +143,483 @@ export default function DecisionPanel({
     }
   }
 
-  const reasonTooShort =
-    reason.trim().length > 0 && reason.trim().length < MIN_REASON_LENGTH;
-
   if (status === "REJECTED" || status === "ARCHIVED") {
     return (
-      <p className="mt-8 rounded-3xl bg-canvas p-5 text-sm text-muted shadow-neu-raised-sm">
-        This application is closed. Re-admitting a rejected applicant is a fresh
-        registration, not a status change.
-      </p>
+      <div className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-6 shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-3 text-slate-300">
+          <Info className="h-5 w-5 text-slate-400" />
+          <p className="text-xs sm:text-sm">
+            This application is closed. Re-admitting a rejected applicant is a fresh
+            registration, not a status change.
+          </p>
+        </div>
+      </div>
     );
   }
 
+  const isReasonRequired =
+    selectedChoice === CLINIC_DECISIONS.REJECT ||
+    selectedChoice === CLINIC_DECISIONS.SUSPEND;
+
+  const isReasonTooShort =
+    isReasonRequired &&
+    reason.trim().length > 0 &&
+    reason.trim().length < MIN_REASON_LENGTH;
+
+  const isSubmitDisabled =
+    pending !== null ||
+    (isReasonRequired && reason.trim().length < MIN_REASON_LENGTH) ||
+    (selectedChoice === CLINIC_DECISIONS.APPROVE &&
+      (planKey === "" ||
+        (needsEntitlementReason &&
+          entitlementReason.trim().length < MIN_REASON_LENGTH)));
+
   return (
-    <section className="mt-8 rounded-3xl bg-canvas p-5 shadow-neu-raised-sm">
-      <h2 className="text-sm font-semibold text-ink">Decision</h2>
-
-      {error && (
-        <p
-          role="alert"
-          className="mt-3 rounded-lg bg-alert-bg p-3 text-sm text-alert-ink"
-        >
-          {error}
-        </p>
-      )}
-      {notice && (
-        <p
-          role="status"
-          className="mt-3 rounded-lg bg-warn-bg p-3 text-sm text-warn-ink"
-        >
-          {notice}
-        </p>
-      )}
-
-      {status === "PENDING" && (
-        <>
-          {!emailVerified && (
-            <p className="mt-3 rounded-lg bg-warn-bg p-3 text-xs text-warn-ink">
-              This applicant has not verified their email address yet. Approving
-              is still possible — they will be asked to verify before they can
-              sign in.
-            </p>
-          )}
-
-          <div className="mt-4">
-            <Select
-              id="planKey"
-              label="Plan"
-              value={planKey}
-              onChange={(event) => setPlanKey(event.target.value)}
-            >
-              {selectablePlans.length === 0 && <option value="">No plans</option>}
-              {selectablePlans.map((plan) => (
-                <option key={plan.key} value={plan.key}>
-                  {plan.name}
-                  {plan.isActive ? "" : " (retired)"}
-                </option>
-              ))}
-            </Select>
+    <div className="space-y-5">
+      {/* Make a Decision Card */}
+      <section className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/85 p-5 sm:p-6 shadow-lg backdrop-blur-md space-y-5">
+        {/* Header */}
+        <div className="flex items-start gap-3.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/50 text-indigo-400">
+            <Scale className="h-4.5 w-4.5" />
           </div>
-
-          <fieldset className="mt-5">
-            <legend className="text-xs font-medium text-muted">
-              Feature entitlements
-            </legend>
-            <p className="mt-1 text-[11px] text-faint">
-              Ticked follows the selected plan unless you change it. A change is
-              stored as an override and needs a reason.
+          <div>
+            <h2 className="text-base font-bold text-white tracking-tight">
+              Make a decision
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              This action will determine whether the clinic can access the platform.
             </p>
-            <div className="mt-3 space-y-2">
-              {features.map((feature) => {
-                const planDefault = planDefaults.get(feature.key) ?? false;
-                const enabled = isEnabled(feature);
-                const deviates = enabled !== planDefault;
+          </div>
+        </div>
 
-                return (
-                  <label
-                    key={feature.key}
-                    className="flex items-start gap-3 rounded-2xl bg-canvas px-3 py-2 shadow-neu-raised-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={enabled}
-                      disabled={!feature.globalEnabled}
-                      onChange={(event) =>
-                        setOverrides((current) => ({
-                          ...current,
-                          [feature.key]: event.target.checked,
-                        }))
-                      }
-                      className="mt-0.5 h-4 w-4 rounded-2xl bg-canvas shadow-neu-inset"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm text-ink">
-                        {feature.name}
-                        {feature.tier !== "CORE" && (
-                          <span className="ml-2 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted">
-                            {feature.tier}
-                          </span>
-                        )}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-faint">
-                        {!feature.globalEnabled
-                          ? "Disabled platform-wide — no plan can grant it."
-                          : deviates
-                            ? `Overrides the plan (plan says ${planDefault ? "on" : "off"})`
-                            : "Follows the plan"}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
+        {error && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
+            <span>{error}</span>
+          </div>
+        )}
 
-          {needsEntitlementReason && (
-            <div className="mt-4">
-              <label
-                htmlFor="entitlementReason"
-                className="block text-xs font-medium text-muted"
-              >
-                Why these features differ from the plan
-              </label>
-              <textarea
-                id="entitlementReason"
-                rows={2}
-                value={entitlementReason}
-                onChange={(event) => setEntitlementReason(event.target.value)}
-                className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
-              />
-            </div>
-          )}
+        {notice && (
+          <div
+            role="status"
+            className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-300"
+          >
+            <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+            <span>{notice}</span>
+          </div>
+        )}
 
-          <div className="mt-5">
-            <label htmlFor="reason" className="block text-xs font-medium text-muted">
-              Reason (required to reject)
-            </label>
-            <textarea
-              id="reason"
-              rows={2}
-              value={reason}
-              placeholder={`Enter at least ${MIN_REASON_LENGTH} characters...`}
-              onChange={(event) => setReason(event.target.value)}
-              className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
-            />
-            {reasonTooShort && (
-              <p className="mt-1 text-[11px] text-warn-ink">
-                At least {MIN_REASON_LENGTH} characters.
+        {/* 3 Selectable Decision Cards */}
+        <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2.5">
+            Decision
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Card 1: Approve */}
+            <button
+              type="button"
+              onClick={() => {
+                if (status === "PENDING" || status === "SUSPENDED") {
+                  setSelectedChoice(
+                    status === "SUSPENDED"
+                      ? CLINIC_DECISIONS.REACTIVATE
+                      : CLINIC_DECISIONS.APPROVE,
+                  );
+                } else {
+                  setSelectedChoice(CLINIC_DECISIONS.APPROVE);
+                }
+              }}
+              className={cx(
+                "relative flex flex-col items-start p-3.5 rounded-xl border text-left transition-all duration-150 cursor-pointer",
+                selectedChoice === CLINIC_DECISIONS.APPROVE ||
+                  selectedChoice === CLINIC_DECISIONS.REACTIVATE
+                  ? "border-emerald-500/70 bg-emerald-950/30 text-white ring-1 ring-emerald-500/30 shadow-md shadow-emerald-950/40"
+                  : "border-slate-800 bg-[#090e23]/60 text-slate-400 hover:border-slate-700 hover:text-slate-300",
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2
+                    className={cx(
+                      "h-4 w-4",
+                      selectedChoice === CLINIC_DECISIONS.APPROVE ||
+                        selectedChoice === CLINIC_DECISIONS.REACTIVATE
+                        ? "text-emerald-400"
+                        : "text-slate-500",
+                    )}
+                  />
+                  <span className="text-xs font-bold text-white">
+                    {status === "SUSPENDED" ? "Reactivate" : "Approve"}
+                  </span>
+                </div>
+                <span
+                  className={cx(
+                    "h-3 w-3 rounded-full border flex items-center justify-center",
+                    selectedChoice === CLINIC_DECISIONS.APPROVE ||
+                      selectedChoice === CLINIC_DECISIONS.REACTIVATE
+                      ? "border-emerald-400 bg-emerald-400"
+                      : "border-slate-600 bg-transparent",
+                  )}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                {status === "SUSPENDED"
+                  ? "Restore full access"
+                  : "Allow full access"}
               </p>
+            </button>
+
+            {/* Card 2: Suspend */}
+            <button
+              type="button"
+              onClick={() => setSelectedChoice(CLINIC_DECISIONS.SUSPEND)}
+              className={cx(
+                "relative flex flex-col items-start p-3.5 rounded-xl border text-left transition-all duration-150 cursor-pointer",
+                selectedChoice === CLINIC_DECISIONS.SUSPEND
+                  ? "border-amber-500/70 bg-amber-950/30 text-white ring-1 ring-amber-500/30 shadow-md shadow-amber-950/40"
+                  : "border-slate-800 bg-[#090e23]/60 text-slate-400 hover:border-slate-700 hover:text-slate-300",
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <PauseCircle
+                    className={cx(
+                      "h-4 w-4",
+                      selectedChoice === CLINIC_DECISIONS.SUSPEND
+                        ? "text-amber-400"
+                        : "text-slate-500",
+                    )}
+                  />
+                  <span className="text-xs font-bold text-white">Suspend</span>
+                </div>
+                <span
+                  className={cx(
+                    "h-3 w-3 rounded-full border flex items-center justify-center",
+                    selectedChoice === CLINIC_DECISIONS.SUSPEND
+                      ? "border-amber-400 bg-amber-400"
+                      : "border-slate-600 bg-transparent",
+                  )}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                Temporarily restrict access
+              </p>
+            </button>
+
+            {/* Card 3: Reject */}
+            <button
+              type="button"
+              onClick={() => setSelectedChoice(CLINIC_DECISIONS.REJECT)}
+              className={cx(
+                "relative flex flex-col items-start p-3.5 rounded-xl border text-left transition-all duration-150 cursor-pointer",
+                selectedChoice === CLINIC_DECISIONS.REJECT
+                  ? "border-rose-500/70 bg-rose-950/30 text-white ring-1 ring-rose-500/30 shadow-md shadow-rose-950/40"
+                  : "border-slate-800 bg-[#090e23]/60 text-slate-400 hover:border-slate-700 hover:text-slate-300",
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <XCircle
+                    className={cx(
+                      "h-4 w-4",
+                      selectedChoice === CLINIC_DECISIONS.REJECT
+                        ? "text-rose-400"
+                        : "text-slate-500",
+                    )}
+                  />
+                  <span className="text-xs font-bold text-white">Reject</span>
+                </div>
+                <span
+                  className={cx(
+                    "h-3 w-3 rounded-full border flex items-center justify-center",
+                    selectedChoice === CLINIC_DECISIONS.REJECT
+                      ? "border-rose-400 bg-rose-400"
+                      : "border-slate-600 bg-transparent",
+                  )}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                Deny access permanently
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* Approval Options: Plan & Features */}
+        {selectedChoice === CLINIC_DECISIONS.APPROVE && status === "PENDING" && (
+          <div className="space-y-4 pt-1 border-t border-slate-800/60">
+            {!emailVerified && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                <span>
+                  This applicant has not verified their email address yet. Approving
+                  is still possible — they will be asked to verify before they can
+                  sign in.
+                </span>
+              </div>
+            )}
+
+            <div>
+              <Select
+                id="planKey"
+                label="Plan"
+                value={planKey}
+                onChange={(event) => setPlanKey(event.target.value)}
+              >
+                {selectablePlans.length === 0 && <option value="">No plans</option>}
+                {selectablePlans.map((plan) => (
+                  <option key={plan.key} value={plan.key}>
+                    {plan.name}
+                    {plan.isActive ? "" : " (retired)"}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-semibold text-slate-300">
+                Feature entitlements
+              </legend>
+              <p className="text-[11px] text-slate-500">
+                Ticked follows the selected plan unless you change it. A change is
+                stored as an override and needs a reason.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                {features.map((feature) => {
+                  const planDefault = planDefaults.get(feature.key) ?? false;
+                  const enabled = isEnabled(feature);
+                  const deviates = enabled !== planDefault;
+
+                  return (
+                    <label
+                      key={feature.key}
+                      className={cx(
+                        "flex items-start gap-2.5 rounded-xl border p-2.5 text-xs transition-colors cursor-pointer",
+                        enabled
+                          ? "border-slate-700 bg-[#090e23]/80 text-white"
+                          : "border-slate-800/80 bg-[#090e23]/40 text-slate-400",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        disabled={!feature.globalEnabled}
+                        onChange={(event) =>
+                          setOverrides((current) => ({
+                            ...current,
+                            [feature.key]: event.target.checked,
+                          }))
+                        }
+                        className="mt-0.5 h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0 focus:ring-offset-0"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="font-semibold text-white block">
+                          {feature.name}
+                          {feature.tier !== "CORE" && (
+                            <span className="ml-1.5 rounded border border-slate-700 bg-slate-800 px-1 py-0.2 text-[9px] text-slate-300 uppercase">
+                              {feature.tier}
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          {!feature.globalEnabled
+                            ? "Disabled platform-wide"
+                            : deviates
+                              ? `Overrides plan (${planDefault ? "on" : "off"})`
+                              : "Follows plan"}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {needsEntitlementReason && (
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="entitlementReason"
+                  className="block text-xs font-semibold text-slate-300"
+                >
+                  Why these features differ from the plan
+                </label>
+                <textarea
+                  id="entitlementReason"
+                  rows={2}
+                  value={entitlementReason}
+                  onChange={(event) => setEntitlementReason(event.target.value)}
+                  placeholder="Explain the plan deviation..."
+                  className="w-full rounded-xl border border-slate-800 bg-[#090e23]/80 px-3.5 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Suspend Context Warning */}
+        {selectedChoice === CLINIC_DECISIONS.SUSPEND && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-start gap-2">
+            <Info className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+            <span>
+              Suspending removes access for everyone in this organisation on their
+              next request, including sessions that are already open.
+            </span>
+          </div>
+        )}
+
+        {/* Reason Field with Character Count */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label htmlFor="reason" className="block text-xs font-semibold text-slate-300">
+              Reason {isReasonRequired ? "(required)" : "(optional)"}
+            </label>
+            <span className="text-[11px] font-mono text-slate-500 tabular-nums">
+              {reason.length}/{MAX_REASON_LENGTH}
+            </span>
+          </div>
+          <textarea
+            id="reason"
+            rows={2}
+            value={reason}
+            maxLength={MAX_REASON_LENGTH}
+            placeholder="Add a reason for your decision..."
+            onChange={(event) => setReason(event.target.value)}
+            className="w-full rounded-xl border border-slate-800 bg-[#090e23]/80 px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all resize-none"
+          />
+          {isReasonTooShort && (
+            <p className="text-[11px] text-amber-400">
+              Reason must be at least {MIN_REASON_LENGTH} characters.
+            </p>
+          )}
+        </div>
+
+        {/* Bottom Actions Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Primary Action Button */}
+            {selectedChoice === CLINIC_DECISIONS.APPROVE && (
+              <button
+                type="button"
+                disabled={isSubmitDisabled}
+                onClick={() => submit(CLINIC_DECISIONS.APPROVE)}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/25 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                <span>
+                  {pending === CLINIC_DECISIONS.APPROVE
+                    ? "Approving…"
+                    : "Approve application"}
+                </span>
+              </button>
+            )}
+
+            {selectedChoice === CLINIC_DECISIONS.REACTIVATE && (
+              <button
+                type="button"
+                disabled={isSubmitDisabled}
+                onClick={() => submit(CLINIC_DECISIONS.REACTIVATE)}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-400 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>
+                  {pending === CLINIC_DECISIONS.REACTIVATE
+                    ? "Reactivating…"
+                    : "Reactivate organisation"}
+                </span>
+              </button>
+            )}
+
+            {selectedChoice === CLINIC_DECISIONS.SUSPEND && (
+              <button
+                type="button"
+                disabled={isSubmitDisabled}
+                onClick={() => submit(CLINIC_DECISIONS.SUSPEND)}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-amber-600/25 hover:from-amber-500 hover:to-amber-400 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <PauseCircle className="h-4 w-4" />
+                <span>
+                  {pending === CLINIC_DECISIONS.SUSPEND
+                    ? "Suspending…"
+                    : "Suspend application"}
+                </span>
+              </button>
+            )}
+
+            {selectedChoice === CLINIC_DECISIONS.REJECT && (
+              <button
+                type="button"
+                disabled={isSubmitDisabled}
+                onClick={() => submit(CLINIC_DECISIONS.REJECT)}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-rose-600/25 hover:from-rose-500 hover:to-rose-400 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <XCircle className="h-4 w-4" />
+                <span>
+                  {pending === CLINIC_DECISIONS.REJECT
+                    ? "Rejecting…"
+                    : "Reject application"}
+                </span>
+              </button>
+            )}
+
+            {/* Direct Shortcut Buttons matching reference */}
+            {status === "ACTIVE" && selectedChoice !== CLINIC_DECISIONS.SUSPEND && (
+              <button
+                type="button"
+                onClick={() => setSelectedChoice(CLINIC_DECISIONS.SUSPEND)}
+                className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition-colors"
+              >
+                Suspend
+              </button>
+            )}
+
+            {status === "PENDING" && selectedChoice !== CLINIC_DECISIONS.SUSPEND && (
+              <button
+                type="button"
+                onClick={() => setSelectedChoice(CLINIC_DECISIONS.SUSPEND)}
+                className="rounded-xl border border-slate-800 bg-[#090e23]/60 px-3.5 py-2 text-xs font-semibold text-amber-400/80 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+              >
+                Suspend
+              </button>
+            )}
+
+            {status === "PENDING" && selectedChoice !== CLINIC_DECISIONS.REJECT && (
+              <button
+                type="button"
+                onClick={() => setSelectedChoice(CLINIC_DECISIONS.REJECT)}
+                className="rounded-xl border border-slate-800 bg-[#090e23]/60 px-3.5 py-2 text-xs font-semibold text-rose-400/80 hover:border-rose-500/40 hover:text-rose-300 transition-colors"
+              >
+                Reject
+              </button>
             )}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={
-                pending !== null ||
-                planKey === "" ||
-                (needsEntitlementReason &&
-                  entitlementReason.trim().length < MIN_REASON_LENGTH)
-              }
-              onClick={() => submit(CLINIC_DECISIONS.APPROVE)}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:opacity-50"
-            >
-              {pending === CLINIC_DECISIONS.APPROVE ? "Approving…" : "Approve"}
-            </button>
-            <button
-              type="button"
-              disabled={pending !== null || reason.trim().length < MIN_REASON_LENGTH}
-              onClick={() => submit(CLINIC_DECISIONS.REJECT)}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-alert-ink transition hover:bg-alert-bg disabled:opacity-50"
-            >
-              {pending === CLINIC_DECISIONS.REJECT ? "Rejecting…" : "Reject"}
-            </button>
-          </div>
-        </>
-      )}
-
-      {status === "ACTIVE" && (
-        <>
-          <p className="mt-3 text-xs text-muted">
-            Suspending removes access for everyone in this organisation on their
-            next request, including sessions that are already open.
-          </p>
-          <label
-            htmlFor="suspendReason"
-            className="mt-4 block text-xs font-medium text-muted"
-          >
-            Reason (required)
-          </label>
-          <textarea
-            id="suspendReason"
-            rows={2}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink shadow-neu-inset"
-          />
+          {/* Cancel Button */}
           <button
             type="button"
-            disabled={pending !== null || reason.trim().length < MIN_REASON_LENGTH}
-            onClick={() => submit(CLINIC_DECISIONS.SUSPEND)}
-            className="mt-4 rounded-lg border border-orange-500/40 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-500/10 disabled:opacity-50"
+            onClick={() => {
+              setReason("");
+              setEntitlementReason("");
+              setError(null);
+              setNotice(null);
+            }}
+            className="text-xs font-medium text-slate-400 hover:text-white transition-colors px-2 py-1"
           >
-            {pending === CLINIC_DECISIONS.SUSPEND ? "Suspending…" : "Suspend"}
+            Cancel
           </button>
-        </>
-      )}
+        </div>
+      </section>
 
-      {status === "SUSPENDED" && (
-        <>
-          <p className="mt-3 text-xs text-muted">
-            Reactivating restores access for everyone in this organisation.
-          </p>
-          <button
-            type="button"
-            disabled={pending !== null}
-            onClick={() => submit(CLINIC_DECISIONS.REACTIVATE)}
-            className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:opacity-50"
-          >
-            {pending === CLINIC_DECISIONS.REACTIVATE
-              ? "Reactivating…"
-              : "Reactivate"}
-          </button>
-        </>
-      )}
-    </section>
+      {/* Informational Footer Panel */}
+      <div className="rounded-2xl border border-slate-800/80 bg-[#0d1427]/60 p-4 shadow-sm flex items-start gap-3">
+        <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
+        <div className="text-xs text-slate-400 leading-relaxed">
+          Approving this application will activate the clinic and grant them access to the platform.
+        </div>
+      </div>
+    </div>
   );
 }
