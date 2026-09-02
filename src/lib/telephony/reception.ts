@@ -78,6 +78,7 @@ export function buildReceptionRouteXml(input: {
     ),
     callerId: providerNumber,
     destination: receptionNumber,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 

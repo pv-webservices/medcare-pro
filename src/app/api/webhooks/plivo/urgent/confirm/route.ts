@@ -34,10 +34,7 @@ export async function POST(request: Request): Promise<Response> {
       clinic,
       providerNumber: verification.params.To,
       digits,
-      runtimeMenu:
-        digits === "9"
-          ? await getClinicIvrRuntimeMenuForTrustedClinic(clinic)
-          : undefined,
+      runtimeMenu: await getClinicIvrRuntimeMenuForTrustedClinic(clinic),
     });
     if (
       digits === "1" &&

@@ -26,9 +26,9 @@ export async function POST(request: Request): Promise<Response> {
     );
     if (!clinic) return xmlResponse(buildTelephonyUnavailableXml());
 
+    const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     const digits = verification.params.Digits;
     if (digits === "9") {
-      const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
       return xmlResponse(
         buildEffectiveClinicMainMenuXml({
           inputActionUrl: buildPlivoInputActionUrl(request.url),
@@ -42,6 +42,7 @@ export async function POST(request: Request): Promise<Response> {
         requestUrl: request.url,
         clinic,
         invalidSelection: true,
+        runtimeMenu,
       }),
     );
   } catch {

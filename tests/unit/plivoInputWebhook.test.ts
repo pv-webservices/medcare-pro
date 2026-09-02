@@ -175,6 +175,7 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(buildClinicInformationForClinic).toHaveBeenCalledWith({
       requestUrl: INPUT_WEBHOOK_URL,
       clinic: TEST_CLINIC,
+      runtimeMenu: expect.objectContaining({ source: "default" }),
     });
     expect(requireTenantFeatureEntitlement).not.toHaveBeenCalled();
     expect(observeCallEvents).toHaveBeenCalledWith({
@@ -386,6 +387,10 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).toContain("Our updated options at Sunrise Clinic are ready.");
     expect(xml).toContain(`ivrRev=${currentMenu.revision}`);
     expect(xml).not.toContain(`ivrRev=${heardMenu.revision}`);
+    for (const tag of xml.match(/<Speak[^>]*>/g) ?? []) {
+      expect(tag).toContain('language="en-US"');
+      expect(tag).toContain('voice="WOMAN"');
+    }
     expect(observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
       phoneMenuSource: "CUSTOM",
       events: ["MENU_REVISION_REFRESHED"],

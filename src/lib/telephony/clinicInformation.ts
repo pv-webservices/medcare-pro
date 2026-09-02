@@ -10,6 +10,7 @@ import {
   buildPlivoActionUrl,
   PLIVO_INFORMATION_WEBHOOK_PATH,
 } from "@/lib/telephony/plivo";
+import type { ClinicIvrRuntimeMenu } from "@/lib/telephony/ivrRuntime";
 
 function clean(value: string | null | undefined): string | null {
   const normalized = value?.trim().replace(/\s+/g, " ") ?? "";
@@ -80,6 +81,7 @@ export async function buildClinicInformationForClinic(input: {
   clinic: InboundClinicContext;
   now?: Date;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): Promise<string> {
   const hours = await getClinicBusinessHoursForTrustedClinic(
     input.clinic.clinicId,
@@ -96,5 +98,6 @@ export async function buildClinicInformationForClinic(input: {
     ),
     prompt: buildClinicInformationPrompt({ clinic: input.clinic, state }),
     invalidSelection: input.invalidSelection,
+    runtimeMenu: input.runtimeMenu,
   });
 }

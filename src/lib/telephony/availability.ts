@@ -100,6 +100,7 @@ export async function buildDoctorMenuForClinic(
     doctors: current.items,
     hasNext: current.hasNext,
     invalidSelection,
+    runtimeMenu,
   });
 }
 
@@ -168,6 +169,7 @@ export async function handleDoctorMenuInput(input: {
     ),
     appointmentTypes: typePage.items,
     hasNext: typePage.hasNext,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 
@@ -234,6 +236,7 @@ export async function handleAppointmentTypeMenuInput(input: {
       ),
       appointmentTypes: next.items,
       hasNext: next.hasNext,
+      runtimeMenu: input.runtimeMenu,
     });
   }
 
@@ -249,6 +252,7 @@ export async function handleAppointmentTypeMenuInput(input: {
       appointmentTypes: current.items,
       hasNext: current.hasNext,
       invalidSelection: true,
+      runtimeMenu: input.runtimeMenu,
     });
   }
 
@@ -352,6 +356,7 @@ function renderSlotResult(input: {
     slotTimes: page.map((slot) => slot.start),
     hasNext,
     invalidSelection: input.invalidSelection,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 

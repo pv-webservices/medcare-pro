@@ -89,6 +89,7 @@ function patientConfirmation(input: BookingCallInput, invalid = false): string {
       PLIVO_BOOKING_IDENTITY_WEBHOOK_PATH,
     ),
     invalidSelection: invalid,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 
@@ -183,6 +184,7 @@ async function renderDoctorMenu(
     doctors: current.items,
     hasNext: current.hasNext,
     invalidSelection,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 
@@ -230,6 +232,7 @@ export async function handleBookingDoctorInput(input: BookingCallInput): Promise
     ),
     appointmentTypes: first.items,
     hasNext: first.hasNext,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 
@@ -255,6 +258,7 @@ export async function handleBookingTypeInput(input: BookingCallInput): Promise<s
       ),
       appointmentTypes: next.items,
       hasNext: next.hasNext,
+      runtimeMenu: input.runtimeMenu,
     });
   }
   const index = listIndex(input.digits);
@@ -269,6 +273,7 @@ export async function handleBookingTypeInput(input: BookingCallInput): Promise<s
       appointmentTypes: current.items,
       hasNext: current.hasNext,
       invalidSelection: true,
+      runtimeMenu: input.runtimeMenu,
     });
   }
   return renderBookingSlots(input, doctorId, type.id, 0);
@@ -328,6 +333,7 @@ async function renderBookingSlots(
     hasNext: safeOffset + IVR_SLOT_PAGE_SIZE < available.length,
     invalidSelection,
     leadingMessage,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 
@@ -369,6 +375,7 @@ export async function handleBookingSlotInput(input: BookingCallInput): Promise<s
     doctorName: result.doctorName,
     appointmentTypeName: result.appointmentTypeName,
     startTime: selected.start,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 
@@ -434,6 +441,7 @@ export async function handleBookingConfirmationInput(input: BookingCallInput): P
       appointmentTypeName: result.appointmentTypeName,
       startTime,
       invalidSelection: true,
+      runtimeMenu: input.runtimeMenu,
     });
   }
 

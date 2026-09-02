@@ -39,6 +39,7 @@ function canonicalNumber(value: unknown): string | null {
 export function buildUrgentMenuForClinic(
   requestUrl: string,
   invalidSelection = false,
+  runtimeMenu?: ClinicIvrRuntimeMenu,
 ): string {
   return buildUrgentAssistanceMenuXml({
     actionUrl: buildPlivoActionUrl(
@@ -46,6 +47,7 @@ export function buildUrgentMenuForClinic(
       PLIVO_URGENT_CONFIRM_WEBHOOK_PATH,
     ),
     invalidSelection,
+    runtimeMenu,
   });
 }
 
@@ -76,11 +78,11 @@ export function handleUrgentConfirmation(input: {
     });
   }
   if (input.digits !== "1") {
-    return buildUrgentMenuForClinic(input.requestUrl, true);
+    return buildUrgentMenuForClinic(input.requestUrl, true, input.runtimeMenu);
   }
 
   if (input.clinic.urgentPhoneNumber === null) {
-    return buildUrgentTransferNotConfiguredXml();
+    return buildUrgentTransferNotConfiguredXml(input.runtimeMenu);
   }
 
   const providerNumber = canonicalNumber(input.providerNumber);
@@ -94,7 +96,7 @@ export function handleUrgentConfirmation(input: {
       urgentPhoneNumber: input.clinic.urgentPhoneNumber,
     })
   ) {
-    return buildUrgentTransferTemporarilyUnavailableXml();
+    return buildUrgentTransferTemporarilyUnavailableXml(input.runtimeMenu);
   }
 
   const actionUrl = buildPlivoActionUrl(
@@ -106,15 +108,19 @@ export function handleUrgentConfirmation(input: {
     actionUrl,
     callerId: providerNumber,
     destination: urgentNumber,
+    runtimeMenu: input.runtimeMenu,
   });
 }
 
-export function buildUrgentDialOutcomeXml(status: unknown): string {
+export function buildUrgentDialOutcomeXml(
+  status: unknown,
+  runtimeMenu?: ClinicIvrRuntimeMenu,
+): string {
   if (status === "completed") return buildUrgentTransferCompletedXml();
 
   // Every documented non-completed value and any future/unknown value uses
   // the same privacy-preserving failure response.
-  return buildUrgentTransferFailureXml();
+  return buildUrgentTransferFailureXml(runtimeMenu);
 }
 
 export function isDocumentedDialStatus(

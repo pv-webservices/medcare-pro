@@ -71,9 +71,7 @@ export async function POST(request: Request): Promise<Response> {
         publicPhoneNumber: clinic.publicPhoneNumber,
         receptionPhoneNumber: clinic.receptionPhoneNumber,
       });
-      const runtimeMenu = receptionAvailable
-        ? undefined
-        : await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
+      const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
       const xml = buildReceptionRouteXml({
         requestUrl: request.url,
         clinic,
@@ -86,7 +84,7 @@ export async function POST(request: Request): Promise<Response> {
         callerNumber: verification.params.From,
         routingModeAtStart: routingMode,
         initialRoute: ClinicTelephonyCallInitialRoute.RECEPTION,
-        phoneMenuSource: runtimeMenu
+        phoneMenuSource: !receptionAvailable
           ? runtimeMenu.source === "custom"
             ? ClinicTelephonyCallMenuSource.CUSTOM
             : ClinicTelephonyCallMenuSource.DEFAULT

@@ -4,6 +4,7 @@ import { buildUrgentTransferFailureXml } from "@/lib/telephony/plivo";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import { buildUrgentDialOutcomeXml } from "@/lib/telephony/urgent";
 import { observeProductionCallEvents } from "@/lib/telephony/callObservability";
+import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
 
 export const runtime = "nodejs";
 
@@ -29,7 +30,11 @@ export async function POST(request: Request): Promise<Response> {
 
     const status = verification.params.DialStatus;
     const normalizedStatus = typeof status === "string" ? status : undefined;
-    const xml = buildUrgentDialOutcomeXml(normalizedStatus);
+    const runtimeMenu =
+      normalizedStatus === "completed"
+        ? undefined
+        : await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
+    const xml = buildUrgentDialOutcomeXml(normalizedStatus, runtimeMenu);
     await observeProductionCallEvents({
       clinicId: clinic.clinicId,
       providerCallUuid: verification.params.DialALegUUID,

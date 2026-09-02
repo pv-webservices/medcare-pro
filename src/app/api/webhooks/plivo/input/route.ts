@@ -135,13 +135,14 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     if (action === "urgent-assistance") {
-      return xmlResponse(buildUrgentMenuForClinic(request.url));
+      return xmlResponse(buildUrgentMenuForClinic(request.url, false, runtimeMenu));
     }
     if (action === "clinic-information") {
       return xmlResponse(
         await buildClinicInformationForClinic({
           requestUrl: request.url,
           clinic,
+          runtimeMenu,
         }),
       );
     }

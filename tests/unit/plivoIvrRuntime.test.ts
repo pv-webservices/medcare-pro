@@ -46,7 +46,7 @@ describe("runtime clinic main-menu Plivo XML", () => {
     ).toBe(buildClinicMainMenuXml(INPUT_URL, "Sunrise Clinic"));
   });
 
-  it("applies custom voice/language only to the custom top-level prompt", () => {
+  it("applies custom voice/language to every custom main-menu Speak", () => {
     const menu = customMenu();
     const xml = buildEffectiveClinicMainMenuXml({
       inputActionUrl: INPUT_URL,
@@ -64,9 +64,11 @@ describe("runtime clinic main-menu Plivo XML", () => {
     expect(xml).toContain("Press 4 for care &amp; information.");
     expect(xml.indexOf("Press 2")).toBeLessThan(xml.indexOf("Press 4"));
     expect(xml).toContain("Press 9 to repeat these options.");
+    expect(xml.match(/language="en-GB"/g)).toHaveLength(2);
+    expect(xml.match(/voice="MAN"/g)).toHaveLength(2);
   });
 
-  it("keeps leading system messages on the existing default Speak behavior", () => {
+  it("applies custom speech attributes to revision and no-input messages", () => {
     const menu = customMenu();
     const xml = buildEffectiveClinicMainMenuXml({
       message: "Our phone menu has just changed.",
@@ -76,9 +78,9 @@ describe("runtime clinic main-menu Plivo XML", () => {
     });
 
     expect(xml).toContain(
-      "<Speak>Our phone menu has just changed.</Speak><GetInput",
+      '<Speak language="en-GB" voice="MAN">Our phone menu has just changed.</Speak><GetInput',
     );
-    expect(xml.match(/language="en-GB"/g)).toHaveLength(1);
-    expect(xml.match(/voice="MAN"/g)).toHaveLength(1);
+    expect(xml.match(/language="en-GB"/g)).toHaveLength(3);
+    expect(xml.match(/voice="MAN"/g)).toHaveLength(3);
   });
 });

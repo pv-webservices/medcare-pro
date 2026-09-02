@@ -60,6 +60,22 @@ type AddDial = (
   attributes: Readonly<Record<string, string | number | boolean>>,
 ) => object;
 
+export type IvrSpeakAttributes = Readonly<{
+  language?: string;
+  voice?: string;
+}>;
+
+export function getRuntimeSpeakAttributes(
+  runtimeMenu?: ClinicIvrRuntimeMenu,
+): IvrSpeakAttributes {
+  return runtimeMenu?.source === "custom"
+    ? {
+        language: runtimeMenu.language,
+        voice: runtimeMenu.voice,
+      }
+    : {};
+}
+
 export function buildPlivoInputActionUrl(requestUrl: string): string {
   return new URL(
     PLIVO_INPUT_WEBHOOK_PATH,
@@ -206,33 +222,38 @@ export function buildEffectiveClinicMainMenuXml(input: {
   }
 
   const response = createPlivoResponse();
-  if (input.message) response.addSpeak(input.message, {});
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
+  if (input.message) response.addSpeak(input.message, speakAttributes);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
   addDtmfMenu(
     response,
     inputActionUrlForRuntime(input.inputActionUrl, input.runtimeMenu),
     input.runtimeMenu.prompt,
-    {
-      language: input.runtimeMenu.language,
-      voice: input.runtimeMenu.voice,
-    },
+    speakAttributes,
   );
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
 export function buildUrgentAssistanceMenuXml(input: {
   actionUrl: string;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
-  addDtmfMenu(response, input.actionUrl, buildUrgentAssistancePrompt());
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  addDtmfMenu(
+    response,
+    input.actionUrl,
+    buildUrgentAssistancePrompt(),
+    speakAttributes,
+  );
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
@@ -240,9 +261,13 @@ export function buildUrgentTransferXml(input: {
   actionUrl: string;
   callerId: string;
   destination: string;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
-  response.addSpeak("Connecting you to urgent clinic assistance.", {});
+  response.addSpeak(
+    "Connecting you to urgent clinic assistance.",
+    getRuntimeSpeakAttributes(input.runtimeMenu),
+  );
   // Plivo 4.75.1's declaration misspells this documented XML attribute as
   // callerID. The runtime builder and current XML docs both require callerId.
   const addDial = response.addDial as unknown as AddDial;
@@ -257,29 +282,35 @@ export function buildUrgentTransferXml(input: {
   return response.toXML();
 }
 
-export function buildUrgentTransferNotConfiguredXml(): string {
+export function buildUrgentTransferNotConfiguredXml(
+  runtimeMenu?: ClinicIvrRuntimeMenu,
+): string {
   const response = createPlivoResponse();
   response.addSpeak(
     "Urgent telephone transfer is not currently configured for this clinic. If this is a life-threatening emergency, call 112.",
-    {},
+    getRuntimeSpeakAttributes(runtimeMenu),
   );
   return response.toXML();
 }
 
-export function buildUrgentTransferTemporarilyUnavailableXml(): string {
+export function buildUrgentTransferTemporarilyUnavailableXml(
+  runtimeMenu?: ClinicIvrRuntimeMenu,
+): string {
   const response = createPlivoResponse();
   response.addSpeak(
     "Urgent telephone transfer is temporarily unavailable.",
-    {},
+    getRuntimeSpeakAttributes(runtimeMenu),
   );
   return response.toXML();
 }
 
-export function buildUrgentTransferFailureXml(): string {
+export function buildUrgentTransferFailureXml(
+  runtimeMenu?: ClinicIvrRuntimeMenu,
+): string {
   const response = createPlivoResponse();
   response.addSpeak(
     "We could not connect you to urgent clinic assistance. If this is a life-threatening emergency, call 112.",
-    {},
+    getRuntimeSpeakAttributes(runtimeMenu),
   );
   return response.toXML();
 }
@@ -292,9 +323,13 @@ export function buildReceptionTransferXml(input: {
   actionUrl: string;
   callerId: string;
   destination: string;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
-  response.addSpeak("Please hold while we connect you to the clinic.", {});
+  response.addSpeak(
+    "Please hold while we connect you to the clinic.",
+    getRuntimeSpeakAttributes(input.runtimeMenu),
+  );
   const addDial = response.addDial as unknown as AddDial;
   const dial = addDial.call(response, {
     action: input.actionUrl,
@@ -314,25 +349,30 @@ export function buildReceptionTransferCompletedXml(): string {
 export function buildReceptionFailureThenMainMenuXml(
   inputActionUrl: string,
   clinicName: string,
+  runtimeMenu?: ClinicIvrRuntimeMenu,
 ): string {
-  return buildMessageThenMainMenuXml(
-    "We could not connect you to reception. You can continue using our automated telephone service.",
+  return buildEffectiveClinicMainMenuXml({
+    message:
+      "We could not connect you to reception. You can continue using our automated telephone service.",
     inputActionUrl,
     clinicName,
-  );
+    runtimeMenu,
+  });
 }
 
 export function buildClinicInformationMenuXml(input: {
   actionUrl: string;
   prompt: string;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
-  addDtmfMenu(response, input.actionUrl, input.prompt);
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  addDtmfMenu(response, input.actionUrl, input.prompt, speakAttributes);
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
@@ -341,17 +381,20 @@ export function buildDoctorSelectionXml(input: {
   doctors: readonly IvrNamedOption[];
   hasNext: boolean;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
   addDtmfMenu(
     response,
     input.actionUrl,
     buildDoctorMenuPrompt(input.doctors, input.hasNext),
+    speakAttributes,
   );
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
@@ -360,10 +403,12 @@ export function buildAppointmentTypeSelectionXml(input: {
   appointmentTypes: readonly IvrNamedOption[];
   hasNext: boolean;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
   addDtmfMenu(
     response,
@@ -372,8 +417,9 @@ export function buildAppointmentTypeSelectionXml(input: {
       input.appointmentTypes,
       input.hasNext,
     ),
+    speakAttributes,
   );
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
@@ -384,10 +430,12 @@ export function buildSlotSelectionXml(input: {
   slotTimes: readonly string[];
   hasNext: boolean;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
   addDtmfMenu(
     response,
@@ -398,21 +446,29 @@ export function buildSlotSelectionXml(input: {
       input.slotTimes,
       input.hasNext,
     ),
+    speakAttributes,
   );
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
 export function buildPatientConfirmationXml(input: {
   actionUrl: string;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
-  addDtmfMenu(response, input.actionUrl, buildPatientConfirmationPrompt());
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  addDtmfMenu(
+    response,
+    input.actionUrl,
+    buildPatientConfirmationPrompt(),
+    speakAttributes,
+  );
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
@@ -424,13 +480,15 @@ export function buildBookingSlotSelectionXml(input: {
   hasNext: boolean;
   invalidSelection?: boolean;
   leadingMessage?: string;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.leadingMessage) {
-    response.addSpeak(input.leadingMessage, {});
+    response.addSpeak(input.leadingMessage, speakAttributes);
   }
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
   addDtmfMenu(
     response,
@@ -441,8 +499,9 @@ export function buildBookingSlotSelectionXml(input: {
       input.slotTimes,
       input.hasNext,
     ),
+    speakAttributes,
   );
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }
 
@@ -452,12 +511,19 @@ export function buildFinalBookingConfirmationXml(input: {
   appointmentTypeName: string;
   startTime: string;
   invalidSelection?: boolean;
+  runtimeMenu?: ClinicIvrRuntimeMenu;
 }): string {
   const response = createPlivoResponse();
+  const speakAttributes = getRuntimeSpeakAttributes(input.runtimeMenu);
   if (input.invalidSelection) {
-    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, {});
+    response.addSpeak(STAGE_2_INVALID_SELECTION_MESSAGE, speakAttributes);
   }
-  addDtmfMenu(response, input.actionUrl, buildFinalBookingConfirmationPrompt(input));
-  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, {});
+  addDtmfMenu(
+    response,
+    input.actionUrl,
+    buildFinalBookingConfirmationPrompt(input),
+    speakAttributes,
+  );
+  response.addSpeak(STAGE_2_NO_INPUT_MESSAGE, speakAttributes);
   return response.toXML();
 }

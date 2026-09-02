@@ -162,7 +162,9 @@ describe("Stage 7 /answer effective routing", () => {
     });
     expect(xml).toContain("<Dial");
     expect(xml).toContain(`<Number>${RECEPTION_NUMBER}</Number>`);
-    expect(mocks.getRuntimeMenu).not.toHaveBeenCalled();
+    expect(mocks.getRuntimeMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ clinicId: "clinic-a" }),
+    );
     expect(xml).toContain(`callerId="${PROVIDER_NUMBER}"`);
     expect(xml).toContain(`timeout="${RECEPTION_DIAL_TIMEOUT_SECONDS}"`);
     expect(xml).toContain('method="POST"');
