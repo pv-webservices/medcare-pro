@@ -2,9 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Power, PowerOff } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  Building2,
+  Calendar,
+  CheckSquare,
+  LayoutGrid,
+  Megaphone,
+  MessageSquare,
+  Power,
+  PowerOff,
+  Settings,
+  UserCheck,
+  UserRound,
+  Users,
+} from "lucide-react";
 import type { PlatformFeatureRow } from "@/lib/platform/entitlements";
 import { MIN_REASON_LENGTH } from "@/lib/platform/entitlementPolicy";
+import { cx } from "@/components/ui";
 
 /**
  * The platform-wide kill switch — Stage 9, layer 1.
@@ -29,13 +46,42 @@ interface GlobalFeatureSwitchesProps {
 }
 
 const TIER_STYLES: Record<string, string> = {
-  CORE: "border-line text-muted",
-  PREMIUM: "border-line text-ok-ink",
-  BETA: "border-line text-warn-ink",
-  INTERNAL: "border-line text-alert-ink",
+  CORE: "border-slate-700/60 bg-slate-900/60 text-slate-400",
+  PREMIUM: "border-indigo-500/30 bg-indigo-950/60 text-indigo-300",
+  BETA: "border-amber-500/30 bg-amber-950/60 text-amber-300",
+  INTERNAL: "border-rose-500/30 bg-rose-950/60 text-rose-300",
 };
 
 const GENERIC_ERROR = "Could not change that switch. Try again.";
+
+function getFeatureIcon(key: string) {
+  switch (key) {
+    case "clinics":
+      return Building2;
+    case "doctors":
+      return UserRound;
+    case "notifications":
+      return Bell;
+    case "registrations":
+      return UserCheck;
+    case "reports":
+      return BarChart3;
+    case "settings":
+      return Settings;
+    case "tasks":
+      return CheckSquare;
+    case "team":
+      return Users;
+    case "whatsapp":
+      return MessageSquare;
+    case "appointments":
+      return Calendar;
+    case "marketing":
+      return Megaphone;
+    default:
+      return LayoutGrid;
+  }
+}
 
 export default function GlobalFeatureSwitches({
   features,
@@ -109,213 +155,255 @@ export default function GlobalFeatureSwitches({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
+      {/* Alert Notices */}
       {error && (
-        <p
+        <div
           role="alert"
-          className="rounded-lg bg-alert-bg p-3 text-sm text-alert-ink"
+          className="rounded-xl border border-rose-500/30 bg-rose-950/60 p-4 text-xs font-medium text-rose-300 shadow-lg backdrop-blur-md"
         >
           {error}
-        </p>
+        </div>
       )}
       {notice && (
-        <p
+        <div
           role="status"
-          className="rounded-lg bg-ok-bg p-3 text-sm text-ok-ink"
+          className="rounded-xl border border-emerald-500/30 bg-emerald-950/60 p-4 text-xs font-medium text-emerald-300 shadow-lg backdrop-blur-md"
         >
           {notice}
-        </p>
+        </div>
       )}
 
-      {features.map((feature) => {
-        const isOpen = openKey === feature.key;
-        const switchingOff = feature.globalEnabled;
-        const confirmed = !switchingOff || confirmation.trim() === feature.key;
-        const reasonLongEnough = reason.trim().length >= MIN_REASON_LENGTH;
+      {/* 2-Column Responsive Grid on Desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {features.map((feature) => {
+          const Icon = getFeatureIcon(feature.key);
+          const isOpen = openKey === feature.key;
+          const switchingOff = feature.globalEnabled;
+          const confirmed = !switchingOff || confirmation.trim() === feature.key;
+          const reasonLongEnough = reason.trim().length >= MIN_REASON_LENGTH;
 
-        return (
-          <section
-            key={feature.key}
-            className="rounded-3xl bg-canvas p-5 shadow-neu-raised-sm"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-sm font-semibold text-ink">
-                    {feature.name}
-                  </h2>
-                  <code className="rounded bg-canvas px-1.5 py-0.5 text-[11px] text-muted">
-                    {feature.key}
-                  </code>
-                  <span
-                    className={`rounded border px-1.5 py-0.5 text-[10px] ${
-                      TIER_STYLES[feature.tier] ?? TIER_STYLES.CORE
-                    }`}
-                  >
-                    {feature.tier}
-                  </span>
-                  <span
-                    className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
-                      feature.globalEnabled
-                        ? "border-line bg-ok-bg text-ok-ink"
-                        : "border-line bg-alert-bg text-alert-ink"
-                    }`}
-                  >
-                    {feature.globalEnabled ? "Live" : "Switched off"}
+          return (
+            <div
+              key={feature.key}
+              className={cx(
+                "group relative flex flex-col justify-between rounded-2xl border bg-[#0d1427]/85 p-5 sm:p-6 shadow-lg backdrop-blur-md transition-all duration-150",
+                isOpen
+                  ? "border-indigo-500/50 shadow-indigo-500/10"
+                  : "border-slate-800/80 hover:border-slate-700 hover:-translate-y-0.5",
+              )}
+            >
+              <div>
+                {/* Header Row: Left info lockup + Right Action Button */}
+                <div className="flex items-start justify-between gap-4">
+                  {/* Left Info */}
+                  <div className="flex items-start gap-4 min-w-0">
+                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-950/60 text-indigo-400 shadow-sm transition-transform duration-150 group-hover:scale-105">
+                      <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-sm sm:text-base font-semibold text-white tracking-tight">
+                          {feature.name}
+                        </h2>
+                        <code className="rounded bg-slate-900/80 px-1.5 py-0.5 font-mono text-[11px] text-slate-400 border border-slate-800">
+                          {feature.key}
+                        </code>
+                        <span
+                          className={cx(
+                            "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                            TIER_STYLES[feature.tier] ?? TIER_STYLES.CORE,
+                          )}
+                        >
+                          {feature.tier}
+                        </span>
+                        <span
+                          className={cx(
+                            "rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                            feature.globalEnabled
+                              ? "border-emerald-500/30 bg-emerald-950/60 text-emerald-300"
+                              : "border-rose-500/30 bg-rose-950/60 text-rose-300",
+                          )}
+                        >
+                          {feature.globalEnabled ? "Live" : "Switched off"}
+                        </span>
+                      </div>
+
+                      {feature.description && (
+                        <p className="mt-2 text-xs text-slate-400 leading-relaxed line-clamp-2">
+                          {feature.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Action Button */}
+                  {!isOpen && (
+                    <div className="shrink-0">
+                      {feature.globalEnabled ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => open(feature.key)}
+                          className="inline-flex items-center gap-2.5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-3.5 py-2 text-left text-xs font-semibold text-rose-300 hover:bg-rose-900/40 hover:border-rose-500/50 active:scale-[0.99] transition-all disabled:opacity-50"
+                        >
+                          <PowerOff className="h-4 w-4 text-rose-400 shrink-0" />
+                          <div className="leading-tight text-[11px]">
+                            <span className="block font-semibold">Switch off</span>
+                            <span className="block text-[10px] text-rose-400/80 font-normal">
+                              platform-wide
+                            </span>
+                          </div>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => open(feature.key)}
+                          className="inline-flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3.5 py-2 text-left text-xs font-semibold text-emerald-300 hover:bg-emerald-900/40 hover:border-emerald-500/50 active:scale-[0.99] transition-all disabled:opacity-50"
+                        >
+                          <Power className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <div className="leading-tight text-[11px]">
+                            <span className="block font-semibold">Switch on</span>
+                            <span className="block text-[10px] text-emerald-400/80 font-normal">
+                              platform-wide
+                            </span>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Entitlement & Plan Context */}
+                <div className="mt-3.5 flex items-center gap-1.5 text-xs text-slate-400">
+                  <Users className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <span>
+                    <strong className="text-slate-200 font-semibold tabular-nums">
+                      {feature.entitledTenants}
+                    </strong>{" "}
+                    of{" "}
+                    <strong className="text-slate-200 font-semibold tabular-nums">
+                      {totalCustomerTenants}
+                    </strong>{" "}
+                    organisation{totalCustomerTenants === 1 ? "" : "s"} entitled
+                    {feature.plansIncluding.length > 0
+                      ? ` \u00B7 in ${feature.plansIncluding.join(", ")}`
+                      : " \u00B7 in no plan"}
                   </span>
                 </div>
 
-                {feature.description && (
-                  <p className="mt-1.5 text-xs text-muted">
-                    {feature.description}
-                  </p>
-                )}
-
-                <p className="mt-2 text-xs text-muted">
-                  <span className="tabular-nums text-ink">
-                    {feature.entitledTenants}
-                  </span>{""}
-                  of {totalCustomerTenants} organisation
-                  {totalCustomerTenants === 1 ? "" : "s"} entitled
-                  {feature.plansIncluding.length > 0
-                    ? ` · in ${feature.plansIncluding.join(",")}`
-                    : "· in no plan"}
-                  {feature.overridesGranted + feature.overridesRevoked > 0 &&
-                    ` · ${feature.overridesGranted} granted and ${feature.overridesRevoked} revoked by override`}
-                </p>
-
+                {/* Not Enforced Alert */}
                 {!feature.isEnforced && (
-                  <p className="mt-2 flex items-start gap-2 rounded-lg bg-warn-bg p-2.5 text-[11px] text-warn-ink">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-950/40 p-2.5 text-[11px] text-amber-300">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
                     <span>
-                      Nothing checks this key, so switching it changes nothing
-                      today. {feature.enforcementNote}
+                      Nothing checks this key, so switching it changes nothing today.{" "}
+                      {feature.enforcementNote}
                     </span>
-                  </p>
-                )}
-
-                {feature.lastChange.at && (
-                  <p className="mt-2 text-[11px] text-faint">
-                    Last changed {feature.lastChange.at.toISOString().slice(0, 10)}
-                    {feature.lastChange.byName
-                      ? ` by ${feature.lastChange.byName}`
-                      : ""}
-                    {feature.lastChange.reason
-                      ? ` — “${feature.lastChange.reason}”`
-                      : ""}
-                  </p>
+                  </div>
                 )}
               </div>
 
-              {!isOpen && (
-                <button
-                  type="button"
-                  onClick={() => open(feature.key)}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                    feature.globalEnabled
-                      ? "border-line bg-alert-bg text-alert-ink hover:bg-alert-bg"
-                      : "border-line bg-ok-bg text-ok-ink hover:bg-ok-bg"
-                  }`}
-                >
-                  {feature.globalEnabled ? (
-                    <>
-                      <PowerOff className="h-3.5 w-3.5" />
-                      Switch off platform-wide
-                    </>
+              {/* Inline Expandable Decision Drawer */}
+              {isOpen && (
+                <div className="mt-4 rounded-xl border border-indigo-500/30 bg-[#080d1e] p-4 sm:p-5 shadow-lg space-y-4">
+                  {switchingOff ? (
+                    <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-950/40 p-3.5 text-xs text-rose-300">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+                      <p className="leading-relaxed">
+                        This removes <strong className="text-white font-semibold">{feature.name}</strong> from{" "}
+                        <span className="font-bold text-white tabular-nums">
+                          {feature.entitledTenants}
+                        </span>{" "}
+                        organisation{feature.entitledTenants === 1 ? "" : "s"} the moment it saves. No plan, override or role can reach past it, and nobody in those organisations can restore it themselves.
+                      </p>
+                    </div>
                   ) : (
-                    <>
-                      <Power className="h-3.5 w-3.5" />
-                      Switch back on
-                    </>
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-3.5 text-xs text-emerald-300 leading-relaxed">
+                      Restoring <strong className="text-white font-semibold">{feature.name}</strong> re-enables it for every organisation entitled at layer 2.
+                    </div>
                   )}
-                </button>
+
+                  <div>
+                    <label
+                      htmlFor={`reason-${feature.key}`}
+                      className="block text-xs font-medium text-slate-300"
+                    >
+                      Reason{" "}
+                      <span className="text-slate-500">
+                        (required, at least {MIN_REASON_LENGTH} characters)
+                      </span>
+                    </label>
+                    <textarea
+                      id={`reason-${feature.key}`}
+                      rows={2}
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      placeholder={
+                        switchingOff
+                          ? "e.g. BSP outage — suspending outbound messaging until resolved"
+                          : "e.g. BSP outage resolved, messaging restored"
+                      }
+                      className="mt-1.5 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                    />
+                  </div>
+
+                  {switchingOff && (
+                    <div>
+                      <label
+                        htmlFor={`confirm-${feature.key}`}
+                        className="block text-xs font-medium text-slate-300"
+                      >
+                        Type <code className="text-indigo-300 font-mono font-bold">{feature.key}</code> to confirm
+                      </label>
+                      <input
+                        id={`confirm-${feature.key}`}
+                        type="text"
+                        autoComplete="off"
+                        value={confirmation}
+                        placeholder={feature.key}
+                        onChange={(event) => setConfirmation(event.target.value)}
+                        className="mt-1.5 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2 font-mono text-xs sm:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      disabled={pending || !confirmed || !reasonLongEnough}
+                      onClick={() => submit(feature)}
+                      className={cx(
+                        "rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-md transition-all",
+                        switchingOff
+                          ? "bg-rose-600 hover:bg-rose-500 disabled:bg-rose-950/60 disabled:text-rose-400"
+                          : "bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50",
+                        "disabled:cursor-not-allowed",
+                      )}
+                    >
+                      {pending
+                        ? "Saving…"
+                        : switchingOff
+                          ? `Switch ${feature.key} off`
+                          : `Switch ${feature.key} on`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={close}
+                      disabled={pending}
+                      className="rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
-
-            {isOpen && (
-              <div className="mt-4 rounded-2xl bg-canvas p-4 shadow-neu-raised-sm">
-                {switchingOff && (
-                  <p className="flex items-start gap-2 rounded-lg bg-alert-bg p-3 text-xs text-alert-ink">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>
-                      This removes {feature.name} from{""}
-                      <span className="font-semibold tabular-nums">
-                        {feature.entitledTenants}
-                      </span>{""}
-                      organisation{feature.entitledTenants === 1 ? "" : "s"} the
-                      moment it saves. No plan, override or role can reach past
-                      it, and nobody in those organisations can restore it
-                      themselves.
-                    </span>
-                  </p>
-                )}
-
-                <label
-                  htmlFor={`reason-${feature.key}`}
-                  className="mt-4 block text-xs font-medium text-muted"
-                >
-                  Reason (required, at least {MIN_REASON_LENGTH} characters)
-                </label>
-                <textarea
-                  id={`reason-${feature.key}`}
-                  rows={2}
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder={
-                    switchingOff
-                      ? "e.g. BSP outage — suspending outbound messaging until resolved"
-                      : "e.g. BSP outage resolved, messaging restored"
-                  }
-                  className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 text-sm text-ink placeholder:text-faint shadow-neu-inset"
-                />
-
-                {switchingOff && (
-                  <>
-                    <label
-                      htmlFor={`confirm-${feature.key}`}
-                      className="mt-4 block text-xs font-medium text-muted"
-                    >
-                      Type <code className="text-ink">{feature.key}</code>{""}
-                      to confirm
-                    </label>
-                    <input
-                      id={`confirm-${feature.key}`}
-                      type="text"
-                      autoComplete="off"
-                      value={confirmation}
-                      onChange={(event) => setConfirmation(event.target.value)}
-                      className="mt-1.5 w-full rounded-2xl bg-canvas px-3 py-2 font-mono text-sm text-ink shadow-neu-inset"
-                    />
-                  </>
-                )}
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={pending || !confirmed || !reasonLongEnough}
-                    onClick={() => submit(feature)}
-                    className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-canvas-deep disabled:text-muted"
-                  >
-                    {pending
-                      ? "Saving…"
-                      : switchingOff
-                        ? `Switch ${feature.key} off`
-                        : `Switch ${feature.key} on`}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={close}
-                    disabled={pending}
-                    className="rounded-lg border border-line px-4 py-2 text-xs font-medium text-muted transition hover:border-line disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </section>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

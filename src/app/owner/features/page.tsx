@@ -20,38 +20,39 @@ export default async function OwnerFeaturesPage() {
   const owner = await requireOwnerPage();
   const { features, totalCustomerTenants } = await getPlatformFeatureAdmin(owner);
 
-  const live = features.filter((feature) => feature.globalEnabled).length;
-
   return (
-    <div className="mx-auto max-w-4xl p-8">
-      <Link
-        href="/owner/dashboard"
-        className="mb-6 inline-flex items-center gap-2 text-xs text-muted hover:text-ink"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Platform overview
-      </Link>
+    <div className="w-full px-4 py-7 sm:px-6 md:px-8 lg:px-10 space-y-6 text-white font-sans">
+      {/* Breadcrumbs & Header */}
+      <div>
+        <Link
+          href="/owner/dashboard"
+          className="group inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+          <span>Platform overview</span>
+        </Link>
 
-      <h1 className="text-xl font-semibold">Platform features</h1>
-      <p className="mt-1 max-w-2xl text-xs text-muted">
-        The first of four layers. A feature switched off here is off for every
-        organisation on MEDCARE PRO, whatever their plan says and whatever their
-        own admin has set — no plan, override or role can reach past it.{""}
-        <span className="tabular-nums text-muted">{live}</span> of{""}
-        <span className="tabular-nums text-muted">{features.length}</span>{""}
-        live.
-      </p>
-
-      <div className="mt-6">
-        <GlobalFeatureSwitches
-          features={features}
-          totalCustomerTenants={totalCustomerTenants}
-        />
+        <h1 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-white">
+          Platform features
+        </h1>
+        <p className="mt-1.5 max-w-3xl text-xs sm:text-sm text-slate-400 leading-relaxed">
+          Control platform-wide features for all organisations on MEDCARE PRO.
+          <br className="hidden sm:inline" /> Switch features on or off for every organisation, regardless of plan or role.
+        </p>
       </div>
 
-      <p className="mt-8 text-[11px] text-faint">
+      <GlobalFeatureSwitches
+        features={features}
+        totalCustomerTenants={totalCustomerTenants}
+      />
+
+      <p className="mt-8 text-[11px] text-slate-500">
         Adding a feature to this list is a code change, not a screen: a key
-        nothing checks gates nothing. See src/lib/defaultFeatures.ts.
+        nothing checks gates nothing. See{" "}
+        <code className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 text-slate-400">
+          src/lib/defaultFeatures.ts
+        </code>
+        .
       </p>
     </div>
   );
