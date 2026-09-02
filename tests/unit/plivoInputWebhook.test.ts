@@ -358,6 +358,25 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).toContain(`ivrRev=${menu.revision}`);
   });
 
+  it("safely replays the default menu after a custom profile is reset", async () => {
+    const heardMenu = customRuntimeMenu();
+    const currentMenu = defaultClinicIvrRuntimeMenu(TEST_CLINIC.clinicName);
+    getRuntimeMenu.mockResolvedValueOnce(currentMenu);
+
+    const { xml } = await postDigit(
+      "6",
+      `${INPUT_WEBHOOK_URL}?ivrRev=${heardMenu.revision}`,
+    );
+
+    expect(beginTelephoneBooking).not.toHaveBeenCalled();
+    expect(buildDoctorMenuForClinic).not.toHaveBeenCalled();
+    expect(buildClinicInformationForClinic).not.toHaveBeenCalled();
+    expect(xml).toContain(IVR_MENU_CHANGED_MESSAGE);
+    expect(xml).toContain("Welcome to Sunrise Clinic.");
+    expect(xml).toContain("Press 2 for appointment booking.");
+    expect(xml).not.toContain("ivrRev=");
+  });
+
   it("treats a forged revision only as stale state and never as scope or action", async () => {
     const menu = customRuntimeMenu();
     getRuntimeMenu.mockResolvedValueOnce(menu);
