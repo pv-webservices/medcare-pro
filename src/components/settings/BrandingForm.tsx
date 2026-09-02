@@ -2,27 +2,20 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Button from "@/components/ui/Button";
+import {
+  Building2,
+  Check,
+  CheckCircle2,
+  Image as ImageIcon,
+  Info,
+  Lightbulb,
+  MapPin,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import Input from "@/components/ui/Input";
-import Card from "@/components/ui/Card";
-
-/**
- * Clinic branding — PRD §6.8 (FR-8.3, FR-8.4).
- *
- * Branding is per clinic: `logo_url` and `theme_color` live on `clinics` in
- * PRD §7, and there are no such columns on the account. The clinic edited here
- * is the one picked in the sidebar switcher, so this screen never disagrees
- * with the rest of the app about which clinic is in view (FR-2.3).
- *
- * The logo is a URL, not an upload. The column stores a URL, and a real upload
- * would mean adding a storage vendor — which PRD §11 asks the build to avoid.
- *
- * Validation runs as you type rather than only on submit: a mistyped hex colour
- * should be flagged at the keystroke, not after a round trip.
- */
-
-const HEX_COLOR = /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-const FALLBACK_COLOR = "#1d4ed8";
 
 interface BrandingFormProps {
   clinicId: string;
@@ -34,7 +27,6 @@ interface BrandingFormProps {
   canEdit: boolean;
 }
 
-/** Mirrors createClinicSchema in src/lib/clinics.ts. */
 const MAX_NAME = 255;
 const MAX_ADDRESS = 1000;
 const MAX_CITY = 255;
@@ -58,32 +50,27 @@ function validateLogoUrl(value: string): string | null {
   }
 }
 
-
-
 export default function BrandingForm({
   clinicId,
   clinicName,
   clinicAddress,
   clinicCity,
   logoUrl,
-  themeColor,
   canEdit,
 }: BrandingFormProps) {
   const router = useRouter();
-  // The clinic's own details, which used to be edited on the Clinics screen.
-  // They save through the same PATCH /api/clinics/[id] the logo already used,
-  // so removing that screen took no endpoint with it.
+
   const [name, setName] = useState(clinicName);
   const [address, setAddress] = useState(clinicAddress ?? "");
   const [city, setCity] = useState(clinicCity ?? "");
   const [logo, setLogo] = useState(logoUrl ?? "");
-  const [logoLoadFailed, setLogoLoadFailed] = useState(false);
+  const [logoErrorState, setLogoErrorState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const hasUploadedLogo = logo.startsWith("data:image/");
+  const hasLogo = Boolean(logo.trim() && !logoErrorState);
 
   function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -104,19 +91,25 @@ export default function BrandingForm({
     reader.onload = () => {
       if (typeof reader.result === "string") {
         setLogo(reader.result);
-        setLogoLoadFailed(false);
+        setLogoErrorState(false);
         setSaved(false);
       }
     };
     reader.readAsDataURL(file);
   }
 
-  const logoError = validateLogoUrl(logo);
-  // A clinic with no name is what the server would reject anyway; catching it
-  // here means the user is told at the keystroke rather than after a round trip.
-  const nameError =
-    name.trim() === "" ? "Clinic name is required." : null;
-  const hasErrors = logoError !== null || nameError !== null;
+  function handleRemoveLogo() {
+    setLogo("");
+    setLogoErrorState(false);
+    setSaved(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  const logoValidationError = validateLogoUrl(logo);
+  const nameError = name.trim() === "" ? "Clinic name is required." : null;
+  const hasErrors = logoValidationError !== null || nameError !== null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -132,14 +125,14 @@ export default function BrandingForm({
       const response = await fetch(`/api/clinics/${clinicId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        // Empty string clears the field — the server maps it to null.
         body: JSON.stringify({
           name: name.trim(),
-          address,
-          city,
-          logoUrl: logo,
+          address: address.trim() || null,
+          city: city.trim() || null,
+          logoUrl: logo.trim() || null,
         }),
       });
+
       const payload: { success?: boolean; error?: string } = await response
         .json()
         .catch(() => ({}));
@@ -159,174 +152,277 @@ export default function BrandingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <p
+        <div
           role="alert"
-          className="rounded-xl bg-alert-bg px-4 py-3 text-body text-alert-ink"
+          className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs sm:text-sm font-medium text-rose-700 shadow-2xs"
         >
           {error}
-        </p>
+        </div>
       )}
 
       {saved && (
-        <p
+        <div
           role="status"
-          className="rounded-xl bg-ok-bg px-4 py-3 text-body font-medium text-ok-ink"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-medium text-emerald-700 shadow-2xs"
         >
-          Saved.
-        </p>
+          Changes saved successfully.
+        </div>
       )}
 
-      <div className="grid gap-6">
-        <div className="grid gap-4 max-w-2xl">
-          <Input
-            id="clinic-name"
-            name="name"
-            label="Clinic name"
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value);
-              setSaved(false);
-            }}
-            disabled={!canEdit}
-            maxLength={MAX_NAME}
-            error={nameError ?? undefined}
-          />
+      {/* Responsive 2-Column Desktop Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left ~70% (8 cols) — Clinic identity Card */}
+        <div className="lg:col-span-8">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-7 shadow-xs space-y-6">
+            {/* Card Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1 border-b border-slate-100">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">
+                  Clinic identity
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  This information appears on registration records and printed slips.
+                </p>
+              </div>
 
-          <Input
-            id="clinic-address"
-            name="address"
-            label="Address"
-            value={address}
-            onChange={(event) => {
-              setAddress(event.target.value);
-              setSaved(false);
-            }}
-            disabled={!canEdit}
-            maxLength={MAX_ADDRESS}
-            placeholder="Street, area, landmark"
-            hint="Shown on registration records and printed slips."
-          />
+              <span className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-600">
+                <Check className="h-3 w-3" />
+                Primary information
+              </span>
+            </div>
 
-          <Input
-            id="clinic-city"
-            name="city"
-            label="City"
-            value={city}
-            onChange={(event) => {
-              setCity(event.target.value);
-              setSaved(false);
-            }}
-            disabled={!canEdit}
-            maxLength={MAX_CITY}
-          />
+            {/* Form Fields Stack */}
+            <div className="space-y-4">
+              {/* Clinic Name */}
+              <Input
+                id="clinic-name"
+                name="name"
+                label="Clinic name"
+                icon={<Building2 className="h-4 w-4 text-slate-400" />}
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setSaved(false);
+                }}
+                disabled={!canEdit}
+                maxLength={MAX_NAME}
+                error={nameError ?? undefined}
+                placeholder="Clinic name"
+              />
 
-          <div>
-            <label className="mb-1.5 block text-body font-semibold text-ink">
-              Logo
-            </label>
+              {/* Address */}
+              <Input
+                id="clinic-address"
+                name="address"
+                label="Address"
+                icon={<MapPin className="h-4 w-4 text-slate-400" />}
+                value={address}
+                onChange={(event) => {
+                  setAddress(event.target.value);
+                  setSaved(false);
+                }}
+                disabled={!canEdit}
+                maxLength={MAX_ADDRESS}
+                placeholder="Street, area, landmark"
+                hint="Shown on registration records and printed slips."
+              />
 
-            {/* Hidden native file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              disabled={!canEdit}
-              className="hidden"
-            />
+              {/* City */}
+              <Input
+                id="clinic-city"
+                name="city"
+                label="City"
+                icon={<Building2 className="h-4 w-4 text-slate-400" />}
+                value={city}
+                onChange={(event) => {
+                  setCity(event.target.value);
+                  setSaved(false);
+                }}
+                disabled={!canEdit}
+                maxLength={MAX_CITY}
+                placeholder="City name"
+                hint="Used for reports and communication."
+              />
 
-            {/* Preview of uploaded logo */}
-            {hasUploadedLogo && (
-              <div className="mb-3 flex items-center gap-3 rounded-xl bg-canvas-deep p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logo}
-                  alt="Uploaded logo"
-                  className="h-12 w-auto max-w-[120px] rounded object-contain"
+              {/* Clinic Logo Dedicated Box */}
+              <div className="pt-2">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Clinic logo
+                </label>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  This logo will be used on printed documents and patient communications.
+                </p>
+
+                {/* Hidden native file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  disabled={!canEdit}
+                  className="hidden"
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="text-body font-medium text-ink">Logo uploaded</p>
-                  <p className="text-meta text-muted">Image loaded from your device</p>
+
+                <div className="mt-3 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  {/* Left: Preview + Metadata */}
+                  <div className="flex items-center gap-4 min-w-0">
+                    {/* Logo Preview Container */}
+                    <div className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white p-1 shadow-2xs overflow-hidden">
+                      {hasLogo ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={logo}
+                          alt="Clinic logo"
+                          onError={() => setLogoErrorState(true)}
+                          className="h-full w-full object-contain select-none"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400">
+                          <Building2 className="h-7 w-7 text-indigo-400/80" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Logo Upload Status & Format Note */}
+                    <div className="min-w-0">
+                      {hasLogo ? (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                          <span>Logo uploaded</span>
+                        </div>
+                      ) : (
+                        <div className="text-xs font-semibold text-slate-600">
+                          No logo uploaded
+                        </div>
+                      )}
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        JPG or PNG &middot; Max size 2MB &middot; Recommended 512 &times; 512px
+                      </p>
+
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs transition-colors"
+                        >
+                          <Upload className="h-3.5 w-3.5 text-slate-500" />
+                          <span>{hasLogo ? "Replace logo" : "Upload logo"}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Remove Button (if logo uploaded) */}
+                  {hasLogo && canEdit && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-300 shadow-2xs transition-colors shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                      <span>Remove</span>
+                    </button>
+                  )}
                 </div>
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLogo("");
-                      setSaved(false);
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
-                    className="rounded-md px-2.5 py-1.5 text-meta font-medium text-muted hover:bg-canvas-deep hover:text-ink transition-colors"
-                  >
-                    Remove
-                  </button>
-                )}
+              </div>
+            </div>
+
+            {/* Bottom Save Action Button */}
+            {canEdit && (
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-start">
+                <button
+                  type="submit"
+                  disabled={isSaving || hasErrors}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 px-6 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-indigo-600/25 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>{isSaving ? "Saving..." : "Save changes"}</span>
+                </button>
               </div>
             )}
 
-            {/* Upload button + URL input */}
-            {!hasUploadedLogo && (
-              <>
-                {canEdit && (
-                  <div className="flex gap-3 mb-2">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 rounded-xl bg-canvas px-4 py-2.5 text-body font-medium text-ink border border-line shadow-card hover:bg-canvas-deep hover:border-line transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4 text-muted">
-                        <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
-                        <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
-                      </svg>
-                      Upload from device
-                    </button>
-                    <span className="self-center text-meta text-faint">or</span>
-                  </div>
-                )}
-                <Input
-                  id="logo-url"
-                  name="logoUrl"
-                  label="Logo URL"
-                  type="url"
-                  inputMode="url"
-                  value={logo}
-                  onChange={(event) => {
-                    setLogo(event.target.value);
-                    setLogoLoadFailed(false);
-                    setSaved(false);
-                  }}
-                  disabled={!canEdit}
-                  maxLength={2000}
-                  placeholder="https://example.com/logo.png"
-                  error={logoError ?? undefined}
-                  hint={!logoError ? "Paste a web address or upload from your device. Max 2 MB." : undefined}
-                />
-              </>
+            {!canEdit && (
+              <div className="rounded-xl bg-slate-50 p-3.5 text-xs text-slate-500">
+                Your role cannot edit this clinic&apos;s details. Ask an admin or the account owner if you need access.
+              </div>
             )}
           </div>
         </div>
-      </div>
 
-      {canEdit ? (
-        <div className="pt-2">
-          <Button
-            type="submit"
-            disabled={isSaving || hasErrors}
-            variant="primary"
-            isBusy={isSaving}
-            busyLabel="Saving…"
-          >
-            Save changes
-          </Button>
+        {/* Right ~30% (4 cols) — Branding tips Informational Card */}
+        <div className="lg:col-span-4">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs space-y-6">
+            {/* Header */}
+            <div>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <Lightbulb className="h-4 w-4 text-indigo-600" />
+                <span>Branding tips</span>
+              </div>
+              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                A clear identity helps your clinic build trust and stay consistent across all communications.
+              </p>
+            </div>
+
+            {/* Three Benefit Rows */}
+            <div className="space-y-4">
+              {/* Tip 1: Square Logo */}
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs">
+                  <ImageIcon className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">
+                    Use a square logo
+                  </h3>
+                  <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
+                    For the best results, upload a square image (1:1 ratio).
+                  </p>
+                </div>
+              </div>
+
+              {/* Tip 2: Keep It Simple */}
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">
+                    Keep it simple
+                  </h3>
+                  <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
+                    Clean and minimal logos look best on small prints and digital screens.
+                  </p>
+                </div>
+              </div>
+
+              {/* Tip 3: Stay Consistent */}
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">
+                    Stay consistent
+                  </h3>
+                  <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
+                    Your logo helps create a professional and trusted experience.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Informational Callout */}
+            <div className="rounded-xl border border-indigo-100/80 bg-indigo-50/60 p-3.5 flex items-start gap-2.5 text-xs text-indigo-900 leading-relaxed">
+              <Info className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
+              <span>
+                This information is used across patient records, invoices, and reports.
+              </span>
+            </div>
+          </div>
         </div>
-      ) : (
-        <p className="mt-4 rounded-xl bg-canvas-deep px-4 py-3 text-body text-muted">
-          Your role cannot edit this clinic&apos;s details. Ask an admin or the
-          account owner if you need access.
-        </p>
-      )}
+      </div>
     </form>
   );
 }
