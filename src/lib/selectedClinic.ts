@@ -54,3 +54,41 @@ export async function resolveSelectedClinicId(
 
   return clinic ? requested : null;
 }
+
+/**
+ * Resolves the effective operational clinic for dashboard features (such as Call Handling).
+ *
+ * If a valid clinic is explicitly selected in the switcher, it is returned directly.
+ * If no clinic is selected (or a selection was invalid) and the actor has access to
+ * exactly ONE clinic within their tenant, that single clinic is resolved.
+ * For multi-clinic accounts with no selection, null is returned (All clinics).
+ */
+export async function resolveDashboardOperationalClinicId(
+  actor: ActorContext,
+  selectedClinicId: string | null,
+  permission = "clinic:read",
+): Promise<string | null> {
+  if (selectedClinicId) {
+    return selectedClinicId;
+  }
+
+  const access = await accessibleClinicScope(actor, permission);
+  if (access.scope === "none") {
+    return null;
+  }
+
+  const clinics = await prisma.clinic.findMany({
+    where: {
+      tenantId: actor.tenantId,
+      ...(access.scope === "clinics" ? { id: { in: [...access.clinicIds] } } : {}),
+    },
+    select: { id: true },
+    take: 2,
+  });
+
+  if (clinics.length === 1) {
+    return clinics[0].id;
+  }
+
+  return null;
+}

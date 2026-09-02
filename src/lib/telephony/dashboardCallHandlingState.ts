@@ -5,9 +5,9 @@ import {
 } from "@/lib/telephony/routing";
 
 export const DASHBOARD_CALL_HANDLING_OPTIONS = [
-  { label: "Auto", routingMode: "AUTO" },
+  { label: "Automatic", routingMode: "AUTO" },
   { label: "Reception", routingMode: "OPEN" },
-  { label: "IVR", routingMode: "AFTER_HOURS" },
+  { label: "Phone menu", routingMode: "AFTER_HOURS" },
 ] as const satisfies readonly {
   label: string;
   routingMode: ClinicTelephonyRoutingMode;
@@ -17,9 +17,9 @@ export const CALL_HANDLING_SUCCESS_MESSAGES: Record<
   ClinicTelephonyRoutingMode,
   string
 > = {
-  AUTO: "Call handling set to Auto.",
+  AUTO: "Call handling set to Automatic.",
   OPEN: "Calls will now go to Reception.",
-  AFTER_HOURS: "IVR override is now active.",
+  AFTER_HOURS: "Phone menu override is now active.",
 };
 
 export interface CallHandlingEffectiveStateInput {
@@ -61,7 +61,7 @@ export function resolveCallHandlingEffectiveState(
   if (requestedRoute === "RECEPTION" && !input.receptionAvailable) {
     return {
       effectiveRoute: "IVR",
-      status: "Reception unavailable · IVR fallback active",
+      status: "Reception unavailable · Phone menu active",
       supportingText:
         "Configure a safe reception destination before sending calls to reception.",
       tone: "warn",
@@ -81,8 +81,8 @@ export function resolveCallHandlingEffectiveState(
   if (input.routingMode === "AFTER_HOURS") {
     return {
       effectiveRoute: "IVR",
-      status: "Manual override · IVR",
-      supportingText: "IVR is handling calls regardless of business hours.",
+      status: "Manual override · Phone menu",
+      supportingText: "Phone menu is handling calls regardless of business hours.",
       tone: "info",
     };
   }
@@ -90,7 +90,7 @@ export function resolveCallHandlingEffectiveState(
   if (!input.hasRegularHours) {
     return {
       effectiveRoute: "IVR",
-      status: "Business hours not configured · IVR active",
+      status: "Business hours not configured · Phone menu active",
       supportingText: null,
       tone: "warn",
     };
@@ -107,7 +107,7 @@ export function resolveCallHandlingEffectiveState(
 
   return {
     effectiveRoute: "IVR",
-    status: "Closed · IVR active",
+    status: "Closed · Phone menu active",
     supportingText: null,
     tone: "neutral",
   };

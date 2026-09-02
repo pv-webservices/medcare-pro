@@ -181,13 +181,13 @@ describe("dashboard call-handling effective states", () => {
     [
       "AUTO + closed",
       { routingMode: "AUTO", isOpen: false, hasRegularHours: true },
-      "Closed · IVR active",
+      "Closed · Phone menu active",
       "IVR",
     ],
     [
       "AUTO + no hours",
       { routingMode: "AUTO", isOpen: false, hasRegularHours: false },
-      "Business hours not configured · IVR active",
+      "Business hours not configured · Phone menu active",
       "IVR",
     ],
     [
@@ -199,7 +199,7 @@ describe("dashboard call-handling effective states", () => {
     [
       "AFTER_HOURS",
       { routingMode: "AFTER_HOURS", isOpen: true, hasRegularHours: true },
-      "Manual override · IVR",
+      "Manual override · Phone menu",
       "IVR",
     ],
   ] as const)("derives %s", (_case, input, status, effectiveRoute) => {
@@ -222,7 +222,7 @@ describe("dashboard call-handling effective states", () => {
         receptionAvailable: false,
       }),
     ).toMatchObject({
-      status: "Reception unavailable · IVR fallback active",
+      status: "Reception unavailable · Phone menu active",
       effectiveRoute: "IVR",
     });
   });

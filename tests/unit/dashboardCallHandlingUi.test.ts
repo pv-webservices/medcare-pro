@@ -24,9 +24,9 @@ const pageSource = readFileSync(
 describe("dashboard call-handling UI contract", () => {
   it("maps product labels to the existing backend enum", () => {
     expect(DASHBOARD_CALL_HANDLING_OPTIONS).toEqual([
-      { label: "Auto", routingMode: "AUTO" },
+      { label: "Automatic", routingMode: "AUTO" },
       { label: "Reception", routingMode: "OPEN" },
-      { label: "IVR", routingMode: "AFTER_HOURS" },
+      { label: "Phone menu", routingMode: "AFTER_HOURS" },
     ]);
   });
 
@@ -75,7 +75,7 @@ describe("dashboard call-handling UI contract", () => {
     expect(componentSource).toContain(
       "disabled={!model.enabled || mutation.pendingMode !== null}",
     );
-    expect(componentSource).toContain("min-h-11");
+    expect(componentSource).toContain("min-h-9");
   });
 
   it("PATCHes only routingMode and keeps 403 as a visible failure", () => {
@@ -94,15 +94,16 @@ describe("dashboard call-handling UI contract", () => {
     expect(componentSource).not.toContain("PLIVO_PUBLIC_WEBHOOK_ORIGIN");
   });
 
-  it("renders All clinics as a non-mutating per-clinic explanation", () => {
+  it("renders All clinics view as a compact non-mutating informational note without large empty card", () => {
     expect(componentSource).toContain(
-      "Call routing is configured per clinic. Select a clinic above to view or change its routing.",
+      "Select a clinic to manage call handling.",
     );
-    expect(componentSource).toContain(
+    expect(componentSource).not.toContain(
       "No routing changes are available in the All clinics view.",
     );
-    expect(pageSource).toContain("selectedClinicId === null");
+    expect(pageSource).toContain("operationalClinicId === null");
     expect(pageSource).toContain("Promise.resolve(null)");
+    expect(pageSource).toContain("resolveDashboardOperationalClinicId");
   });
 
   it("keeps Call Handling fixed before and outside DashboardLayoutEditor", () => {
@@ -122,6 +123,7 @@ describe("dashboard call-handling UI contract", () => {
       'key={callHandling?.clinicId ?? "all-clinics"}',
     );
     expect(pageSource).toContain("resolveSelectedClinicId(actor)");
+    expect(pageSource).toContain("resolveDashboardOperationalClinicId");
     expect(pageSource).not.toContain("cookies(");
   });
 });

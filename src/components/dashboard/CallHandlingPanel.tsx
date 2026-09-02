@@ -4,7 +4,7 @@ import type { ClinicTelephonyRoutingMode } from "@prisma/client";
 import { Clock3, LoaderCircle, PhoneCall } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useReducer, useRef, type KeyboardEvent } from "react";
-import { Panel, StatusPill, cx, useToast } from "@/components/ui";
+import { StatusPill, cx, useToast } from "@/components/ui";
 import type { DashboardCallHandlingModel } from "@/lib/telephony/dashboardCallHandling";
 import {
   CALL_HANDLING_SUCCESS_MESSAGES,
@@ -76,15 +76,17 @@ function formatNextOpening(model: DashboardCallHandlingModel): string | null {
 
 function AllClinicsCallHandling() {
   return (
-    <Panel
-      title="Call handling"
-      description="Call routing is configured per clinic. Select a clinic above to view or change its routing."
-      actions={<StatusPill tone="neutral">Per clinic</StatusPill>}
-    >
-      <p className="text-label text-muted">
-        No routing changes are available in the All clinics view.
-      </p>
-    </Panel>
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3 text-label text-muted shadow-card">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-canvas-deep text-muted">
+          <PhoneCall aria-hidden="true" className="h-3.5 w-3.5" />
+        </span>
+        <span className="truncate text-label text-muted">
+          Select a clinic to manage call handling.
+        </span>
+      </div>
+      <StatusPill tone="neutral">Per clinic</StatusPill>
+    </div>
   );
 }
 
@@ -210,97 +212,106 @@ function ClinicCallHandling({
   }
 
   return (
-    <Panel
-      title="Call handling"
-      description={`Control incoming calls for ${clinicName}.`}
-      actions={
-        <StatusPill tone={model.enabled ? "ok" : "neutral"}>
-          {model.enabled ? "Active" : "Disabled"}
-        </StatusPill>
-      }
+    <section
+      aria-label="Call handling"
+      className="overflow-hidden rounded-2xl border border-line bg-canvas p-4 sm:p-5 shadow-card dashboard-card-hover"
     >
-      {model.canManage ? (
-        <div
-          role="radiogroup"
-          aria-label={`Call routing for ${clinicName}`}
-          aria-busy={mutation.pendingMode !== null}
-          className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-canvas-deep p-1"
-        >
-          {DASHBOARD_CALL_HANDLING_OPTIONS.map((option, index) => {
-            const selected = displayedMode === option.routingMode;
-            const pending = mutation.pendingMode === option.routingMode;
-            return (
-              <button
-                key={option.routingMode}
-                ref={(element) => {
-                  routingButtons.current[index] = element;
-                }}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={pending ? `${option.label}, updating` : option.label}
-                tabIndex={selected ? 0 : -1}
-                disabled={!model.enabled || mutation.pendingMode !== null}
-                onClick={() => changeRoutingMode(option.routingMode)}
-                onKeyDown={(event) => moveRoutingFocus(event, index)}
-                className={cx(
-                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-label font-semibold",
-                  "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
-                  selected
-                    ? "bg-canvas text-ink shadow-card"
-                    : "text-muted hover:bg-canvas hover:text-ink",
-                  "disabled:cursor-not-allowed disabled:opacity-60",
-                )}
-              >
-                {pending && (
-                  <LoaderCircle
-                    aria-hidden="true"
-                    className="h-4 w-4 animate-spin"
-                  />
-                )}
-                {option.label}
-              </button>
-            );
-          })}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-section font-semibold text-ink">Call handling</h2>
+            <StatusPill tone={model.enabled ? "ok" : "neutral"}>
+              {model.enabled ? "Active" : "Disabled"}
+            </StatusPill>
+          </div>
+          <p className="mt-0.5 truncate text-meta text-muted">
+            Control incoming calls for {clinicName}.
+          </p>
         </div>
-      ) : (
-        <div className="rounded-xl border border-line bg-canvas-deep px-4 py-3 text-label text-muted">
-          Routing changes require clinic edit permission.
-        </div>
-      )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="flex min-w-0 gap-3 rounded-xl border border-line px-4 py-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-soft-ink">
+        {model.canManage ? (
+          <div
+            role="radiogroup"
+            aria-label={`Call routing for ${clinicName}`}
+            aria-busy={mutation.pendingMode !== null}
+            className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-canvas-deep p-1 sm:w-auto"
+          >
+            {DASHBOARD_CALL_HANDLING_OPTIONS.map((option, index) => {
+              const selected = displayedMode === option.routingMode;
+              const pending = mutation.pendingMode === option.routingMode;
+              return (
+                <button
+                  key={option.routingMode}
+                  ref={(element) => {
+                    routingButtons.current[index] = element;
+                  }}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={pending ? `${option.label}, updating` : option.label}
+                  tabIndex={selected ? 0 : -1}
+                  disabled={!model.enabled || mutation.pendingMode !== null}
+                  onClick={() => changeRoutingMode(option.routingMode)}
+                  onKeyDown={(event) => moveRoutingFocus(event, index)}
+                  className={cx(
+                    "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-label font-semibold",
+                    "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+                    selected
+                      ? "bg-canvas text-ink shadow-card"
+                      : "text-muted hover:bg-canvas hover:text-ink",
+                    "disabled:cursor-not-allowed disabled:opacity-60",
+                  )}
+                >
+                  {pending && (
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 animate-spin"
+                    />
+                  )}
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-line bg-canvas-deep px-3.5 py-2 text-meta text-muted">
+            Routing changes require clinic edit permission.
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3.5 grid gap-2.5 sm:grid-cols-2">
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-line/80 bg-canvas-deep/40 px-3.5 py-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent-soft-ink">
             <PhoneCall aria-hidden="true" className="h-4 w-4" />
           </span>
-          <div className="min-w-0">
-            <p className="text-meta font-medium text-muted">Current routing</p>
-            <p aria-live="polite" className="mt-0.5 text-body font-semibold text-ink">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Current routing</p>
+            <p aria-live="polite" className="truncate text-label font-semibold text-ink">
               {effective.status}
             </p>
             {effective.supportingText && (
-              <p className="mt-1 text-meta text-muted">{effective.supportingText}</p>
+              <p className="truncate text-meta text-muted">{effective.supportingText}</p>
             )}
           </div>
         </div>
 
-        <div className="flex min-w-0 gap-3 rounded-xl border border-line px-4 py-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-info-bg text-info-ink">
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-line/80 bg-canvas-deep/40 px-3.5 py-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-info-bg text-info-ink">
             <Clock3 aria-hidden="true" className="h-4 w-4" />
           </span>
-          <div className="min-w-0">
-            <p className="text-meta font-medium text-muted">Today&apos;s hours</p>
-            <p className="tnum mt-0.5 text-body font-semibold text-ink">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Today&apos;s hours</p>
+            <p className="tnum truncate text-label font-semibold text-ink">
               {formatTodayHours(model)}
             </p>
             {nextOpening && !model.isOpen && (
-              <p className="mt-1 text-meta text-muted">Next opening: {nextOpening}</p>
+              <p className="truncate text-meta text-muted">Next opening: {nextOpening}</p>
             )}
           </div>
         </div>
       </div>
-    </Panel>
+    </section>
   );
 }
 
