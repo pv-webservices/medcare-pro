@@ -18,6 +18,7 @@ const WEBHOOK_URL = "https://medcare-tunnel.example/api/webhooks/plivo/answer";
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
 const getRuntimeMenu = vi.hoisted(() => vi.fn());
+const observeInboundCall = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
@@ -30,6 +31,10 @@ vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
     getClinicIvrRuntimeMenuForTrustedClinic: getRuntimeMenu,
   };
 });
+
+vi.mock("@/lib/telephony/callObservability", () => ({
+  observeInboundProductionCall: observeInboundCall,
+}));
 
 const TEST_CLINIC = Object.freeze({
   clinicId: "clinic-a",
@@ -50,6 +55,8 @@ describe("POST /api/webhooks/plivo/answer", () => {
     getRuntimeMenu.mockResolvedValue(
       defaultClinicIvrRuntimeMenu(TEST_CLINIC.clinicName),
     );
+    observeInboundCall.mockReset();
+    observeInboundCall.mockResolvedValue("recorded");
   });
 
   afterEach(() => {
@@ -70,6 +77,24 @@ describe("POST /api/webhooks/plivo/answer", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(observeInboundCall).toHaveBeenCalledWith(expect.objectContaining({
+      clinicId: "clinic-a",
+      providerCallUuid: REALISTIC_ANSWER_PARAMS.CallUUID,
+      callerNumber: REALISTIC_ANSWER_PARAMS.From,
+      routingModeAtStart: "AFTER_HOURS",
+      initialRoute: "IVR",
+      phoneMenuSource: "DEFAULT",
+      events: ["ROUTED_TO_IVR"],
+    }));
+  });
+
+  it("returns identical valid XML when the diagnostic write is unavailable", async () => {
+    const baseline = await POST(buildSignedPlivoWebhookRequest({ url: WEBHOOK_URL }));
+    const baselineXml = await baseline.text();
+    observeInboundCall.mockResolvedValueOnce("write-failed");
+    const degraded = await POST(buildSignedPlivoWebhookRequest({ url: WEBHOOK_URL }));
+    expect(degraded.status).toBe(200);
+    expect(await degraded.text()).toBe(baselineXml);
   });
 
   it("accepts a valid signature among comma-separated V3 signatures", async () => {
@@ -98,6 +123,7 @@ describe("POST /api/webhooks/plivo/answer", () => {
     expect(response.status).toBe(403);
     expect(await response.text()).not.toContain("MedCare Pro");
     expect(getRuntimeMenu).not.toHaveBeenCalled();
+    expect(observeInboundCall).not.toHaveBeenCalled();
   });
 
   it("rejects a request with no Plivo signature", async () => {
@@ -339,6 +365,22 @@ describe("POST /api/webhooks/plivo/answer", () => {
     expect(xml).not.toContain("<GetInput");
     expect(xml).not.toContain("Clinic");
     expect(getRuntimeMenu).not.toHaveBeenCalled();
+    expect(observeInboundCall).not.toHaveBeenCalled();
+  });
+
+  it("keeps valid call XML safe when the provider CallUUID is malformed", async () => {
+    observeInboundCall.mockResolvedValueOnce("invalid-call");
+    const response = await POST(
+      buildSignedPlivoWebhookRequest({
+        url: WEBHOOK_URL,
+        paramOverrides: { CallUUID: "bad" },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("<GetInput");
+    expect(observeInboundCall).toHaveBeenCalledWith(
+      expect.objectContaining({ providerCallUuid: "bad" }),
+    );
   });
 
   it("ignores signed tenant and clinic identifiers when resolving", async () => {

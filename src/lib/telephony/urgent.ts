@@ -49,6 +49,18 @@ export function buildUrgentMenuForClinic(
   });
 }
 
+export function isUrgentTransferDestinationAvailable(input: {
+  providerNumber: unknown;
+  publicPhoneNumber: unknown;
+  urgentPhoneNumber: unknown;
+}): boolean {
+  return isCallTransferDestinationAvailable({
+    providerNumber: input.providerNumber,
+    publicPhoneNumber: input.publicPhoneNumber,
+    destinationPhoneNumber: input.urgentPhoneNumber,
+  });
+}
+
 export function handleUrgentConfirmation(input: {
   requestUrl: string;
   clinic: InboundClinicContext;
@@ -76,10 +88,10 @@ export function handleUrgentConfirmation(input: {
   if (
     providerNumber === null ||
     urgentNumber === null ||
-    !isCallTransferDestinationAvailable({
+    !isUrgentTransferDestinationAvailable({
       providerNumber: input.providerNumber,
       publicPhoneNumber: input.clinic.publicPhoneNumber,
-      destinationPhoneNumber: input.clinic.urgentPhoneNumber,
+      urgentPhoneNumber: input.clinic.urgentPhoneNumber,
     })
   ) {
     return buildUrgentTransferTemporarilyUnavailableXml();

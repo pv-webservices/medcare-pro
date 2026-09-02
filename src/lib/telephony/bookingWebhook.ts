@@ -1,3 +1,4 @@
+import { ClinicTelephonyCallEventType } from "@prisma/client";
 import { FeatureError } from "@/lib/featureResolution";
 import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features";
 import type { InboundClinicContext } from "@/lib/telephony/clinicConfig";
@@ -12,6 +13,7 @@ import {
   getClinicIvrRuntimeMenuForTrustedClinic,
   type ClinicIvrRuntimeMenu,
 } from "@/lib/telephony/ivrRuntime";
+import { observeProductionCallEvents } from "@/lib/telephony/callObservability";
 
 export interface ValidatedBookingWebhookInput {
   requestUrl: string;
@@ -47,6 +49,11 @@ export async function processBookingWebhook(
       );
     } catch (error: unknown) {
       if (!(error instanceof FeatureError)) throw error;
+      await observeProductionCallEvents({
+        clinicId: clinic.clinicId,
+        providerCallUuid: verification.params.CallUUID,
+        events: [ClinicTelephonyCallEventType.APPOINTMENTS_UNAVAILABLE],
+      });
       return xmlResponse(
         buildEffectiveClinicMainMenuXml({
           message:

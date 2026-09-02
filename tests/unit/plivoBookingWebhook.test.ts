@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   slots: vi.fn(),
   confirm: vi.fn(),
   getRuntimeMenu: vi.fn(),
+  observeCallEvents: vi.fn(),
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
@@ -37,6 +38,9 @@ vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
     getClinicIvrRuntimeMenuForTrustedClinic: mocks.getRuntimeMenu,
   };
 });
+vi.mock("@/lib/telephony/callObservability", () => ({
+  observeProductionCallEvents: mocks.observeCallEvents,
+}));
 
 import { POST as identityPost } from "@/app/api/webhooks/plivo/booking/identity/route";
 import { POST as doctorPost } from "@/app/api/webhooks/plivo/booking/doctor/route";
@@ -96,6 +100,7 @@ describe("every Stage 5 booking webhook", () => {
     mocks.getRuntimeMenu.mockResolvedValue(
       defaultClinicIvrRuntimeMenu(clinic.clinicName),
     );
+    mocks.observeCallEvents.mockResolvedValue("recorded");
     for (const handler of [mocks.identity, mocks.doctor, mocks.type, mocks.slots, mocks.confirm]) {
       handler.mockResolvedValue("<Response><Speak>Safe booking response.</Speak></Response>");
     }
@@ -171,6 +176,10 @@ describe("every Stage 5 booking webhook", () => {
       expect(handler).not.toHaveBeenCalled();
       expect(xml).toContain("Custom booking return for Sunrise Clinic.");
       expect(xml).toContain(`ivrRev=${customRuntimeMenu.revision}`);
+      expect(mocks.observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+        clinicId: "clinic-a",
+        events: ["APPOINTMENTS_UNAVAILABLE"],
+      }));
     },
   );
 

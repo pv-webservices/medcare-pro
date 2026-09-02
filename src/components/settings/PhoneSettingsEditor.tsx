@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  Activity,
   ArrowRight,
   Ban,
   CalendarDays,
   CheckCircle2,
   Clock3,
   PhoneForwarded,
+  PhoneIncoming,
   PhoneCall,
   Save,
   ShieldCheck,
@@ -54,6 +56,11 @@ import {
   type TelephonyTestCallStatus,
   type TelephonyTestCallView,
 } from "@/lib/telephony/testCallContract";
+import type {
+  PhoneDiagnosticsHealthStatus,
+  PhoneDiagnosticsView,
+  ProductionCallDiagnosticView,
+} from "@/lib/telephony/callDiagnosticsContract";
 
 interface PhoneSettingsEditorProps {
   clinicId: string;
@@ -61,6 +68,7 @@ interface PhoneSettingsEditorProps {
   initialSettings: ClinicPhoneSettingsView;
   initialHours: readonly ClinicBusinessHoursDay[];
   initialTestCall: TelephonyTestCallPanelView;
+  initialDiagnostics: PhoneDiagnosticsView;
   timezoneOptions: readonly string[];
 }
 
@@ -87,6 +95,160 @@ const TEST_STATUS_LABELS: Record<TelephonyTestCallStatus, string> = {
   COMPLETED: "Completed",
   FAILED: "Failed",
 };
+
+const DIAGNOSTIC_HEALTH_LABELS: Record<
+  PhoneDiagnosticsHealthStatus,
+  string
+> = {
+  healthy: "Healthy",
+  attention: "Needs attention",
+  "no-data": "No recent calls",
+};
+
+function diagnosticHealthTone(
+  status: PhoneDiagnosticsHealthStatus,
+): StatusTone {
+  if (status === "healthy") return "ok";
+  if (status === "attention") return "warn";
+  return "neutral";
+}
+
+function diagnosticCallTone(
+  status: ProductionCallDiagnosticView["status"],
+): StatusTone {
+  if (status === "COMPLETED") return "ok";
+  if (status === "INCOMPLETE") return "warn";
+  return "neutral";
+}
+
+function diagnosticCallStatus(
+  status: ProductionCallDiagnosticView["status"],
+): string {
+  if (status === "COMPLETED") return "Completed";
+  if (status === "INCOMPLETE") return "Incomplete";
+  return "Active";
+}
+
+function formatDiagnosticTime(value: string, timezone: string): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: timezone,
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatCallDuration(seconds: number | null): string {
+  if (seconds === null) return "Duration unavailable";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function PhoneDiagnosticsPanel({
+  diagnostics,
+}: {
+  diagnostics: PhoneDiagnosticsView;
+}) {
+  const health = diagnostics.health;
+  const healthDetail =
+    health.status === "no-data"
+      ? "No production calls have been observed in the last 24 hours."
+      : health.status === "attention"
+        ? "Recent call-flow telemetry includes an incomplete call or transfer problem."
+        : "Recent observed call flows have no detected operational issue.";
+
+  return (
+    <Panel
+      title="Phone diagnostics"
+      description="Privacy-conscious operational activity from signed production call callbacks."
+      actions={
+        <StatusPill tone={diagnosticHealthTone(health.status)}>
+          {DIAGNOSTIC_HEALTH_LABELS[health.status]}
+        </StatusPill>
+      }
+    >
+      <div className="rounded-2xl border border-line bg-canvas-deep px-4 py-4 sm:px-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+          >
+            <Activity className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-body font-semibold text-ink">
+              {DIAGNOSTIC_HEALTH_LABELS[health.status]}
+            </p>
+            <p className="mt-1 text-meta leading-relaxed text-muted">
+              {healthDetail}
+            </p>
+            <p className="mt-2 text-meta font-medium text-muted">
+              Times shown in {diagnostics.timezone}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ["Calls observed", health.recentCalls],
+          ["Incomplete", health.incompleteCalls],
+          ["Reception issues", health.receptionFailures],
+          ["Urgent issues", health.urgentTransferFailures],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-line bg-canvas px-4 py-3">
+            <dt className="text-meta text-muted">{label}</dt>
+            <dd className="mt-1 text-title font-semibold text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-body font-semibold text-ink">Recent activity</h3>
+          <span className="text-meta text-muted">Last 24 hours</span>
+        </div>
+        {diagnostics.recentCalls.length === 0 ? (
+          <div className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center">
+            <PhoneIncoming aria-hidden="true" className="mx-auto h-5 w-5 text-muted" />
+            <p className="mt-2 text-label font-medium text-muted">
+              No production call activity is available yet.
+            </p>
+          </div>
+        ) : (
+          <ol className="mt-3 space-y-3">
+            {diagnostics.recentCalls.map((call) => (
+              <li key={call.id} className="rounded-2xl border border-line bg-canvas px-4 py-3.5">
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-label font-semibold text-ink">{call.callerLabel}</p>
+                    <p className="mt-1 text-meta text-muted">
+                      {formatDiagnosticTime(call.startedAt, diagnostics.timezone)} · {call.initialRoute === "RECEPTION" ? "Reception" : call.initialRoute === "IVR" ? "Phone menu" : "Route unavailable"} · {formatCallDuration(call.durationSeconds)}
+                    </p>
+                  </div>
+                  <StatusPill tone={diagnosticCallTone(call.status)}>
+                    {diagnosticCallStatus(call.status)}
+                  </StatusPill>
+                </div>
+                {call.highlights.length > 0 && (
+                  <ul className="mt-3 flex flex-wrap gap-2" aria-label="Call highlights">
+                    {call.highlights.map((highlight) => (
+                      <li key={highlight} className="rounded-full bg-canvas-deep px-2.5 py-1 text-meta text-muted">
+                        {highlight}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </Panel>
+  );
+}
 
 function testStatusTone(status: TelephonyTestCallStatus): StatusTone {
   if (status === "COMPLETED") return "ok";
@@ -205,6 +367,7 @@ export default function PhoneSettingsEditor({
   initialSettings,
   initialHours,
   initialTestCall,
+  initialDiagnostics,
   timezoneOptions,
 }: PhoneSettingsEditorProps) {
   const router = useRouter();
@@ -488,6 +651,8 @@ export default function PhoneSettingsEditor({
           </div>
         )}
       </Panel>
+
+      <PhoneDiagnosticsPanel diagnostics={initialDiagnostics} />
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-2 lg:items-start">
         <Panel

@@ -45,6 +45,7 @@ export const PLIVO_RECEPTION_STATUS_WEBHOOK_PATH =
   "/api/webhooks/plivo/reception/status";
 export const PLIVO_INFORMATION_WEBHOOK_PATH =
   "/api/webhooks/plivo/information";
+export const PLIVO_HANGUP_WEBHOOK_PATH = "/api/webhooks/plivo/hangup";
 export const URGENT_DIAL_TIMEOUT_SECONDS = 25;
 export const RECEPTION_DIAL_TIMEOUT_SECONDS = URGENT_DIAL_TIMEOUT_SECONDS;
 

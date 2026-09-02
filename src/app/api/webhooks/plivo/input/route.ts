@@ -1,4 +1,8 @@
 import {
+  ClinicTelephonyCallEventType,
+  ClinicTelephonyCallMenuSource,
+} from "@prisma/client";
+import {
   buildEffectiveClinicMainMenuXml,
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
@@ -21,6 +25,10 @@ import {
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import { buildUrgentMenuForClinic } from "@/lib/telephony/urgent";
 import { buildClinicInformationForClinic } from "@/lib/telephony/clinicInformation";
+import {
+  eventForMainMenuAction,
+  observeProductionCallEvents,
+} from "@/lib/telephony/callObservability";
 
 export const runtime = "nodejs";
 
@@ -53,14 +61,22 @@ export async function POST(request: Request): Promise<Response> {
     const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
     if (!doesIvrRevisionMatchRuntimeMenu(request.url, runtimeMenu)) {
-      return xmlResponse(
-        buildEffectiveClinicMainMenuXml({
-          inputActionUrl,
-          clinicName: clinic.clinicName,
-          runtimeMenu,
-          message: IVR_MENU_CHANGED_MESSAGE,
-        }),
-      );
+      const xml = buildEffectiveClinicMainMenuXml({
+        inputActionUrl,
+        clinicName: clinic.clinicName,
+        runtimeMenu,
+        message: IVR_MENU_CHANGED_MESSAGE,
+      });
+      await observeProductionCallEvents({
+        clinicId: clinic.clinicId,
+        providerCallUuid: verification.params.CallUUID,
+        phoneMenuSource:
+          runtimeMenu.source === "custom"
+            ? ClinicTelephonyCallMenuSource.CUSTOM
+            : ClinicTelephonyCallMenuSource.DEFAULT,
+        events: [ClinicTelephonyCallEventType.MENU_REVISION_REFRESHED],
+      });
+      return xmlResponse(xml);
     }
 
     const validatedDigits = verification.params.Digits;
@@ -70,6 +86,15 @@ export async function POST(request: Request): Promise<Response> {
       runtimeMenu.source === "default"
         ? resolveMainMenuAction(digits)
         : resolveRuntimeMainMenuAction(runtimeMenu, digits);
+    await observeProductionCallEvents({
+      clinicId: clinic.clinicId,
+      providerCallUuid: verification.params.CallUUID,
+      phoneMenuSource:
+        runtimeMenu.source === "custom"
+          ? ClinicTelephonyCallMenuSource.CUSTOM
+          : ClinicTelephonyCallMenuSource.DEFAULT,
+      events: [eventForMainMenuAction(action)],
+    });
     if (action === "tomorrow-slots" || action === "appointment-booking") {
       try {
         await requireTenantFeatureEntitlement(
@@ -78,6 +103,11 @@ export async function POST(request: Request): Promise<Response> {
         );
       } catch (error: unknown) {
         if (!(error instanceof FeatureError)) throw error;
+        await observeProductionCallEvents({
+          clinicId: clinic.clinicId,
+          providerCallUuid: verification.params.CallUUID,
+          events: [ClinicTelephonyCallEventType.APPOINTMENTS_UNAVAILABLE],
+        });
         return xmlResponse(
           buildEffectiveClinicMainMenuXml({
             message:

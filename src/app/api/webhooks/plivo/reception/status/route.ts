@@ -1,8 +1,10 @@
+import { ClinicTelephonyCallEventType } from "@prisma/client";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { buildTelephonyUnavailableXml } from "@/lib/telephony/plivo";
 import { buildReceptionDialOutcomeXml } from "@/lib/telephony/reception";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
+import { observeProductionCallEvents } from "@/lib/telephony/callObservability";
 
 export const runtime = "nodejs";
 
@@ -28,17 +30,27 @@ export async function POST(request: Request): Promise<Response> {
 
     const statusValue = verification.params.DialStatus;
     const status = typeof statusValue === "string" ? statusValue : undefined;
-    return xmlResponse(
-      buildReceptionDialOutcomeXml({
-        requestUrl: request.url,
-        clinic,
-        status,
-        runtimeMenu:
-          status === "completed"
-            ? undefined
-            : await getClinicIvrRuntimeMenuForTrustedClinic(clinic),
-      }),
-    );
+    const xml = buildReceptionDialOutcomeXml({
+      requestUrl: request.url,
+      clinic,
+      status,
+      runtimeMenu:
+        status === "completed"
+          ? undefined
+          : await getClinicIvrRuntimeMenuForTrustedClinic(clinic),
+    });
+    await observeProductionCallEvents({
+      clinicId: clinic.clinicId,
+      providerCallUuid: verification.params.DialALegUUID,
+      events:
+        status === "completed"
+          ? [ClinicTelephonyCallEventType.RECEPTION_CONNECTED]
+          : [
+              ClinicTelephonyCallEventType.RECEPTION_FAILED,
+              ClinicTelephonyCallEventType.RECEPTION_FALLBACK_TO_IVR,
+            ],
+    });
+    return xmlResponse(xml);
   } catch {
     console.error("Could not process the Plivo reception Dial callback.");
     return new Response("Service unavailable.", { status: 503 });

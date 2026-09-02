@@ -1,8 +1,13 @@
+import { ClinicTelephonyCallEventType } from "@prisma/client";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { buildTelephonyUnavailableXml } from "@/lib/telephony/plivo";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
-import { handleUrgentConfirmation } from "@/lib/telephony/urgent";
+import {
+  handleUrgentConfirmation,
+  isUrgentTransferDestinationAvailable,
+} from "@/lib/telephony/urgent";
 import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
+import { observeProductionCallEvents } from "@/lib/telephony/callObservability";
 
 export const runtime = "nodejs";
 
@@ -24,18 +29,31 @@ export async function POST(request: Request): Promise<Response> {
 
     const value = verification.params.Digits;
     const digits = typeof value === "string" ? value : undefined;
-    return xmlResponse(
-      handleUrgentConfirmation({
-        requestUrl: request.url,
-        clinic,
+    const xml = handleUrgentConfirmation({
+      requestUrl: request.url,
+      clinic,
+      providerNumber: verification.params.To,
+      digits,
+      runtimeMenu:
+        digits === "9"
+          ? await getClinicIvrRuntimeMenuForTrustedClinic(clinic)
+          : undefined,
+    });
+    if (
+      digits === "1" &&
+      !isUrgentTransferDestinationAvailable({
         providerNumber: verification.params.To,
-        digits,
-        runtimeMenu:
-          digits === "9"
-            ? await getClinicIvrRuntimeMenuForTrustedClinic(clinic)
-            : undefined,
-      }),
-    );
+        publicPhoneNumber: clinic.publicPhoneNumber,
+        urgentPhoneNumber: clinic.urgentPhoneNumber,
+      })
+    ) {
+      await observeProductionCallEvents({
+        clinicId: clinic.clinicId,
+        providerCallUuid: verification.params.CallUUID,
+        events: [ClinicTelephonyCallEventType.URGENT_TRANSFER_UNAVAILABLE],
+      });
+    }
+    return xmlResponse(xml);
   } catch {
     console.error("Could not process the Plivo urgent confirmation callback.");
     return new Response("Service unavailable.", { status: 503 });

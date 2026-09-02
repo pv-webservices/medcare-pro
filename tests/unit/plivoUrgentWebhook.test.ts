@@ -28,6 +28,7 @@ const STATUS_URL = `${new URL(PLIVO_URGENT_STATUS_WEBHOOK_PATH, "https://voice.m
 const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
 const getRuntimeMenu = vi.hoisted(() => vi.fn());
+const observeCallEvents = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
@@ -40,6 +41,10 @@ vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
     getClinicIvrRuntimeMenuForTrustedClinic: getRuntimeMenu,
   };
 });
+
+vi.mock("@/lib/telephony/callObservability", () => ({
+  observeProductionCallEvents: observeCallEvents,
+}));
 
 import {
   compileCustomClinicIvrRuntimeMenu,
@@ -80,6 +85,8 @@ function signedStatus(
     paramOverrides: {
       To: URGENT_NUMBER,
       From: PROVIDER_NUMBER,
+      DialALegUUID: "urgent-a-leg-0001",
+      DialBLegUUID: "urgent-b-leg-0001",
       ...(dialStatus === null ? {} : { DialStatus: dialStatus }),
       ...options.overrides,
     },
@@ -102,6 +109,8 @@ describe("POST /api/webhooks/plivo/urgent/confirm", () => {
     getRuntimeMenu.mockResolvedValue(
       defaultClinicIvrRuntimeMenu(TEST_CLINIC.clinicName),
     );
+    observeCallEvents.mockReset();
+    observeCallEvents.mockResolvedValue("recorded");
   });
 
   afterEach(() => {
@@ -187,6 +196,10 @@ describe("POST /api/webhooks/plivo/urgent/confirm", () => {
     expect(xml).toContain("Urgent telephone transfer is temporarily unavailable.");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain("configuration");
+    expect(observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+      clinicId: "clinic-a",
+      events: ["URGENT_TRANSFER_UNAVAILABLE"],
+    }));
   });
 
   it("does not fall back to reception when urgentPhoneNumber is missing", async () => {
@@ -201,6 +214,17 @@ describe("POST /api/webhooks/plivo/urgent/confirm", () => {
     expect(xml).toContain("call 112");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain(RECEPTION_NUMBER);
+    expect(observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+      events: ["URGENT_TRANSFER_UNAVAILABLE"],
+    }));
+  });
+
+  it("preserves unavailable guidance when diagnostic persistence fails", async () => {
+    resolveClinic.mockResolvedValue({ ...TEST_CLINIC, urgentPhoneNumber: null });
+    const baseline = await body(await confirmPOST(signedConfirm()));
+    observeCallEvents.mockResolvedValueOnce("write-failed");
+    const degraded = await body(await confirmPOST(signedConfirm()));
+    expect(degraded).toBe(baseline);
   });
 
   it("permits urgent and reception numbers to identify the same human destination", async () => {
@@ -298,6 +322,8 @@ describe("POST /api/webhooks/plivo/urgent/status", () => {
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
     resolveClinic.mockReset();
     resolveClinic.mockResolvedValue(TEST_CLINIC);
+    observeCallEvents.mockReset();
+    observeCallEvents.mockResolvedValue("recorded");
   });
 
   afterEach(() => {
@@ -323,6 +349,18 @@ describe("POST /api/webhooks/plivo/urgent/status", () => {
     expect(xml).not.toContain("could not connect");
     expect(xml).not.toContain("<GetInput");
     expect(xml).not.toContain("appointment");
+    expect(observeCallEvents).toHaveBeenCalledWith({
+      clinicId: "clinic-a",
+      providerCallUuid: "urgent-a-leg-0001",
+      events: ["URGENT_TRANSFER_CONNECTED"],
+    });
+  });
+
+  it("preserves urgent transfer outcome XML when diagnostic persistence fails", async () => {
+    const baseline = await body(await statusPOST(signedStatus("failed")));
+    observeCallEvents.mockResolvedValueOnce("write-failed");
+    const degraded = await body(await statusPOST(signedStatus("failed")));
+    expect(degraded).toBe(baseline);
   });
 
   it.each(["busy", "failed", "cancel", "timeout", "no-answer"])(
@@ -333,6 +371,11 @@ describe("POST /api/webhooks/plivo/urgent/status", () => {
       expect(xml).toContain("call 112");
       expect(xml).not.toContain(dialStatus);
       expect(xml).not.toContain("<GetInput");
+      expect(observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+        providerCallUuid: "urgent-a-leg-0001",
+        events: ["URGENT_TRANSFER_FAILED"],
+      }));
+      expect(JSON.stringify(observeCallEvents.mock.calls)).not.toContain("urgent-b-leg-0001");
     },
   );
 
@@ -384,6 +427,8 @@ describe.each([
     process.env.PLIVO_AUTH_TOKEN = TEST_PLIVO_AUTH_TOKEN;
     resolveClinic.mockReset();
     resolveClinic.mockResolvedValue(TEST_CLINIC);
+    observeCallEvents.mockReset();
+    observeCallEvents.mockResolvedValue("recorded");
   });
 
   afterEach(() => {

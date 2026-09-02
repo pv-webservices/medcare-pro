@@ -9,6 +9,7 @@ const domain = vi.hoisted(() => ({
   createRequest: vi.fn(),
   createAppointment: vi.fn(),
   getExisting: vi.fn(),
+  observeCallEvents: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({
@@ -33,6 +34,10 @@ vi.mock("@/lib/appointmentBooking", () => ({
   buildPhoneBookingSourceRef: () => `plivo:${"a".repeat(64)}`,
   createAppointmentForScope: domain.createAppointment,
   getPhoneIvrAppointmentForCall: domain.getExisting,
+}));
+
+vi.mock("@/lib/telephony/callObservability", () => ({
+  observeProductionCallEvents: domain.observeCallEvents,
 }));
 
 import {
@@ -99,6 +104,7 @@ describe("safe telephone booking flow", () => {
     domain.listTypes.mockResolvedValue([{ id: "type-a", name: "Consultation", durationMinutes: 30 }]);
     domain.getSlots.mockResolvedValue(slots());
     domain.createAppointment.mockResolvedValue({ id: "appointment-a" });
+    domain.observeCallEvents.mockResolvedValue("recorded");
   });
 
   it("uses a neutral confirmation and never speaks exact-match demographics", async () => {
@@ -119,6 +125,11 @@ describe("safe telephone booking flow", () => {
       const xml = await beginTelephoneBooking(base);
       expect(domain.createRequest).toHaveBeenCalledOnce();
       expect(domain.createAppointment).not.toHaveBeenCalled();
+      expect(domain.observeCallEvents).toHaveBeenCalledWith({
+        clinicId: "clinic-a",
+        providerCallUuid: "call-uuid-123456",
+        events: ["BOOKING_FOLLOW_UP_CREATED"],
+      });
       expect(xml).not.toContain("Sensitive");
       expect(xml).not.toContain("+919876543210");
       expect(xml).not.toMatch(/two|multiple|zero patients/i);

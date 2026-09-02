@@ -10,6 +10,9 @@ const migration = readFileSync(
   "utf8",
 );
 const environment = readFileSync(resolve(".env.example"), "utf8");
+const testCallModel = schema.match(
+  /model ClinicTelephonyTestCall \{([\s\S]*?)\n\}/,
+)?.[1];
 
 describe("Phase 5 additive test-call persistence", () => {
   it("adds a test-only closed lifecycle without changing existing telephony tables", () => {
@@ -22,13 +25,10 @@ describe("Phase 5 additive test-call persistence", () => {
   });
 
   it("stores only safe correlation and masked destination data", () => {
-    expect(schema).toContain("providerRequestUuid");
-    expect(schema).toContain("providerCallUuid");
-    expect(schema).toContain("destinationLast4");
-    expect(schema).not.toMatch(/model ClinicTelephonyTestCall[\s\S]*authToken/);
-    expect(schema).not.toMatch(/model ClinicTelephonyTestCall[\s\S]*fullDestination/);
-    expect(schema).not.toMatch(/model ClinicTelephonyTestCall[\s\S]*recording/);
-    expect(schema).not.toMatch(/model ClinicTelephonyTestCall[\s\S]*transcript/);
+    expect(testCallModel).toContain("providerRequestUuid");
+    expect(testCallModel).toContain("providerCallUuid");
+    expect(testCallModel).toContain("destinationLast4");
+    expect(testCallModel).not.toMatch(/authToken|fullDestination|recording|transcript/);
   });
 
   it("uses a unique active-clinic guard and bounded operational indexes", () => {

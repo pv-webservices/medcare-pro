@@ -419,6 +419,7 @@ model Clinic {
   appointments             Appointment[]
   appointmentTypes         AppointmentType[]
   telephonyBookingRequests TelephonyBookingRequest[]
+  telephonyCalls           ClinicTelephonyCall[]
   telephonyTestCalls       ClinicTelephonyTestCall[]
   tasks                    Task[]
 
@@ -462,6 +463,43 @@ enum ClinicTelephonyTestCallFailureCategory {
   BUSY
   PROVIDER_ERROR
   UNKNOWN
+}
+
+enum ClinicTelephonyCallStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum ClinicTelephonyCallInitialRoute {
+  RECEPTION
+  IVR
+}
+
+enum ClinicTelephonyCallMenuSource {
+  DEFAULT
+  CUSTOM
+}
+
+enum ClinicTelephonyCallEventType {
+  CALL_RECEIVED
+  ROUTED_TO_RECEPTION
+  ROUTED_TO_IVR
+  MAIN_MENU_TOMORROW_SLOTS
+  MAIN_MENU_APPOINTMENT_BOOKING
+  MAIN_MENU_URGENT_ASSISTANCE
+  MAIN_MENU_CLINIC_INFORMATION
+  MAIN_MENU_REPEAT
+  MAIN_MENU_INVALID_INPUT
+  MENU_REVISION_REFRESHED
+  APPOINTMENTS_UNAVAILABLE
+  RECEPTION_CONNECTED
+  RECEPTION_FAILED
+  RECEPTION_FALLBACK_TO_IVR
+  URGENT_TRANSFER_CONNECTED
+  URGENT_TRANSFER_FAILED
+  URGENT_TRANSFER_UNAVAILABLE
+  BOOKING_FOLLOW_UP_CREATED
+  CALL_COMPLETED
 }
 
 /// Optional per-clinic voice routing configuration. Provider credentials stay
@@ -566,6 +604,48 @@ model ClinicTelephonyTestCall {
   @@index([requestedByUserId, createdAt], map: "clinic_test_calls_requester_created_idx")
   @@index([status, expiresAt], map: "clinic_test_calls_status_expiry_idx")
   @@map("clinic_telephony_test_calls")
+}
+
+/// Privacy-bounded operational record for one real inbound call. Provider
+/// correlation remains server-only; no complete telephone number, raw input,
+/// patient data, recording, transcript, or provider payload is stored here.
+model ClinicTelephonyCall {
+  id                 String                           @id @default(cuid())
+  clinicId           String                           @map("clinic_id")
+  providerCallUuid   String                           @unique(map: "clinic_calls_provider_uuid_key") @map("provider_call_uuid") @db.VarChar(128)
+  callerLast4        String?                          @map("caller_last_4") @db.Char(4)
+  status             ClinicTelephonyCallStatus        @default(ACTIVE)
+  initialRoute       ClinicTelephonyCallInitialRoute? @map("initial_route")
+  routingModeAtStart ClinicTelephonyRoutingMode       @map("routing_mode_at_start")
+  phoneMenuSource    ClinicTelephonyCallMenuSource?   @map("phone_menu_source")
+  startedAt          DateTime                         @default(now()) @map("started_at")
+  endedAt            DateTime?                        @map("ended_at")
+  durationSeconds    Int?                             @map("duration_seconds")
+  lastActivityAt     DateTime                         @default(now()) @map("last_activity_at")
+  createdAt          DateTime                         @default(now()) @map("created_at")
+  updatedAt          DateTime                         @updatedAt @map("updated_at")
+
+  clinic Clinic                     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  events ClinicTelephonyCallEvent[]
+
+  @@index([clinicId, startedAt], map: "clinic_calls_clinic_started_idx")
+  @@index([startedAt], map: "clinic_calls_started_idx")
+  @@map("clinic_telephony_calls")
+}
+
+/// First occurrence of a safe semantic production-call event. The compound
+/// uniqueness is the provider-retry idempotency boundary.
+model ClinicTelephonyCallEvent {
+  id         String                       @id @default(cuid())
+  callId     String                       @map("call_id")
+  eventType  ClinicTelephonyCallEventType @map("event_type")
+  occurredAt DateTime                     @default(now()) @map("occurred_at")
+
+  call ClinicTelephonyCall @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@unique([callId, eventType], map: "clinic_call_events_call_type_key")
+  @@index([callId, occurredAt], map: "clinic_call_events_call_occurred_idx")
+  @@map("clinic_telephony_call_events")
 }
 
 enum TelephonyBookingRequestReason {

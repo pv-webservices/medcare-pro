@@ -1,4 +1,9 @@
 import {
+  ClinicTelephonyCallEventType,
+  ClinicTelephonyCallInitialRoute,
+  ClinicTelephonyCallMenuSource,
+} from "@prisma/client";
+import {
   buildEffectiveClinicMainMenuXml,
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
@@ -15,6 +20,7 @@ import {
   isReceptionDestinationAvailable,
 } from "@/lib/telephony/reception";
 import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
+import { observeInboundProductionCall } from "@/lib/telephony/callObservability";
 
 export const runtime = "nodejs";
 
@@ -65,34 +71,63 @@ export async function POST(request: Request): Promise<Response> {
         publicPhoneNumber: clinic.publicPhoneNumber,
         receptionPhoneNumber: clinic.receptionPhoneNumber,
       });
-      return xmlResponse(
-        buildReceptionRouteXml({
-          requestUrl: request.url,
-          clinic,
-          providerNumber: verification.params.To,
-          runtimeMenu: receptionAvailable
-            ? undefined
-            : await getClinicIvrRuntimeMenuForTrustedClinic(clinic),
-        }),
-      );
+      const runtimeMenu = receptionAvailable
+        ? undefined
+        : await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
+      const xml = buildReceptionRouteXml({
+        requestUrl: request.url,
+        clinic,
+        providerNumber: verification.params.To,
+        runtimeMenu,
+      });
+      await observeInboundProductionCall({
+        clinicId: clinic.clinicId,
+        providerCallUuid: verification.params.CallUUID,
+        callerNumber: verification.params.From,
+        routingModeAtStart: routingMode,
+        initialRoute: ClinicTelephonyCallInitialRoute.RECEPTION,
+        phoneMenuSource: runtimeMenu
+          ? runtimeMenu.source === "custom"
+            ? ClinicTelephonyCallMenuSource.CUSTOM
+            : ClinicTelephonyCallMenuSource.DEFAULT
+          : null,
+        events: receptionAvailable
+          ? [ClinicTelephonyCallEventType.ROUTED_TO_RECEPTION]
+          : [
+              ClinicTelephonyCallEventType.ROUTED_TO_RECEPTION,
+              ClinicTelephonyCallEventType.RECEPTION_FALLBACK_TO_IVR,
+              ClinicTelephonyCallEventType.ROUTED_TO_IVR,
+            ],
+      });
+      return xmlResponse(xml);
     }
 
     const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
-    return new Response(
-      buildEffectiveClinicMainMenuXml({
-        inputActionUrl,
-        clinicName: clinic.clinicName,
-        runtimeMenu,
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/xml; charset=utf-8",
-          "Cache-Control": "no-store",
-        },
+    const xml = buildEffectiveClinicMainMenuXml({
+      inputActionUrl,
+      clinicName: clinic.clinicName,
+      runtimeMenu,
+    });
+    await observeInboundProductionCall({
+      clinicId: clinic.clinicId,
+      providerCallUuid: verification.params.CallUUID,
+      callerNumber: verification.params.From,
+      routingModeAtStart: routingMode,
+      initialRoute: ClinicTelephonyCallInitialRoute.IVR,
+      phoneMenuSource:
+        runtimeMenu.source === "custom"
+          ? ClinicTelephonyCallMenuSource.CUSTOM
+          : ClinicTelephonyCallMenuSource.DEFAULT,
+      events: [ClinicTelephonyCallEventType.ROUTED_TO_IVR],
+    });
+    return new Response(xml, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "no-store",
       },
-    );
+    });
   } catch {
     console.error("Could not resolve or generate the Plivo answer XML.");
     return new Response("Service unavailable.", { status: 503 });

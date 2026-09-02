@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   getHours: vi.fn(),
   resolveBusinessState: vi.fn(),
   getRuntimeMenu: vi.fn(),
+  observeInboundCall: vi.fn(),
+  observeCallEvents: vi.fn(),
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
@@ -23,6 +25,11 @@ vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
     getClinicIvrRuntimeMenuForTrustedClinic: mocks.getRuntimeMenu,
   };
 });
+
+vi.mock("@/lib/telephony/callObservability", () => ({
+  observeInboundProductionCall: mocks.observeInboundCall,
+  observeProductionCallEvents: mocks.observeCallEvents,
+}));
 
 import { POST as answerPOST } from "@/app/api/webhooks/plivo/answer/route";
 import { POST as statusPOST } from "@/app/api/webhooks/plivo/reception/status/route";
@@ -95,6 +102,8 @@ function signedStatus(
 ) {
   const params: Record<string, string> = {
     CallUUID: "call-a",
+    DialALegUUID: "a-leg-call-0001",
+    DialBLegUUID: "b-leg-call-0001",
     From: CALLER_NUMBER,
     To: options.to ?? RECEPTION_NUMBER,
   };
@@ -116,6 +125,8 @@ describe("Stage 7 /answer effective routing", () => {
     mocks.getRuntimeMenu.mockResolvedValue(
       defaultClinicIvrRuntimeMenu(BASE_CLINIC.clinicName),
     );
+    mocks.observeInboundCall.mockResolvedValue("recorded");
+    mocks.observeCallEvents.mockResolvedValue("recorded");
   });
 
   afterEach(() => {
@@ -162,6 +173,12 @@ describe("Stage 7 /answer effective routing", () => {
     expect(xml).not.toContain("+9199999999");
     expect(xml).not.toContain("<Record");
     expect(mocks.getHours).not.toHaveBeenCalled();
+    expect(mocks.observeInboundCall).toHaveBeenCalledWith(expect.objectContaining({
+      clinicId: "clinic-a",
+      initialRoute: "RECEPTION",
+      routingModeAtStart: "OPEN",
+      events: ["ROUTED_TO_RECEPTION"],
+    }));
   });
 
   it("routes AUTO-open to reception using clinic-local business state", async () => {
@@ -176,6 +193,11 @@ describe("Stage 7 /answer effective routing", () => {
       expect.objectContaining({ timezone: "Asia/Kolkata", hours: [] }),
     );
     expect(xml).toContain(`<Number>${RECEPTION_NUMBER}</Number>`);
+    expect(mocks.observeInboundCall).toHaveBeenCalledWith(expect.objectContaining({
+      routingModeAtStart: "AUTO",
+      initialRoute: "RECEPTION",
+      events: ["ROUTED_TO_RECEPTION"],
+    }));
   });
 
   it("routes AUTO-closed to IVR", async () => {
@@ -186,6 +208,11 @@ describe("Stage 7 /answer effective routing", () => {
     const { xml } = await answer();
     expect(xml).toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
+    expect(mocks.observeInboundCall).toHaveBeenCalledWith(expect.objectContaining({
+      routingModeAtStart: "AUTO",
+      initialRoute: "IVR",
+      events: ["ROUTED_TO_IVR"],
+    }));
   });
 
   it("uses a valid custom profile when AUTO-closed routes to IVR", async () => {
@@ -210,6 +237,15 @@ describe("Stage 7 /answer effective routing", () => {
     expect(xml).toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain(BASE_CLINIC.urgentPhoneNumber);
+    expect(mocks.observeInboundCall).toHaveBeenCalledWith(expect.objectContaining({
+      initialRoute: "RECEPTION",
+      phoneMenuSource: "DEFAULT",
+      events: [
+        "ROUTED_TO_RECEPTION",
+        "RECEPTION_FALLBACK_TO_IVR",
+        "ROUTED_TO_IVR",
+      ],
+    }));
   });
 
   it("uses a valid custom menu for an unsafe reception fallback", async () => {
@@ -275,6 +311,8 @@ describe("Stage 7 reception Dial action callback", () => {
     mocks.getRuntimeMenu.mockResolvedValue(
       defaultClinicIvrRuntimeMenu(BASE_CLINIC.clinicName),
     );
+    mocks.observeCallEvents.mockReset();
+    mocks.observeCallEvents.mockResolvedValue("recorded");
   });
 
   afterEach(() => {
@@ -294,6 +332,11 @@ describe("Stage 7 reception Dial action callback", () => {
     expect(xml).not.toContain("<GetInput");
     expect(xml).not.toContain("<Dial");
     expect(mocks.getRuntimeMenu).not.toHaveBeenCalled();
+    expect(mocks.observeCallEvents).toHaveBeenCalledWith({
+      clinicId: "clinic-a",
+      providerCallUuid: "a-leg-call-0001",
+      events: ["RECEPTION_CONNECTED"],
+    });
   });
 
   it("uses a valid custom profile after a failed reception transfer", async () => {
@@ -302,6 +345,18 @@ describe("Stage 7 reception Dial action callback", () => {
     expect(xml).toContain("We could not connect you to reception.");
     expect(xml).toContain("Custom greeting for Sunrise Clinic.");
     expect(xml).toContain(`ivrRev=${CUSTOM_RUNTIME_MENU.revision}`);
+    expect(mocks.observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+      providerCallUuid: "a-leg-call-0001",
+      events: ["RECEPTION_FAILED", "RECEPTION_FALLBACK_TO_IVR"],
+    }));
+    expect(JSON.stringify(mocks.observeCallEvents.mock.calls)).not.toContain("b-leg-call-0001");
+  });
+
+  it("preserves reception fallback XML when event persistence fails", async () => {
+    const baseline = await (await statusPOST(signedStatus("failed"))).text();
+    mocks.observeCallEvents.mockResolvedValueOnce("write-failed");
+    const degraded = await (await statusPOST(signedStatus("failed"))).text();
+    expect(degraded).toBe(baseline);
   });
 
   it.each([

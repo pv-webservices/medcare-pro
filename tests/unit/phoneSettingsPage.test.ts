@@ -97,6 +97,35 @@ describe("Phone settings clinic-facing page", () => {
     expect(component).not.toMatch(/plivoNumber|providerCallUuid|providerRequestUuid/);
   });
 
+  it("adds clinic-scoped production diagnostics without replacing Phase 5", () => {
+    expect(page).toContain("getPhoneDiagnosticsForActor(actor, clinicId)");
+    expect(page).toContain("initialDiagnostics={diagnostics}");
+    expect(page.indexOf('can(actor, "clinic:edit", clinicId)')).toBeLessThan(
+      page.indexOf("getPhoneDiagnosticsForActor(actor, clinicId)"),
+    );
+    expect(component).toContain('title="Phone diagnostics"');
+    expect(component).toContain('title="Test phone menu"');
+    expect(component.indexOf('title="Test phone menu"')).toBeLessThan(
+      component.indexOf("<PhoneDiagnosticsPanel"),
+    );
+  });
+
+  it("renders no-data, healthy, attention, recent masked calls, and clinic timezone safely", () => {
+    expect(component).toContain('"no-data": "No recent calls"');
+    expect(component).toContain('healthy: "Healthy"');
+    expect(component).toContain('attention: "Needs attention"');
+    expect(component).toContain("No production call activity is available yet.");
+    expect(component).toContain("diagnostics.recentCalls.map");
+    expect(component).toContain("call.callerLabel");
+    expect(component).toContain("Times shown in {diagnostics.timezone}");
+    expect(component).toContain('timeZone: timezone');
+    expect(component).toContain("sm:px-5");
+    expect(component).toContain("lg:grid-cols-4");
+    expect(component).not.toMatch(
+      /providerCallUuid|DialBLegUUID|hangupCause|rawPayload|recording|transcript/,
+    );
+  });
+
   it("renders unavailable, active, terminal, permission, and safe failure states", () => {
     expect(component).toContain("testCall.unavailableReason");
     expect(component).toContain("!testCall.available || pending !== null || testPending");

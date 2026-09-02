@@ -29,6 +29,7 @@ const buildDoctorMenuForClinic = vi.hoisted(() => vi.fn());
 const beginTelephoneBooking = vi.hoisted(() => vi.fn());
 const buildClinicInformationForClinic = vi.hoisted(() => vi.fn());
 const getRuntimeMenu = vi.hoisted(() => vi.fn());
+const observeCallEvents = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
@@ -57,6 +58,11 @@ vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
     ...actual,
     getClinicIvrRuntimeMenuForTrustedClinic: getRuntimeMenu,
   };
+});
+
+vi.mock("@/lib/telephony/callObservability", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony/callObservability")>();
+  return { ...actual, observeProductionCallEvents: observeCallEvents };
 });
 
 const TEST_CLINIC = Object.freeze({
@@ -142,6 +148,8 @@ describe("POST /api/webhooks/plivo/input", () => {
     getRuntimeMenu.mockResolvedValue(
       defaultClinicIvrRuntimeMenu(TEST_CLINIC.clinicName),
     );
+    observeCallEvents.mockReset();
+    observeCallEvents.mockResolvedValue("recorded");
   });
 
   afterEach(() => {
@@ -169,6 +177,36 @@ describe("POST /api/webhooks/plivo/input", () => {
       clinic: TEST_CLINIC,
     });
     expect(requireTenantFeatureEntitlement).not.toHaveBeenCalled();
+    expect(observeCallEvents).toHaveBeenCalledWith({
+      clinicId: "clinic-a",
+      providerCallUuid: REALISTIC_ANSWER_PARAMS.CallUUID,
+      phoneMenuSource: "DEFAULT",
+      events: ["MAIN_MENU_CLINIC_INFORMATION"],
+    });
+  });
+
+  it.each([
+    ["1", "MAIN_MENU_TOMORROW_SLOTS"],
+    ["2", "MAIN_MENU_APPOINTMENT_BOOKING"],
+    ["3", "MAIN_MENU_URGENT_ASSISTANCE"],
+    ["4", "MAIN_MENU_CLINIC_INFORMATION"],
+    ["9", "MAIN_MENU_REPEAT"],
+    ["0", "MAIN_MENU_INVALID_INPUT"],
+  ])("records semantic action for digit %s without retaining the raw keypress", async (digit, event) => {
+    await postDigit(digit);
+    expect(observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+      clinicId: "clinic-a",
+      events: [event],
+    }));
+    expect(JSON.stringify(observeCallEvents.mock.calls)).not.toContain("Digits");
+  });
+
+  it("returns identical valid dispatch XML when event persistence is unavailable", async () => {
+    const baseline = await postDigit("4");
+    observeCallEvents.mockResolvedValueOnce("write-failed");
+    const degraded = await postDigit("4");
+    expect(degraded.response.status).toBe(200);
+    expect(degraded.xml).toBe(baseline.xml);
   });
 
   it("opens emergency guidance and explicit confirmation for signed digit 3 without Dial", async () => {
@@ -225,6 +263,9 @@ describe("POST /api/webhooks/plivo/input", () => {
     );
     expect(xml).toContain("Welcome to Sunrise Clinic.");
     expect(buildDoctorMenuForClinic).not.toHaveBeenCalled();
+    expect(observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+      events: ["APPOINTMENTS_UNAVAILABLE"],
+    }));
   });
 
   it("replays the complete menu for signed digit 9", async () => {
@@ -345,6 +386,10 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).toContain("Our updated options at Sunrise Clinic are ready.");
     expect(xml).toContain(`ivrRev=${currentMenu.revision}`);
     expect(xml).not.toContain(`ivrRev=${heardMenu.revision}`);
+    expect(observeCallEvents).toHaveBeenCalledWith(expect.objectContaining({
+      phoneMenuSource: "CUSTOM",
+      events: ["MENU_REVISION_REFRESHED"],
+    }));
   });
 
   it("safely replays a current custom menu when a legacy callback has no revision", async () => {

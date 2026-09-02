@@ -1,4 +1,7 @@
-import { TelephonyBookingRequestReason } from "@prisma/client";
+import {
+  ClinicTelephonyCallEventType,
+  TelephonyBookingRequestReason,
+} from "@prisma/client";
 import {
   buildPhoneBookingSourceRef,
   createAppointmentForScope,
@@ -45,6 +48,7 @@ import {
 } from "@/lib/telephony/plivo";
 import { parseSignedIdState, parseSignedPageState } from "@/lib/telephony/availability";
 import type { ClinicIvrRuntimeMenu } from "@/lib/telephony/ivrRuntime";
+import { observeProductionCallEvents } from "@/lib/telephony/callObservability";
 
 interface BookingCallInput {
   requestUrl: string;
@@ -112,6 +116,11 @@ async function createCallbackForResolution(
       (resolution.kind === "one"
         ? TelephonyBookingRequestReason.USER_REQUESTED
         : callbackReasonForResolution(resolution)),
+  });
+  await observeProductionCallEvents({
+    clinicId: input.clinic.clinicId,
+    providerCallUuid: callUuid,
+    events: [ClinicTelephonyCallEventType.BOOKING_FOLLOW_UP_CREATED],
   });
   return messageThenMainMenu(
     "Your callback request has been saved. The clinic can follow up using the caller number received with this call.",

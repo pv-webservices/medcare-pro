@@ -1,7 +1,9 @@
+import { ClinicTelephonyCallEventType } from "@prisma/client";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { buildUrgentTransferFailureXml } from "@/lib/telephony/plivo";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import { buildUrgentDialOutcomeXml } from "@/lib/telephony/urgent";
+import { observeProductionCallEvents } from "@/lib/telephony/callObservability";
 
 export const runtime = "nodejs";
 
@@ -26,11 +28,18 @@ export async function POST(request: Request): Promise<Response> {
     if (!clinic) return xmlResponse(buildUrgentTransferFailureXml());
 
     const status = verification.params.DialStatus;
-    return xmlResponse(
-      buildUrgentDialOutcomeXml(
-        typeof status === "string" ? status : undefined,
-      ),
-    );
+    const normalizedStatus = typeof status === "string" ? status : undefined;
+    const xml = buildUrgentDialOutcomeXml(normalizedStatus);
+    await observeProductionCallEvents({
+      clinicId: clinic.clinicId,
+      providerCallUuid: verification.params.DialALegUUID,
+      events: [
+        normalizedStatus === "completed"
+          ? ClinicTelephonyCallEventType.URGENT_TRANSFER_CONNECTED
+          : ClinicTelephonyCallEventType.URGENT_TRANSFER_FAILED,
+      ],
+    });
+    return xmlResponse(xml);
   } catch {
     console.error("Could not process the Plivo urgent Dial callback.");
     return new Response("Service unavailable.", { status: 503 });
