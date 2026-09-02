@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type { ClinicIvrMenuAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildMainMenuPrompt } from "@/lib/telephony/ivr";
 import {
@@ -11,6 +10,7 @@ import {
   type PlivoSpeakLanguage,
   type PlivoSpeakVoice,
 } from "@/lib/telephony/ivrProfile";
+import type { ClinicIvrMenuActionValue } from "@/lib/telephony/ivrProfileContract";
 import {
   resolveMainMenuAction,
   type MainMenuAction,
@@ -68,7 +68,7 @@ const loadRuntimeProfile: ClinicIvrRuntimeProfileLookup = (clinicId) =>
     },
   });
 
-function mapStoredAction(action: ClinicIvrMenuAction): IvrBusinessAction {
+function mapStoredAction(action: ClinicIvrMenuActionValue): IvrBusinessAction {
   switch (action) {
     case "TOMORROW_SLOTS":
       return "tomorrow-slots";

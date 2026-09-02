@@ -79,6 +79,10 @@ describe("SETTINGS_SECTIONS", () => {
       SETTINGS_SECTIONS.find((section) => section.href === "/settings/features")
         ?.viewPermissions,
     ).toEqual(["feature:view"]);
+    expect(
+      SETTINGS_SECTIONS.find((section) => section.href === "/settings/phone-menu")
+        ?.viewPermissions,
+    ).toEqual(["clinic:edit"]);
   });
 
   it("describes every section without a placeholder", () => {
@@ -120,7 +124,9 @@ describe("who reaches what", () => {
   });
 
   it("keeps view and change apart on every section", () => {
-    for (const section of SETTINGS_SECTIONS) {
+    for (const section of SETTINGS_SECTIONS.filter(
+      (candidate) => candidate.href !== "/settings/phone-menu",
+    )) {
       const viewerOnly = holder(...section.viewPermissions.filter(
         (permission) => !section.managePermissions.includes(permission),
       ));
@@ -129,6 +135,17 @@ describe("who reaches what", () => {
       // decorative for it.
       expect(visibleSettingsSections(viewerOnly)).toContain(section);
       expect(canManageSection(section, viewerOnly)).toBe(false);
+    }
+  });
+
+  it("advertises Phone menu only at the existing telephony-management boundary", () => {
+    const phoneMenu = SETTINGS_SECTIONS.find(
+      (section) => section.href === "/settings/phone-menu",
+    )!;
+    expect(visibleSettingsSections(holder("clinic:edit"))).toContain(phoneMenu);
+    expect(canManageSection(phoneMenu, holder("clinic:edit"))).toBe(true);
+    for (const permission of ["settings:view", "settings:manage", "clinic:read"]) {
+      expect(visibleSettingsSections(holder(permission))).not.toContain(phoneMenu);
     }
   });
 });

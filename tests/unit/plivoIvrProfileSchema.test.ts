@@ -22,6 +22,10 @@ const liveRouting = readFileSync(
   resolve("src/lib/telephony/routing.ts"),
   "utf8",
 );
+const clientContract = readFileSync(
+  resolve("src/lib/telephony/ivrProfileContract.ts"),
+  "utf8",
+);
 
 describe("Phase 2A IVR profile Prisma foundation", () => {
   it("adds optional clinic-owned profile and cascading menu relations", () => {
@@ -94,5 +98,13 @@ describe("Phase 2B static fallback and management isolation", () => {
   it("does not persist a runtime revision or add a Phase 2B schema field", () => {
     expect(schema).not.toContain("ivrRevision");
     expect(schema).not.toContain("ivr_revision");
+  });
+
+  it("shares the Phase 3 browser contract without importing server infrastructure", () => {
+    expect(clientContract).toContain("replaceClinicIvrProfileSchema");
+    expect(clientContract).toContain("CLINIC_IVR_MENU_ACTIONS");
+    expect(clientContract).not.toContain("@prisma/client");
+    expect(clientContract).not.toContain("@/lib/prisma");
+    expect(clientContract).not.toContain("@/lib/audit");
   });
 });

@@ -105,6 +105,19 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     viewPermissions: ["settings:view", "settings:manage", "clinic:read", "clinic:edit"],
     managePermissions: ["settings:manage", "clinic:edit"],
   },
+  {
+    href: "/settings/phone-menu",
+    title: "Phone menu",
+    description:
+      "Customize the automated greeting and keypad options callers hear when this clinic routes calls to IVR.",
+    // The existing profile GET is a telephony-management read: it requires
+    // clinic:read AND clinic:edit. Listing clinic:read or either settings key
+    // here would advertise a page whose backend correctly refuses that actor.
+    // clinic:edit is the discoverability signal; the page and API still re-run
+    // the full tenant, scope, read, edit, and Clinics-module boundary.
+    viewPermissions: ["clinic:edit"],
+    managePermissions: ["clinic:edit"],
+  },
 ] as const;
 
 /**

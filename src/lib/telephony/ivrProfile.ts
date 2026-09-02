@@ -1,188 +1,25 @@
-import type {
-  ClinicIvrMenuAction,
-  Prisma,
-} from "@prisma/client";
-import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import type { ActorContext } from "@/lib/rbac";
 import { assertActorCanManageTelephony } from "@/lib/telephony/access";
+import {
+  DEFAULT_CLINIC_IVR_GREETING_TEMPLATE,
+  DEFAULT_CLINIC_IVR_ITEMS,
+  DEFAULT_CLINIC_IVR_LANGUAGE,
+  DEFAULT_CLINIC_IVR_VOICE,
+  type ClinicIvrMenuActionValue,
+  type PlivoSpeakLanguage,
+  type PlivoSpeakVoice,
+  type ReplaceClinicIvrProfileInput,
+} from "@/lib/telephony/ivrProfileContract";
 
-export const CLINIC_IVR_MENU_ACTIONS = [
-  "TOMORROW_SLOTS",
-  "APPOINTMENT_BOOKING",
-  "URGENT_ASSISTANCE",
-  "CLINIC_INFORMATION",
-] as const satisfies readonly ClinicIvrMenuAction[];
-
-export const PLIVO_SPEAK_VOICES = ["WOMAN", "MAN"] as const;
-export type PlivoSpeakVoice = (typeof PLIVO_SPEAK_VOICES)[number];
-
-export const PLIVO_SPEAK_LANGUAGES = [
-  "arb",
-  "cmn-CN",
-  "da-DK",
-  "nl-NL",
-  "en-AU",
-  "en-IN",
-  "en-GB",
-  "en-US",
-  "fr-CA",
-  "fr-FR",
-  "de-DE",
-  "hi-IN",
-  "it-IT",
-  "ja-JP",
-  "ko-KR",
-  "pt-BR",
-  "pt-PT",
-  "ru-RU",
-  "es-MX",
-  "es-ES",
-  "es-US",
-] as const;
-export type PlivoSpeakLanguage = (typeof PLIVO_SPEAK_LANGUAGES)[number];
-
-/** Current plain Speak language/voice compatibility from Plivo documentation. */
-export const PLIVO_SPEAK_LANGUAGE_VOICES = {
-  arb: ["WOMAN"],
-  "cmn-CN": ["WOMAN"],
-  "da-DK": ["WOMAN", "MAN"],
-  "nl-NL": ["WOMAN", "MAN"],
-  "en-AU": ["WOMAN", "MAN"],
-  "en-IN": ["WOMAN"],
-  "en-GB": ["WOMAN", "MAN"],
-  "en-US": ["WOMAN", "MAN"],
-  "fr-CA": ["WOMAN"],
-  "fr-FR": ["WOMAN", "MAN"],
-  "de-DE": ["WOMAN", "MAN"],
-  "hi-IN": ["WOMAN"],
-  "it-IT": ["WOMAN", "MAN"],
-  "ja-JP": ["WOMAN", "MAN"],
-  "ko-KR": ["WOMAN"],
-  "pt-BR": ["WOMAN", "MAN"],
-  "pt-PT": ["WOMAN", "MAN"],
-  "ru-RU": ["WOMAN", "MAN"],
-  "es-MX": ["WOMAN"],
-  "es-ES": ["WOMAN", "MAN"],
-  "es-US": ["WOMAN", "MAN"],
-} as const satisfies Readonly<
-  Record<PlivoSpeakLanguage, readonly PlivoSpeakVoice[]>
->;
-
-export const DEFAULT_CLINIC_IVR_GREETING_TEMPLATE =
-  "Welcome to {clinicName}.";
-export const DEFAULT_CLINIC_IVR_LANGUAGE: PlivoSpeakLanguage = "en-US";
-export const DEFAULT_CLINIC_IVR_VOICE: PlivoSpeakVoice = "WOMAN";
-export const CLINIC_IVR_GREETING_MAX_LENGTH = 500;
-export const CLINIC_IVR_LABEL_MAX_LENGTH = 80;
-export const CLINIC_IVR_MAX_MENU_ITEMS = 7;
-
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
-const MARKUP_DELIMITERS = /[<>]/;
-
-function isPlainText(value: string): boolean {
-  return !CONTROL_CHARACTERS.test(value) && !MARKUP_DELIMITERS.test(value);
-}
-
-function hasOnlyClinicNamePlaceholder(value: string): boolean {
-  return !/[{}]/.test(value.replaceAll("{clinicName}", ""));
-}
-
-const greetingTemplateSchema = z
-  .string()
-  .trim()
-  .min(1, "Greeting is required.")
-  .max(
-    CLINIC_IVR_GREETING_MAX_LENGTH,
-    `Greeting must be at most ${CLINIC_IVR_GREETING_MAX_LENGTH} characters.`,
-  )
-  .refine(isPlainText, "Greeting must be plain text without markup or control characters.")
-  .refine(
-    hasOnlyClinicNamePlaceholder,
-    "Only the {clinicName} placeholder is supported.",
-  );
-
-const menuLabelSchema = z
-  .string()
-  .trim()
-  .min(1, "Menu label is required.")
-  .max(
-    CLINIC_IVR_LABEL_MAX_LENGTH,
-    `Menu label must be at most ${CLINIC_IVR_LABEL_MAX_LENGTH} characters.`,
-  )
-  .refine(isPlainText, "Menu label must be plain text without markup or control characters.");
-
-const clinicIvrMenuItemSchema = z
-  .object({
-    digit: z.number().int().min(1).max(7),
-    label: menuLabelSchema,
-    action: z.enum(CLINIC_IVR_MENU_ACTIONS),
-    position: z.number().int().min(0).max(6),
-    enabled: z.boolean(),
-  })
-  .strict();
-
-export const replaceClinicIvrProfileSchema = z
-  .object({
-    greetingTemplate: greetingTemplateSchema,
-    language: z.enum(PLIVO_SPEAK_LANGUAGES),
-    voice: z.enum(PLIVO_SPEAK_VOICES),
-    items: z
-      .array(clinicIvrMenuItemSchema)
-      .min(1, "At least one business menu item is required.")
-      .max(
-        CLINIC_IVR_MAX_MENU_ITEMS,
-        `At most ${CLINIC_IVR_MAX_MENU_ITEMS} business menu items are allowed.`,
-      ),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    const uniqueness: readonly (readonly [string, readonly unknown[]])[] = [
-      ["digit", input.items.map((item) => item.digit)],
-      ["action", input.items.map((item) => item.action)],
-      ["position", input.items.map((item) => item.position)],
-    ];
-    for (const [field, values] of uniqueness) {
-      if (new Set(values).size !== values.length) {
-        context.addIssue({
-          code: "custom",
-          path: ["items"],
-          message: `Each menu item must have a unique ${field}.`,
-        });
-      }
-    }
-
-    if (!input.items.some((item) => item.enabled)) {
-      context.addIssue({
-        code: "custom",
-        path: ["items"],
-        message: "At least one business action must be enabled.",
-      });
-    }
-
-    const allowedVoices = PLIVO_SPEAK_LANGUAGE_VOICES[input.language];
-    if (!(allowedVoices as readonly string[]).includes(input.voice)) {
-      context.addIssue({
-        code: "custom",
-        path: ["voice"],
-        message: `${input.voice} is not supported for ${input.language}.`,
-      });
-    }
-  })
-  .transform((input) => ({
-    ...input,
-    items: [...input.items].sort((left, right) => left.position - right.position),
-  }));
-
-export type ReplaceClinicIvrProfileInput = z.infer<
-  typeof replaceClinicIvrProfileSchema
->;
+export * from "@/lib/telephony/ivrProfileContract";
 
 export interface ClinicIvrMenuItemView {
   digit: number;
   label: string;
-  action: ClinicIvrMenuAction;
+  action: ClinicIvrMenuActionValue;
   position: number;
   enabled: boolean;
 }
@@ -196,38 +33,6 @@ export interface ClinicIvrProfileView {
   items: readonly ClinicIvrMenuItemView[];
   updatedAt: Date | null;
 }
-
-export const DEFAULT_CLINIC_IVR_ITEMS: readonly ClinicIvrMenuItemView[] =
-  Object.freeze([
-    Object.freeze({
-      digit: 1,
-      label: "tomorrow slots",
-      action: "TOMORROW_SLOTS" as const,
-      position: 0,
-      enabled: true,
-    }),
-    Object.freeze({
-      digit: 2,
-      label: "appointment booking",
-      action: "APPOINTMENT_BOOKING" as const,
-      position: 1,
-      enabled: true,
-    }),
-    Object.freeze({
-      digit: 3,
-      label: "urgent assistance",
-      action: "URGENT_ASSISTANCE" as const,
-      position: 2,
-      enabled: true,
-    }),
-    Object.freeze({
-      digit: 4,
-      label: "clinic information",
-      action: "CLINIC_INFORMATION" as const,
-      position: 3,
-      enabled: true,
-    }),
-  ]);
 
 export function defaultClinicIvrProfile(
   clinicId: string,
@@ -243,18 +48,6 @@ export function defaultClinicIvrProfile(
   });
 }
 
-export function renderClinicIvrGreeting(
-  greetingTemplate: string,
-  clinicName: string,
-): string {
-  const template = greetingTemplateSchema.parse(greetingTemplate);
-  const normalizedClinicName = clinicName.trim().replace(/\s+/g, " ");
-  if (normalizedClinicName === "" || !isPlainText(normalizedClinicName)) {
-    throw new Error("A plain-text clinic name is required.");
-  }
-  return template.replaceAll("{clinicName}", normalizedClinicName);
-}
-
 interface StoredClinicIvrProfile {
   id: string;
   clinicId: string;
@@ -265,7 +58,7 @@ interface StoredClinicIvrProfile {
   items: Array<{
     digit: number;
     label: string;
-    action: ClinicIvrMenuAction;
+    action: ClinicIvrMenuActionValue;
     position: number;
     enabled: boolean;
   }>;

@@ -6,6 +6,7 @@ import {
   History,
   LayoutDashboard,
   Lock,
+  PhoneCall,
   ShieldCheck,
   Star,
   type LucideIcon,
@@ -74,6 +75,13 @@ const SECTION_STYLES: Record<string, SectionStyle> = {
     iconBg: "bg-[#fce7f3] dark:bg-alert-bg",
     iconColor: "text-[#db2777] dark:text-alert-mark",
     displayDescription: "Update your clinic's name, address, location, and logo.",
+  },
+  "/settings/phone-menu": {
+    icon: PhoneCall,
+    iconBg: "bg-[#e0f7f4] dark:bg-ok-bg",
+    iconColor: "text-[#0f8f83] dark:text-ok-mark",
+    displayDescription:
+      "Customize the automated greeting and keypad options callers hear.",
   },
 };
 
