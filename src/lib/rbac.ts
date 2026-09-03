@@ -245,24 +245,72 @@ export function holdsAnywhere(held: HeldPermissions, permission: string): boolea
   return held.all || held.keys.has(permission);
 }
 
+const ROLE_PRIORITY: Record<string, number> = {
+  OWNER: 1,
+  CLINIC_ADMIN: 2,
+  DOCTOR: 3,
+  RECEPTIONIST: 4,
+  STAFF: 5,
+};
+
+function getRolePriority(key: string | null): number {
+  return key ? (ROLE_PRIORITY[key] ?? 10) : 10;
+}
+
 /**
- * The role name to record in `registration_edit_log.role_at_time`.
+ * Resolves the role name for an actor, optionally narrowed to a clinic scope.
  *
- * Captured at edit time and denormalised into the log, so revoking a role later
- * never rewrites the history of what someone held when they made the edit.
+ * Used to record in `registration_edit_log.role_at_time` as well as to display
+ * the user's role in the dashboard header and user menu.
+ *
+ * Evaluation precedence:
+ * 1. If `clinicId` is specified, direct assignment for that clinic takes precedence.
+ * 2. Tenant-wide assignment (clinicId = null, e.g. Owner).
+ * 3. Fallback to any role assignment held by the user in this tenant (prioritized by role rank).
+ * 4. "unknown" if the user has no active role in the tenant.
  */
 export async function resolveRoleNameAtTime(
   actor: ActorContext,
   clinicId?: string,
 ): Promise<string> {
-  const assignment = await prisma.userRole.findFirst({
+  const assignments = await prisma.userRole.findMany({
     where: {
       userId: actor.userId,
-      ...(clinicId ? { OR: [{ clinicId: null }, { clinicId }] } : { clinicId: null }),
       role: { tenantId: actor.tenantId },
     },
-    select: { role: { select: { name: true } } },
+    select: {
+      clinicId: true,
+      role: { select: { name: true, key: true } },
+    },
   });
 
-  return assignment?.role.name ?? "unknown";
+  if (assignments.length === 0) {
+    return "unknown";
+  }
+
+  // 1. If clinicId is provided, look for an assignment scoped to that clinic
+  if (clinicId) {
+    const directMatches = assignments.filter((a) => a.clinicId === clinicId);
+    if (directMatches.length > 0) {
+      directMatches.sort(
+        (a, b) => getRolePriority(a.role.key) - getRolePriority(b.role.key),
+      );
+      return directMatches[0].role.name;
+    }
+  }
+
+  // 2. Look for an account-wide / tenant-wide assignment (clinicId: null, e.g. Owner)
+  const tenantWideMatches = assignments.filter((a) => a.clinicId === null);
+  if (tenantWideMatches.length > 0) {
+    tenantWideMatches.sort(
+      (a, b) => getRolePriority(a.role.key) - getRolePriority(b.role.key),
+    );
+    return tenantWideMatches[0].role.name;
+  }
+
+  // 3. Fallback to any role assignment the user holds in this tenant
+  const sorted = [...assignments].sort(
+    (a, b) => getRolePriority(a.role.key) - getRolePriority(b.role.key),
+  );
+  return sorted[0].role.name;
 }

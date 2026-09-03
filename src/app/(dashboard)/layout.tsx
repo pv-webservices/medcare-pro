@@ -102,7 +102,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   // `countUnreadForActor` returns 0 rather than throwing for a Staff user, so
   // the shell renders the same for everyone — only the badge differs.
   const selectedClinicId = await resolveSelectedClinicId(actor);
-  const [clinics, unreadNotifications, held, modules, currentUser, roleName] =
+  const [clinics, unreadNotifications, held, modules, currentUser] =
     await Promise.all([
       listClinicsForActor(actor),
       countUnreadForActor(actor),
@@ -112,8 +112,14 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         where: { id: actor.userId, tenantId: actor.tenantId },
         select: { name: true, email: true },
       }),
-      resolveRoleNameAtTime(actor, selectedClinicId ?? undefined),
     ]);
+
+  const activeClinicId =
+    selectedClinicId ?? (clinics.length === 1 ? clinics[0]?.id : null);
+  const roleName = await resolveRoleNameAtTime(
+    actor,
+    activeClinicId ?? undefined,
+  );
 
   const userName = currentUser?.name ?? "Admin User";
 
@@ -171,7 +177,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     .map(({ href, label, hint }) => ({ href, label, hint }));
 
   const activeClinic =
-    clinics.find((clinic) => clinic.id === selectedClinicId) ?? null;
+    clinics.find((clinic) => clinic.id === activeClinicId) ?? null;
   const scopeLabel = activeClinic?.name ?? "All clinics";
 
   const switcherClinics = clinics.map(({ id, name, city, logoUrl }) => ({
