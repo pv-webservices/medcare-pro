@@ -160,6 +160,7 @@ describe("whatsappTemplateMedia binding", () => {
     const origTtl = process.env.MEDIA_PREVIEW_URL_TTL_SECONDS;
     try {
       process.env.MEDIA_PREVIEW_URL_TTL_SECONDS = "600";
+      // Test DOCUMENT
       vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValueOnce({
         id: "asset-preview-1",
         clinicId: "clinic-A",
@@ -171,9 +172,27 @@ describe("whatsappTemplateMedia binding", () => {
         lastUsedAt: null,
       } as never);
 
-      const result = await generateMediaPreviewUrlForActor(actor, "asset-preview-1");
-      expect(result.ttlSeconds).toBe(600);
-      expect(result.url).toContain("/api/media/asset-preview-1/content?token=");
+      const docResult = await generateMediaPreviewUrlForActor(actor, "asset-preview-1");
+      expect(docResult.ttlSeconds).toBe(600);
+      expect(docResult.url).toMatch(
+        /\/api\/media\/asset-preview-1\/document\/[^/]+\/doc\.pdf$/,
+      );
+
+      // Test IMAGE
+      vi.mocked(prisma.mediaAsset.findFirst).mockResolvedValueOnce({
+        id: "asset-preview-2",
+        clinicId: "clinic-A",
+        originalFileName: "pic.jpg",
+        mimeType: "image/jpeg",
+        mediaType: "IMAGE",
+        fileSize: 1024,
+        createdAt: new Date(),
+        lastUsedAt: null,
+      } as never);
+
+      const imgResult = await generateMediaPreviewUrlForActor(actor, "asset-preview-2");
+      expect(imgResult.ttlSeconds).toBe(600);
+      expect(imgResult.url).toContain("/api/media/asset-preview-2/content?token=");
     } finally {
       if (origTtl !== undefined) process.env.MEDIA_PREVIEW_URL_TTL_SECONDS = origTtl;
       else delete process.env.MEDIA_PREVIEW_URL_TTL_SECONDS;

@@ -125,7 +125,9 @@ describe("deliverTemplate with media", () => {
     vi.mocked(sendMedia).mockResolvedValueOnce({ ok: true, providerMessageId: "MSG-VID", message: "Sent" });
 
     await deliverTemplate(baseTemplate, deliveryTarget);
-    expect(vi.mocked(sendMedia).mock.calls[0][0].mediaType).toBe("video");
+    const videoCall = vi.mocked(sendMedia).mock.calls[0][0];
+    expect(videoCall.mediaType).toBe("video");
+    expect(videoCall.mediaUrl).toContain("/api/media/asset-video/content?token=");
 
     // Test DOCUMENT
     vi.mocked(prisma.whatsappTemplateMedia.findUnique).mockResolvedValueOnce({
@@ -137,6 +139,7 @@ describe("deliverTemplate with media", () => {
         tenantId: "tenant-1",
         clinicId: "clinic-A",
         mediaType: "DOCUMENT",
+        originalFileName: "Doctor Prescription.pdf",
         deletedAt: null,
       },
     } as never);
@@ -144,7 +147,12 @@ describe("deliverTemplate with media", () => {
     vi.mocked(sendMedia).mockResolvedValueOnce({ ok: true, providerMessageId: "MSG-DOC", message: "Sent" });
 
     await deliverTemplate(baseTemplate, deliveryTarget);
-    expect(vi.mocked(sendMedia).mock.calls[1][0].mediaType).toBe("document");
+    const docCall = vi.mocked(sendMedia).mock.calls[1][0];
+    expect(docCall.mediaType).toBe("document");
+    expect(docCall.mediaUrl).toMatch(
+      /\/api\/media\/asset-doc\/document\/[^/]+\/Doctor-Prescription\.pdf$/,
+    );
+    expect(docCall.mediaUrl).not.toContain("?token=");
   });
 
   it("falls back to legacy template mediaUrl when no clinic media is bound", async () => {

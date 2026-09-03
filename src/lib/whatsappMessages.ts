@@ -18,7 +18,10 @@ import {
   type MediaType,
   type SendResult,
 } from "@/lib/whatsapp";
-import { buildMediaContentUrl } from "@/lib/mediaSecurity";
+import {
+  buildMediaContentUrl,
+  buildDocumentContentUrl,
+} from "@/lib/mediaSecurity";
 import { MediaConfigurationError } from "@/lib/mediaTypes";
 import {
   assertCanSendSomewhere,
@@ -291,12 +294,21 @@ export async function deliverTemplate(
       const asset = templateMedia.mediaAsset;
       usedMediaAssetId = asset.id;
       try {
-        const signedUrl = buildMediaContentUrl({
-          mediaId: asset.id,
-          tenantId: asset.tenantId,
-          clinicId: target.clinicId,
-          purpose: "whatsapp",
-        });
+        const signedUrl =
+          asset.mediaType === "DOCUMENT"
+            ? buildDocumentContentUrl({
+                mediaId: asset.id,
+                tenantId: asset.tenantId,
+                clinicId: target.clinicId,
+                originalFileName: asset.originalFileName,
+                purpose: "whatsapp",
+              })
+            : buildMediaContentUrl({
+                mediaId: asset.id,
+                tenantId: asset.tenantId,
+                clinicId: target.clinicId,
+                purpose: "whatsapp",
+              });
         const mediaType: MediaType =
           asset.mediaType === "IMAGE"
             ? "image"

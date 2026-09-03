@@ -21,7 +21,11 @@ import {
   moveTempToFinal,
   writeUploadToTemp,
 } from "@/lib/mediaStorage";
-import { buildMediaContentUrl, getPreviewTtlSeconds } from "@/lib/mediaSecurity";
+import {
+  buildMediaContentUrl,
+  buildDocumentContentUrl,
+  getPreviewTtlSeconds,
+} from "@/lib/mediaSecurity";
 
 function toSafeMediaAsset(row: {
   id: string;
@@ -270,13 +274,23 @@ export async function generateMediaPreviewUrlForActor(
   const media = await getMediaForActor(actor, mediaId);
 
   const ttlSeconds = getPreviewTtlSeconds();
-  const url = buildMediaContentUrl({
-    mediaId: media.id,
-    tenantId: actor.tenantId,
-    clinicId: media.clinicId,
-    purpose: "preview",
-    ttlSeconds,
-  });
+  const url =
+    media.mediaType === "DOCUMENT"
+      ? buildDocumentContentUrl({
+          mediaId: media.id,
+          tenantId: actor.tenantId,
+          clinicId: media.clinicId,
+          originalFileName: media.originalFileName,
+          purpose: "preview",
+          ttlSeconds,
+        })
+      : buildMediaContentUrl({
+          mediaId: media.id,
+          tenantId: actor.tenantId,
+          clinicId: media.clinicId,
+          purpose: "preview",
+          ttlSeconds,
+        });
 
   return { url, ttlSeconds };
 }

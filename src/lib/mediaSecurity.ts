@@ -202,3 +202,107 @@ export function buildMediaContentUrl(params: {
   const origin = getCanonicalPublicOrigin();
   return `${origin}/api/media/${params.mediaId}/content?token=${encodeURIComponent(token)}`;
 }
+
+/**
+ * Sanitizes an original filename for safe usage in download URLs and Content-Disposition headers.
+ * Strips path traversal sequences, CR/LF, NUL, and control characters to prevent header injection.
+ * Replaces whitespace with hyphens and guarantees a `.pdf` extension for document delivery.
+ */
+export function sanitizeDownloadFileName(
+  fileName?: string | null,
+  fallback = "document.pdf",
+): string {
+  if (!fileName || typeof fileName !== "string") {
+    return fallback;
+  }
+
+  // 1. Strip newlines, carriage returns, null bytes, and control characters
+  let clean = fileName
+    .replace(/[\r\n\0]/g, "")
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .trim();
+
+  // 2. Extract final segment (strip directory paths posix / win32)
+  const segments = clean.split(/[/\\]+/);
+  clean = segments[segments.length - 1]?.trim() ?? "";
+
+  // 3. Remove leading dots and path traversal patterns
+  clean = clean.replace(/\.\.+/g, ".").replace(/^[.]+/, "");
+
+  // 4. Remove quotes and backslashes to protect HTTP headers
+  clean = clean.replace(/["\\]/g, "");
+
+  // 5. Replace sequences of spaces or unsafe characters with hyphens
+  clean = clean.replace(/\s+/g, "-");
+
+  // 6. Keep unicode letters/numbers, dot, hyphen, and underscore
+  clean = clean.replace(/[^\p{L}\p{N}._-]/gu, "");
+
+  // 7. Extract base name and extension
+  const extMatch = /\.([a-zA-Z0-9]+)$/.exec(clean);
+  let base = clean;
+  let ext = ".pdf";
+  if (extMatch) {
+    ext = `.${extMatch[1].toLowerCase()}`;
+    base = clean.slice(0, -extMatch[0].length);
+  }
+
+  // Strip trailing/leading punctuation from base
+  base = base.replace(/^[._-]+|[._-]+$/g, "");
+  if (!base) {
+    return fallback;
+  }
+
+  // Limit base length to 80 chars
+  if (base.length > 80) {
+    base = base.slice(0, 80).replace(/[._-]+$/, "");
+  }
+
+  // Ensure ext is .pdf for documents
+  if (ext !== ".pdf") {
+    ext = ".pdf";
+  }
+
+  return `${base}${ext}`;
+}
+
+/**
+ * Generates an RFC 6266 and RFC 5987 compliant Content-Disposition header.
+ * Provides an ASCII fallback for legacy clients and filename* with UTF-8 encoding.
+ */
+export function buildContentDispositionHeader(fileName: string): string {
+  const safeName = sanitizeDownloadFileName(fileName);
+  // ASCII fallback: replace non-ASCII characters with underscore and strip quotes
+  const asciiFallback = safeName.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "");
+  // RFC 5987 percent-encoded UTF-8
+  const utf8Encoded = encodeURIComponent(safeName);
+
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8Encoded}`;
+}
+
+/**
+ * Builds the full HTTPS URL for secure document delivery with the token in a path
+ * segment and the sanitized document filename as the final segment ending in `.pdf`.
+ *
+ * Example: https://medcare.sitecraf.com/api/media/[id]/document/[token]/Document-Test.pdf
+ */
+export function buildDocumentContentUrl(params: {
+  mediaId: string;
+  tenantId: string;
+  clinicId: string;
+  originalFileName: string;
+  purpose: MediaTokenPurpose;
+  ttlSeconds?: number;
+}): string {
+  const token = generateMediaToken({
+    mediaId: params.mediaId,
+    tenantId: params.tenantId,
+    clinicId: params.clinicId,
+    purpose: params.purpose,
+    ttlSeconds: params.ttlSeconds,
+  });
+  const origin = getCanonicalPublicOrigin();
+  const safeFileName = sanitizeDownloadFileName(params.originalFileName, "document.pdf");
+  return `${origin}/api/media/${params.mediaId}/document/${token}/${encodeURIComponent(safeFileName)}`;
+}
+

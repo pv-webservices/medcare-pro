@@ -3,6 +3,9 @@ import {
   generateMediaToken,
   verifyMediaToken,
   buildMediaContentUrl,
+  buildDocumentContentUrl,
+  sanitizeDownloadFileName,
+  buildContentDispositionHeader,
   InvalidTokenError,
 } from "@/lib/mediaSecurity";
 
@@ -149,6 +152,96 @@ describe("mediaSecurity tokens", () => {
       if (origSecret !== undefined) env.MEDIA_ACCESS_SECRET = origSecret;
       else delete env.MEDIA_ACCESS_SECRET;
     }
+  });
+
+  describe("sanitizeDownloadFileName", () => {
+    it("preserves safe filename and replaces spaces with hyphens", () => {
+      expect(sanitizeDownloadFileName("Document Test.pdf")).toBe("Document-Test.pdf");
+      expect(sanitizeDownloadFileName("Blood Report 2026.pdf")).toBe("Blood-Report-2026.pdf");
+    });
+
+    it("prevents directory traversal attacks", () => {
+      expect(sanitizeDownloadFileName("../../secret.pdf")).toBe("secret.pdf");
+      expect(sanitizeDownloadFileName("..\\..\\secret.pdf")).toBe("secret.pdf");
+      expect(sanitizeDownloadFileName("/var/log/secret.pdf")).toBe("secret.pdf");
+    });
+
+    it("prevents header injection via CR/LF and control characters", () => {
+      const injected = "foo\r\nX-Test: injected\nbar.pdf";
+      const sanitized = sanitizeDownloadFileName(injected);
+      expect(sanitized).not.toContain("\r");
+      expect(sanitized).not.toContain("\n");
+      expect(sanitized).toBe("fooX-Test-injectedbar.pdf");
+    });
+
+    it("handles unicode and preserves accented characters", () => {
+      expect(sanitizeDownloadFileName("Patient Résumé.pdf")).toBe("Patient-Résumé.pdf");
+    });
+
+    it("strips double quotes and backslashes", () => {
+      expect(sanitizeDownloadFileName('"quoted".pdf')).toBe("quoted.pdf");
+      expect(sanitizeDownloadFileName('a\\b\\"c.pdf')).toBe("c.pdf");
+    });
+
+    it("truncates excessively long base names while preserving .pdf", () => {
+      const longName = "a".repeat(120) + ".pdf";
+      const sanitized = sanitizeDownloadFileName(longName);
+      expect(sanitized.endsWith(".pdf")).toBe(true);
+      expect(sanitized.length).toBeLessThanOrEqual(84); // 80 base + .pdf
+    });
+
+    it("falls back cleanly on empty or invalid inputs", () => {
+      expect(sanitizeDownloadFileName("")).toBe("document.pdf");
+      expect(sanitizeDownloadFileName(null)).toBe("document.pdf");
+      expect(sanitizeDownloadFileName("   ")).toBe("document.pdf");
+      expect(sanitizeDownloadFileName("...")).toBe("document.pdf");
+    });
+
+    it("ensures extension is .pdf", () => {
+      expect(sanitizeDownloadFileName("notes.txt")).toBe("notes.pdf");
+      expect(sanitizeDownloadFileName("noextension")).toBe("noextension.pdf");
+    });
+  });
+
+  describe("buildContentDispositionHeader", () => {
+    it("builds standard RFC 6266 and RFC 5987 header", () => {
+      const header = buildContentDispositionHeader("Document Test.pdf");
+      expect(header).toBe(
+        'attachment; filename="Document-Test.pdf"; filename*=UTF-8\'\'Document-Test.pdf',
+      );
+    });
+
+    it("provides ASCII fallback and encoded filename* for unicode names", () => {
+      const header = buildContentDispositionHeader("Patient Résumé.pdf");
+      expect(header).toContain('attachment; filename="Patient-R_sum_.pdf"');
+      expect(header).toContain("filename*=UTF-8''Patient-R%C3%A9sum%C3%A9.pdf");
+    });
+  });
+
+  describe("buildDocumentContentUrl", () => {
+    it("builds full HTTPS URL ending in safe .pdf filename without query token", () => {
+      const url = buildDocumentContentUrl({
+        mediaId: "asset-doc-1",
+        tenantId: "tenant-1",
+        clinicId: "clinic-A",
+        originalFileName: "Lab Results Test.pdf",
+        purpose: "whatsapp",
+      });
+
+      expect(url).toMatch(
+        /^http:\/\/localhost:3000\/api\/media\/asset-doc-1\/document\/[^/]+\/Lab-Results-Test\.pdf$/,
+      );
+      expect(url).not.toContain("?token=");
+
+      // Verify the token extracted from the path segment
+      const parts = url.split("/");
+      const token = parts[parts.length - 2];
+      const payload = verifyMediaToken(token);
+      expect(payload.mediaId).toBe("asset-doc-1");
+      expect(payload.tenantId).toBe("tenant-1");
+      expect(payload.clinicId).toBe("clinic-A");
+      expect(payload.purpose).toBe("whatsapp");
+    });
   });
 });
 
