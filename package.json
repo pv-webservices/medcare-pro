@@ -48,7 +48,8 @@
     "verify:ap7-appointment-types": "tsx scripts/verify-ap7-appointment-types.mts",
     "verify:ap8-appointment-notifications": "tsx scripts/verify-ap8-appointment-notifications.mts",
     "verify:ap9-appointment-edit": "tsx scripts/verify-ap9-appointment-edit.mts",
-    "clinics:backfill": "tsx scripts/backfill-tenant-clinics.mts"
+    "clinics:backfill": "tsx scripts/backfill-tenant-clinics.mts",
+    "ivr:backfill": "tsx scripts/backfill-ivr.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

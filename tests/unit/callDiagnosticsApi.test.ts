@@ -65,8 +65,8 @@ describe("GET /api/clinics/[id]/telephony/diagnostics", () => {
     expect(mocks.getDiagnostics).not.toHaveBeenCalled();
   });
 
-  it("keeps the Clinics module boundary", async () => {
-    mocks.requireModule.mockRejectedValueOnce(new FeatureError("clinics", "entitlement"));
+  it("keeps the IVR module boundary", async () => {
+    mocks.requireModule.mockRejectedValueOnce(new FeatureError("ivr", "entitlement"));
     const response = await GET(new Request("https://app.example/api/test"), context());
     expect(response.status).toBe(403);
     expect(mocks.getDiagnostics).not.toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe("GET /api/clinics/[id]/telephony/diagnostics", () => {
       context("clinic-a"),
     );
     expect(response.status).toBe(200);
-    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "clinics");
+    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "ivr");
     expect(mocks.getDiagnostics).toHaveBeenCalledWith(ACTOR, "clinic-a");
   });
 

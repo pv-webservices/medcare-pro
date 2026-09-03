@@ -5,6 +5,12 @@ const mocks = vi.hoisted(() => ({
   getHours: vi.fn(),
   resolveBusinessState: vi.fn(),
   getRuntimeMenu: vi.fn(),
+  requireTenantFeatureEntitlement: vi.fn(),
+}));
+
+vi.mock("@/lib/features", () => ({
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
+  requireTenantFeatureEntitlement: mocks.requireTenantFeatureEntitlement,
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => {
@@ -242,6 +248,7 @@ describe("Stage 7 clinic-information webhook controls and V3 security", () => {
     mocks.getRuntimeMenu.mockResolvedValue(
       defaultClinicIvrRuntimeMenu(BASE_CLINIC.clinicName),
     );
+    mocks.requireTenantFeatureEntitlement.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

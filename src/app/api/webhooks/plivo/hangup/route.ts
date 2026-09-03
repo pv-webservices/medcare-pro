@@ -1,3 +1,5 @@
+import { FeatureError } from "@/lib/featureResolution";
+import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { completeObservedProductionCall } from "@/lib/telephony/callObservability";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
@@ -20,6 +22,12 @@ export async function POST(request: Request): Promise<Response> {
       verification.params.To,
     );
     if (!clinic) return accepted();
+    try {
+      await requireTenantFeatureEntitlement(clinic.tenantId, MODULE_FEATURES.ivr);
+    } catch (error: unknown) {
+      if (!(error instanceof FeatureError)) throw error;
+      return accepted();
+    }
 
     const result = await completeObservedProductionCall({
       clinicId: clinic.clinicId,

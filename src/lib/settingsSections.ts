@@ -26,6 +26,8 @@
  * open the same screen — see the note on Branding below.
  */
 
+import type { ModuleFeatureKey } from "@/lib/moduleFeatures";
+
 export interface SettingsSection {
   href: string;
   title: string;
@@ -41,6 +43,8 @@ export interface SettingsSection {
    * as "View only" to everybody, the account owner included.
    */
   managePermissions: readonly string[];
+  /** Feature gating the module, where applicable. */
+  feature?: ModuleFeatureKey | null;
 }
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
@@ -112,6 +116,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       "Configure reception, urgent-call routing, timezone, and the business hours used by automatic call handling.",
     viewPermissions: ["clinic:edit"],
     managePermissions: ["clinic:edit"],
+    feature: "ivr",
   },
   {
     href: "/settings/phone-menu",
@@ -125,6 +130,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     // the full tenant, scope, read, edit, and Clinics-module boundary.
     viewPermissions: ["clinic:edit"],
     managePermissions: ["clinic:edit"],
+    feature: "ivr",
   },
 ] as const;
 
@@ -142,10 +148,15 @@ export const SETTINGS_VIEW_PERMISSIONS: readonly string[] = [
 /** Sections this person may open at all. */
 export function visibleSettingsSections(
   holds: (permission: string) => boolean,
+  featureAllowed?: (feature: string) => boolean,
 ): SettingsSection[] {
-  return SETTINGS_SECTIONS.filter((section) =>
-    section.viewPermissions.some(holds),
-  );
+  return SETTINGS_SECTIONS.filter((section) => {
+    if (!section.viewPermissions.some(holds)) return false;
+    if (section.feature && featureAllowed && !featureAllowed(section.feature)) {
+      return false;
+    }
+    return true;
+  });
 }
 
 /** Whether this person may change anything on a section they can see. */

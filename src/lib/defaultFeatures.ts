@@ -135,6 +135,15 @@ export const DEFAULT_FEATURES: readonly DefaultFeatureDefinition[] = [
     inDefaultPlan: true,
   },
   {
+    key: "ivr",
+    name: "IVR",
+    description:
+      "Automated phone menus, call routing, and telephone appointment booking.",
+    tier: "CORE",
+    globalEnabled: true,
+    inDefaultPlan: true,
+  },
+  {
     key: "marketing",
     name: "Marketing campaigns",
     description: "Campaign tools. Not built yet.",

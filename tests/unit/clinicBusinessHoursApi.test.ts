@@ -63,10 +63,10 @@ describe("clinic business-hours API", () => {
     }));
   });
 
-  it("authenticates, gates the clinics module, and scopes GET by route id", async () => {
+  it("authenticates, gates the ivr module, and scopes GET by route id", async () => {
     const response = await GET(new Request("https://app.example"), context);
     expect(response.status).toBe(200);
-    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "clinics");
+    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "ivr");
     expect(mocks.getHours).toHaveBeenCalledWith(ACTOR, "clinic-a");
   });
 

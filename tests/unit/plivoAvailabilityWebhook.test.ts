@@ -22,7 +22,7 @@ vi.mock("@/lib/telephony/clinicConfig", () => ({
 }));
 
 vi.mock("@/lib/features", () => ({
-  MODULE_FEATURES: { appointments: "appointments" },
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
   requireTenantFeatureEntitlement: mocks.requireEntitlement,
 }));
 
@@ -209,8 +209,12 @@ describe.each(routes)("POST Stage 4 $label webhook", (route) => {
 
   it("returns a safe menu when tenant appointment entitlement is denied", async () => {
     mocks.getRuntimeMenu.mockResolvedValueOnce(CUSTOM_RUNTIME_MENU);
-    mocks.requireEntitlement.mockRejectedValueOnce(
-      new FeatureError("appointments", "entitlement"),
+    mocks.requireEntitlement.mockImplementation(
+      async (_tenantId: string, featureKey: string) => {
+        if (featureKey === "appointments") {
+          throw new FeatureError("appointments", "entitlement");
+        }
+      },
     );
 
     const response = await route.post(signed());
@@ -222,6 +226,17 @@ describe.each(routes)("POST Stage 4 $label webhook", (route) => {
     );
     expect(xml).toContain("Custom availability return for Sunrise Clinic.");
     expect(xml).toContain(`ivrRev=${CUSTOM_RUNTIME_MENU.revision}`);
+    expect(route.handler).not.toHaveBeenCalled();
+  });
+
+  it("returns unavailable when IVR entitlement is denied", async () => {
+    mocks.requireEntitlement.mockRejectedValueOnce(
+      new FeatureError("ivr", "global"),
+    );
+    const response = await route.post(signed());
+    const xml = await response.text();
+    expect(response.status).toBe(200);
+    expect(xml).toContain("Telephone assistance is not configured for this number.");
     expect(route.handler).not.toHaveBeenCalled();
   });
 

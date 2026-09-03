@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import SettingsNav from "@/components/settings/SettingsNav";
+import { resolveModulesForActor } from "@/lib/features";
+import type { ModuleFeatureKey } from "@/lib/moduleFeatures";
 import { holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import { visibleSettingsSections } from "@/lib/settingsSections";
@@ -32,9 +34,13 @@ export default async function SettingsLayout({
 
   try {
     const actor = await requireActor();
-    const held = await permissionsHeldAnywhere(actor);
-    items = visibleSettingsSections((permission) =>
-      holdsAnywhere(held, permission),
+    const [held, modules] = await Promise.all([
+      permissionsHeldAnywhere(actor),
+      resolveModulesForActor(actor),
+    ]);
+    items = visibleSettingsSections(
+      (permission) => holdsAnywhere(held, permission),
+      (feature) => modules.get(feature as ModuleFeatureKey)?.allowed === true,
     ).map((section) => ({ href: section.href, label: section.title }));
   } catch (error: unknown) {
     if (!(error instanceof UnauthenticatedError)) {

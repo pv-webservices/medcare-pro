@@ -67,7 +67,7 @@ describe("clinic-facing phone settings API", () => {
   it("gates the module and scopes safe GET to the URL clinic", async () => {
     const response = await GET(new Request("https://app.example"), context("clinic-a"));
     expect(response.status).toBe(200);
-    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "clinics");
+    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "ivr");
     expect(mocks.getSettings).toHaveBeenCalledWith(ACTOR, "clinic-a");
     expect(JSON.stringify(await response.json())).not.toMatch(
       /plivoNumber|authToken|webhook/i,

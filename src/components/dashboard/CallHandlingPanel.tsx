@@ -3,8 +3,8 @@
 import type { ClinicTelephonyRoutingMode } from "@prisma/client";
 import { Clock3, LoaderCircle, PhoneCall } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useReducer, useRef, type KeyboardEvent } from "react";
-import { StatusPill, cx, useToast } from "@/components/ui";
+import { useEffect, useReducer, useRef, useState, type KeyboardEvent } from "react";
+import { ConfirmDialog, StatusPill, cx, useToast } from "@/components/ui";
 import type { DashboardCallHandlingModel } from "@/lib/telephony/dashboardCallHandling";
 import {
   CALL_HANDLING_SUCCESS_MESSAGES,
@@ -103,10 +103,24 @@ function ClinicCallHandling({
   const showToast = useToast();
   const request = useRef<AbortController | null>(null);
   const routingButtons = useRef<Array<HTMLButtonElement | null>>([]);
+  const [pendingTargetMode, setPendingTargetMode] =
+    useState<ClinicTelephonyRoutingMode | null>(null);
   const [mutation, dispatch] = useReducer(callHandlingMutationReducer, {
     confirmedMode: model.routingMode,
     pendingMode: null,
   });
+
+  function requestRoutingModeChange(routingMode: ClinicTelephonyRoutingMode) {
+    if (
+      !model.enabled ||
+      !model.canManage ||
+      mutation.pendingMode !== null ||
+      routingMode === mutation.confirmedMode
+    ) {
+      return;
+    }
+    setPendingTargetMode(routingMode);
+  }
 
   useEffect(() => {
     dispatch({ type: "reset", routingMode: model.routingMode });
@@ -128,6 +142,15 @@ function ClinicCallHandling({
     receptionAvailable: model.receptionAvailable,
   });
   const nextOpening = formatNextOpening(model);
+
+  const currentOption =
+    DASHBOARD_CALL_HANDLING_OPTIONS.find(
+      (opt) => opt.routingMode === mutation.confirmedMode,
+    ) ?? DASHBOARD_CALL_HANDLING_OPTIONS[0];
+
+  const targetOption = DASHBOARD_CALL_HANDLING_OPTIONS.find(
+    (opt) => opt.routingMode === pendingTargetMode,
+  );
 
   async function changeRoutingMode(routingMode: ClinicTelephonyRoutingMode) {
     if (
@@ -206,7 +229,7 @@ function ClinicCallHandling({
       (currentIndex + direction + DASHBOARD_CALL_HANDLING_OPTIONS.length) %
       DASHBOARD_CALL_HANDLING_OPTIONS.length;
     routingButtons.current[nextIndex]?.focus();
-    void changeRoutingMode(
+    requestRoutingModeChange(
       DASHBOARD_CALL_HANDLING_OPTIONS[nextIndex].routingMode,
     );
   }
@@ -251,7 +274,7 @@ function ClinicCallHandling({
                   aria-label={pending ? `${option.label}, updating` : option.label}
                   tabIndex={selected ? 0 : -1}
                   disabled={!model.enabled || mutation.pendingMode !== null}
-                  onClick={() => changeRoutingMode(option.routingMode)}
+                  onClick={() => requestRoutingModeChange(option.routingMode)}
                   onKeyDown={(event) => moveRoutingFocus(event, index)}
                   className={cx(
                     "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-label font-semibold",
@@ -311,6 +334,34 @@ function ClinicCallHandling({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={pendingTargetMode !== null}
+        onCancel={() => {
+          if (mutation.pendingMode === null) {
+            setPendingTargetMode(null);
+          }
+        }}
+        onConfirm={() => {
+          if (pendingTargetMode) {
+            const target = pendingTargetMode;
+            void changeRoutingMode(target).finally(() => {
+              setPendingTargetMode(null);
+            });
+          }
+        }}
+        title="Change call handling setting?"
+        body={
+          targetOption
+            ? `Do you really want to change the settings from ${currentOption.label} to ${targetOption.label}?`
+            : ""
+        }
+        confirmLabel="Yes"
+        cancelLabel="No"
+        tone="primary"
+        isBusy={mutation.pendingMode !== null}
+        busyLabel="Changing..."
+      />
     </section>
   );
 }

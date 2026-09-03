@@ -58,6 +58,19 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
 
+    try {
+      await requireTenantFeatureEntitlement(clinic.tenantId, MODULE_FEATURES.ivr);
+    } catch (error: unknown) {
+      if (!(error instanceof FeatureError)) throw error;
+      return new Response(buildTelephonyUnavailableXml(), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     const inputActionUrl = buildPlivoInputActionUrl(request.url);
     if (!doesIvrRevisionMatchRuntimeMenu(request.url, runtimeMenu)) {

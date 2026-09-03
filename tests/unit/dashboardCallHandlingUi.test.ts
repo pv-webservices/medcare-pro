@@ -126,4 +126,17 @@ describe("dashboard call-handling UI contract", () => {
     expect(pageSource).toContain("resolveDashboardOperationalClinicId");
     expect(pageSource).not.toContain("cookies(");
   });
+
+  it("guards call-handling routing switches with a confirmation stopper dialog asking to change settings from current to target with Yes and No", () => {
+    expect(componentSource).toContain("<ConfirmDialog");
+    expect(componentSource).toContain("title=\"Change call handling setting?\"");
+    expect(componentSource).toContain(
+      "Do you really want to change the settings from ${currentOption.label} to ${targetOption.label}?",
+    );
+    expect(componentSource).toContain('confirmLabel="Yes"');
+    expect(componentSource).toContain('cancelLabel="No"');
+    expect(componentSource).toContain('tone="primary"');
+    expect(componentSource).toContain("onClick={() => requestRoutingModeChange(option.routingMode)}");
+    expect(componentSource).not.toContain("onClick={() => changeRoutingMode(option.routingMode)}");
+  });
 });

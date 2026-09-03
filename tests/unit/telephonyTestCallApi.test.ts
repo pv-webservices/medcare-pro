@@ -98,9 +98,9 @@ describe("controlled telephony test-call actor APIs", () => {
     expect(mocks.start).not.toHaveBeenCalled();
   });
 
-  it("respects the Clinics module lock", async () => {
+  it("respects the IVR module lock", async () => {
     mocks.requireModule.mockRejectedValueOnce(
-      new FeatureError("clinics", "entitlement"),
+      new FeatureError("ivr", "entitlement"),
     );
     const response = await post({});
     expect(response.status).toBe(403);
@@ -110,7 +110,7 @@ describe("controlled telephony test-call actor APIs", () => {
   it("accepts only an empty body and scopes start to the URL clinic", async () => {
     const response = await post({}, "clinic-a");
     expect(response.status).toBe(201);
-    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "clinics");
+    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "ivr");
     expect(mocks.start).toHaveBeenCalledWith(
       ACTOR,
       "clinic-a",

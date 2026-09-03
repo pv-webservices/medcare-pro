@@ -90,10 +90,10 @@ describe("clinic IVR profile management API", () => {
     mocks.resetProfile.mockResolvedValue(PROFILE);
   });
 
-  it("authenticates, gates the clinics module, and scopes GET to the route id", async () => {
+  it("authenticates, gates the ivr module, and scopes GET to the route id", async () => {
     const response = await GET(new Request("https://app.example"), context);
     expect(response.status).toBe(200);
-    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "clinics");
+    expect(mocks.requireModule).toHaveBeenCalledWith(ACTOR, "ivr");
     expect(mocks.getProfile).toHaveBeenCalledWith(ACTOR, "clinic-a");
     expect(JSON.stringify(await response.json())).not.toMatch(
       /plivoNumber|phoneNumber|authToken|webhook/i,

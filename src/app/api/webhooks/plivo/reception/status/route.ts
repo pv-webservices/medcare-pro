@@ -1,4 +1,6 @@
 import { ClinicTelephonyCallEventType } from "@prisma/client";
+import { FeatureError } from "@/lib/featureResolution";
+import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { buildTelephonyUnavailableXml } from "@/lib/telephony/plivo";
 import { buildReceptionDialOutcomeXml } from "@/lib/telephony/reception";
@@ -27,6 +29,12 @@ export async function POST(request: Request): Promise<Response> {
     }
     const clinic = await resolveInboundClinicByPlivoNumber(sourceNumbers[0]);
     if (!clinic) return xmlResponse(buildTelephonyUnavailableXml());
+    try {
+      await requireTenantFeatureEntitlement(clinic.tenantId, MODULE_FEATURES.ivr);
+    } catch (error: unknown) {
+      if (!(error instanceof FeatureError)) throw error;
+      return xmlResponse(buildTelephonyUnavailableXml());
+    }
 
     const statusValue = verification.params.DialStatus;
     const status = typeof statusValue === "string" ? statusValue : undefined;

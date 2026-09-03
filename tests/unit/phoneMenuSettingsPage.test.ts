@@ -32,7 +32,7 @@ describe("Phone menu settings page contract", () => {
   });
 
   it("enforces module and selected-clinic edit authority before profile loading", () => {
-    expect(pageSource).toContain("moduleLock(actor, MODULE_FEATURES.clinics)");
+    expect(pageSource).toContain("moduleLock(actor, MODULE_FEATURES.ivr)");
     expect(pageSource).toContain('can(actor, "clinic:edit", clinicId)');
     expect(pageSource.indexOf('can(actor, "clinic:edit", clinicId)')).toBeLessThan(
       pageSource.indexOf("getClinicIvrProfileForActor(actor, clinicId)"),

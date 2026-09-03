@@ -10,6 +10,12 @@ import {
 const mocks = vi.hoisted(() => ({
   bind: vi.fn(),
   getRuntime: vi.fn(),
+  requireTenantFeatureEntitlement: vi.fn(),
+}));
+
+vi.mock("@/lib/features", () => ({
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
+  requireTenantFeatureEntitlement: mocks.requireTenantFeatureEntitlement,
 }));
 
 vi.mock("@/lib/session", () => ({
@@ -47,6 +53,7 @@ const BASE_CONTEXT = {
   testCallId: "test-call-a",
   clinicId: "clinic-a",
   clinicName: "Sharma Clinic",
+  tenantId: "tenant-a",
   status: "ANSWERED",
   terminal: false,
 } as const;
@@ -86,6 +93,7 @@ describe("dedicated Plivo test-call callback security", () => {
     delete process.env.PLIVO_PUBLIC_WEBHOOK_ORIGIN;
     mocks.bind.mockResolvedValue(BASE_CONTEXT);
     mocks.getRuntime.mockResolvedValue(defaultClinicIvrRuntimeMenu("Sharma Clinic"));
+    mocks.requireTenantFeatureEntitlement.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -179,6 +187,7 @@ describe("controlled IVR test answer and DTMF flow", () => {
     delete process.env.PLIVO_PUBLIC_WEBHOOK_ORIGIN;
     mocks.bind.mockResolvedValue(BASE_CONTEXT);
     mocks.getRuntime.mockResolvedValue(defaultClinicIvrRuntimeMenu("Sharma Clinic"));
+    mocks.requireTenantFeatureEntitlement.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {

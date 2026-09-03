@@ -8,6 +8,8 @@ import {
   buildPlivoInputActionUrl,
   buildTelephonyUnavailableXml,
 } from "@/lib/telephony/plivo";
+import { FeatureError } from "@/lib/featureResolution";
+import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features";
 import { resolveInboundClinicByPlivoNumber } from "@/lib/telephony/clinicConfig";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import {
@@ -41,6 +43,19 @@ export async function POST(request: Request): Promise<Response> {
       verification.params.To,
     );
     if (!clinic) {
+      return new Response(buildTelephonyUnavailableXml(), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
+    try {
+      await requireTenantFeatureEntitlement(clinic.tenantId, MODULE_FEATURES.ivr);
+    } catch (error: unknown) {
+      if (!(error instanceof FeatureError)) throw error;
       return new Response(buildTelephonyUnavailableXml(), {
         status: 200,
         headers: {

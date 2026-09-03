@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FeatureError } from "@/lib/featureResolution";
 import { POST } from "@/app/api/webhooks/plivo/answer/route";
 import { buildMainMenuPrompt } from "@/lib/telephony/ivr";
 import {
@@ -19,9 +20,15 @@ const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
 const getRuntimeMenu = vi.hoisted(() => vi.fn());
 const observeInboundCall = vi.hoisted(() => vi.fn());
+const requireTenantFeatureEntitlement = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
+}));
+
+vi.mock("@/lib/features", () => ({
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
+  requireTenantFeatureEntitlement,
 }));
 
 vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
@@ -57,6 +64,8 @@ describe("POST /api/webhooks/plivo/answer", () => {
     );
     observeInboundCall.mockReset();
     observeInboundCall.mockResolvedValue("recorded");
+    requireTenantFeatureEntitlement.mockReset();
+    requireTenantFeatureEntitlement.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -408,5 +417,21 @@ describe("POST /api/webhooks/plivo/answer", () => {
     );
 
     expect(resolveClinic).toHaveBeenCalledWith("+14155550101");
+  });
+
+  it("denies call when IVR feature is disabled", async () => {
+    requireTenantFeatureEntitlement.mockRejectedValueOnce(
+      new FeatureError("ivr", "global"),
+    );
+    const response = await POST(
+      buildSignedPlivoWebhookRequest({
+        url: WEBHOOK_URL,
+        params: REALISTIC_ANSWER_PARAMS,
+      }),
+    );
+    expect(response.status).toBe(200);
+    const xml = await response.text();
+    expect(xml).toContain("Telephone assistance is not configured for this number.");
+    expect(observeInboundCall).not.toHaveBeenCalled();
   });
 });

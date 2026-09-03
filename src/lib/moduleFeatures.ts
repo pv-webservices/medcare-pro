@@ -34,6 +34,7 @@ export const MODULE_FEATURES = {
   // note on its catalogue entry. Silence at layer 3 DENIES here, so a role sees
   // nothing until a Clinic Admin enables it.
   appointments: "appointments",
+  ivr: "ivr",
 } as const;
 
 export type ModuleFeatureKey = (typeof MODULE_FEATURES)[keyof typeof MODULE_FEATURES];

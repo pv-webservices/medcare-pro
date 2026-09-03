@@ -7,6 +7,12 @@ const mocks = vi.hoisted(() => ({
   getRuntimeMenu: vi.fn(),
   observeInboundCall: vi.fn(),
   observeCallEvents: vi.fn(),
+  requireTenantFeatureEntitlement: vi.fn(),
+}));
+
+vi.mock("@/lib/features", () => ({
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
+  requireTenantFeatureEntitlement: mocks.requireTenantFeatureEntitlement,
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
@@ -127,6 +133,7 @@ describe("Stage 7 /answer effective routing", () => {
     );
     mocks.observeInboundCall.mockResolvedValue("recorded");
     mocks.observeCallEvents.mockResolvedValue("recorded");
+    mocks.requireTenantFeatureEntitlement.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

@@ -50,7 +50,7 @@ export default async function PhoneSettingsPage() {
     throw error;
   }
 
-  const locked = await moduleLock(actor, MODULE_FEATURES.clinics);
+  const locked = await moduleLock(actor, MODULE_FEATURES.ivr);
   if (locked) return <ModuleLocked title="Phone settings" reason={locked} />;
 
   const held = await permissionsHeldAnywhere(actor);

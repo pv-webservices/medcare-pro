@@ -41,6 +41,12 @@ export async function processBookingWebhook(
   try {
     const clinic = await resolveInboundClinicByPlivoNumber(verification.params.To);
     if (!clinic) return xmlResponse(buildTelephonyUnavailableXml());
+    try {
+      await requireTenantFeatureEntitlement(clinic.tenantId, MODULE_FEATURES.ivr);
+    } catch (error: unknown) {
+      if (!(error instanceof FeatureError)) throw error;
+      return xmlResponse(buildTelephonyUnavailableXml());
+    }
     const runtimeMenu = await getClinicIvrRuntimeMenuForTrustedClinic(clinic);
     try {
       await requireTenantFeatureEntitlement(

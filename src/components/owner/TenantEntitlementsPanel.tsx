@@ -69,6 +69,8 @@ function getFeatureIcon(key: string) {
       return MessageSquare;
     case "appointments":
       return Calendar;
+    case "ivr":
+      return PhoneCall;
     case "marketing":
       return Megaphone;
     default:

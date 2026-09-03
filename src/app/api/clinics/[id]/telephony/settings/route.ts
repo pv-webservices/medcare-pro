@@ -14,7 +14,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
-    await requireModule(actor, MODULE_FEATURES.clinics);
+    await requireModule(actor, MODULE_FEATURES.ivr);
     const { id } = await context.params;
     return jsonOk(await getClinicPhoneSettingsForActor(actor, id));
   } catch (error: unknown) {
@@ -28,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const actor = await requireActor();
-    await requireModule(actor, MODULE_FEATURES.clinics);
+    await requireModule(actor, MODULE_FEATURES.ivr);
     const { id } = await context.params;
     const input = updateClinicPhoneSettingsSchema.parse(
       await readJsonBody(request),

@@ -29,9 +29,15 @@ const originalAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const resolveClinic = vi.hoisted(() => vi.fn());
 const getRuntimeMenu = vi.hoisted(() => vi.fn());
 const observeCallEvents = vi.hoisted(() => vi.fn());
+const requireTenantFeatureEntitlement = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: resolveClinic,
+}));
+
+vi.mock("@/lib/features", () => ({
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
+  requireTenantFeatureEntitlement,
 }));
 
 vi.mock("@/lib/telephony/ivrRuntime", async (importOriginal) => {
@@ -111,6 +117,8 @@ describe("POST /api/webhooks/plivo/urgent/confirm", () => {
     );
     observeCallEvents.mockReset();
     observeCallEvents.mockResolvedValue("recorded");
+    requireTenantFeatureEntitlement.mockReset();
+    requireTenantFeatureEntitlement.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -324,6 +332,8 @@ describe("POST /api/webhooks/plivo/urgent/status", () => {
     resolveClinic.mockResolvedValue(TEST_CLINIC);
     observeCallEvents.mockReset();
     observeCallEvents.mockResolvedValue("recorded");
+    requireTenantFeatureEntitlement.mockReset();
+    requireTenantFeatureEntitlement.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

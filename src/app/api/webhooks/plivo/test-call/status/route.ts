@@ -1,3 +1,5 @@
+import { FeatureError } from "@/lib/featureResolution";
+import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import {
   bindAndTransitionTelephonyTestCallCallback,
@@ -23,12 +25,21 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    await bindAndTransitionTelephonyTestCallCallback({
+    const context = await bindAndTransitionTelephonyTestCallCallback({
       testCallId: verifiedTestCallId(request.url),
       callUuid: oneValidatedPlivoValue(verification.params, "CallUUID"),
       requestUuid: oneValidatedPlivoValue(verification.params, "RequestUUID"),
       transition: resolveTelephonyTestCallStatusTransition(verification.params),
     });
+    try {
+      await requireTenantFeatureEntitlement(context.tenantId, MODULE_FEATURES.ivr);
+    } catch (error: unknown) {
+      if (!(error instanceof FeatureError)) throw error;
+      return new Response("", {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     return new Response("", {
       status: 200,
       headers: { "Cache-Control": "no-store" },

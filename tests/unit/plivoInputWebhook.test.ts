@@ -36,7 +36,7 @@ vi.mock("@/lib/telephony/clinicConfig", () => ({
 }));
 
 vi.mock("@/lib/features", () => ({
-  MODULE_FEATURES: { appointments: "appointments" },
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
   requireTenantFeatureEntitlement,
 }));
 
@@ -177,7 +177,11 @@ describe("POST /api/webhooks/plivo/input", () => {
       clinic: TEST_CLINIC,
       runtimeMenu: expect.objectContaining({ source: "default" }),
     });
-    expect(requireTenantFeatureEntitlement).not.toHaveBeenCalled();
+    expect(requireTenantFeatureEntitlement).toHaveBeenCalledWith("tenant-a", "ivr");
+    expect(requireTenantFeatureEntitlement).not.toHaveBeenCalledWith(
+      "tenant-a",
+      "appointments",
+    );
     expect(observeCallEvents).toHaveBeenCalledWith({
       clinicId: "clinic-a",
       providerCallUuid: REALISTIC_ANSWER_PARAMS.CallUUID,
@@ -227,7 +231,11 @@ describe("POST /api/webhooks/plivo/input", () => {
     expect(xml).toContain("Press 9 to return to the main menu");
     expect(xml).not.toContain("<Dial");
     expect(xml).not.toContain("<Record");
-    expect(requireTenantFeatureEntitlement).not.toHaveBeenCalled();
+    expect(requireTenantFeatureEntitlement).toHaveBeenCalledWith("tenant-a", "ivr");
+    expect(requireTenantFeatureEntitlement).not.toHaveBeenCalledWith(
+      "tenant-a",
+      "appointments",
+    );
     expect(buildDoctorMenuForClinic).not.toHaveBeenCalled();
     expect(beginTelephoneBooking).not.toHaveBeenCalled();
   });
@@ -252,8 +260,12 @@ describe("POST /api/webhooks/plivo/input", () => {
   });
 
   it("keeps Press 1 unavailable when tenant entitlement is denied", async () => {
-    requireTenantFeatureEntitlement.mockRejectedValueOnce(
-      new FeatureError("appointments", "entitlement"),
+    requireTenantFeatureEntitlement.mockImplementation(
+      async (_tenantId: string, featureKey: string) => {
+        if (featureKey === "appointments") {
+          throw new FeatureError("appointments", "entitlement");
+        }
+      },
     );
 
     const { response, xml } = await postDigit("1");
@@ -339,8 +351,12 @@ describe("POST /api/webhooks/plivo/input", () => {
   it("keeps appointment entitlement attached to a remapped action", async () => {
     const menu = customRuntimeMenu();
     getRuntimeMenu.mockResolvedValueOnce(menu);
-    requireTenantFeatureEntitlement.mockRejectedValueOnce(
-      new FeatureError("appointments", "entitlement"),
+    requireTenantFeatureEntitlement.mockImplementation(
+      async (_tenantId: string, featureKey: string) => {
+        if (featureKey === "appointments") {
+          throw new FeatureError("appointments", "entitlement");
+        }
+      },
     );
 
     const { xml } = await postDigit(
@@ -629,5 +645,15 @@ describe("POST /api/webhooks/plivo/input", () => {
 
     expect(resolveClinic).toHaveBeenCalledTimes(1);
     expect(resolveClinic).toHaveBeenCalledWith("+14155550101");
+  });
+
+  it("terminates call with telephony unavailable XML when IVR feature is disabled", async () => {
+    requireTenantFeatureEntitlement.mockRejectedValueOnce(
+      new FeatureError("ivr", "global"),
+    );
+    const { response, xml } = await postDigit("1");
+    expect(response.status).toBe(200);
+    expect(xml).toContain("Telephone assistance is not configured for this number.");
+    expect(buildDoctorMenuForClinic).not.toHaveBeenCalled();
   });
 });

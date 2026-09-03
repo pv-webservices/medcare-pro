@@ -37,7 +37,7 @@ export default async function PhoneMenuSettingsPage() {
     throw error;
   }
 
-  const locked = await moduleLock(actor, MODULE_FEATURES.clinics);
+  const locked = await moduleLock(actor, MODULE_FEATURES.ivr);
   if (locked) return <ModuleLocked title="Phone menu" reason={locked} />;
 
   const held = await permissionsHeldAnywhere(actor);

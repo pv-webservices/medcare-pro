@@ -21,7 +21,7 @@ vi.mock("@/lib/telephony/clinicConfig", () => ({
   resolveInboundClinicByPlivoNumber: mocks.resolveClinic,
 }));
 vi.mock("@/lib/features", () => ({
-  MODULE_FEATURES: { appointments: "appointments" },
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
   requireTenantFeatureEntitlement: mocks.requireEntitlement,
 }));
 vi.mock("@/lib/telephony/booking", () => ({
@@ -167,8 +167,12 @@ describe("every Stage 5 booking webhook", () => {
     "%s preserves a valid custom menu when booking entitlement is denied",
     async (path, post, handler) => {
       mocks.getRuntimeMenu.mockResolvedValueOnce(customRuntimeMenu);
-      mocks.requireEntitlement.mockRejectedValueOnce(
-        new FeatureError("appointments", "entitlement"),
+      mocks.requireEntitlement.mockImplementation(
+        async (_tenantId: string, featureKey: string) => {
+          if (featureKey === "appointments") {
+            throw new FeatureError("appointments", "entitlement");
+          }
+        },
       );
       const response = await post(requestFor(path));
       const xml = await response.text();
@@ -180,6 +184,20 @@ describe("every Stage 5 booking webhook", () => {
         clinicId: "clinic-a",
         events: ["APPOINTMENTS_UNAVAILABLE"],
       }));
+    },
+  );
+
+  it.each(routes)(
+    "%s terminates call with telephony unavailable XML when IVR entitlement is denied",
+    async (path, post, handler) => {
+      mocks.requireEntitlement.mockRejectedValueOnce(
+        new FeatureError("ivr", "global"),
+      );
+      const response = await post(requestFor(path));
+      const xml = await response.text();
+      expect(response.status).toBe(200);
+      expect(xml).toContain("Telephone assistance is not configured for this number.");
+      expect(handler).not.toHaveBeenCalled();
     },
   );
 

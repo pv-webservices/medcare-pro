@@ -31,7 +31,7 @@ describe("Phone settings clinic-facing page", () => {
   });
 
   it("enforces module and selected-clinic edit authority before loading settings", () => {
-    expect(page).toContain("moduleLock(actor, MODULE_FEATURES.clinics)");
+    expect(page).toContain("moduleLock(actor, MODULE_FEATURES.ivr)");
     expect(page).toContain("resolveSelectedClinicId(actor)");
     expect(page).toContain('can(actor, "clinic:edit", clinicId)');
     expect(page.indexOf('can(actor, "clinic:edit", clinicId)')).toBeLessThan(

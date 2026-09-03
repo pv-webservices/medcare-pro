@@ -7,6 +7,12 @@ import {
 const mocks = vi.hoisted(() => ({
   resolveClinic: vi.fn(),
   completeCall: vi.fn(),
+  requireTenantFeatureEntitlement: vi.fn(),
+}));
+
+vi.mock("@/lib/features", () => ({
+  MODULE_FEATURES: { appointments: "appointments", ivr: "ivr" },
+  requireTenantFeatureEntitlement: mocks.requireTenantFeatureEntitlement,
 }));
 
 vi.mock("@/lib/telephony/clinicConfig", () => ({
@@ -53,6 +59,7 @@ describe("POST /api/webhooks/plivo/hangup", () => {
       clinicName: "Sunrise Clinic",
     });
     mocks.completeCall.mockReset().mockResolvedValue("recorded");
+    mocks.requireTenantFeatureEntitlement.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {

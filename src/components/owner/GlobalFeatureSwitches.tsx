@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   Megaphone,
   MessageSquare,
+  PhoneCall,
   Power,
   PowerOff,
   Settings,
@@ -76,6 +77,8 @@ function getFeatureIcon(key: string) {
       return MessageSquare;
     case "appointments":
       return Calendar;
+    case "ivr":
+      return PhoneCall;
     case "marketing":
       return Megaphone;
     default:

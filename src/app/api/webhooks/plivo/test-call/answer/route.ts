@@ -1,3 +1,5 @@
+import { FeatureError } from "@/lib/featureResolution";
+import { MODULE_FEATURES, requireTenantFeatureEntitlement } from "@/lib/features";
 import { getClinicIvrRuntimeMenuForTrustedClinic } from "@/lib/telephony/ivrRuntime";
 import { verifyPlivoV3Webhook } from "@/lib/telephony/security";
 import { bindAndTransitionTelephonyTestCallCallback } from "@/lib/telephony/testCall";
@@ -32,6 +34,12 @@ export async function POST(request: Request): Promise<Response> {
       requestUuid: oneValidatedPlivoValue(verification.params, "RequestUUID"),
       transition: { kind: "answered" },
     });
+    try {
+      await requireTenantFeatureEntitlement(context.tenantId, MODULE_FEATURES.ivr);
+    } catch (error: unknown) {
+      if (!(error instanceof FeatureError)) throw error;
+      return testCallXmlResponse("<Response></Response>");
+    }
     if (context.terminal) {
       return testCallXmlResponse("<Response></Response>");
     }

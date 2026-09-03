@@ -52,7 +52,8 @@ export async function getDashboardCallHandlingForActor(
 
   if (
     canManage &&
-    (await moduleLock(actor, MODULE_FEATURES.clinics)) !== null
+    ((await moduleLock(actor, MODULE_FEATURES.ivr)) !== null ||
+      (await moduleLock(actor, MODULE_FEATURES.clinics)) !== null)
   ) {
     canManage = false;
   }

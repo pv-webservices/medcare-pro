@@ -55,7 +55,7 @@ interface CallbackTestCallRow extends StoredTestCallView {
   providerCallUuid: string | null;
   activeClinicId: string | null;
   expiresAt: Date;
-  clinic: { name: string };
+  clinic: { name: string; tenantId: string };
 }
 
 export type TelephonyTestCallTransition =
@@ -76,6 +76,7 @@ export interface TrustedTelephonyTestCallContext {
   readonly testCallId: string;
   readonly clinicId: string;
   readonly clinicName: string;
+  readonly tenantId: string;
   readonly status: TelephonyTestCallStatus;
   readonly terminal: boolean;
 }
@@ -409,6 +410,7 @@ function callbackContext(row: CallbackTestCallRow): TrustedTelephonyTestCallCont
     testCallId: row.id,
     clinicId: row.clinicId,
     clinicName: row.clinic.name,
+    tenantId: row.clinic.tenantId,
     status: row.status,
     terminal: !isActiveTelephonyTestCallStatus(row.status),
   });
@@ -431,7 +433,7 @@ export async function bindAndTransitionTelephonyTestCallCallback(input: {
   return prisma.$transaction(async (tx) => {
     let row = (await tx.clinicTelephonyTestCall.findUnique({
       where: { id: input.testCallId },
-      include: { clinic: { select: { name: true } } },
+      include: { clinic: { select: { name: true, tenantId: true } } },
     })) as CallbackTestCallRow | null;
     if (!row) throw new TelephonyTestCallCallbackError(404);
 
@@ -472,7 +474,7 @@ export async function bindAndTransitionTelephonyTestCallCallback(input: {
       });
       row = (await tx.clinicTelephonyTestCall.findUnique({
         where: { id: row.id },
-        include: { clinic: { select: { name: true } } },
+        include: { clinic: { select: { name: true, tenantId: true } } },
       })) as CallbackTestCallRow;
       if (row.providerCallUuid !== callUuid) {
         throw new TelephonyTestCallCallbackError(403);
@@ -524,7 +526,7 @@ export async function bindAndTransitionTelephonyTestCallCallback(input: {
     if (input.transition.kind !== "none") {
       row = (await tx.clinicTelephonyTestCall.findUnique({
         where: { id: row.id },
-        include: { clinic: { select: { name: true } } },
+        include: { clinic: { select: { name: true, tenantId: true } } },
       })) as CallbackTestCallRow;
     }
     return callbackContext(row);

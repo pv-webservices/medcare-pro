@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { cx } from "@/components/ui/cx";
+import { resolveModulesForActor } from "@/lib/features";
+import type { ModuleFeatureKey } from "@/lib/moduleFeatures";
 import { holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import {
@@ -104,10 +106,15 @@ export default async function SettingsPage() {
     throw error;
   }
 
-  const held = await permissionsHeldAnywhere(actor);
+  const [held, modules] = await Promise.all([
+    permissionsHeldAnywhere(actor),
+    resolveModulesForActor(actor),
+  ]);
+  const isFeatureAllowed = (feature: string) =>
+    modules.get(feature as ModuleFeatureKey)?.allowed === true;
   const holds = (permission: string) => holdsAnywhere(held, permission);
 
-  const visible = visibleSettingsSections(holds);
+  const visible = visibleSettingsSections(holds, isFeatureAllowed);
 
   if (visible.length === 0) {
     return (
@@ -127,7 +134,11 @@ export default async function SettingsPage() {
   // Sections they cannot open are still named, without a link. Silence would
   // leave someone unable to tell "this organisation has no such screen" from
   // "my role does not reach it" — and only one of those is worth asking about.
-  const hidden = SETTINGS_SECTIONS.filter((section) => !visible.includes(section));
+  const hidden = SETTINGS_SECTIONS.filter(
+    (section) =>
+      !visible.includes(section) &&
+      (!section.feature || isFeatureAllowed(section.feature)),
+  );
 
   return (
     <section className="space-y-6">
