@@ -110,6 +110,8 @@ model Tenant {
   patients                 Patient[]
   notifications            Notification[]
   whatsappTemplates        WhatsappTemplate[]
+  mediaAssets              MediaAsset[]
+  whatsappTemplateMedia    WhatsappTemplateMedia[]
   plan                     Plan?                     @relation(fields: [planId], references: [id], onDelete: Restrict)
   approvedBy               User?                     @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   rejectedBy               User?                     @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
@@ -200,6 +202,7 @@ model User {
   dashboardLayouts     DashboardLayout[]
   registrationsCreated Registration[]        @relation("RegistrationCreatedBy")
   registrationEdits    RegistrationEditLog[]
+  mediaAssetsUploaded  MediaAsset[]          @relation("MediaAssetUploadedBy")
 
   // --- Stage 1 relations ---------------------------------------------------
   approvedBy  User? @relation("UserApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -410,9 +413,11 @@ model Clinic {
   doctors          Doctor[]
   patients         Patient[]
   registrations    Registration[]
-  notifications    Notification[]
-  whatsappMessages WhatsappMessage[]
-  userRoles        UserRole[]
+  notifications            Notification[]
+  whatsappMessages         WhatsappMessage[]
+  mediaAssets              MediaAsset[]
+  whatsappTemplateMedia    WhatsappTemplateMedia[]
+  userRoles                UserRole[]
   invitations      Invitation[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
@@ -945,6 +950,7 @@ model WhatsappTemplate {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinicMedia WhatsappTemplateMedia[]
 
   /// Template names are unique within an account, not globally.
   @@unique([tenantId, name])
@@ -956,6 +962,7 @@ model WhatsappMessage {
   id                String   @id @default(cuid())
   clinicId          String   @map("clinic_id")
   patientId         String   @map("patient_id")
+  mediaAssetId      String?  @map("media_asset_id")
   /// FR-9.1 — the WhatsappTemplate name this send used. Denormalised rather
   /// than a foreign key: history must survive the template being renamed or
   /// deleted, the same reasoning as `registration_edit_log.role_at_time`.
@@ -979,13 +986,71 @@ model WhatsappMessage {
   failureReason     String?  @map("failure_reason") @db.Text
   sentAt            DateTime @default(now()) @map("sent_at")
 
-  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  clinic     Clinic      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient    Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([clinicId])
   @@index([patientId])
   @@index([clinicId, sentAt])
+  @@index([mediaAssetId])
   @@map("whatsapp_messages")
+}
+
+enum StoredMediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+model MediaAsset {
+  id               String          @id @default(cuid())
+  tenantId         String          @map("tenant_id")
+  clinicId         String          @map("clinic_id")
+  uploadedByUserId String          @map("uploaded_by_user_id")
+  originalFileName String          @map("original_file_name")
+  storedFileName   String          @map("stored_file_name")
+  mimeType         String          @map("mime_type")
+  mediaType        StoredMediaType @map("media_type")
+  fileSize         Int             @map("file_size")
+  storagePath      String          @map("storage_path")
+  sha256           String?         @map("sha256")
+  lastUsedAt       DateTime?       @map("last_used_at")
+  deletedAt        DateTime?       @map("deleted_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic           Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  uploadedBy       User                    @relation("MediaAssetUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  templateMedia    WhatsappTemplateMedia[]
+  whatsappMessages WhatsappMessage[]
+
+  @@index([tenantId, clinicId])
+  @@index([createdAt])
+  @@index([mediaType])
+  @@map("media_assets")
+}
+
+model WhatsappTemplateMedia {
+  id           String           @id @default(cuid())
+  tenantId     String           @map("tenant_id")
+  clinicId     String           @map("clinic_id")
+  templateId   String           @map("template_id")
+  mediaAssetId String           @map("media_asset_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic       Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  template     WhatsappTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  mediaAsset   MediaAsset       @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, clinicId])
+  @@index([tenantId, clinicId])
+  @@index([mediaAssetId])
+  @@index([templateId])
+  @@map("whatsapp_template_media")
 }
 
 // ===========================================================================

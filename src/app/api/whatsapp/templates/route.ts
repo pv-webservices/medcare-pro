@@ -22,11 +22,13 @@ import { MODULE_FEATURES, requireModule } from "@/lib/features";
 // list, since anyone who may send needs to choose from it. That split is the
 // point — a receptionist can send the wording but not rewrite it.
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const actor = await requireActor();
     await requireModule(actor, MODULE_FEATURES.whatsapp);
-    return jsonOk(await listTemplatesForActor(actor));
+    const url = new URL(request.url);
+    const clinicId = url.searchParams.get("clinicId")?.trim() ?? null;
+    return jsonOk(await listTemplatesForActor(actor, clinicId));
   } catch (error: unknown) {
     return toErrorResponse(error, "GET /api/whatsapp/templates");
   }

@@ -15,8 +15,10 @@ import {
   readWhatsappConfig,
   sendMedia,
   sendText,
+  type MediaType,
   type SendResult,
 } from "@/lib/whatsapp";
+import { buildMediaContentUrl } from "@/lib/mediaSecurity";
 import {
   assertCanSendSomewhere,
   getTemplateForActor,
@@ -252,6 +254,7 @@ export async function deliverTemplate(
   const to = toDigits(target.mobileNumber);
 
   let outcome: SendResult;
+  let usedMediaAssetId: string | null = null;
   if (to.length < 10) {
     // Short-circuited rather than sent: the gateway would reject it anyway,
     // and this reason is far more useful than its generic one.
@@ -269,20 +272,60 @@ export async function deliverTemplate(
       providerMessageId: null,
       message: `${target.mobileNumber} is not on WhatsApp.`,
     };
-  } else if (template.mediaType && template.mediaUrl) {
-    outcome = await sendMedia({
-      to,
-      message,
-      footer: template.footer ?? undefined,
-      mediaType: template.mediaType,
-      mediaUrl: template.mediaUrl,
-    });
   } else {
-    outcome = await sendText({
-      to,
-      message,
-      footer: template.footer ?? undefined,
+    // 1. Check for clinic-specific media attachment
+    const templateMedia = await prisma.whatsappTemplateMedia.findUnique({
+      where: {
+        templateId_clinicId: {
+          templateId: template.id,
+          clinicId: target.clinicId,
+        },
+      },
+      include: {
+        mediaAsset: true,
+      },
     });
+
+    if (templateMedia?.mediaAsset && !templateMedia.mediaAsset.deletedAt) {
+      const asset = templateMedia.mediaAsset;
+      usedMediaAssetId = asset.id;
+      const signedUrl = buildMediaContentUrl({
+        mediaId: asset.id,
+        tenantId: asset.tenantId,
+        clinicId: target.clinicId,
+        purpose: "whatsapp",
+      });
+      const mediaType: MediaType =
+        asset.mediaType === "IMAGE"
+          ? "image"
+          : asset.mediaType === "VIDEO"
+            ? "video"
+            : "document";
+
+      outcome = await sendMedia({
+        to,
+        message,
+        footer: template.footer ?? undefined,
+        mediaType,
+        mediaUrl: signedUrl,
+      });
+    } else if (template.mediaType && template.mediaUrl) {
+      // 2. Fallback to legacy template media URL
+      outcome = await sendMedia({
+        to,
+        message,
+        footer: template.footer ?? undefined,
+        mediaType: template.mediaType,
+        mediaUrl: template.mediaUrl,
+      });
+    } else {
+      // 3. Fallback to text send
+      outcome = await sendText({
+        to,
+        message,
+        footer: template.footer ?? undefined,
+      });
+    }
   }
 
   const status: MessageStatus = outcome.ok ? "sent" : "failed";
@@ -292,6 +335,7 @@ export async function deliverTemplate(
       data: {
         clinicId: target.clinicId,
         patientId: target.patientId,
+        mediaAssetId: usedMediaAssetId,
         // Denormalised copy — see the schema note. History must survive the
         // template being renamed or deleted.
         templateName: template.name,
@@ -300,6 +344,15 @@ export async function deliverTemplate(
         failureReason: outcome.ok ? null : outcome.message,
       },
     });
+
+    if (usedMediaAssetId && outcome.ok) {
+      await prisma.mediaAsset
+        .update({
+          where: { id: usedMediaAssetId },
+          data: { lastUsedAt: new Date() },
+        })
+        .catch(() => {});
+    }
   } catch (error: unknown) {
     // The message may genuinely have gone out; losing the log row must not
     // turn that into an error on screen or stop the remaining recipients.

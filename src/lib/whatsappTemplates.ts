@@ -122,6 +122,7 @@ export interface TemplateRecord {
   mediaUrl: string | null;
   /** Which placeholders this body actually uses, for the UI's preview. */
   placeholders: TemplatePlaceholder[];
+  clinicMediaAsset?: import("@/lib/mediaTypes").SafeMediaAsset | null;
 }
 
 function toRecord(row: {
@@ -131,6 +132,9 @@ function toRecord(row: {
   footer: string | null;
   mediaType: string | null;
   mediaUrl: string | null;
+  clinicMedia?: Array<{
+    mediaAsset?: import("@/lib/mediaTypes").SafeMediaAsset | null;
+  }>;
 }): TemplateRecord {
   return {
     id: row.id,
@@ -144,6 +148,7 @@ function toRecord(row: {
       : null,
     mediaUrl: row.mediaUrl,
     placeholders: usedPlaceholders(row.body),
+    clinicMediaAsset: row.clinicMedia?.[0]?.mediaAsset ?? null,
   };
 }
 
@@ -194,8 +199,38 @@ export async function assertCanSendSomewhere(actor: ActorContext): Promise<void>
  */
 export async function listTemplatesForActor(
   actor: ActorContext,
+  clinicId?: string | null,
 ): Promise<TemplateRecord[]> {
   await assertCanSendSomewhere(actor);
+
+  if (clinicId) {
+    const rows = await prisma.whatsappTemplate.findMany({
+      where: { tenantId: actor.tenantId },
+      orderBy: { name: "asc" },
+      select: {
+        ...TEMPLATE_SELECT,
+        clinicMedia: {
+          where: { clinicId },
+          select: {
+            mediaAsset: {
+              select: {
+                id: true,
+                clinicId: true,
+                originalFileName: true,
+                mimeType: true,
+                mediaType: true,
+                fileSize: true,
+                createdAt: true,
+                lastUsedAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return rows.map(toRecord);
+  }
 
   const rows = await prisma.whatsappTemplate.findMany({
     where: { tenantId: actor.tenantId },
@@ -210,7 +245,41 @@ export async function listTemplatesForActor(
 export async function getTemplateForActor(
   actor: ActorContext,
   templateId: string,
+  clinicId?: string | null,
 ): Promise<TemplateRecord> {
+  if (clinicId) {
+    const row = await prisma.whatsappTemplate.findFirst({
+      where: { id: templateId, tenantId: actor.tenantId },
+      select: {
+        ...TEMPLATE_SELECT,
+        clinicMedia: {
+          where: { clinicId },
+          select: {
+            mediaAsset: {
+              select: {
+                id: true,
+                clinicId: true,
+                originalFileName: true,
+                mimeType: true,
+                mediaType: true,
+                fileSize: true,
+                createdAt: true,
+                lastUsedAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!row) {
+      // 404, not 403 — another account's id must not be confirmable.
+      throw new ScopeError();
+    }
+
+    return toRecord(row);
+  }
+
   const row = await prisma.whatsappTemplate.findFirst({
     where: { id: templateId, tenantId: actor.tenantId },
     select: TEMPLATE_SELECT,

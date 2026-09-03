@@ -52,12 +52,23 @@ export default async function MessagesPage() {
     return <ModuleLocked title="Messages" reason={locked} />;
   }
 
+  const [clinics, selectedClinicId, canManageTemplates] = await Promise.all([
+    listClinicsForActor(actor),
+    resolveSelectedClinicId(actor),
+    can(actor, "message:template"),
+  ]);
+
+  // The sidebar switcher only renders when there is more than one clinic, so a
+  // single-clinic account has nothing to select and is resolved directly.
+  const clinicId = selectedClinicId ?? (clinics.length === 1 ? clinics[0].id : null);
+  const clinicName = clinics.find((clinic) => clinic.id === clinicId)?.name ?? null;
+
   let templates: TemplateRecord[] | null = null;
   let messages: MessageRecord[] = [];
   try {
     [templates, messages] = await Promise.all([
-      listTemplatesForActor(actor),
-      listMessagesForActor(actor),
+      listTemplatesForActor(actor, clinicId),
+      listMessagesForActor(actor, { clinicId: clinicId ?? undefined }),
     ]);
   } catch (error: unknown) {
     if (!(error instanceof PermissionError)) {
@@ -79,12 +90,6 @@ export default async function MessagesPage() {
 
   const configured = isWhatsappConfigured();
 
-  const [clinics, selectedClinicId, canManageTemplates] = await Promise.all([
-    listClinicsForActor(actor),
-    resolveSelectedClinicId(actor),
-    can(actor, "message:template"),
-  ]);
-
   // Asked of the gateway only when there is something to ask about. A probe
   // that cannot answer — rotating sender, gateway down — is left as null and
   // reported as nothing rather than as a fault.
@@ -93,11 +98,6 @@ export default async function MessagesPage() {
     const probe = await getDeviceStatus().catch(() => null);
     device = probe?.ok ? probe.device : null;
   }
-
-  // The sidebar switcher only renders when there is more than one clinic, so a
-  // single-clinic account has nothing to select and is resolved directly.
-  const clinicId = selectedClinicId ?? (clinics.length === 1 ? clinics[0].id : null);
-  const clinicName = clinics.find((clinic) => clinic.id === clinicId)?.name ?? null;
 
   return (
     <section className="space-y-5">
@@ -140,6 +140,7 @@ export default async function MessagesPage() {
         <TemplateManager
           templates={templates}
           canManage={canManageTemplates}
+          clinicId={clinicId}
           clinicName={clinicName}
         />
       </div>
