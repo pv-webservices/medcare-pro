@@ -19,6 +19,7 @@ import {
   type SendResult,
 } from "@/lib/whatsapp";
 import { buildMediaContentUrl } from "@/lib/mediaSecurity";
+import { MediaConfigurationError } from "@/lib/mediaTypes";
 import {
   assertCanSendSomewhere,
   getTemplateForActor,
@@ -289,26 +290,38 @@ export async function deliverTemplate(
     if (templateMedia?.mediaAsset && !templateMedia.mediaAsset.deletedAt) {
       const asset = templateMedia.mediaAsset;
       usedMediaAssetId = asset.id;
-      const signedUrl = buildMediaContentUrl({
-        mediaId: asset.id,
-        tenantId: asset.tenantId,
-        clinicId: target.clinicId,
-        purpose: "whatsapp",
-      });
-      const mediaType: MediaType =
-        asset.mediaType === "IMAGE"
-          ? "image"
-          : asset.mediaType === "VIDEO"
-            ? "video"
-            : "document";
+      try {
+        const signedUrl = buildMediaContentUrl({
+          mediaId: asset.id,
+          tenantId: asset.tenantId,
+          clinicId: target.clinicId,
+          purpose: "whatsapp",
+        });
+        const mediaType: MediaType =
+          asset.mediaType === "IMAGE"
+            ? "image"
+            : asset.mediaType === "VIDEO"
+              ? "video"
+              : "document";
 
-      outcome = await sendMedia({
-        to,
-        message,
-        footer: template.footer ?? undefined,
-        mediaType,
-        mediaUrl: signedUrl,
-      });
+        outcome = await sendMedia({
+          to,
+          message,
+          footer: template.footer ?? undefined,
+          mediaType,
+          mediaUrl: signedUrl,
+        });
+      } catch (mediaError: unknown) {
+        console.error("Failed to prepare or send media template", mediaError);
+        outcome = {
+          ok: false,
+          providerMessageId: null,
+          message:
+            mediaError instanceof MediaConfigurationError
+              ? "Media service is not configured for WhatsApp sending."
+              : "Failed to send media message.",
+        };
+      }
     } else if (template.mediaType && template.mediaUrl) {
       // 2. Fallback to legacy template media URL
       outcome = await sendMedia({
@@ -398,12 +411,21 @@ export async function sendToPatients(
     // from the client, and a patient's clinic is what decides the permission.
     await assertClinicInTenant(actor.tenantId, recipient.clinicId);
 
-    const outcome = await deliverTemplate(template, {
-      patientId: recipient.id,
-      clinicId: recipient.clinicId,
-      mobileNumber: recipient.mobileNumber,
-      values: recipient.values,
-    });
+    let outcome: DeliveryOutcome;
+    try {
+      outcome = await deliverTemplate(template, {
+        patientId: recipient.id,
+        clinicId: recipient.clinicId,
+        mobileNumber: recipient.mobileNumber,
+        values: recipient.values,
+      });
+    } catch (deliverError: unknown) {
+      console.error(`Failed delivering template to recipient ${recipient.id}`, deliverError);
+      outcome = {
+        status: "failed",
+        failureReason: "Failed to deliver message to this recipient.",
+      };
+    }
 
     results.push({
       patientId: recipient.id,

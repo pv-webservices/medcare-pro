@@ -21,7 +21,7 @@ import {
   moveTempToFinal,
   writeUploadToTemp,
 } from "@/lib/mediaStorage";
-import { buildMediaContentUrl } from "@/lib/mediaSecurity";
+import { buildMediaContentUrl, getPreviewTtlSeconds } from "@/lib/mediaSecurity";
 
 function toSafeMediaAsset(row: {
   id: string;
@@ -269,12 +269,15 @@ export async function generateMediaPreviewUrlForActor(
 ): Promise<{ url: string; ttlSeconds: number }> {
   const media = await getMediaForActor(actor, mediaId);
 
+  const ttlSeconds = getPreviewTtlSeconds();
   const url = buildMediaContentUrl({
     mediaId: media.id,
     tenantId: actor.tenantId,
     clinicId: media.clinicId,
     purpose: "preview",
+    ttlSeconds,
   });
 
-  return { url, ttlSeconds: 300 };
+  return { url, ttlSeconds };
 }
+

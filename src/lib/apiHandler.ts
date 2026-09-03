@@ -6,6 +6,12 @@ import { UnauthenticatedError } from "@/lib/session";
 import { PlatformAuthorizationError } from "@/lib/platform/context";
 import { RateLimitError } from "@/lib/rateLimit";
 import type { ApiResponse } from "@/lib/utils";
+import {
+  MediaConfigurationError,
+  MediaFileMissingError,
+  MediaAccessError,
+} from "@/lib/mediaTypes";
+import { InvalidTokenError } from "@/lib/mediaSecurity";
 
 /**
  * Shared error mapping for API routes.
@@ -152,6 +158,19 @@ export function toErrorResponse(
       error.issues[0]?.message ?? "Check the submitted values.",
       400,
     );
+  }
+
+  if (error instanceof MediaConfigurationError) {
+    console.error(`${context} failed due to media configuration:`, error.message);
+    return jsonError("Media service is temporarily unavailable.", 503);
+  }
+
+  if (error instanceof MediaFileMissingError) {
+    return jsonError("The requested media file could not be found.", 404);
+  }
+
+  if (error instanceof MediaAccessError || error instanceof InvalidTokenError) {
+    return jsonError("You do not have access to this media.", 403);
   }
 
   console.error(`${context} failed`, error);

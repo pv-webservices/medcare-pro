@@ -2,6 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { Readable } from "node:stream";
+import {
+  MediaConfigurationError,
+  MediaFileMissingError,
+} from "@/lib/mediaTypes";
+
+export { MediaConfigurationError, MediaFileMissingError };
 
 export class StorageError extends Error {
   constructor(message: string) {
@@ -21,6 +27,11 @@ export function getMediaStorageRoot(): string {
   if (custom !== "") {
     root = path.resolve(custom);
   } else {
+    if (process.env.NODE_ENV === "production") {
+      throw new MediaConfigurationError(
+        "MEDIA_STORAGE_ROOT is required in production.",
+      );
+    }
     // Default safe local directory for dev/testing
     root = path.resolve(process.cwd(), ".private_media");
   }
@@ -34,7 +45,7 @@ export function getMediaStorageRoot(): string {
 
   for (const forbidden of forbiddenSubstrings) {
     if (root.includes(forbidden) || root.endsWith(forbidden.slice(0, -1))) {
-      throw new StorageError(
+      throw new MediaConfigurationError(
         "MEDIA_STORAGE_ROOT cannot be set inside public, public_html, or .next directories.",
       );
     }

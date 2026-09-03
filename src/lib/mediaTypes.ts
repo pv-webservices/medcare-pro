@@ -93,3 +93,25 @@ export const listMediaQuerySchema = z.object({
   clinicId: z.string().trim().min(1).max(64),
   mediaType: z.enum(["IMAGE", "VIDEO", "DOCUMENT"]).optional(),
 });
+
+export class MediaConfigurationError extends Error {
+  constructor(message = "Media service is not properly configured.") {
+    super(message);
+    this.name = "MediaConfigurationError";
+  }
+}
+
+export class MediaFileMissingError extends Error {
+  constructor(message = "The requested media file could not be found.") {
+    super(message);
+    this.name = "MediaFileMissingError";
+  }
+}
+
+export class MediaAccessError extends Error {
+  constructor(message = "You do not have access to this media.") {
+    super(message);
+    this.name = "MediaAccessError";
+  }
+}
+

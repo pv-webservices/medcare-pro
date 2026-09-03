@@ -164,7 +164,13 @@ export default function TemplateManager({
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok || !payload.success || !payload.data?.url) {
-        throw new Error(payload.error ?? "Failed to generate preview URL.");
+        if (res.status === 404) {
+          throw new Error("That file could not be found.");
+        }
+        if (res.status === 503) {
+          throw new Error("Media preview is temporarily unavailable.");
+        }
+        throw new Error(payload.error ?? "Media preview is temporarily unavailable.");
       }
       setPreviewUrl(payload.data.url as string);
     } catch (err: unknown) {
@@ -317,7 +323,7 @@ export default function TemplateManager({
                 Attachments are saved specifically for this clinic.
               </>
             ) : (
-              "Only these can be sent. Free-text messaging is not supported."
+              "MedCarePro sends saved templates only in this workflow."
             )}
           </p>
         </div>
@@ -825,7 +831,15 @@ export default function TemplateManager({
                   <p className="text-label text-muted">Loading preview…</p>
                 </div>
               ) : previewError ? (
-                <p className="text-body text-alert-ink font-medium">{previewError}</p>
+                <div className="flex flex-col items-center gap-3 p-6 text-center max-w-md">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-alert-bg text-alert-ink">
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-body font-semibold text-ink">Preview Unavailable</p>
+                    <p className="text-label text-muted mt-1">{previewError}</p>
+                  </div>
+                </div>
               ) : previewUrl ? (
                 previewingAsset.mediaType === "IMAGE" ? (
                   // eslint-disable-next-line @next/next/no-img-element

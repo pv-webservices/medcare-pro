@@ -124,7 +124,7 @@ describe("GET & HEAD /api/media/[id]/content", () => {
       storagePath: testFileRel,
       mimeType: "image/jpeg",
       fileSize: fileContent.length,
-    } as any);
+    } as never);
 
     const req = new Request(`http://localhost:3000/api/media/media-1/content?token=${token}`);
     const res = await HEAD(req, { params: Promise.resolve({ id: "media-1" }) });
@@ -150,7 +150,7 @@ describe("GET & HEAD /api/media/[id]/content", () => {
       storagePath: testFileRel,
       mimeType: "image/jpeg",
       fileSize: fileContent.length,
-    } as any);
+    } as never);
 
     const req = new Request(`http://localhost:3000/api/media/media-1/content?token=${token}`);
     const res = await GET(req, { params: Promise.resolve({ id: "media-1" }) });
@@ -174,7 +174,7 @@ describe("GET & HEAD /api/media/[id]/content", () => {
       storagePath: testFileRel,
       mimeType: "video/mp4",
       fileSize: fileContent.length,
-    } as any);
+    } as never);
 
     const req = new Request(`http://localhost:3000/api/media/media-1/content?token=${token}`, {
       headers: { Range: "bytes=0-9" },
@@ -201,7 +201,7 @@ describe("GET & HEAD /api/media/[id]/content", () => {
       storagePath: testFileRel,
       mimeType: "video/mp4",
       fileSize: fileContent.length,
-    } as any);
+    } as never);
 
     const req = new Request(`http://localhost:3000/api/media/media-1/content?token=${token}`, {
       headers: { Range: "bytes=999-1000" },

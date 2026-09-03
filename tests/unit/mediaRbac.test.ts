@@ -63,13 +63,13 @@ describe("Media RBAC and Multi-tenancy Scoping", () => {
     // Clinic belongs to tenant
     vi.mocked(prisma.clinic.findFirst).mockResolvedValueOnce({
       id: "clinic-1",
-    } as any);
+    } as never);
     // User roles return only message:send, not message:template
     vi.mocked(prisma.userRole.findMany).mockResolvedValueOnce([
       {
         role: { permissions: ["message:send"] },
       },
-    ] as any);
+    ] as never);
 
     await expect(
       saveUploadedMediaAsset(actor, {
@@ -83,13 +83,13 @@ describe("Media RBAC and Multi-tenancy Scoping", () => {
   it("rejects listing media if user has no messaging access in clinic", async () => {
     vi.mocked(prisma.clinic.findFirst).mockResolvedValueOnce({
       id: "clinic-1",
-    } as any);
+    } as never);
     // Neither message:template nor message:send
     vi.mocked(prisma.userRole.findMany).mockResolvedValue([
       {
         role: { permissions: ["patients:view"] },
       },
-    ] as any);
+    ] as never);
 
     await expect(listMediaForActor(actor, "clinic-1")).rejects.toThrow(ScopeError);
   });
@@ -108,19 +108,19 @@ describe("Media RBAC and Multi-tenancy Scoping", () => {
       id: "asset-1",
       clinicId: "clinic-1",
       storagePath: "path/to/file.jpg",
-    } as any);
+    } as never);
 
     // Assert clinic belongs to tenant
     vi.mocked(prisma.clinic.findFirst).mockResolvedValueOnce({
       id: "clinic-1",
-    } as any);
+    } as never);
 
     // User only has message:send
     vi.mocked(prisma.userRole.findMany).mockResolvedValueOnce([
       {
         role: { permissions: ["message:send"] },
       },
-    ] as any);
+    ] as never);
 
     await expect(deleteMediaForActor(actor, "asset-1")).rejects.toThrow(
       PermissionError,

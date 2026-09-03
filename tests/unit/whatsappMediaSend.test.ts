@@ -69,7 +69,7 @@ describe("deliverTemplate with media", () => {
         mediaType: "IMAGE",
         deletedAt: null,
       },
-    } as any);
+    } as never);
 
     vi.mocked(sendMedia).mockResolvedValueOnce({
       ok: true,
@@ -120,7 +120,7 @@ describe("deliverTemplate with media", () => {
         mediaType: "VIDEO",
         deletedAt: null,
       },
-    } as any);
+    } as never);
 
     vi.mocked(sendMedia).mockResolvedValueOnce({ ok: true, providerMessageId: "MSG-VID", message: "Sent" });
 
@@ -139,7 +139,7 @@ describe("deliverTemplate with media", () => {
         mediaType: "DOCUMENT",
         deletedAt: null,
       },
-    } as any);
+    } as never);
 
     vi.mocked(sendMedia).mockResolvedValueOnce({ ok: true, providerMessageId: "MSG-DOC", message: "Sent" });
 
@@ -200,4 +200,65 @@ describe("deliverTemplate with media", () => {
       }),
     });
   });
+
+  it("handles media preparation errors gracefully as failed recipient outcome rather than throwing", async () => {
+    vi.mocked(prisma.whatsappTemplateMedia.findUnique).mockResolvedValueOnce({
+      id: "binding-broken",
+      templateId: "tmpl-1",
+      clinicId: "clinic-A",
+      mediaAsset: {
+        id: "asset-broken",
+        tenantId: "tenant-1",
+        clinicId: "clinic-A",
+        mediaType: "IMAGE",
+        deletedAt: null,
+      },
+    } as never);
+
+    // Simulate provider failure during sendMedia
+    vi.mocked(sendMedia).mockResolvedValueOnce({
+      ok: false,
+      providerMessageId: null,
+      message: "Gateway media download error: 404",
+    });
+
+    const result = await deliverTemplate(baseTemplate, deliveryTarget);
+
+    expect(result.status).toBe("failed");
+    expect(result.failureReason).toBe("Gateway media download error: 404");
+    expect(prisma.whatsappMessage.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "failed",
+        failureReason: "Gateway media download error: 404",
+      }),
+    });
+  });
+
+  it("scopes template media strictly to the target clinic", async () => {
+    // Clinic A has media
+    vi.mocked(prisma.whatsappTemplateMedia.findUnique).mockResolvedValueOnce({
+      id: "binding-A",
+      templateId: "tmpl-1",
+      clinicId: "clinic-A",
+      mediaAsset: {
+        id: "asset-clinic-A",
+        tenantId: "tenant-1",
+        clinicId: "clinic-A",
+        mediaType: "IMAGE",
+        deletedAt: null,
+      },
+    } as never);
+
+    vi.mocked(sendMedia).mockResolvedValueOnce({ ok: true, providerMessageId: "M1", message: "Sent" });
+
+    await deliverTemplate(baseTemplate, { ...deliveryTarget, clinicId: "clinic-A" });
+
+    expect(prisma.whatsappTemplateMedia.findUnique).toHaveBeenCalledWith({
+      where: {
+        templateId_clinicId: { templateId: "tmpl-1", clinicId: "clinic-A" },
+      },
+      include: { mediaAsset: true },
+    });
+  });
 });
+

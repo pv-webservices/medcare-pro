@@ -103,7 +103,7 @@ export default async function MessagesPage() {
     <section className="space-y-5">
       <PageHeader
         title="Messages"
-        description="Send approved WhatsApp templates to patients. Free-text messages are not supported by the provider."
+        description="Send saved WhatsApp message templates to patients. MedCarePro sends saved templates only in this workflow."
         scope={clinicName ?? "All clinics"}
       />
 
@@ -120,7 +120,7 @@ export default async function MessagesPage() {
       {templates.length === 0 ? (
         <EmptyState
           icon={<MessageSquare className="h-5 w-5" strokeWidth={2} />}
-          title="No approved templates yet"
+          title="No message templates yet"
           guidance={
             canManageTemplates
               ? "Add a template below before you can message patients."

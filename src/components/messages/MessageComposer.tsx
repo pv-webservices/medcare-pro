@@ -23,6 +23,7 @@ import Button from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
 import Select from "@/components/ui/Select";
 import { todayDateOnly } from "@/lib/dates";
+import WhatsAppMediaPreview from "@/components/messages/WhatsAppMediaPreview";
 
 interface MessageComposerProps {
   templates: readonly TemplateRecord[];
@@ -424,11 +425,11 @@ export default function MessageComposer({
 
                 {/* Message Bubble */}
                 <div className="mt-3 max-w-[88%] rounded-2xl rounded-tl-xs bg-white p-4 text-body text-[#111B21] shadow-sm">
-                  {template?.mediaType && (
-                    <div className="mb-2 rounded-lg bg-canvas-deep px-2.5 py-1 text-meta font-medium text-muted">
-                      📎 [{template.mediaType.toUpperCase()} attachment]
-                    </div>
-                  )}
+                  <WhatsAppMediaPreview
+                    clinicMediaAsset={template?.clinicMediaAsset}
+                    legacyMediaType={template?.mediaType}
+                    legacyMediaUrl={template?.mediaUrl}
+                  />
                   <p className="whitespace-pre-wrap leading-relaxed text-body text-[#111B21]">
                     {preview || "No template selected."}
                   </p>
@@ -446,7 +447,7 @@ export default function MessageComposer({
 
               <div className="mt-4 text-center">
                 <span className="inline-block rounded-full bg-black/5 px-3 py-1 text-micro text-[#54656F]">
-                  Visual preview only · Free-text messages not supported
+                  Visual preview only · MedCarePro sends saved templates only in this workflow
                 </span>
               </div>
             </div>

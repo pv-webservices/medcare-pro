@@ -1,5 +1,12 @@
 import crypto from "node:crypto";
-import type { MediaAccessTokenPayload, MediaTokenPurpose } from "@/lib/mediaTypes";
+import {
+  MediaConfigurationError,
+  MediaAccessError,
+  type MediaAccessTokenPayload,
+  type MediaTokenPurpose,
+} from "@/lib/mediaTypes";
+
+export { MediaConfigurationError, MediaAccessError };
 
 export class InvalidTokenError extends Error {
   constructor(message = "Invalid or expired media token.") {
@@ -28,7 +35,7 @@ function getMediaAccessSecret(): string {
   }
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error(
+    throw new MediaConfigurationError(
       "MEDIA_ACCESS_SECRET is required in production. Generate a strong random key.",
     );
   }
@@ -144,6 +151,10 @@ export function verifyMediaToken(token: string): MediaAccessTokenPayload {
     throw new InvalidTokenError("Incomplete token claims.");
   }
 
+  if (payload.purpose !== "preview" && payload.purpose !== "whatsapp") {
+    throw new InvalidTokenError("Unsupported token purpose.");
+  }
+
   return payload;
 }
 
@@ -153,8 +164,27 @@ export function verifyMediaToken(token: string): MediaAccessTokenPayload {
 export function getCanonicalPublicOrigin(): string {
   const origin = (process.env.NEXTAUTH_URL ?? "").trim().replace(/\/+$/, "");
   if (origin !== "") {
-    return origin;
+    try {
+      const parsed = new URL(origin);
+      if (!parsed.protocol.startsWith("http")) {
+        throw new Error();
+      }
+      return origin;
+    } catch {
+      if (process.env.NODE_ENV === "production") {
+        throw new MediaConfigurationError(
+          "NEXTAUTH_URL is not a valid HTTP/HTTPS URL.",
+        );
+      }
+    }
   }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new MediaConfigurationError(
+      "NEXTAUTH_URL is required in production for canonical media URLs.",
+    );
+  }
+
   return "http://localhost:3000";
 }
 

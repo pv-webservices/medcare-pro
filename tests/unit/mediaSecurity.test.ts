@@ -96,4 +96,59 @@ describe("mediaSecurity tokens", () => {
     expect(payload.mediaId).toBe("media-asset-123");
     expect(payload.purpose).toBe("whatsapp");
   });
+
+  it("rejects token with unsupported purpose", () => {
+    const fakeToken = generateMediaToken({
+      ...baseParams,
+      purpose: "preview",
+    });
+    const [, sig] = fakeToken.split(".");
+    const forged = Buffer.from(
+      JSON.stringify({
+        v: 1,
+        mediaId: "media-asset-123",
+        tenantId: "tenant-alpha",
+        clinicId: "clinic-main",
+        purpose: "unsupported-hack",
+        exp: Math.floor(Date.now() / 1000) + 600,
+      }),
+    )
+      .toString("base64")
+      .replace(/=/g, "");
+    expect(() => verifyMediaToken(`${forged}.${sig}`)).toThrow(InvalidTokenError);
+  });
+
+  it("throws MediaConfigurationError in production when MEDIA_ACCESS_SECRET is missing", () => {
+    const env = process.env as Record<string, string | undefined>;
+    const origEnv = env.NODE_ENV;
+    const origSecret = env.MEDIA_ACCESS_SECRET;
+    try {
+      env.NODE_ENV = "production";
+      delete env.MEDIA_ACCESS_SECRET;
+      expect(() => generateMediaToken(baseParams)).toThrow("MEDIA_ACCESS_SECRET is required in production");
+    } finally {
+      env.NODE_ENV = origEnv;
+      if (origSecret !== undefined) env.MEDIA_ACCESS_SECRET = origSecret;
+    }
+  });
+
+  it("throws MediaConfigurationError in production when NEXTAUTH_URL is invalid", () => {
+    const env = process.env as Record<string, string | undefined>;
+    const origEnv = env.NODE_ENV;
+    const origUrl = env.NEXTAUTH_URL;
+    const origSecret = env.MEDIA_ACCESS_SECRET;
+    try {
+      env.NODE_ENV = "production";
+      env.MEDIA_ACCESS_SECRET = "production-test-secret-with-sufficient-entropy-123456789";
+      env.NEXTAUTH_URL = "not-a-valid-url";
+      expect(() => buildMediaContentUrl(baseParams)).toThrow("NEXTAUTH_URL is not a valid HTTP/HTTPS URL.");
+    } finally {
+      env.NODE_ENV = origEnv;
+      if (origUrl !== undefined) env.NEXTAUTH_URL = origUrl;
+      else delete env.NEXTAUTH_URL;
+      if (origSecret !== undefined) env.MEDIA_ACCESS_SECRET = origSecret;
+      else delete env.MEDIA_ACCESS_SECRET;
+    }
+  });
 });
+
