@@ -1,9 +1,27 @@
 "use client";
 
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useSyncExternalStore,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import IconButton from "@/components/ui/IconButton";
 import { cx } from "@/components/ui/cx";
+
+const emptySubscribe = () => () => {};
+
+function useMounted() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+}
 
 /**
  * A panel that slides in from the edge.
@@ -45,6 +63,7 @@ export default function Drawer({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const mounted = useMounted();
 
   useEffect(() => {
     if (!isOpen) {
@@ -68,7 +87,7 @@ export default function Drawer({
     };
   }, [isOpen]);
 
-  if (!isOpen) {
+  if (!isOpen || !mounted || typeof document === "undefined") {
     return null;
   }
 
@@ -111,7 +130,7 @@ export default function Drawer({
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end" onKeyDown={handleKeyDown}>
       <div
         aria-hidden="true"
@@ -157,6 +176,7 @@ export default function Drawer({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

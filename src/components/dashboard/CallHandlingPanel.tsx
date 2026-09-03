@@ -237,7 +237,10 @@ function ClinicCallHandling({
   return (
     <section
       aria-label="Call handling"
-      className="overflow-hidden rounded-2xl border border-line bg-canvas p-4 sm:p-5 shadow-card dashboard-card-hover"
+      className={cx(
+        "overflow-hidden rounded-2xl border border-line bg-canvas p-4 sm:p-5 shadow-card",
+        pendingTargetMode === null && "dashboard-card-hover",
+      )}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">

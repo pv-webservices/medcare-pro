@@ -5,13 +5,25 @@ import {
   useEffect,
   useId,
   useRef,
+  useSyncExternalStore,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import { cx } from "@/components/ui/cx";
+
+const emptySubscribe = () => () => {};
+
+function useMounted() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+}
 
 /**
  * A modal dialog, and the confirmation dialog built on it.
@@ -66,6 +78,7 @@ export default function Modal({
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const mounted = useMounted();
 
   const requestClose = useCallback(() => {
     if (!isBusy) {
@@ -96,7 +109,7 @@ export default function Modal({
     };
   }, [isOpen]);
 
-  if (!isOpen) {
+  if (!isOpen || !mounted || typeof document === "undefined") {
     return null;
   }
 
@@ -139,7 +152,7 @@ export default function Modal({
     }
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-6"
       onKeyDown={handleKeyDown}
@@ -194,7 +207,8 @@ export default function Modal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
