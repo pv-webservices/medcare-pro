@@ -460,10 +460,17 @@ export async function sendToPatients(
   };
 }
 
-/** FR-9.2 — what went out, newest first, scoped to the actor's clinics. */
+export interface MessageHistoryFilters {
+  clinicId?: string;
+  limit?: number;
+  sentFrom?: Date;
+  sentToExclusive?: Date;
+}
+
+/** FR-9.2 — what went out, newest first, scoped to the actor's clinics and date range. */
 export async function listMessagesForActor(
   actor: ActorContext,
-  options: { clinicId?: string; limit?: number } = {},
+  options: MessageHistoryFilters = {},
 ): Promise<MessageRecord[]> {
   const access = await accessibleClinicScope(actor, "message:send");
 
@@ -486,8 +493,18 @@ export async function listMessagesForActor(
           },
         };
 
+  const dateFilter =
+    options.sentFrom || options.sentToExclusive
+      ? {
+          sentAt: {
+            ...(options.sentFrom ? { gte: options.sentFrom } : {}),
+            ...(options.sentToExclusive ? { lt: options.sentToExclusive } : {}),
+          },
+        }
+      : {};
+
   const rows = await prisma.whatsappMessage.findMany({
-    where: { clinic: { tenantId: actor.tenantId }, ...reachable },
+    where: { clinic: { tenantId: actor.tenantId }, ...reachable, ...dateFilter },
     orderBy: { sentAt: "desc" },
     take: options.limit ?? 100,
     select: {

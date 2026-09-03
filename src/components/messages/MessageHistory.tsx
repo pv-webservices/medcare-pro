@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { Info } from "lucide-react";
 import type { MessageRecord } from "@/lib/whatsappMessages";
 
 interface MessageHistoryProps {
   messages: readonly MessageRecord[];
+  hasActiveFilter?: boolean;
+  clearHref?: string;
 }
 
 function formatTimestamp(value: Date): string {
@@ -17,8 +20,31 @@ function formatTimestamp(value: Date): string {
   });
 }
 
-export default function MessageHistory({ messages }: MessageHistoryProps) {
+export default function MessageHistory({
+  messages,
+  hasActiveFilter = false,
+  clearHref = "/messages",
+}: MessageHistoryProps) {
   if (messages.length === 0) {
+    if (hasActiveFilter) {
+      return (
+        <div className="rounded-3xl border border-line bg-canvas px-6 py-10 text-center shadow-card">
+          <p className="mb-1 font-semibold text-ink">
+            No messages found for this date range
+          </p>
+          <p className="mb-4 text-body text-muted">
+            Try another date range or clear the filter.
+          </p>
+          <Link
+            href={clearHref}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-canvas px-4 py-2 text-label font-semibold text-ink shadow-sm hover:bg-canvas-deep transition-colors"
+          >
+            Clear filters
+          </Link>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-3xl border border-line bg-canvas px-6 py-10 text-center shadow-card">
         <p className="mb-1 font-semibold text-ink">No messages sent yet</p>

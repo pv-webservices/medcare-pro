@@ -2,6 +2,7 @@ import { MessageSquare } from "lucide-react";
 import { redirect } from "next/navigation";
 import MessageComposer from "@/components/messages/MessageComposer";
 import MessageHistory from "@/components/messages/MessageHistory";
+import MessageHistoryFilters from "@/components/messages/MessageHistoryFilters";
 import TemplateManager from "@/components/messages/TemplateManager";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -24,6 +25,8 @@ import {
 } from "@/lib/whatsappTemplates";
 import ModuleLocked from "@/components/ui/ModuleLocked";
 import { MODULE_FEATURES, moduleLock } from "@/lib/features";
+import { resolveMessageHistoryDateRange } from "@/lib/messageHistoryFilter";
+import { prisma } from "@/lib/prisma";
 
 // WhatsApp — PRD §6.9 (FR-9.1, FR-9.2).
 //
@@ -36,7 +39,11 @@ import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 // page: reaching this URL directly gets the same refusal the API gives. The
 // clinic comes from the sidebar switcher, as in every other module (FR-2.3).
 
-export default async function MessagesPage() {
+interface MessagesPageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function MessagesPage(props: MessagesPageProps) {
   let actor;
   try {
     actor = await requireActor();
@@ -52,6 +59,15 @@ export default async function MessagesPage() {
     return <ModuleLocked title="Messages" reason={locked} />;
   }
 
+  const rawSearchParams = (await props.searchParams) ?? {};
+  const getParam = (key: string): string | undefined => {
+    const val = rawSearchParams[key];
+    return Array.isArray(val) ? val[0] : val;
+  };
+  const historyRange = getParam("historyRange");
+  const historyFrom = getParam("historyFrom");
+  const historyTo = getParam("historyTo");
+
   const [clinics, selectedClinicId, canManageTemplates] = await Promise.all([
     listClinicsForActor(actor),
     resolveSelectedClinicId(actor),
@@ -63,18 +79,47 @@ export default async function MessagesPage() {
   const clinicId = selectedClinicId ?? (clinics.length === 1 ? clinics[0].id : null);
   const clinicName = clinics.find((clinic) => clinic.id === clinicId)?.name ?? null;
 
+  let clinicTimezone: string | undefined;
+  if (clinicId) {
+    const config = await prisma.clinicTelephonyConfig.findUnique({
+      where: { clinicId },
+      select: { timezone: true },
+    });
+    clinicTimezone = config?.timezone;
+  }
+
+  const resolvedFilter = resolveMessageHistoryDateRange({
+    range: historyRange,
+    from: historyFrom,
+    to: historyTo,
+    timeZone: clinicTimezone,
+  });
+
   let templates: TemplateRecord[] | null = null;
   let messages: MessageRecord[] = [];
   try {
     [templates, messages] = await Promise.all([
       listTemplatesForActor(actor, clinicId),
-      listMessagesForActor(actor, { clinicId: clinicId ?? undefined }),
+      listMessagesForActor(actor, {
+        clinicId: clinicId ?? undefined,
+        sentFrom: resolvedFilter.sentFrom,
+        sentToExclusive: resolvedFilter.sentToExclusive,
+      }),
     ]);
   } catch (error: unknown) {
     if (!(error instanceof PermissionError)) {
       throw error;
     }
   }
+
+  const clearParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(rawSearchParams)) {
+    if (key !== "historyRange" && key !== "historyFrom" && key !== "historyTo") {
+      const single = Array.isArray(value) ? value[0] : value;
+      if (single) clearParams.set(key, single);
+    }
+  }
+  const clearHref = clearParams.toString() ? `/messages?${clearParams.toString()}` : "/messages";
 
   if (!templates) {
     return (
@@ -149,7 +194,18 @@ export default async function MessagesPage() {
         <h2 id="history-heading" className="text-lg font-bold tracking-tight text-ink">
           Message history
         </h2>
-        <MessageHistory messages={messages} />
+        <MessageHistoryFilters
+          currentRange={resolvedFilter.range}
+          currentFrom={resolvedFilter.formattedFrom}
+          currentTo={resolvedFilter.formattedTo}
+          totalCount={messages.length}
+          error={resolvedFilter.error}
+        />
+        <MessageHistory
+          messages={messages}
+          hasActiveFilter={resolvedFilter.hasActiveFilter}
+          clearHref={clearHref}
+        />
       </section>
     </section>
   );
