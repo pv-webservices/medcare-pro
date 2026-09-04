@@ -92,4 +92,138 @@ describe("RkvRobo device adapter", () => {
     expect(isWhatsappDeviceNotFoundMessage("Invalid sender device. This device is not added under this API key.")).toBe(true);
     expect(isWhatsappDeviceNotFoundMessage("The number does not exist, or you do not have permission.")).toBe(false);
   });
+
+  describe("device matching in getDeviceStatus", () => {
+    const testConfig: WhatsappConfig = {
+      apiKey: "tenant-key",
+      baseUrl: "https://provider.test/api",
+      sender: "919599143235",
+    };
+
+    it("matches device using 'body' property with 10-digit number", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+        status: true,
+        info: [{ id: 1, body: "9599143235", status: "Connected" }],
+      })));
+      await expect(getDeviceStatus(testConfig)).resolves.toEqual({
+        ok: true,
+        device: {
+          status: "Connected",
+          connected: true,
+          webhookUrl: null,
+          messagesSent: null,
+        },
+      });
+    });
+
+    it("returns NOT_FOUND for a single row with a different number instead of falling back to row 0", async () => {
+      const differentDeviceConfig: WhatsappConfig = {
+        ...testConfig,
+        sender: "919582609956",
+      };
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+        status: true,
+        info: [{ id: 1, body: "919599143235", status: "Connected" }],
+      })));
+      await expect(getDeviceStatus(differentDeviceConfig)).resolves.toEqual({
+        ok: false,
+        reason: "NOT_FOUND",
+        message: "Requested WhatsApp device was not found under this provider account.",
+      });
+    });
+
+    it("correctly selects the matching row from multiple rows even if disconnected", async () => {
+      const targetConfig: WhatsappConfig = {
+        ...testConfig,
+        sender: "919582609956",
+      };
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+        status: true,
+        info: [
+          { id: 1, body: "919599143235", status: "Connected" },
+          { id: 2, body: "919582609956", status: "Disconnected" },
+        ],
+      })));
+      await expect(getDeviceStatus(targetConfig)).resolves.toEqual({
+        ok: true,
+        device: {
+          status: "Disconnected",
+          connected: false,
+          webhookUrl: null,
+          messagesSent: null,
+        },
+      });
+    });
+
+    it("returns NOT_FOUND when no row matches across multiple rows", async () => {
+      const targetConfig: WhatsappConfig = {
+        ...testConfig,
+        sender: "919582609956",
+      };
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+        status: true,
+        info: [
+          { id: 1, body: "919599143235", status: "Connected" },
+          { id: 2, body: "918888888888", status: "Connected" },
+        ],
+      })));
+      await expect(getDeviceStatus(targetConfig)).resolves.toEqual({
+        ok: false,
+        reason: "NOT_FOUND",
+        message: "Requested WhatsApp device was not found under this provider account.",
+      });
+    });
+
+    it.each([
+      ["device", "919599143235"],
+      ["sender", "919599143235"],
+      ["number", "919599143235"],
+      ["phone", "919599143235"],
+      ["phone_number", "919599143235"],
+      ["jid", "919599143235@s.whatsapp.net"],
+      ["jid", "919599143235:1@s.whatsapp.net"],
+    ])("matches requested device across legacy identity key '%s'", async (key, val) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+        status: true,
+        info: [{ [key]: val, status: "Connected" }],
+      })));
+      await expect(getDeviceStatus(testConfig)).resolves.toEqual({
+        ok: true,
+        device: {
+          status: "Connected",
+          connected: true,
+          webhookUrl: null,
+          messagesSent: null,
+        },
+      });
+    });
+
+    it("normalizes formatting like '+91 95991 43235' to match '919599143235'", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+        status: true,
+        info: [{ body: "+91 95991 43235", status: "Connected" }],
+      })));
+      await expect(getDeviceStatus(testConfig)).resolves.toEqual({
+        ok: true,
+        device: {
+          status: "Connected",
+          connected: true,
+          webhookUrl: null,
+          messagesSent: null,
+        },
+      });
+    });
+
+    it("rejects similar numbers like '919599143236' with NOT_FOUND", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+        status: true,
+        info: [{ body: "919599143236", status: "Connected" }],
+      })));
+      await expect(getDeviceStatus(testConfig)).resolves.toEqual({
+        ok: false,
+        reason: "NOT_FOUND",
+        message: "Requested WhatsApp device was not found under this provider account.",
+      });
+    });
+  });
 });

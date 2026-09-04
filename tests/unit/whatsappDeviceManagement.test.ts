@@ -146,6 +146,38 @@ describe("tenant WhatsApp device management", () => {
     expect(mocks.deviceUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ connectionStatus: "PENDING" }) }));
   });
 
+  it("invokes generateDeviceQr and returns alreadyConnected: false when device is absent at provider", async () => {
+    mocks.accountFindMany.mockResolvedValue([account]);
+    mocks.getStatus.mockResolvedValue({
+      ok: false,
+      reason: "NOT_FOUND",
+      message: "Requested WhatsApp device was not found under this provider account.",
+    });
+    mocks.generateQr.mockResolvedValue({ ok: true, qr: "safe-qr", message: "ready" });
+    const result = await connectWhatsappDevice(actor, { phoneNumber: row.phoneNumber, name: "Device" });
+    expect(result).toMatchObject({
+      alreadyConnected: false,
+      qr: "safe-qr",
+      phoneNumber: row.phoneNumber,
+    });
+    expect(mocks.generateQr).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns alreadyConnected: true and skips generateDeviceQr when matching device is already connected at provider", async () => {
+    mocks.accountFindMany.mockResolvedValue([account]);
+    mocks.getStatus.mockResolvedValue({
+      ok: true,
+      device: { connected: true, status: "Connected" },
+    });
+    const result = await connectWhatsappDevice(actor, { phoneNumber: row.phoneNumber, name: "Device" });
+    expect(result).toMatchObject({
+      alreadyConnected: true,
+      qr: null,
+      phoneNumber: row.phoneNumber,
+    });
+    expect(mocks.generateQr).not.toHaveBeenCalled();
+  });
+
   it("does not leave a new device PENDING after an ambiguous QR response", async () => {
     mocks.accountFindMany.mockResolvedValue([account]);
     mocks.generateQr.mockResolvedValue({ ok: false, definitive: false, message: "unexpected response" });

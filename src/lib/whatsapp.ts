@@ -444,26 +444,45 @@ export async function getDeviceStatus(config?: WhatsappConfig): Promise<DevicePr
   const rows = response.payload.info.filter(
     (entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null,
   );
-  const identityKeys = ["device", "sender", "number", "phone", "phone_number", "jid"] as const;
-  const matched = rows.find((row) => identityKeys.some((key) => {
-    const identity = row[key];
-    return typeof identity === "string" && identity.replace(/\D/g, "") === requestedDigits;
-  }));
-  // The endpoint is queried with a number and commonly returns one row without
-  // echoing an identity. With multiple rows, however, never assume row zero is
-  // the requested tenant device.
-  const entry = matched ?? (rows.length === 1 ? rows[0] : null);
-  if (typeof entry !== "object" || entry === null) {
+  const identityKeys = [
+    "device",
+    "sender",
+    "number",
+    "phone",
+    "phone_number",
+    "body",
+    "jid",
+  ] as const;
+
+  const isPhoneMatch = (digits: string, target: string): boolean => {
+    if (!digits || !target) return false;
+    if (digits === target) return true;
+    if (digits.length === 10 && target === `91${digits}`) return true;
+    if (target.length === 10 && digits === `91${target}`) return true;
+    return false;
+  };
+
+  const matched = rows.find((row) =>
+    identityKeys.some((key) => {
+      const identity = row[key];
+      if (typeof identity !== "string" && typeof identity !== "number") return false;
+      const rawIdentity = String(identity).trim();
+      const beforeAt = rawIdentity.includes("@") ? rawIdentity.split("@")[0] : rawIdentity;
+      const phonePart = beforeAt.includes(":") ? beforeAt.split(":")[0] : beforeAt;
+      const digits = phonePart.replace(/\D/g, "");
+      return isPhoneMatch(digits, requestedDigits);
+    }),
+  );
+
+  if (!matched) {
     return {
       ok: false,
-      reason: rows.length > 1 ? "NOT_FOUND" : "UNAVAILABLE",
-      message: rows.length > 1
-        ? "The gateway did not report the requested device."
-        : "The gateway returned an unreadable device record.",
+      reason: "NOT_FOUND",
+      message: "Requested WhatsApp device was not found under this provider account.",
     };
   }
 
-  const row = entry as Record<string, unknown>;
+  const row = matched;
   const status = typeof row.status === "string" ? row.status : "Unknown";
 
   return {
