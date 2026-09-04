@@ -112,6 +112,10 @@ model Tenant {
   whatsappTemplates        WhatsappTemplate[]
   mediaAssets              MediaAsset[]
   whatsappTemplateMedia    WhatsappTemplateMedia[]
+  whatsappProviderAccounts WhatsappProviderAccount[]
+  whatsappDevices          WhatsappDevice[]
+  whatsappSettings         TenantWhatsappSettings?
+  clinicWhatsappSettings   ClinicWhatsappSettings[]
   plan                     Plan?                     @relation(fields: [planId], references: [id], onDelete: Restrict)
   approvedBy               User?                     @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   rejectedBy               User?                     @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
@@ -410,15 +414,16 @@ model Clinic {
   businessHours   ClinicBusinessHours[]
   ivrProfile      ClinicIvrProfile?
 
-  doctors          Doctor[]
-  patients         Patient[]
-  registrations    Registration[]
-  notifications            Notification[]
-  whatsappMessages         WhatsappMessage[]
-  mediaAssets              MediaAsset[]
-  whatsappTemplateMedia    WhatsappTemplateMedia[]
-  userRoles                UserRole[]
-  invitations      Invitation[]
+  doctors               Doctor[]
+  patients              Patient[]
+  registrations         Registration[]
+  notifications         Notification[]
+  whatsappMessages      WhatsappMessage[]
+  mediaAssets           MediaAsset[]
+  whatsappTemplateMedia WhatsappTemplateMedia[]
+  whatsappSettings      ClinicWhatsappSettings?
+  userRoles             UserRole[]
+  invitations           Invitation[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments             Appointment[]
@@ -428,6 +433,7 @@ model Clinic {
   telephonyTestCalls       ClinicTelephonyTestCall[]
   tasks                    Task[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@map("clinics")
 }
@@ -928,6 +934,86 @@ model Notification {
 // WhatsappTemplate row, and no endpoint accepts a free-text body.
 // ---------------------------------------------------------------------------
 
+/// One separately purchased RkvRobo account. A tenant normally has one today,
+/// but the relation is deliberately one-to-many for enterprise expansion.
+model WhatsappProviderAccount {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  name            String
+  apiBaseUrl      String   @default("https://bot.rkvrobo.in/api") @map("api_base_url")
+  encryptedApiKey String   @map("encrypted_api_key") @db.Text
+  keyVersion      Int      @default(1) @map("key_version")
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  devices WhatsappDevice[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, name])
+  @@index([tenantId, enabled])
+  @@map("whatsapp_provider_accounts")
+}
+
+/// A deterministic RkvRobo sending device. `phoneNumber` is the provider's
+/// sender identifier; "rotate" is rejected in the application layer.
+model WhatsappDevice {
+  id                String   @id @default(cuid())
+  tenantId          String   @map("tenant_id")
+  providerAccountId String   @map("provider_account_id")
+  name              String
+  phoneNumber       String   @map("phone_number")
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  providerAccount WhatsappProviderAccount  @relation(fields: [providerAccountId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  tenantDefaults  TenantWhatsappSettings[] @relation("TenantWhatsappDefaultDevice")
+  clinicOverrides ClinicWhatsappSettings[] @relation("ClinicWhatsappDevice")
+  messages        WhatsappMessage[]
+
+  @@unique([id, tenantId])
+  @@unique([providerAccountId, phoneNumber])
+  @@index([tenantId, enabled])
+  @@map("whatsapp_devices")
+}
+
+/// Organisation-wide fallback used when a clinic has no explicit override.
+model TenantWhatsappSettings {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique @map("tenant_id")
+  defaultDeviceId String?  @map("default_device_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultDevice WhatsappDevice? @relation("TenantWhatsappDefaultDevice", fields: [defaultDeviceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@index([defaultDeviceId, tenantId])
+  @@map("tenant_whatsapp_settings")
+}
+
+/// Optional per-clinic device choice. Absence means the tenant default applies.
+model ClinicWhatsappSettings {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  clinicId  String   @unique @map("clinic_id")
+  deviceId  String   @map("device_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic Clinic         @relation(fields: [clinicId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  device WhatsappDevice @relation("ClinicWhatsappDevice", fields: [deviceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([clinicId, tenantId])
+  @@index([tenantId])
+  @@index([deviceId, tenantId])
+  @@map("clinic_whatsapp_settings")
+}
+
 /// FR-9.1 — the account's approved message set.
 ///
 /// Account-scoped, not clinic-scoped: one business writes its wording once and
@@ -949,7 +1035,7 @@ model WhatsappTemplate {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   clinicMedia WhatsappTemplateMedia[]
 
   /// Template names are unique within an account, not globally.
@@ -963,6 +1049,7 @@ model WhatsappMessage {
   clinicId          String   @map("clinic_id")
   patientId         String   @map("patient_id")
   mediaAssetId      String?  @map("media_asset_id")
+  whatsappDeviceId  String?  @map("whatsapp_device_id")
   /// FR-9.1 — the WhatsappTemplate name this send used. Denormalised rather
   /// than a foreign key: history must survive the template being renamed or
   /// deleted, the same reasoning as `registration_edit_log.role_at_time`.
@@ -986,14 +1073,16 @@ model WhatsappMessage {
   failureReason     String?  @map("failure_reason") @db.Text
   sentAt            DateTime @default(now()) @map("sent_at")
 
-  clinic     Clinic      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  patient    Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  mediaAsset MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  clinic         Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient        Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  mediaAsset     MediaAsset?     @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  whatsappDevice WhatsappDevice? @relation(fields: [whatsappDeviceId], references: [id], onDelete: SetNull)
 
   @@index([clinicId])
   @@index([patientId])
   @@index([clinicId, sentAt])
   @@index([mediaAssetId])
+  @@index([whatsappDeviceId])
   @@map("whatsapp_messages")
 }
 
@@ -1033,18 +1122,18 @@ model MediaAsset {
 }
 
 model WhatsappTemplateMedia {
-  id           String           @id @default(cuid())
-  tenantId     String           @map("tenant_id")
-  clinicId     String           @map("clinic_id")
-  templateId   String           @map("template_id")
-  mediaAssetId String           @map("media_asset_id")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  clinicId     String   @map("clinic_id")
+  templateId   String   @map("template_id")
+  mediaAssetId String   @map("media_asset_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  clinic       Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  template     WhatsappTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  mediaAsset   MediaAsset       @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clinic     Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  template   WhatsappTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset       @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
 
   @@unique([templateId, clinicId])
   @@index([tenantId, clinicId])

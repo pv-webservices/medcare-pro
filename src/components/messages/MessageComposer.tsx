@@ -168,8 +168,8 @@ export default function MessageComposer({
           role="alert"
           className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-body text-warn-ink"
         >
-          WhatsApp is not connected yet. Set WHATSAPP_BSP_API_KEY in the
-          environment before sending.
+          WhatsApp is not connected yet. Ask an administrator to configure a
+          provider account and sending device in Settings.
         </p>
       )}
 

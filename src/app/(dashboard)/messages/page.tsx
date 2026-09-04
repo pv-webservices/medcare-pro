@@ -12,9 +12,9 @@ import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import {
   getDeviceStatus,
-  isWhatsappConfigured,
   type DeviceStatus,
 } from "@/lib/whatsapp";
+import { resolveWhatsappConfigForClinic } from "@/lib/whatsappProviderConfig";
 import {
   listMessagesForActor,
   type MessageRecord,
@@ -133,14 +133,27 @@ export default async function MessagesPage(props: MessagesPageProps) {
     );
   }
 
-  const configured = isWhatsappConfigured();
+  const clinicConfigurations = await Promise.all(
+    clinics.map((clinic) =>
+      resolveWhatsappConfigForClinic(actor.tenantId, clinic.id).catch((error) => {
+        console.error(`Could not resolve WhatsApp device for clinic ${clinic.id}`, error);
+        return null;
+      }),
+    ),
+  );
+  const selectedConfig = clinicId
+    ? clinicConfigurations[clinics.findIndex((clinic) => clinic.id === clinicId)] ?? null
+    : null;
+  const configured = clinicId
+    ? Boolean(selectedConfig)
+    : clinicConfigurations.length > 0 && clinicConfigurations.every(Boolean);
 
   // Asked of the gateway only when there is something to ask about. A probe
   // that cannot answer — rotating sender, gateway down — is left as null and
   // reported as nothing rather than as a fault.
   let device: DeviceStatus | null = null;
-  if (configured) {
-    const probe = await getDeviceStatus().catch(() => null);
+  if (selectedConfig) {
+    const probe = await getDeviceStatus(selectedConfig).catch(() => null);
     device = probe?.ok ? probe.device : null;
   }
 

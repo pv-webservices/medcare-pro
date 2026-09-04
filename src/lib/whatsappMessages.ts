@@ -12,12 +12,12 @@ import {
 } from "@/lib/rbac";
 import {
   checkNumber,
-  readWhatsappConfig,
   sendMedia,
   sendText,
   type MediaType,
   type SendResult,
 } from "@/lib/whatsapp";
+import { resolveWhatsappConfigForClinic } from "@/lib/whatsappProviderConfig";
 import {
   buildMediaContentUrl,
   buildDocumentContentUrl,
@@ -214,8 +214,11 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * silently stop messaging real patients whenever the provider hiccuped, which
  * is a worse failure than one wasted send.
  */
-async function isNotOnWhatsapp(to: string): Promise<boolean> {
-  const check = await checkNumber(to);
+async function isNotOnWhatsapp(
+  to: string,
+  config: import("@/lib/whatsapp").WhatsappConfig,
+): Promise<boolean> {
+  const check = await checkNumber(to, config);
   return check.checked && !check.exists;
 }
 
@@ -223,6 +226,7 @@ async function isNotOnWhatsapp(to: string): Promise<boolean> {
 export interface DeliveryTarget {
   /** The patient the row is filed against. Never null: the column is NOT NULL. */
   patientId: string;
+  tenantId: string;
   clinicId: string;
   mobileNumber: string;
   values: TemplateValues;
@@ -256,10 +260,21 @@ export async function deliverTemplate(
 ): Promise<DeliveryOutcome> {
   const message = renderTemplate(template.body, target.values);
   const to = toDigits(target.mobileNumber);
+  const config = await resolveWhatsappConfigForClinic(
+    target.tenantId,
+    target.clinicId,
+  );
 
   let outcome: SendResult;
   let usedMediaAssetId: string | null = null;
-  if (to.length < 10) {
+  if (!config) {
+    outcome = {
+      ok: false,
+      providerMessageId: null,
+      message:
+        "WhatsApp is not configured for this clinic. Choose an organisation default or clinic device in Settings.",
+    };
+  } else if (to.length < 10) {
     // Short-circuited rather than sent: the gateway would reject it anyway,
     // and this reason is far more useful than its generic one.
     outcome = {
@@ -267,7 +282,7 @@ export async function deliverTemplate(
       providerMessageId: null,
       message: `${target.mobileNumber} is not a valid WhatsApp number.`,
     };
-  } else if (await isNotOnWhatsapp(to)) {
+  } else if (await isNotOnWhatsapp(to, config)) {
     // Checked before sending, not after failing. Repeatedly messaging numbers
     // with no WhatsApp account is one of the patterns that gets a sending
     // number flagged — and "not on WhatsApp" tells the front desk what to fix.
@@ -322,7 +337,7 @@ export async function deliverTemplate(
           footer: template.footer ?? undefined,
           mediaType,
           mediaUrl: signedUrl,
-        });
+        }, config);
       } catch (mediaError: unknown) {
         console.error("Failed to prepare or send media template", mediaError);
         outcome = {
@@ -342,14 +357,14 @@ export async function deliverTemplate(
         footer: template.footer ?? undefined,
         mediaType: template.mediaType,
         mediaUrl: template.mediaUrl,
-      });
+      }, config);
     } else {
       // 3. Fallback to text send
       outcome = await sendText({
         to,
         message,
         footer: template.footer ?? undefined,
-      });
+      }, config);
     }
   }
 
@@ -361,6 +376,7 @@ export async function deliverTemplate(
         clinicId: target.clinicId,
         patientId: target.patientId,
         mediaAssetId: usedMediaAssetId,
+        whatsappDeviceId: config?.deviceId ?? null,
         // Denormalised copy — see the schema note. History must survive the
         // template being renamed or deleted.
         templateName: template.name,
@@ -405,10 +421,6 @@ export async function sendToPatients(
   // own clinic is re-checked in loadRecipients before anything goes out.
   await assertCanSendSomewhere(actor);
 
-  // Throws with the precise reason — missing key vs missing sending device —
-  // rather than a generic "not configured".
-  readWhatsappConfig();
-
   const template = await getTemplateForActor(actor, input.templateId);
   const recipients = await loadRecipients(actor, input.patientIds);
 
@@ -427,6 +439,7 @@ export async function sendToPatients(
     try {
       outcome = await deliverTemplate(template, {
         patientId: recipient.id,
+        tenantId: actor.tenantId,
         clinicId: recipient.clinicId,
         mobileNumber: recipient.mobileNumber,
         values: recipient.values,

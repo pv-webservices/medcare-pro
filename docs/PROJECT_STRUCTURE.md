@@ -81,7 +81,7 @@ medcare-pro/
 │   └── types/
 │
 ├── public/
-├── .env.example        # DATABASE_URL, NEXTAUTH_SECRET, EMAIL_*, WHATSAPP_BSP_*
+├── .env.example        # DATABASE_URL, NEXTAUTH_SECRET, EMAIL_*, provider encryption key
 ├── next.config.js
 ├── tailwind.config.ts
 ├── package.json

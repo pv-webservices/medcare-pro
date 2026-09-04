@@ -23,7 +23,16 @@ vi.mock("@/lib/whatsapp", () => ({
   sendText: vi.fn(),
   checkNumber: vi.fn().mockResolvedValue({ checked: true, exists: true }),
   readWhatsappConfig: vi.fn(),
+  WhatsappNotConfiguredError: class WhatsappNotConfiguredError extends Error {},
   MEDIA_TYPES: ["image", "video", "audio", "document"],
+}));
+
+vi.mock("@/lib/whatsappProviderConfig", () => ({
+  resolveWhatsappConfigForClinic: vi.fn().mockResolvedValue({
+    apiKey: "test-key",
+    sender: "919999999999",
+    baseUrl: "https://example.test/api",
+  }),
 }));
 
 import { prisma } from "@/lib/prisma";
@@ -44,6 +53,7 @@ describe("deliverTemplate with media", () => {
 
   const deliveryTarget = {
     patientId: "patient-1",
+    tenantId: "tenant-1",
     clinicId: "clinic-A",
     mobileNumber: "+919876543210",
     values: {
@@ -269,4 +279,3 @@ describe("deliverTemplate with media", () => {
     });
   });
 });
-

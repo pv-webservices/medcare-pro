@@ -1,8 +1,8 @@
 /**
  * WhatsApp connectivity check — READ ONLY, against the LIVE gateway.
  *
- *     npm run whatsapp:doctor
- *     npm run whatsapp:doctor -- 919812345678    # also check one number
+ *     npm run whatsapp:doctor -- <tenantId> <clinicId>
+ *     npm run whatsapp:doctor -- <tenantId> <clinicId> 919812345678
  *
  * Answers "is WhatsApp actually working?" without sending anything. It calls
  * only `/info-devices` and `/check-number`, both of which read; there is no
@@ -11,16 +11,13 @@
  * Run it after changing the API key, after reconnecting a device, or when the
  * front desk reports that sends are failing.
  *
- * Secrets are never printed — only whether they are set, and their last four
- * characters, so a wrong-key mix-up is still diagnosable.
+ * Secrets are never printed, even partially.
  */
 import {
   checkNumber,
   getDeviceStatus,
-  isWhatsappConfigured,
-  readWhatsappConfig,
-  ROTATE_SENDER,
 } from "@/lib/whatsapp";
+import { resolveWhatsappConfigForClinic } from "@/lib/whatsappProviderConfig";
 
 // tsx does not read .env by itself. The verify scripts get it as a side effect
 // of importing Prisma, which loads it for the datasource; this one never
@@ -47,23 +44,24 @@ function fail(label: string, detail = ""): void {
   console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ""}`);
 }
 
-function tail(value: string): string {
-  return value.length <= 4 ? "****" : `…${value.slice(-4)}`;
-}
-
 async function main(): Promise<void> {
   console.log("\nConfiguration");
-
-  if (!isWhatsappConfigured()) {
+  const tenantId = process.argv[2]?.trim();
+  const clinicId = process.argv[3]?.trim();
+  if (!tenantId || !clinicId) {
     fail(
-      "WhatsApp is not configured",
-      "set WHATSAPP_BSP_API_KEY and WHATSAPP_BSP_SENDER",
+      "Tenant and clinic are required",
+      "npm run whatsapp:doctor -- <tenantId> <clinicId> [number]",
     );
     return;
   }
 
-  const config = readWhatsappConfig();
-  ok("API key set", `${config.apiKey.length} chars, ${tail(config.apiKey)}`);
+  const config = await resolveWhatsappConfigForClinic(tenantId, clinicId);
+  if (!config) {
+    fail("WhatsApp is not configured for that tenant and clinic");
+    return;
+  }
+  ok("Encrypted API key resolved");
   ok("Base URL", config.baseUrl);
   ok("Sending device", config.sender);
 
@@ -76,18 +74,13 @@ async function main(): Promise<void> {
   } else if (webhookToken.length < 24) {
     warn("Webhook token is short", "use at least 32 hex chars: openssl rand -hex 32");
   } else {
-    ok("Webhook token set", `${webhookToken.length} chars, ${tail(webhookToken)}`);
+    ok("Webhook token set");
   }
 
   console.log("\nDevice (live, read-only)");
 
-  if (config.sender === ROTATE_SENDER) {
-    warn(
-      "Sender is 'rotate'",
-      "no single device to report on; ensure at least one device has Rotate ON",
-    );
-  } else {
-    const probe = await getDeviceStatus();
+  {
+    const probe = await getDeviceStatus(config);
 
     if (!probe.ok) {
       fail("Could not read device status", probe.message);
@@ -135,10 +128,10 @@ async function main(): Promise<void> {
     }
   }
 
-  const target = process.argv[2]?.trim();
+  const target = process.argv[4]?.trim();
   if (target) {
     console.log("\nNumber check (live, read-only)");
-    const result = await checkNumber(target.replace(/\D/g, ""));
+    const result = await checkNumber(target.replace(/\D/g, ""), config);
     if (!result.checked) {
       fail("Could not check that number", result.message);
     } else if (result.exists) {

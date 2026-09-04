@@ -14,7 +14,6 @@ import { requirePermission, ScopeError, type ActorContext } from "@/lib/rbac";
 import { deliverTemplate, type MessageStatus } from "@/lib/whatsappMessages";
 import { getTemplateForActor } from "@/lib/whatsappTemplates";
 import { renderTemplate } from "@/lib/whatsappTemplateText";
-import { readWhatsappConfig } from "@/lib/whatsapp";
 
 /**
  * Sending an approved reminder about one appointment — AP-8.
@@ -110,14 +109,6 @@ export async function sendAppointmentReminder(
     throw new BadRequestError(NO_PATIENT_MESSAGE);
   }
 
-  // AFTER the refusals, and that order is deliberate. Both can be wrong at
-  // once, and "this appointment is cancelled" answers what the person actually
-  // clicked, where "WhatsApp is not configured" sends them to fix an
-  // environment variable that would not have helped. Throws with the precise
-  // reason — missing key vs missing sending device — when it is the real
-  // problem.
-  readWhatsappConfig();
-
   const template = await getTemplateForActor(actor, input.templateId);
 
   const facts = await loadReminderFacts(actor, appointmentId);
@@ -127,6 +118,7 @@ export async function sendAppointmentReminder(
   const outcome = await deliverTemplate(template, {
     // From the row loaded inside the actor's scope, never from the client.
     patientId,
+    tenantId: actor.tenantId,
     clinicId: appointment.clinicId,
     // The APPOINTMENT's number, not the patient record's. The desk may have
     // taken a different contact when the slot was booked, and that is the one
@@ -186,4 +178,3 @@ async function loadReminderFacts(actor: ActorContext, appointmentId: string) {
     slotTime: formatClockTime(row.slotStart),
   };
 }
-

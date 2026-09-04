@@ -110,6 +110,15 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     managePermissions: ["settings:manage", "clinic:edit"],
   },
   {
+    href: "/settings/whatsapp",
+    title: "WhatsApp provider",
+    description:
+      "Connect tenant-owned RkvRobo accounts, register devices, and choose organisation or clinic sending numbers.",
+    viewPermissions: ["settings:view", "settings:manage"],
+    managePermissions: ["settings:manage"],
+    feature: "whatsapp",
+  },
+  {
     href: "/settings/phone-settings",
     title: "Phone settings",
     description:

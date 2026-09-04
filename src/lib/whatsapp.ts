@@ -70,7 +70,7 @@ export class WhatsappNotConfiguredError extends Error {
   }
 }
 
-/** True when a send could even be attempted — used to explain the UI's state. */
+/** @deprecated Runtime tenant sends resolve database-backed configuration. */
 export function isWhatsappConfigured(): boolean {
   return (
     (process.env.WHATSAPP_BSP_API_KEY ?? "").trim() !== "" &&
@@ -78,6 +78,7 @@ export function isWhatsappConfigured(): boolean {
   );
 }
 
+/** @deprecated Kept only for the standalone legacy diagnostics scripts. */
 export function readWhatsappConfig(): WhatsappConfig {
   const apiKey = (process.env.WHATSAPP_BSP_API_KEY ?? "").trim();
   const sender = (process.env.WHATSAPP_BSP_SENDER ?? "").trim();
@@ -139,8 +140,9 @@ function readMessage(body: Record<string, unknown>, ok: boolean): string {
 async function post(
   path: string,
   fields: Record<string, string | number>,
+  suppliedConfig?: WhatsappConfig,
 ): Promise<GatewayResponse> {
-  const config = readWhatsappConfig();
+  const config = suppliedConfig ?? readWhatsappConfig();
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -244,9 +246,10 @@ function readMessageId(payload: Record<string, unknown> | null): string | null {
 async function send(
   path: string,
   fields: Record<string, string | number>,
+  config?: WhatsappConfig,
 ): Promise<SendResult> {
   // full=1 asks for the whole WhatsApp payload so `data.key.id` comes back.
-  const response = await post(path, { full: 1, ...fields });
+  const response = await post(path, { full: 1, ...fields }, config);
 
   return {
     ok: response.ok,
@@ -255,22 +258,28 @@ async function send(
   };
 }
 
-export async function sendText(params: SendTextParams): Promise<SendResult> {
+export async function sendText(
+  params: SendTextParams,
+  config?: WhatsappConfig,
+): Promise<SendResult> {
   return send(SEND_TEXT_PATH, {
     number: params.to,
     message: params.message,
     ...(params.footer ? { footer: params.footer } : {}),
-  });
+  }, config);
 }
 
-export async function sendMedia(params: SendMediaParams): Promise<SendResult> {
+export async function sendMedia(
+  params: SendMediaParams,
+  config?: WhatsappConfig,
+): Promise<SendResult> {
   return send(SEND_MEDIA_PATH, {
     number: params.to,
     media_type: params.mediaType,
     url: params.mediaUrl,
     caption: params.message,
     ...(params.footer ? { footer: params.footer } : {}),
-  });
+  }, config);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,8 +307,11 @@ export interface NumberCheck {
  * `exists: false` — a gateway hiccup must not be read as "this patient has no
  * WhatsApp", which would silently stop messaging a real person.
  */
-export async function checkNumber(to: string): Promise<NumberCheck> {
-  const response = await post(CHECK_NUMBER_PATH, { number: to });
+export async function checkNumber(
+  to: string,
+  config?: WhatsappConfig,
+): Promise<NumberCheck> {
+  const response = await post(CHECK_NUMBER_PATH, { number: to }, config);
 
   if (!response.ok) {
     return { exists: false, checked: false, message: response.message };
@@ -351,18 +363,22 @@ export type DeviceProbe =
   | { ok: true; device: DeviceStatus }
   | { ok: false; message: string };
 
-export async function getDeviceStatus(): Promise<DeviceProbe> {
-  const config = readWhatsappConfig();
+export async function getDeviceStatus(config?: WhatsappConfig): Promise<DeviceProbe> {
+  const resolvedConfig = config ?? readWhatsappConfig();
 
   // Rotation has no single device to report on — the gateway picks per send.
-  if (config.sender === ROTATE_SENDER) {
+  if (resolvedConfig.sender === ROTATE_SENDER) {
     return {
       ok: false,
       message: "Sending device is set to rotate, so there is no single device to report on.",
     };
   }
 
-  const response = await post(DEVICE_INFO_PATH, { number: config.sender });
+  const response = await post(
+    DEVICE_INFO_PATH,
+    { number: resolvedConfig.sender },
+    resolvedConfig,
+  );
 
   if (!response.ok) {
     // The gateway's own wording is far more useful than a generic failure —

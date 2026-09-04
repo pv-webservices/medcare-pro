@@ -171,6 +171,36 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "platform",
     category: "roles",
   },
+  [AUDIT_ACTIONS.WHATSAPP_PROVIDER_ACCOUNT_CREATED]: {
+    label: "WhatsApp provider account added",
+    detail: "A tenant-owned RkvRobo provider account was configured.",
+    side: "tenant",
+    category: "organisation",
+  },
+  [AUDIT_ACTIONS.WHATSAPP_PROVIDER_ACCOUNT_UPDATED]: {
+    label: "WhatsApp provider account updated",
+    detail: "A RkvRobo provider account configuration was changed.",
+    side: "tenant",
+    category: "organisation",
+  },
+  [AUDIT_ACTIONS.WHATSAPP_DEVICE_CREATED]: {
+    label: "WhatsApp device added",
+    detail: "A deterministic WhatsApp sending device was configured.",
+    side: "tenant",
+    category: "organisation",
+  },
+  [AUDIT_ACTIONS.WHATSAPP_DEVICE_UPDATED]: {
+    label: "WhatsApp device updated",
+    detail: "A WhatsApp sending device configuration was changed.",
+    side: "tenant",
+    category: "organisation",
+  },
+  [AUDIT_ACTIONS.WHATSAPP_ROUTING_UPDATED]: {
+    label: "WhatsApp routing updated",
+    detail: "The organisation default or clinic-specific sending device was changed.",
+    side: "tenant",
+    category: "organisation",
+  },
   [AUDIT_ACTIONS.CLINIC_TELEPHONY_CONFIG_UPDATED]: {
     label: "Clinic telephone routing changed",
     detail:
