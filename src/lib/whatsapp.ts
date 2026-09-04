@@ -34,6 +34,9 @@ const SEND_TEXT_PATH = "/send-message";
 const SEND_MEDIA_PATH = "/send-media";
 const CHECK_NUMBER_PATH = "/check-number";
 const DEVICE_INFO_PATH = "/info-devices";
+const GENERATE_QR_PATH = "/generate-qr";
+const LOGOUT_DEVICE_PATH = "/logout-device";
+const DELETE_DEVICE_PATH = "/delete-device";
 
 const DEFAULT_BASE_URL = "https://bot.rkvrobo.in/api";
 
@@ -410,6 +413,46 @@ export async function getDeviceStatus(config?: WhatsappConfig): Promise<DevicePr
       messagesSent: typeof row.message_sent === "number" ? row.message_sent : null,
     },
   };
+}
+
+export type DeviceQrResult =
+  | { ok: true; qr: string; message: string }
+  | { ok: false; message: string };
+
+/** Starts QR onboarding. Only the QR material is returned; credentials stay server-side. */
+export async function generateDeviceQr(
+  config: WhatsappConfig,
+  phoneNumber: string,
+): Promise<DeviceQrResult> {
+  const response = await post(
+    GENERATE_QR_PATH,
+    { device: phoneNumber, force: "true" },
+    { ...config, sender: phoneNumber },
+  );
+  if (!response.ok || !response.payload) {
+    return { ok: false, message: response.message };
+  }
+  const data = response.payload.data;
+  const qrCandidates = [
+    response.payload.qr,
+    response.payload.qrcode,
+    response.payload.qr_code,
+    typeof data === "object" && data !== null ? (data as Record<string, unknown>).qr : null,
+  ];
+  const qr = qrCandidates.find(
+    (candidate): candidate is string => typeof candidate === "string" && candidate.trim() !== "",
+  );
+  return qr
+    ? { ok: true, qr: qr.trim(), message: response.message }
+    : { ok: false, message: "The gateway did not return a QR code." };
+}
+
+export async function logoutDevice(config: WhatsappConfig): Promise<GatewayResponse> {
+  return post(LOGOUT_DEVICE_PATH, { device: config.sender }, config);
+}
+
+export async function deleteDevice(config: WhatsappConfig): Promise<GatewayResponse> {
+  return post(DELETE_DEVICE_PATH, { device: config.sender }, config);
 }
 
 // ---------------------------------------------------------------------------

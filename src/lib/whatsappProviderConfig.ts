@@ -1,8 +1,7 @@
-import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
-import { BadRequestError, ConflictError } from "@/lib/apiHandler";
+import { BadRequestError } from "@/lib/apiHandler";
 import { prisma } from "@/lib/prisma";
 import {
   can,
@@ -10,69 +9,20 @@ import {
   requirePermission,
   type ActorContext,
 } from "@/lib/rbac";
-import {
-  decryptWhatsappApiKey,
-  encryptWhatsappApiKey,
-} from "@/lib/whatsappCredentialCrypto";
+import { decryptWhatsappApiKey } from "@/lib/whatsappCredentialCrypto";
 import type { WhatsappConfig } from "@/lib/whatsapp";
 
 export interface ResolvedWhatsappConfig extends WhatsappConfig {
   deviceId: string;
   providerAccountId: string;
+  usedFallback: boolean;
 }
-
-export const RKVROBO_DEFAULT_BASE_URL = "https://bot.rkvrobo.in/api";
-
-const nameSchema = z.string().trim().min(1).max(100);
-const baseUrlSchema = z
-  .string()
-  .trim()
-  .url()
-  .max(500)
-  .transform((value) => value.replace(/\/+$/, ""))
-  .refine((value) => new URL(value).protocol === "https:", {
-    message: "The provider API URL must use HTTPS.",
-  });
-const phoneNumberSchema = z
-  .string()
-  .trim()
-  .transform((value) => value.replace(/[^\d]/g, ""))
-  .refine((value) => value.length >= 10 && value.length <= 15, {
-    message: "Enter the WhatsApp device number with country code.",
-  });
-
-export const saveWhatsappAccountSchema = z
-  .object({
-    accountId: z.string().min(1).optional(),
-    name: nameSchema,
-    apiBaseUrl: baseUrlSchema.default(RKVROBO_DEFAULT_BASE_URL),
-    apiKey: z.string().trim().min(8).max(1000).optional(),
-    enabled: z.boolean().default(true),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    if (!value.accountId && !value.apiKey) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["apiKey"],
-        message: "The RkvRobo API key is required for a new account.",
-      });
-    }
-  });
-
-export const saveWhatsappDeviceSchema = z
-  .object({
-    deviceId: z.string().min(1).optional(),
-    providerAccountId: z.string().min(1),
-    name: nameSchema,
-    phoneNumber: phoneNumberSchema,
-    enabled: z.boolean().default(true),
-  })
-  .strict();
 
 export const saveWhatsappRoutingSchema = z
   .object({
     defaultDeviceId: z.string().min(1).nullable(),
+    backupDeviceId: z.string().min(1).nullable(),
+    automaticFailover: z.boolean(),
     clinicOverrides: z
       .array(
         z.object({
@@ -84,27 +34,30 @@ export const saveWhatsappRoutingSchema = z
   })
   .strict();
 
-export const whatsappConfigMutationSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("saveAccount"), value: saveWhatsappAccountSchema }),
-  z.object({ action: z.literal("saveDevice"), value: saveWhatsappDeviceSchema }),
-  z.object({ action: z.literal("saveRouting"), value: saveWhatsappRoutingSchema }),
-]);
+export const whatsappConfigMutationSchema = z.object({
+  action: z.literal("saveRouting"),
+  value: saveWhatsappRoutingSchema,
+});
 
 export interface WhatsappConfigurationView {
   accounts: Array<{
     id: string;
     name: string;
-    apiBaseUrl: string;
     enabled: boolean;
-    hasApiKey: true;
+    deviceLimit: number;
     devices: Array<{
       id: string;
       name: string;
       phoneNumber: string;
       enabled: boolean;
+      connectionStatus: "PENDING" | "CONNECTED" | "DISCONNECTED" | "UNKNOWN";
+      lastStatusCheckedAt: string | null;
+      webhookConfigured: boolean;
     }>;
   }>;
   defaultDeviceId: string | null;
+  backupDeviceId: string | null;
+  automaticFailover: boolean;
   clinics: Array<{ id: string; name: string; deviceId: string | null }>;
 }
 
@@ -128,8 +81,8 @@ export async function getWhatsappConfigurationForActor(
       select: {
         id: true,
         name: true,
-        apiBaseUrl: true,
         enabled: true,
+        deviceLimit: true,
         devices: {
           orderBy: [{ createdAt: "asc" }],
           select: {
@@ -137,13 +90,17 @@ export async function getWhatsappConfigurationForActor(
             name: true,
             phoneNumber: true,
             enabled: true,
+            connectionStatus: true,
+            lastStatusCheckedAt: true,
+            webhookPublicId: true,
+            webhookSecretHash: true,
           },
         },
       },
     }),
     prisma.tenantWhatsappSettings.findUnique({
       where: { tenantId: actor.tenantId },
-      select: { defaultDeviceId: true },
+      select: { defaultDeviceId: true, backupDeviceId: true, automaticFailover: true },
     }),
     prisma.clinic.findMany({
       where: { tenantId: actor.tenantId },
@@ -157,176 +114,27 @@ export async function getWhatsappConfigurationForActor(
   ]);
 
   return {
-    accounts: accounts.map((account) => ({ ...account, hasApiKey: true as const })),
+    accounts: accounts.map((account) => ({
+      ...account,
+      devices: account.devices.map((device) => ({
+        id: device.id,
+        name: device.name,
+        phoneNumber: device.phoneNumber,
+        enabled: device.enabled,
+        connectionStatus: device.connectionStatus,
+        lastStatusCheckedAt: device.lastStatusCheckedAt?.toISOString() ?? null,
+        webhookConfigured: Boolean(device.webhookPublicId && device.webhookSecretHash),
+      })),
+    })),
     defaultDeviceId: settings?.defaultDeviceId ?? null,
+    backupDeviceId: settings?.backupDeviceId ?? null,
+    automaticFailover: settings?.automaticFailover ?? false,
     clinics: clinics.map((clinic) => ({
       id: clinic.id,
       name: clinic.name,
       deviceId: clinic.whatsappSettings?.deviceId ?? null,
     })),
   };
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return Boolean(
-    typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: unknown }).code === "P2002",
-  );
-}
-
-export async function saveWhatsappAccountForActor(
-  actor: ActorContext,
-  input: z.infer<typeof saveWhatsappAccountSchema>,
-): Promise<void> {
-  await requirePermission(actor, "settings:manage");
-  const accountId = input.accountId ?? randomUUID();
-  const existing = input.accountId
-    ? await prisma.whatsappProviderAccount.findFirst({
-        where: { id: input.accountId, tenantId: actor.tenantId },
-        select: { id: true, encryptedApiKey: true, enabled: true },
-      })
-    : null;
-  if (input.accountId && !existing) throw new BadRequestError("Provider account not found.");
-
-  if (!input.enabled && existing?.enabled) {
-    const selected = await prisma.whatsappDevice.count({
-      where: {
-        tenantId: actor.tenantId,
-        providerAccountId: accountId,
-        OR: [
-          { tenantDefaults: { some: { tenantId: actor.tenantId } } },
-          { clinicOverrides: { some: { tenantId: actor.tenantId } } },
-        ],
-      },
-    });
-    if (selected > 0) {
-      throw new ConflictError("Choose replacement devices before disabling this account.");
-    }
-  }
-
-  const encryptedApiKey = input.apiKey
-    ? encryptWhatsappApiKey(input.apiKey, actor.tenantId, accountId)
-    : existing!.encryptedApiKey;
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.whatsappProviderAccount.upsert({
-        where: { id: accountId },
-        create: {
-          id: accountId,
-          tenantId: actor.tenantId,
-          name: input.name,
-          apiBaseUrl: input.apiBaseUrl,
-          encryptedApiKey,
-          enabled: input.enabled,
-        },
-        update: {
-          name: input.name,
-          apiBaseUrl: input.apiBaseUrl,
-          encryptedApiKey,
-          enabled: input.enabled,
-        },
-      });
-      await writeAuditLog(tx, {
-        action: input.accountId
-          ? AUDIT_ACTIONS.WHATSAPP_PROVIDER_ACCOUNT_UPDATED
-          : AUDIT_ACTIONS.WHATSAPP_PROVIDER_ACCOUNT_CREATED,
-        targetType: "WhatsappProviderAccount",
-        targetId: accountId,
-        actorUserId: actor.userId,
-        actorTenantId: actor.tenantId,
-        afterValue: { enabled: input.enabled },
-      });
-    });
-  } catch (error: unknown) {
-    if (isUniqueConstraintError(error)) {
-      throw new ConflictError("A provider account with that name already exists.");
-    }
-    throw error;
-  }
-}
-
-export async function saveWhatsappDeviceForActor(
-  actor: ActorContext,
-  input: z.infer<typeof saveWhatsappDeviceSchema>,
-): Promise<void> {
-  await requirePermission(actor, "settings:manage");
-  const account = await prisma.whatsappProviderAccount.findFirst({
-    where: { id: input.providerAccountId, tenantId: actor.tenantId },
-    select: { id: true, enabled: true },
-  });
-  if (!account) throw new BadRequestError("Provider account not found.");
-
-  const existing = input.deviceId
-    ? await prisma.whatsappDevice.findFirst({
-        where: { id: input.deviceId, tenantId: actor.tenantId },
-        select: { id: true, enabled: true },
-      })
-    : null;
-  if (input.deviceId && !existing) throw new BadRequestError("WhatsApp device not found.");
-
-  if ((!input.enabled || !account.enabled) && existing?.enabled) {
-    const selected = await prisma.whatsappDevice.count({
-      where: {
-        id: input.deviceId,
-        tenantId: actor.tenantId,
-        OR: [
-          { tenantDefaults: { some: { tenantId: actor.tenantId } } },
-          { clinicOverrides: { some: { tenantId: actor.tenantId } } },
-        ],
-      },
-    });
-    if (selected > 0) {
-      throw new ConflictError(
-        "Choose a replacement before making this routed device unavailable.",
-      );
-    }
-  }
-
-  const deviceId = input.deviceId ?? randomUUID();
-  try {
-    await prisma.$transaction(async (tx) => {
-      if (input.deviceId) {
-        await tx.whatsappDevice.update({
-          where: { id: deviceId },
-          data: {
-            providerAccountId: input.providerAccountId,
-            name: input.name,
-            phoneNumber: input.phoneNumber,
-            enabled: input.enabled,
-          },
-        });
-      } else {
-        await tx.whatsappDevice.create({
-          data: {
-            id: deviceId,
-            tenantId: actor.tenantId,
-            providerAccountId: input.providerAccountId,
-            name: input.name,
-            phoneNumber: input.phoneNumber,
-            enabled: input.enabled,
-          },
-        });
-      }
-      await writeAuditLog(tx, {
-        action: input.deviceId
-          ? AUDIT_ACTIONS.WHATSAPP_DEVICE_UPDATED
-          : AUDIT_ACTIONS.WHATSAPP_DEVICE_CREATED,
-        targetType: "WhatsappDevice",
-        targetId: deviceId,
-        actorUserId: actor.userId,
-        actorTenantId: actor.tenantId,
-        afterValue: { enabled: input.enabled, providerAccountId: input.providerAccountId },
-      });
-    });
-  } catch (error: unknown) {
-    if (isUniqueConstraintError(error)) {
-      throw new ConflictError("That device number already exists on this provider account.");
-    }
-    throw error;
-  }
 }
 
 async function assertSelectableDevices(
@@ -359,6 +167,10 @@ export async function saveWhatsappRoutingForActor(
   }
 
   await prisma.$transaction(async (tx) => {
+    const previousSettings = await tx.tenantWhatsappSettings.findUnique({
+      where: { tenantId: actor.tenantId },
+      select: { defaultDeviceId: true, backupDeviceId: true, automaticFailover: true },
+    });
     const clinicCount = await tx.clinic.count({
       where: { id: { in: [...uniqueClinicIds] }, tenantId: actor.tenantId },
     });
@@ -370,14 +182,27 @@ export async function saveWhatsappRoutingForActor(
       actor.tenantId,
       [
         ...(input.defaultDeviceId ? [input.defaultDeviceId] : []),
+        ...(input.backupDeviceId ? [input.backupDeviceId] : []),
         ...input.clinicOverrides.flatMap((row) => row.deviceId ? [row.deviceId] : []),
       ],
     );
+    if (input.defaultDeviceId && input.defaultDeviceId === input.backupDeviceId) {
+      throw new BadRequestError("Primary and backup WhatsApp devices must be different.");
+    }
 
     await tx.tenantWhatsappSettings.upsert({
       where: { tenantId: actor.tenantId },
-      create: { tenantId: actor.tenantId, defaultDeviceId: input.defaultDeviceId },
-      update: { defaultDeviceId: input.defaultDeviceId },
+      create: {
+        tenantId: actor.tenantId,
+        defaultDeviceId: input.defaultDeviceId,
+        backupDeviceId: input.backupDeviceId,
+        automaticFailover: input.automaticFailover,
+      },
+      update: {
+        defaultDeviceId: input.defaultDeviceId,
+        backupDeviceId: input.backupDeviceId,
+        automaticFailover: input.automaticFailover,
+      },
     });
     for (const row of input.clinicOverrides) {
       if (row.deviceId) {
@@ -400,9 +225,16 @@ export async function saveWhatsappRoutingForActor(
       actorTenantId: actor.tenantId,
       afterValue: {
         hasDefault: input.defaultDeviceId !== null,
+        hasBackup: input.backupDeviceId !== null,
+        automaticFailover: input.automaticFailover,
         clinicOverrideCount: input.clinicOverrides.filter((row) => row.deviceId).length,
       },
     });
+    const auditBase = { targetType: "TenantWhatsappSettings", targetId: actor.tenantId, actorUserId: actor.userId, actorTenantId: actor.tenantId } as const;
+    if ((previousSettings?.defaultDeviceId ?? null) !== input.defaultDeviceId) await writeAuditLog(tx, { ...auditBase, action: AUDIT_ACTIONS.WHATSAPP_PRIMARY_CHANGED });
+    if ((previousSettings?.backupDeviceId ?? null) !== input.backupDeviceId) await writeAuditLog(tx, { ...auditBase, action: AUDIT_ACTIONS.WHATSAPP_BACKUP_CHANGED });
+    if ((previousSettings?.automaticFailover ?? false) !== input.automaticFailover) await writeAuditLog(tx, { ...auditBase, action: AUDIT_ACTIONS.WHATSAPP_FAILOVER_CHANGED, afterValue: { enabled: input.automaticFailover } });
+    if (input.clinicOverrides.length > 0) await writeAuditLog(tx, { ...auditBase, action: AUDIT_ACTIONS.WHATSAPP_CLINIC_ASSIGNMENT_CHANGED, afterValue: { clinicCount: input.clinicOverrides.length } });
   });
 }
 
@@ -422,6 +254,7 @@ export async function resolveWhatsappConfigForClinic(
               tenantId: true,
               phoneNumber: true,
               enabled: true,
+              connectionStatus: true,
               providerAccount: {
                 select: {
                   id: true,
@@ -438,12 +271,31 @@ export async function resolveWhatsappConfigForClinic(
         select: {
           whatsappSettings: {
             select: {
+              automaticFailover: true,
               defaultDevice: {
                 select: {
                   id: true,
                   tenantId: true,
                   phoneNumber: true,
                   enabled: true,
+                  connectionStatus: true,
+                  providerAccount: {
+                    select: {
+                      id: true,
+                      enabled: true,
+                      apiBaseUrl: true,
+                      encryptedApiKey: true,
+                    },
+                  },
+                },
+              },
+              backupDevice: {
+                select: {
+                  id: true,
+                  tenantId: true,
+                  phoneNumber: true,
+                  enabled: true,
+                  connectionStatus: true,
                   providerAccount: {
                     select: {
                       id: true,
@@ -462,10 +314,24 @@ export async function resolveWhatsappConfigForClinic(
   });
   if (!clinic) return null;
 
-  const device =
-    clinic.whatsappSettings?.device ??
-    clinic.tenant.whatsappSettings?.defaultDevice ??
-    null;
+  const explicitClinicDevice = clinic.whatsappSettings?.device ?? null;
+  const tenantSettings = clinic.tenant.whatsappSettings;
+  const primary = tenantSettings?.defaultDevice ?? null;
+  const backup = tenantSettings?.backupDevice ?? null;
+  let device = explicitClinicDevice ?? primary;
+  let usedFallback = false;
+
+  // Clinic overrides never inherit an organisation backup: switching to an
+  // unrelated number would violate the clinic's explicit routing choice.
+  if (
+    !explicitClinicDevice &&
+    tenantSettings?.automaticFailover &&
+    primary?.connectionStatus === "DISCONNECTED"
+  ) {
+    if (backup?.connectionStatus !== "CONNECTED") return null;
+    device = backup;
+    usedFallback = true;
+  }
   if (
     !device ||
     device.tenantId !== tenantId ||
@@ -478,6 +344,7 @@ export async function resolveWhatsappConfigForClinic(
   return {
     deviceId: device.id,
     providerAccountId: device.providerAccount.id,
+    usedFallback,
     sender: device.phoneNumber,
     baseUrl: device.providerAccount.apiBaseUrl.replace(/\/+$/, ""),
     apiKey: decryptWhatsappApiKey(

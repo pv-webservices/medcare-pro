@@ -34,8 +34,8 @@ vi.mock("@/lib/whatsappCredentialCrypto", () => ({
 
 import {
   resolveWhatsappConfigForClinic,
-  saveWhatsappDeviceSchema,
 } from "@/lib/whatsappProviderConfig";
+import { connectWhatsappDeviceSchema } from "@/lib/whatsappDeviceManagement";
 
 function device(id: string, sender: string) {
   return {
@@ -43,6 +43,7 @@ function device(id: string, sender: string) {
     tenantId: "tenant-a",
     phoneNumber: sender,
     enabled: true,
+    connectionStatus: "CONNECTED",
     providerAccount: {
       id: `account-${id}`,
       enabled: true,
@@ -68,12 +69,46 @@ describe("tenant WhatsApp provider routing", () => {
         deviceId: "clinic-device",
         providerAccountId: "account-clinic-device",
         sender: "919111111111",
+        usedFallback: false,
       });
     expect(mocks.decrypt).toHaveBeenCalledWith(
       "encrypted-clinic-device",
       "tenant-a",
       "account-clinic-device",
     );
+  });
+
+  it("uses backup only when inherited primary is positively disconnected", async () => {
+    const primary = { ...device("primary", "919111111111"), connectionStatus: "DISCONNECTED" };
+    const backup = device("backup", "919222222222");
+    mocks.clinicFindFirst.mockResolvedValueOnce({
+      whatsappSettings: null,
+      tenant: { whatsappSettings: { automaticFailover: true, defaultDevice: primary, backupDevice: backup } },
+    });
+    await expect(resolveWhatsappConfigForClinic("tenant-a", "clinic-a"))
+      .resolves.toMatchObject({ deviceId: "backup", sender: "919222222222", usedFallback: true });
+
+    mocks.clinicFindFirst.mockResolvedValueOnce({
+      whatsappSettings: null,
+      tenant: { whatsappSettings: { automaticFailover: true, defaultDevice: { ...primary, connectionStatus: "UNKNOWN" }, backupDevice: backup } },
+    });
+    await expect(resolveWhatsappConfigForClinic("tenant-a", "clinic-a"))
+      .resolves.toMatchObject({ deviceId: "primary", usedFallback: false });
+  });
+
+  it("never applies organisation backup to a clinic-specific device", async () => {
+    mocks.clinicFindFirst.mockResolvedValue({
+      whatsappSettings: { device: { ...device("clinic", "919333333333"), connectionStatus: "DISCONNECTED" } },
+      tenant: { whatsappSettings: { automaticFailover: true, defaultDevice: device("primary", "919111111111"), backupDevice: device("backup", "919222222222") } },
+    });
+    await expect(resolveWhatsappConfigForClinic("tenant-a", "clinic-a"))
+      .resolves.toMatchObject({ deviceId: "clinic", usedFallback: false });
+  });
+
+  it("fails closed when primary and backup are both disconnected", async () => {
+    const disconnected = (id: string, sender: string) => ({ ...device(id, sender), connectionStatus: "DISCONNECTED" });
+    mocks.clinicFindFirst.mockResolvedValue({ whatsappSettings: null, tenant: { whatsappSettings: { automaticFailover: true, defaultDevice: disconnected("primary", "919111111111"), backupDevice: disconnected("backup", "919222222222") } } });
+    await expect(resolveWhatsappConfigForClinic("tenant-a", "clinic-a")).resolves.toBeNull();
   });
 
   it("falls back to the organisation default and fails closed for inactive devices", async () => {
@@ -94,14 +129,12 @@ describe("tenant WhatsApp provider routing", () => {
   });
 
   it("rejects rotation and normalises a deterministic device number", () => {
-    expect(saveWhatsappDeviceSchema.safeParse({
-      providerAccountId: "account-a",
+    expect(connectWhatsappDeviceSchema.safeParse({
       name: "Primary",
       phoneNumber: "rotate",
     }).success).toBe(false);
 
-    const parsed = saveWhatsappDeviceSchema.parse({
-      providerAccountId: "account-a",
+    const parsed = connectWhatsappDeviceSchema.parse({
       name: "Primary",
       phoneNumber: "+91 98765-43210",
     });

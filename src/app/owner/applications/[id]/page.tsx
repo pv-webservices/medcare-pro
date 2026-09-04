@@ -205,6 +205,13 @@ export default async function OwnerApplicationDetailPage({ params }: PageProps) 
             <span>Plan and entitlements</span>
             <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
           </Link>
+          <Link
+            href={`/owner/applications/${application.id}/whatsapp`}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-[#0d1427]/80 px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-600"
+          >
+            WhatsApp integration
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
 

@@ -174,13 +174,13 @@ export const AUDIT_DESCRIPTIONS: Readonly<
   [AUDIT_ACTIONS.WHATSAPP_PROVIDER_ACCOUNT_CREATED]: {
     label: "WhatsApp provider account added",
     detail: "A tenant-owned RkvRobo provider account was configured.",
-    side: "tenant",
+    side: "platform",
     category: "organisation",
   },
   [AUDIT_ACTIONS.WHATSAPP_PROVIDER_ACCOUNT_UPDATED]: {
     label: "WhatsApp provider account updated",
     detail: "A RkvRobo provider account configuration was changed.",
-    side: "tenant",
+    side: "platform",
     category: "organisation",
   },
   [AUDIT_ACTIONS.WHATSAPP_DEVICE_CREATED]: {
@@ -201,6 +201,19 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "organisation",
   },
+  [AUDIT_ACTIONS.WHATSAPP_PROVIDER_KEY_REPLACED]: { label: "WhatsApp provider key replaced", detail: "A platform owner replaced the encrypted provider credential.", side: "platform", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_PROVIDER_ENABLED]: { label: "WhatsApp provider enabled", detail: "A platform owner enabled a provider account.", side: "platform", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_PROVIDER_DISABLED]: { label: "WhatsApp provider disabled", detail: "A platform owner disabled a provider account after routing was cleared.", side: "platform", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_PROVIDER_DEVICE_LIMIT_CHANGED]: { label: "WhatsApp device limit changed", detail: "A platform owner changed the provider account device capacity.", side: "platform", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_DEVICE_QR_INITIATED]: { label: "WhatsApp connection started", detail: "An administrator generated a device connection QR.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_DEVICE_CONNECTED]: { label: "WhatsApp device connected", detail: "RkvRobo positively reported the device connected.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_DEVICE_DISCONNECTED]: { label: "WhatsApp device disconnected", detail: "The device disconnected or its RkvRobo session was logged out.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_DEVICE_REMOVED]: { label: "WhatsApp device removed", detail: "An unrouted device was removed from RkvRobo and MedCarePro.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_WEBHOOK_REGENERATED]: { label: "WhatsApp webhook regenerated", detail: "A new per-device webhook credential invalidated the previous URL.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_PRIMARY_CHANGED]: { label: "WhatsApp primary changed", detail: "The organisation primary sending device changed.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_BACKUP_CHANGED]: { label: "WhatsApp backup changed", detail: "The organisation backup sending device changed.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_FAILOVER_CHANGED]: { label: "WhatsApp failover changed", detail: "Automatic pre-send failover was enabled or disabled.", side: "tenant", category: "organisation" },
+  [AUDIT_ACTIONS.WHATSAPP_CLINIC_ASSIGNMENT_CHANGED]: { label: "WhatsApp clinic routing changed", detail: "One or more clinic-specific device assignments changed.", side: "tenant", category: "organisation" },
   [AUDIT_ACTIONS.CLINIC_TELEPHONY_CONFIG_UPDATED]: {
     label: "Clinic telephone routing changed",
     detail:

@@ -943,6 +943,7 @@ model WhatsappProviderAccount {
   apiBaseUrl      String   @default("https://bot.rkvrobo.in/api") @map("api_base_url")
   encryptedApiKey String   @map("encrypted_api_key") @db.Text
   keyVersion      Int      @default(1) @map("key_version")
+  deviceLimit     Int      @default(2) @map("device_limit")
   enabled         Boolean  @default(true)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -958,40 +959,57 @@ model WhatsappProviderAccount {
 
 /// A deterministic RkvRobo sending device. `phoneNumber` is the provider's
 /// sender identifier; "rotate" is rejected in the application layer.
+enum WhatsappDeviceConnectionStatus {
+  PENDING
+  CONNECTED
+  DISCONNECTED
+  UNKNOWN
+}
+
 model WhatsappDevice {
-  id                String   @id @default(cuid())
-  tenantId          String   @map("tenant_id")
-  providerAccountId String   @map("provider_account_id")
-  name              String
-  phoneNumber       String   @map("phone_number")
-  enabled           Boolean  @default(true)
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id                  String                         @id @default(cuid())
+  tenantId            String                         @map("tenant_id")
+  providerAccountId   String                         @map("provider_account_id")
+  name                String
+  phoneNumber         String                         @map("phone_number")
+  enabled             Boolean                        @default(true)
+  connectionStatus    WhatsappDeviceConnectionStatus @default(UNKNOWN) @map("connection_status")
+  lastStatusCheckedAt DateTime?                      @map("last_status_checked_at")
+  webhookPublicId     String?                        @unique @map("webhook_public_id")
+  webhookSecretHash   String?                        @map("webhook_secret_hash")
+  createdAt           DateTime                       @default(now()) @map("created_at")
+  updatedAt           DateTime                       @updatedAt @map("updated_at")
 
   tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   providerAccount WhatsappProviderAccount  @relation(fields: [providerAccountId, tenantId], references: [id, tenantId], onDelete: Cascade)
   tenantDefaults  TenantWhatsappSettings[] @relation("TenantWhatsappDefaultDevice")
+  tenantBackups   TenantWhatsappSettings[] @relation("TenantWhatsappBackupDevice")
   clinicOverrides ClinicWhatsappSettings[] @relation("ClinicWhatsappDevice")
   messages        WhatsappMessage[]
 
   @@unique([id, tenantId])
   @@unique([providerAccountId, phoneNumber])
+  @@unique([tenantId, phoneNumber])
   @@index([tenantId, enabled])
   @@map("whatsapp_devices")
 }
 
 /// Organisation-wide fallback used when a clinic has no explicit override.
 model TenantWhatsappSettings {
-  id              String   @id @default(cuid())
-  tenantId        String   @unique @map("tenant_id")
-  defaultDeviceId String?  @map("default_device_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id                String   @id @default(cuid())
+  tenantId          String   @unique @map("tenant_id")
+  defaultDeviceId   String?  @map("default_device_id")
+  backupDeviceId    String?  @map("backup_device_id")
+  automaticFailover Boolean  @default(false) @map("automatic_failover")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   defaultDevice WhatsappDevice? @relation("TenantWhatsappDefaultDevice", fields: [defaultDeviceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  backupDevice  WhatsappDevice? @relation("TenantWhatsappBackupDevice", fields: [backupDeviceId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   @@index([defaultDeviceId, tenantId])
+  @@index([backupDeviceId, tenantId])
   @@map("tenant_whatsapp_settings")
 }
 
@@ -1050,6 +1068,7 @@ model WhatsappMessage {
   patientId         String   @map("patient_id")
   mediaAssetId      String?  @map("media_asset_id")
   whatsappDeviceId  String?  @map("whatsapp_device_id")
+  senderNumber      String?  @map("sender_number")
   /// FR-9.1 — the WhatsappTemplate name this send used. Denormalised rather
   /// than a foreign key: history must survive the template being renamed or
   /// deleted, the same reasoning as `registration_edit_log.role_at_time`.

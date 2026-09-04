@@ -100,6 +100,7 @@ export interface MessageRecord {
   status: string;
   failureReason: string | null;
   providerMessageId: string | null;
+  senderNumber: string | null;
   sentAt: Date;
   clinicName: string;
   patientName: string;
@@ -377,6 +378,7 @@ export async function deliverTemplate(
         patientId: target.patientId,
         mediaAssetId: usedMediaAssetId,
         whatsappDeviceId: config?.deviceId ?? null,
+        senderNumber: config?.sender ?? null,
         // Denormalised copy — see the schema note. History must survive the
         // template being renamed or deleted.
         templateName: template.name,
@@ -526,6 +528,7 @@ export async function listMessagesForActor(
       status: true,
       failureReason: true,
       providerMessageId: true,
+      senderNumber: true,
       sentAt: true,
       clinic: { select: { name: true } },
       patient: { select: { name: true, patientCode: true, mobileNumber: true } },

@@ -29,6 +29,9 @@ vi.mock("@/lib/whatsapp", () => ({
 
 vi.mock("@/lib/whatsappProviderConfig", () => ({
   resolveWhatsappConfigForClinic: vi.fn().mockResolvedValue({
+    deviceId: "device-primary",
+    providerAccountId: "account-primary",
+    usedFallback: false,
     apiKey: "test-key",
     sender: "919999999999",
     baseUrl: "https://example.test/api",
@@ -215,8 +218,19 @@ describe("deliverTemplate with media", () => {
     expect(prisma.whatsappMessage.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         mediaAssetId: null,
+        whatsappDeviceId: "device-primary",
+        senderNumber: "919999999999",
       }),
     });
+  });
+
+  it("records an uncertain timeout once and never retries through another device", async () => {
+    vi.mocked(prisma.whatsappTemplateMedia.findUnique).mockResolvedValueOnce(null);
+    vi.mocked(sendText).mockResolvedValueOnce({ ok: false, providerMessageId: null, message: "The WhatsApp gateway did not respond in time." });
+    const result = await deliverTemplate(baseTemplate, deliveryTarget);
+    expect(result.status).toBe("failed");
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(prisma.whatsappMessage.create).toHaveBeenCalledWith({ data: expect.objectContaining({ whatsappDeviceId: "device-primary", senderNumber: "919999999999", status: "failed" }) });
   });
 
   it("handles media preparation errors gracefully as failed recipient outcome rather than throwing", async () => {

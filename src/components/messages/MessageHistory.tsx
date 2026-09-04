@@ -117,7 +117,8 @@ export default function MessageHistory({
                     {message.templateName}
                   </td>
                   <td className="py-4 px-4 align-top text-body text-ink">
-                    {message.clinicName}
+                    <p>{message.clinicName}</p>
+                    {message.senderNumber && <p className="mt-1 text-micro text-muted">Sent from +{message.senderNumber}</p>}
                   </td>
                   <td className="py-4 px-4 align-top">
                     {message.status === "sent" ? (
