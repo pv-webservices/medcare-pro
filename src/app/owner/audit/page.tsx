@@ -69,13 +69,13 @@ export default async function OwnerAuditPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   const filters = ownerAuditFilterSchema.parse({
-    category: one(params.category),
-    action: one(params.action),
-    tenantId: one(params.tenantId),
-    search: one(params.search),
-    from: one(params.from),
-    to: one(params.to),
-    page: one(params.page),
+    category: one(params.category) || undefined,
+    action: one(params.action) || undefined,
+    tenantId: one(params.tenantId) || undefined,
+    search: one(params.search) || undefined,
+    from: one(params.from) || undefined,
+    to: one(params.to) || undefined,
+    page: one(params.page) || undefined,
   });
 
   const result = await listAuditLog(owner, filters);

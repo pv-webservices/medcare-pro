@@ -48,7 +48,11 @@ export const ownerAuditFilterSchema = z.object({
   /** ISO dates, inclusive of the whole `from` day and the whole `to` day. */
   from: z.string().trim().max(10).optional(),
   to: z.string().trim().max(10).optional(),
-  page: z.coerce.number().int().min(1).max(1000).optional(),
+  page: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? undefined : val),
+      z.coerce.number().int().min(1).max(1000).optional(),
+    ),
 });
 
 export type OwnerAuditFilterInput = z.infer<typeof ownerAuditFilterSchema>;
