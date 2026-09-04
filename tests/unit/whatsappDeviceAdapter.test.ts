@@ -37,6 +37,20 @@ describe("RkvRobo device adapter", () => {
     await expect(generateDeviceQr(config, config.sender)).resolves.toMatchObject({ ok: true, qr: expect.any(String) });
   });
 
+  it("accepts the current documented QR-ready response with status=false", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+      status: false,
+      qrcode: "data:image/png;base64,safe-test-qr",
+      message: "Please scann qrcode",
+    })));
+
+    await expect(generateDeviceQr(config, config.sender)).resolves.toEqual({
+      ok: true,
+      qr: "data:image/png;base64,safe-test-qr",
+      message: "Please scann qrcode",
+    });
+  });
+
   it("sends exact endpoint-specific device payloads without generic sender injection", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(response({ status: true, info: [{ device: config.sender, status: "Connected" }] }))
@@ -49,7 +63,15 @@ describe("RkvRobo device adapter", () => {
     await logoutDevice(config);
     await deleteDevice(config);
     expect(postedBody(fetchMock, 0)).toEqual({ api_key: "tenant-key" });
-    expect(postedBody(fetchMock, 1)).toEqual({ api_key: "tenant-key", device: config.sender, force: "true" });
+    expect(postedBody(fetchMock, 1)).toEqual({ api_key: "tenant-key", device: config.sender, force: true });
+    expect(typeof postedBody(fetchMock, 1).force).toBe("boolean");
+    expect(postedBody(fetchMock, 1)).not.toHaveProperty("sender");
+    expect(fetchMock.mock.calls[1][0]).toBe("https://provider.test/api/generate-qr");
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
     expect(postedBody(fetchMock, 2)).toEqual({ api_key: "tenant-key", sender: config.sender });
     expect(postedBody(fetchMock, 3)).toEqual({ api_key: "tenant-key", sender: config.sender });
   });

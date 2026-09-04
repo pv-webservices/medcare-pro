@@ -509,7 +509,7 @@ export async function generateDeviceQr(
 ): Promise<DeviceQrResult> {
   const response = await post(
     GENERATE_QR_PATH,
-    { device: phoneNumber, force: "true" },
+    { device: phoneNumber, force: true },
     config,
   );
   if (!response.payload) {
