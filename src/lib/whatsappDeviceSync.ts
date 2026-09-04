@@ -28,12 +28,12 @@ export function whatsappConfigForProviderDevice(
 export type WhatsappProviderDeviceState =
   | {
       outcome: "PRESENT";
-      connectionStatus: "CONNECTED" | "DISCONNECTED" | "PENDING";
+      connectionStatus: "CONNECTED" | "DISCONNECTED" | "PENDING" | "UNKNOWN";
       message: string;
     }
   | {
       outcome: "NOT_FOUND";
-      connectionStatus: "DISCONNECTED";
+      connectionStatus: "MISSING";
       message: string;
     }
   | {
@@ -56,20 +56,23 @@ export async function probeWhatsappDeviceForProvider(
   );
   if (probe.ok) {
     const providerStatus = probe.device.status.trim().toLowerCase();
+    const connectionStatus = probe.device.connected
+      ? "CONNECTED"
+      : /^(offline|disconnect|disconnected|logout|logged out)$/.test(providerStatus)
+        ? "DISCONNECTED"
+        : /^(connecting|pending|qr|waiting|waiting for qr|scan qr)$/.test(providerStatus)
+          ? "PENDING"
+          : "UNKNOWN";
     return {
       outcome: "PRESENT",
-      connectionStatus: probe.device.connected
-        ? "CONNECTED"
-        : /disconnect|logout|logged out/.test(providerStatus)
-          ? "DISCONNECTED"
-          : "PENDING",
+      connectionStatus,
       message: probe.device.status,
     };
   }
   if (probe.reason === "NOT_FOUND") {
     return {
       outcome: "NOT_FOUND",
-      connectionStatus: "DISCONNECTED",
+      connectionStatus: "MISSING",
       message: probe.message,
     };
   }

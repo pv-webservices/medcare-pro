@@ -110,7 +110,7 @@ export function readWhatsappConfig(): WhatsappConfig {
   };
 }
 
-interface GatewayResponse {
+export interface GatewayResponse {
   ok: boolean;
   /** The parsed body, for callers that need more than status + message. */
   payload: Record<string, unknown> | null;
@@ -146,7 +146,7 @@ function readMessage(body: Record<string, unknown>, ok: boolean): string {
  */
 async function post(
   path: string,
-  fields: Record<string, string | number>,
+  fields: Record<string, string | number | boolean>,
   suppliedConfig?: WhatsappConfig,
 ): Promise<GatewayResponse> {
   const config = suppliedConfig ?? readWhatsappConfig();
@@ -160,20 +160,30 @@ async function post(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         api_key: config.apiKey,
-        sender: config.sender,
         ...fields,
       }),
       signal: controller.signal,
       cache: "no-store",
     });
 
-    const parsed: unknown = await response.json().catch(() => null);
+    const contentType = response.headers.get("content-type") ?? "";
+    const responseText = await response.text().catch(() => "");
+    let parsed: unknown = null;
+    if (responseText.trim() !== "") {
+      try {
+        parsed = JSON.parse(responseText);
+      } catch {
+        parsed = null;
+      }
+    }
 
     if (typeof parsed !== "object" || parsed === null) {
       return {
         ok: false,
         payload: null,
-        message: "The WhatsApp gateway returned an unreadable response.",
+        message: contentType.toLowerCase().includes("json")
+          ? "The WhatsApp gateway returned malformed JSON."
+          : "The WhatsApp gateway returned an unexpected response.",
         failureKind: "UNREADABLE",
         httpOk: response.ok,
       };
@@ -213,6 +223,16 @@ async function post(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Message/check endpoints share the verified sender contract. */
+function postWhatsappMessage(
+  path: string,
+  fields: Record<string, string | number>,
+  config?: WhatsappConfig,
+): Promise<GatewayResponse> {
+  const resolvedConfig = config ?? readWhatsappConfig();
+  return post(path, { sender: resolvedConfig.sender, ...fields }, resolvedConfig);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +286,7 @@ async function send(
   config?: WhatsappConfig,
 ): Promise<SendResult> {
   // full=1 asks for the whole WhatsApp payload so `data.key.id` comes back.
-  const response = await post(path, { full: 1, ...fields }, config);
+  const response = await postWhatsappMessage(path, { full: 1, ...fields }, config);
 
   return {
     ok: response.ok,
@@ -328,7 +348,7 @@ export async function checkNumber(
   to: string,
   config?: WhatsappConfig,
 ): Promise<NumberCheck> {
-  const response = await post(CHECK_NUMBER_PATH, { number: to }, config);
+  const response = await postWhatsappMessage(CHECK_NUMBER_PATH, { number: to }, config);
 
   if (!response.ok) {
     return { exists: false, checked: false, message: response.message };
@@ -380,6 +400,15 @@ export type DeviceProbe =
   | { ok: true; device: DeviceStatus }
   | { ok: false; reason: "NOT_FOUND" | "UNAVAILABLE"; message: string };
 
+/** Narrow provider-absence classification; generic permission failures stay unknown. */
+export function isWhatsappDeviceNotFoundMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  if (/invalid sender device.*not added under this api key/.test(normalized)) return true;
+  if (/\bno device\b/.test(normalized)) return true;
+  return /\b(device|sender)\b.*\b(does not exist|not found|not added under this api key)\b/.test(normalized)
+    && !/\bpermission\b/.test(normalized);
+}
+
 export async function getDeviceStatus(config?: WhatsappConfig): Promise<DeviceProbe> {
   const resolvedConfig = config ?? readWhatsappConfig();
 
@@ -392,17 +421,14 @@ export async function getDeviceStatus(config?: WhatsappConfig): Promise<DevicePr
     };
   }
 
-  const response = await post(
-    DEVICE_INFO_PATH,
-    { number: resolvedConfig.sender },
-    resolvedConfig,
-  );
+  // /info-devices lists the account's devices; filter locally by exact identity.
+  const response = await post(DEVICE_INFO_PATH, {}, resolvedConfig);
 
   if (!response.ok) {
     // The gateway's own wording is far more useful than a generic failure —
     // "The number you are trying to reach does not exist, or you do not have
     // permission." is what a sender in the wrong FORMAT looks like.
-    const notFound = /does not exist|not found|no device/i.test(response.message);
+    const notFound = isWhatsappDeviceNotFoundMessage(response.message);
     return {
       ok: false,
       reason: notFound ? "NOT_FOUND" : "UNAVAILABLE",
@@ -465,7 +491,7 @@ export async function generateDeviceQr(
   const response = await post(
     GENERATE_QR_PATH,
     { device: phoneNumber, force: "true" },
-    { ...config, sender: phoneNumber },
+    config,
   );
   if (!response.payload) {
     return {
@@ -498,11 +524,12 @@ export async function generateDeviceQr(
 }
 
 export async function logoutDevice(config: WhatsappConfig): Promise<GatewayResponse> {
-  return post(LOGOUT_DEVICE_PATH, { device: config.sender }, config);
+  // RkvRobo's logout/delete operations name the existing sender, unlike QR creation.
+  return post(LOGOUT_DEVICE_PATH, { sender: config.sender }, config);
 }
 
 export async function deleteDevice(config: WhatsappConfig): Promise<GatewayResponse> {
-  return post(DELETE_DEVICE_PATH, { device: config.sender }, config);
+  return post(DELETE_DEVICE_PATH, { sender: config.sender }, config);
 }
 
 // ---------------------------------------------------------------------------

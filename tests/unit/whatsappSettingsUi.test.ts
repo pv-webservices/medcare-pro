@@ -14,7 +14,7 @@ describe("WhatsApp owner settings polling", () => {
     expect(source).not.toContain("encryptedApiKey");
   });
   it("counts all configured rows and separates initial webhook setup from regeneration", () => {
-    expect(source).toContain("account.devices.length} of {account.deviceLimit}");
+    expect(source).toContain("account.devices.length} of {account.deviceLimit} device slots are in use.");
     expect(source).not.toContain("account.devices.filter((device) => device.enabled).length");
     expect(source).toContain('act("setupWebhook")');
     expect(source).toContain("Regenerate webhook URL");
@@ -23,9 +23,28 @@ describe("WhatsApp owner settings polling", () => {
     expect(source).toContain("for this exact device in RkvRobo");
   });
   it("labels operational device states and the last provider check", () => {
-    expect(source).toContain("Status has not been confirmed.");
-    expect(source).toContain("Waiting for WhatsApp connection.");
+    expect(source).toContain("RkvRobo could not confirm this device's state.");
+    expect(source).toContain("A confirmed QR session is waiting to be scanned.");
+    expect(source).toContain("Not found in RkvRobo");
     expect(source).toContain("Last checked:");
     expect(source).toContain("Connect WhatsApp</Button>");
+  });
+  it("separates reconnect from add-new and leaves reconnect available at capacity", () => {
+    expect(source).toContain('action: "reconnect"');
+    expect(source).toContain('disabled={availableAccounts.length === 0}');
+    expect(source).toContain("Reconnect as this device");
+  });
+  it("uses an accessible guided removal modal and a boxed lucide close target", () => {
+    expect(source).toContain("Remove WhatsApp device");
+    expect(source).toContain("Organisation primary");
+    expect(source).toContain("Reassign routing to another eligible device");
+    expect(source).toContain("Clear these assignments");
+    expect(source).toContain('variant="dangerSolid"');
+    expect(source).toContain('aria-label="Close"');
+    expect(source).toContain('<X aria-hidden="true" className="h-5 w-5" />');
+    expect(source).toContain("h-10 w-10");
+    expect(source).toContain('event.key === "Escape"');
+    expect(source).toContain('event.key !== "Tab"');
+    expect(source).toContain("event.preventDefault()");
   });
 });

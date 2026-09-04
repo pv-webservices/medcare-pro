@@ -53,7 +53,7 @@ export interface WhatsappConfigurationView {
       name: string;
       phoneNumber: string;
       enabled: boolean;
-      connectionStatus: "PENDING" | "CONNECTED" | "DISCONNECTED" | "UNKNOWN";
+      connectionStatus: "PENDING" | "CONNECTED" | "DISCONNECTED" | "UNKNOWN" | "MISSING";
       lastStatusCheckedAt: string | null;
       webhookConfigured: boolean;
     }>;

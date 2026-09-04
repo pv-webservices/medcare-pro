@@ -964,6 +964,7 @@ enum WhatsappDeviceConnectionStatus {
   CONNECTED
   DISCONNECTED
   UNKNOWN
+  MISSING
 }
 
 model WhatsappDevice {
