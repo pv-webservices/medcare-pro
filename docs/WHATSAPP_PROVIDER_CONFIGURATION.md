@@ -28,21 +28,41 @@ or entering each provider API key again.
 ## Organisation administrator setup
 
 1. Open **Settings → WhatsApp provider**.
-2. Connect each purchased number and scan the returned QR in WhatsApp.
+2. Connect each purchased number. MedCarePro first reconciles it with
+   `/info-devices`; an already-connected RkvRobo device is imported without a
+   new QR. Otherwise, scan the returned QR in WhatsApp.
 3. Refresh status until RkvRobo positively reports `CONNECTED`.
 4. Choose the organisation primary and optional backup device.
 5. Enable automatic failover only when a backup is configured.
 6. Add clinic overrides only where a clinic must send from another device.
 7. Generate each device's webhook URL and manually paste it into RkvRobo.
 
+Device numbers are stored as digits-only international values. In the current
+India-focused phone convention, a ten-digit local input is canonicalized once
+to `91` plus the ten digits; an existing `91` country code is never prepended
+again. Duplicate checks cover both canonical values and legacy ten-digit rows.
+
 Runtime routing is deterministic. A clinic override is always used directly and
 never inherits the organisation backup. An inherited organisation primary uses
 the backup only when failover is enabled, the primary is positively
 `DISCONNECTED`, and the backup is positively `CONNECTED`. `UNKNOWN` does not
-trigger switching. After a send is submitted, timeout, 5xx, network failure, or
+trigger switching. When failover is enabled, stored status older than two
+minutes is refreshed before the failover decision; failover-disabled sends do
+not make that extra provider call. After a send is submitted, timeout, 5xx, network failure, or
 an unreadable response is recorded as failure and is never retried through the
 backup. Disabled accounts and devices are never selected. `sender="rotate"` is
 not accepted.
+
+A local device row occupies one provider slot regardless of enabled or
+connection status. Disconnecting or disabling it does not free a purchased
+RkvRobo slot. Only a successful provider-side Remove followed by deletion of
+the local row frees capacity. Platform and organisation screens use this same
+definition.
+
+QR onboarding distinguishes definitive provider rejection from an ambiguous
+timeout, 5xx, or unreadable response. A definitive rejection removes a newly
+reserved local row. An ambiguous result retains one `PENDING` row because the
+provider may have accepted the request; use Refresh status before retrying.
 
 The database allows multiple `WhatsappProviderAccount` rows for a tenant. There
 is intentionally no unique constraint on `tenant_id` in that table.
@@ -51,7 +71,8 @@ is intentionally no unique constraint on `tenant_id` in that table.
 
 1. Back up the database.
 2. Add `WHATSAPP_PROVIDER_ENCRYPTION_KEY` to the deployment secret store.
-3. Apply Prisma migration `20260904120000_multi_tenant_whatsapp_provider_config`.
+3. Apply Prisma migrations through
+   `20260904190000_complete_whatsapp_provider_management`.
 4. Deploy the application.
 5. Superadmin enters provider accounts in the Platform Console.
 6. Organisation administrators connect devices and configure routing.
@@ -67,12 +88,18 @@ those scripts are retired.
 The legacy `/api/whatsapp/webhook?token=<WHATSAPP_WEBHOOK_TOKEN>` route remains
 temporarily and can update only by globally unique provider message ID. It does
 not accept a tenant, clinic, or device identifier. For each device, generate a
-new URL in Settings and paste it into the RkvRobo Webhook URL field. The new
+different URL in Settings and paste it into that exact device's RkvRobo
+Webhook URL field. Each URL has a different public ID and secret. The new
 `/api/whatsapp/webhook/<publicId>?token=<secret>` route derives device ownership
 from the database, verifies the hashed per-device secret in constant time, and
 scopes updates to that device. After every production device has delivered a
 verified callback through its new URL, clear `WHATSAPP_WEBHOOK_TOKEN`; a later
 release may remove the legacy route.
+
+The raw secret is shown only when first generated. Opening setup for an already
+configured device does not rotate it. Use the explicit **Regenerate webhook
+URL** action only when replacement is intended; regeneration immediately
+invalidates the previous URL.
 
 ## Manual acceptance after deployment
 

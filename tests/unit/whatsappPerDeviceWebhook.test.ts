@@ -28,6 +28,14 @@ describe("per-device WhatsApp webhook", () => {
     expect((await POST(request(secret), { params: Promise.resolve({ publicId: "public-a" }) })).status).toBe(401);
     expect(mocks.updateMessages).not.toHaveBeenCalled();
   });
+  it("rejects Device A's secret when used with Device B's public id", async () => {
+    mocks.findDevice.mockResolvedValue({ id: "device-b", phoneNumber: "919222222222", webhookSecretHash: hash("secret-b") });
+    const response = await POST(request("secret-a"), {
+      params: Promise.resolve({ publicId: "public-b" }),
+    });
+    expect(response.status).toBe(401);
+    expect(mocks.updateMessages).not.toHaveBeenCalled();
+  });
   it("rejects unknown public ids and claimed device mismatches", async () => {
     mocks.findDevice.mockResolvedValueOnce(null);
     expect((await POST(request("secret-a"), { params: Promise.resolve({ publicId: "unknown" }) })).status).toBe(401);

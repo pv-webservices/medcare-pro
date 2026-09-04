@@ -11,6 +11,9 @@ import {
 } from "@/lib/rbac";
 import { decryptWhatsappApiKey } from "@/lib/whatsappCredentialCrypto";
 import type { WhatsappConfig } from "@/lib/whatsapp";
+import { syncWhatsappDeviceWithProvider } from "@/lib/whatsappDeviceSync";
+
+export const WHATSAPP_FAILOVER_STATUS_FRESHNESS_MS = 2 * 60 * 1000;
 
 export interface ResolvedWhatsappConfig extends WhatsappConfig {
   deviceId: string;
@@ -255,9 +258,11 @@ export async function resolveWhatsappConfigForClinic(
               phoneNumber: true,
               enabled: true,
               connectionStatus: true,
+              lastStatusCheckedAt: true,
               providerAccount: {
                 select: {
                   id: true,
+                  tenantId: true,
                   enabled: true,
                   apiBaseUrl: true,
                   encryptedApiKey: true,
@@ -279,9 +284,11 @@ export async function resolveWhatsappConfigForClinic(
                   phoneNumber: true,
                   enabled: true,
                   connectionStatus: true,
+                  lastStatusCheckedAt: true,
                   providerAccount: {
                     select: {
                       id: true,
+                      tenantId: true,
                       enabled: true,
                       apiBaseUrl: true,
                       encryptedApiKey: true,
@@ -296,9 +303,11 @@ export async function resolveWhatsappConfigForClinic(
                   phoneNumber: true,
                   enabled: true,
                   connectionStatus: true,
+                  lastStatusCheckedAt: true,
                   providerAccount: {
                     select: {
                       id: true,
+                      tenantId: true,
                       enabled: true,
                       apiBaseUrl: true,
                       encryptedApiKey: true,
@@ -321,16 +330,28 @@ export async function resolveWhatsappConfigForClinic(
   let device = explicitClinicDevice ?? primary;
   let usedFallback = false;
 
+  const isStale = (checkedAt: Date | null | undefined) =>
+    !checkedAt || Date.now() - checkedAt.getTime() > WHATSAPP_FAILOVER_STATUS_FRESHNESS_MS;
+
   // Clinic overrides never inherit an organisation backup: switching to an
   // unrelated number would violate the clinic's explicit routing choice.
-  if (
-    !explicitClinicDevice &&
-    tenantSettings?.automaticFailover &&
-    primary?.connectionStatus === "DISCONNECTED"
-  ) {
-    if (backup?.connectionStatus !== "CONNECTED") return null;
-    device = backup;
-    usedFallback = true;
+  if (!explicitClinicDevice && tenantSettings?.automaticFailover && primary) {
+    let primaryStatus = primary.connectionStatus;
+    if (isStale(primary.lastStatusCheckedAt)) {
+      const refreshed = await syncWhatsappDeviceWithProvider(primary);
+      primaryStatus = refreshed.connectionStatus;
+    }
+    if (primaryStatus === "DISCONNECTED") {
+      if (!backup) return null;
+      let backupStatus = backup.connectionStatus;
+      if (isStale(backup.lastStatusCheckedAt)) {
+        const refreshed = await syncWhatsappDeviceWithProvider(backup);
+        backupStatus = refreshed.connectionStatus;
+      }
+      if (backupStatus !== "CONNECTED") return null;
+      device = backup;
+      usedFallback = true;
+    }
   }
   if (
     !device ||

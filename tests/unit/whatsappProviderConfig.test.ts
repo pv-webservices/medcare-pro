@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   clinicFindFirst: vi.fn(),
   decrypt: vi.fn().mockReturnValue("decrypted-key"),
+  getStatus: vi.fn(),
+  deviceUpdateMany: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     clinic: { findFirst: mocks.clinicFindFirst },
+    whatsappDevice: { updateMany: mocks.deviceUpdateMany },
   },
 }));
+
+vi.mock("@/lib/whatsapp", () => ({ getDeviceStatus: mocks.getStatus }));
 
 vi.mock("@/lib/apiHandler", () => ({
   BadRequestError: class BadRequestError extends Error {},
@@ -44,8 +49,10 @@ function device(id: string, sender: string) {
     phoneNumber: sender,
     enabled: true,
     connectionStatus: "CONNECTED",
+    lastStatusCheckedAt: new Date(),
     providerAccount: {
       id: `account-${id}`,
+      tenantId: "tenant-a",
       enabled: true,
       apiBaseUrl: "https://bot.rkvrobo.in/api/",
       encryptedApiKey: `encrypted-${id}`,
@@ -94,6 +101,30 @@ describe("tenant WhatsApp provider routing", () => {
     });
     await expect(resolveWhatsappConfigForClinic("tenant-a", "clinic-a"))
       .resolves.toMatchObject({ deviceId: "primary", usedFallback: false });
+  });
+
+  it("refreshes stale primary and backup status only when failover is enabled", async () => {
+    const stale = new Date(Date.now() - 10 * 60 * 1000);
+    const primary = { ...device("primary", "919111111111"), connectionStatus: "CONNECTED", lastStatusCheckedAt: stale };
+    const backup = { ...device("backup", "919222222222"), lastStatusCheckedAt: stale };
+    mocks.clinicFindFirst.mockResolvedValue({
+      whatsappSettings: null,
+      tenant: { whatsappSettings: { automaticFailover: true, defaultDevice: primary, backupDevice: backup } },
+    });
+    mocks.getStatus
+      .mockResolvedValueOnce({ ok: true, device: { connected: false, status: "Disconnected" } })
+      .mockResolvedValueOnce({ ok: true, device: { connected: true, status: "Connected" } });
+    await expect(resolveWhatsappConfigForClinic("tenant-a", "clinic-a"))
+      .resolves.toMatchObject({ deviceId: "backup", usedFallback: true });
+    expect(mocks.getStatus).toHaveBeenCalledTimes(2);
+
+    mocks.getStatus.mockClear();
+    mocks.clinicFindFirst.mockResolvedValue({
+      whatsappSettings: null,
+      tenant: { whatsappSettings: { automaticFailover: false, defaultDevice: primary, backupDevice: backup } },
+    });
+    await resolveWhatsappConfigForClinic("tenant-a", "clinic-a");
+    expect(mocks.getStatus).not.toHaveBeenCalled();
   });
 
   it("never applies organisation backup to a clinic-specific device", async () => {

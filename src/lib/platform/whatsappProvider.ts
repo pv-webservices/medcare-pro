@@ -6,6 +6,7 @@ import type { PlatformActorContext } from "@/lib/platform/context";
 import { prisma } from "@/lib/prisma";
 import { CUSTOMER_TENANT_WHERE } from "@/lib/platformTenant";
 import { encryptWhatsappApiKey } from "@/lib/whatsappCredentialCrypto";
+import { configuredWhatsappDeviceCount, whatsappConfiguredDeviceCount } from "@/lib/whatsappDeviceCapacity";
 
 const baseUrl = z.string().trim().url().max(500).transform((value) => value.replace(/\/+$/, ""))
   .refine((value) => new URL(value).protocol === "https:", "The provider API URL must use HTTPS.");
@@ -56,7 +57,7 @@ export async function listPlatformWhatsappAccounts(
       enabled: true,
       deviceLimit: true,
       encryptedApiKey: true,
-      _count: { select: { devices: { where: { enabled: true } } } },
+      ...whatsappConfiguredDeviceCount,
     },
   });
   return rows.map((row) => ({
@@ -65,7 +66,7 @@ export async function listPlatformWhatsappAccounts(
     apiBaseUrl: row.apiBaseUrl,
     enabled: row.enabled,
     deviceLimit: row.deviceLimit,
-    configuredDevices: row._count.devices,
+    configuredDevices: configuredWhatsappDeviceCount(row),
     apiKeyConfigured: row.encryptedApiKey.length > 0,
   }));
 }
@@ -80,12 +81,12 @@ export async function savePlatformWhatsappAccount(
   const existing = input.accountId
     ? await prisma.whatsappProviderAccount.findFirst({
         where: { id: input.accountId, tenantId },
-        select: { id: true, encryptedApiKey: true, enabled: true, deviceLimit: true, _count: { select: { devices: { where: { enabled: true } } } } },
+        select: { id: true, encryptedApiKey: true, enabled: true, deviceLimit: true, ...whatsappConfiguredDeviceCount },
       })
     : null;
   if (input.accountId && !existing) throw new BadRequestError("Provider account not found.");
   if (existing && input.deviceLimit < existing._count.devices) {
-    throw new ConflictError("Device limit cannot be lower than the number of active configured devices.");
+    throw new ConflictError("Device limit cannot be lower than the number of configured devices.");
   }
   if (existing?.enabled && !input.enabled) {
     const references = await prisma.whatsappDevice.count({

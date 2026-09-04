@@ -34,4 +34,11 @@ describe("platform WhatsApp provider ownership", () => {
     expect(customerRoute).not.toContain("apiKey");
     expect(ownerRoute).toContain("requirePlatformOwner");
   });
+  it("uses the shared all-row device count for platform capacity", () => {
+    const platformService = readFileSync(resolve("src/lib/platform/whatsappProvider.ts"), "utf8");
+    const capacityHelper = readFileSync(resolve("src/lib/whatsappDeviceCapacity.ts"), "utf8");
+    expect(platformService).toContain("whatsappConfiguredDeviceCount");
+    expect(platformService).not.toContain("devices: { where: { enabled: true }");
+    expect(capacityHelper).toContain("devices: true");
+  });
 });

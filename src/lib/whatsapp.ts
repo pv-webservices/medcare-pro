@@ -116,6 +116,10 @@ interface GatewayResponse {
   payload: Record<string, unknown> | null;
   /** Always a string for display, even when the gateway put an object in `msg`. */
   message: string;
+  /** Distinguishes a provider refusal from an outcome that may have succeeded. */
+  failureKind: "REJECTED" | "UNAVAILABLE" | "UNREADABLE" | null;
+  /** QR generation may return usable QR material with non-standard status fields. */
+  httpOk: boolean;
 }
 
 /** Reads `msg` without assuming it is a string — check-number returns an object. */
@@ -170,6 +174,8 @@ async function post(
         ok: false,
         payload: null,
         message: "The WhatsApp gateway returned an unreadable response.",
+        failureKind: "UNREADABLE",
+        httpOk: response.ok,
       };
     }
 
@@ -178,7 +184,13 @@ async function post(
     // outcome — but a non-JSON 5xx still lands above as a failure.
     const ok = body.status === true && response.ok;
 
-    return { ok, payload: body, message: readMessage(body, ok) };
+    return {
+      ok,
+      payload: body,
+      message: readMessage(body, ok),
+      failureKind: ok ? null : response.status >= 500 ? "UNAVAILABLE" : "REJECTED",
+      httpOk: response.ok,
+    };
   } catch (error: unknown) {
     if (error instanceof WhatsappNotConfiguredError) {
       throw error;
@@ -195,6 +207,8 @@ async function post(
       message: aborted
         ? "The WhatsApp gateway did not respond in time."
         : "Could not reach the WhatsApp gateway.",
+      failureKind: "UNAVAILABLE",
+      httpOk: false,
     };
   } finally {
     clearTimeout(timeout);
@@ -364,7 +378,7 @@ export interface DeviceStatus {
  */
 export type DeviceProbe =
   | { ok: true; device: DeviceStatus }
-  | { ok: false; message: string };
+  | { ok: false; reason: "NOT_FOUND" | "UNAVAILABLE"; message: string };
 
 export async function getDeviceStatus(config?: WhatsappConfig): Promise<DeviceProbe> {
   const resolvedConfig = config ?? readWhatsappConfig();
@@ -373,6 +387,7 @@ export async function getDeviceStatus(config?: WhatsappConfig): Promise<DevicePr
   if (resolvedConfig.sender === ROTATE_SENDER) {
     return {
       ok: false,
+      reason: "UNAVAILABLE",
       message: "Sending device is set to rotate, so there is no single device to report on.",
     };
   }
@@ -387,16 +402,39 @@ export async function getDeviceStatus(config?: WhatsappConfig): Promise<DevicePr
     // The gateway's own wording is far more useful than a generic failure —
     // "The number you are trying to reach does not exist, or you do not have
     // permission." is what a sender in the wrong FORMAT looks like.
-    return { ok: false, message: response.message };
+    const notFound = /does not exist|not found|no device/i.test(response.message);
+    return {
+      ok: false,
+      reason: notFound ? "NOT_FOUND" : "UNAVAILABLE",
+      message: response.message,
+    };
   }
 
   if (!Array.isArray(response.payload?.info) || response.payload.info.length === 0) {
-    return { ok: false, message: "The gateway reported no device for that number." };
+    return { ok: false, reason: "NOT_FOUND", message: "The gateway reported no device for that number." };
   }
 
-  const entry = response.payload.info[0];
+  const requestedDigits = resolvedConfig.sender.replace(/\D/g, "");
+  const rows = response.payload.info.filter(
+    (entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null,
+  );
+  const identityKeys = ["device", "sender", "number", "phone", "phone_number", "jid"] as const;
+  const matched = rows.find((row) => identityKeys.some((key) => {
+    const identity = row[key];
+    return typeof identity === "string" && identity.replace(/\D/g, "") === requestedDigits;
+  }));
+  // The endpoint is queried with a number and commonly returns one row without
+  // echoing an identity. With multiple rows, however, never assume row zero is
+  // the requested tenant device.
+  const entry = matched ?? (rows.length === 1 ? rows[0] : null);
   if (typeof entry !== "object" || entry === null) {
-    return { ok: false, message: "The gateway returned an unreadable device record." };
+    return {
+      ok: false,
+      reason: rows.length > 1 ? "NOT_FOUND" : "UNAVAILABLE",
+      message: rows.length > 1
+        ? "The gateway did not report the requested device."
+        : "The gateway returned an unreadable device record.",
+    };
   }
 
   const row = entry as Record<string, unknown>;
@@ -406,8 +444,8 @@ export async function getDeviceStatus(config?: WhatsappConfig): Promise<DevicePr
     ok: true,
     device: {
       status,
-      // The gateway writes "Connected"; anything else is treated as not ready.
-      connected: status.toLowerCase().startsWith("connect"),
+      // Only a positive final state is ready; "Connecting" must remain pending.
+      connected: status.trim().toLowerCase() === "connected",
       webhookUrl:
         typeof row.webhook === "string" && row.webhook !== "" ? row.webhook : null,
       messagesSent: typeof row.message_sent === "number" ? row.message_sent : null,
@@ -417,7 +455,7 @@ export async function getDeviceStatus(config?: WhatsappConfig): Promise<DevicePr
 
 export type DeviceQrResult =
   | { ok: true; qr: string; message: string }
-  | { ok: false; message: string };
+  | { ok: false; definitive: boolean; message: string };
 
 /** Starts QR onboarding. Only the QR material is returned; credentials stay server-side. */
 export async function generateDeviceQr(
@@ -429,8 +467,12 @@ export async function generateDeviceQr(
     { device: phoneNumber, force: "true" },
     { ...config, sender: phoneNumber },
   );
-  if (!response.ok || !response.payload) {
-    return { ok: false, message: response.message };
+  if (!response.payload) {
+    return {
+      ok: false,
+      definitive: response.failureKind === "REJECTED",
+      message: response.message,
+    };
   }
   const data = response.payload.data;
   const qrCandidates = [
@@ -438,13 +480,21 @@ export async function generateDeviceQr(
     response.payload.qrcode,
     response.payload.qr_code,
     typeof data === "object" && data !== null ? (data as Record<string, unknown>).qr : null,
+    typeof data === "object" && data !== null ? (data as Record<string, unknown>).qrcode : null,
+    typeof data === "object" && data !== null ? (data as Record<string, unknown>).qr_code : null,
   ];
   const qr = qrCandidates.find(
     (candidate): candidate is string => typeof candidate === "string" && candidate.trim() !== "",
   );
-  return qr
+  return response.httpOk && qr
     ? { ok: true, qr: qr.trim(), message: response.message }
-    : { ok: false, message: "The gateway did not return a QR code." };
+    : {
+        ok: false,
+        definitive: response.failureKind === "REJECTED",
+        message: qr || response.failureKind === "REJECTED"
+          ? response.message
+          : "The gateway did not return a QR code.",
+      };
 }
 
 export async function logoutDevice(config: WhatsappConfig): Promise<GatewayResponse> {

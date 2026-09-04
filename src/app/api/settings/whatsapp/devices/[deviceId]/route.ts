@@ -1,7 +1,7 @@
 import { jsonOk, readJsonBody, toErrorResponse } from "@/lib/apiHandler";
 import { MODULE_FEATURES, requireModule } from "@/lib/features";
 import { requireActor } from "@/lib/session";
-import { deviceActionSchema, disconnectWhatsappDevice, refreshWhatsappDeviceStatus, regenerateWhatsappWebhook, removeWhatsappDevice, setWhatsappDeviceEnabled } from "@/lib/whatsappDeviceManagement";
+import { deviceActionSchema, disconnectWhatsappDevice, refreshWhatsappDeviceStatus, regenerateWhatsappWebhook, removeWhatsappDevice, setWhatsappDeviceEnabled, setupWhatsappWebhook } from "@/lib/whatsappDeviceManagement";
 
 export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   try {
@@ -13,6 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     if (input.action === "disconnect") await disconnectWhatsappDevice(actor, deviceId);
     else if (input.action === "remove") await removeWhatsappDevice(actor, deviceId);
     else if (input.action === "setEnabled") await setWhatsappDeviceEnabled(actor, deviceId, input.enabled);
+    else if (input.action === "setupWebhook") return jsonOk(await setupWhatsappWebhook(actor, deviceId));
     else return jsonOk(await regenerateWhatsappWebhook(actor, deviceId));
     return jsonOk({ deviceId });
   } catch (error: unknown) {
