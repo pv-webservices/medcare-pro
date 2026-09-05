@@ -120,13 +120,6 @@ export interface GatewayResponse {
   failureKind: "REJECTED" | "UNAVAILABLE" | "UNREADABLE" | null;
   /** QR generation may return usable QR material with non-standard status fields. */
   httpOk: boolean;
-  /** Sanitized transport metadata used to diagnose provider contract failures. */
-  diagnostics: {
-    status: number | null;
-    contentType: string;
-    bodyLength: number;
-    keys: string[];
-  };
 }
 
 /** Reads `msg` without assuming it is a string — check-number returns an object. */
@@ -197,12 +190,6 @@ async function requestGateway(
           : "The WhatsApp gateway returned an unexpected response.",
         failureKind: "UNREADABLE",
         httpOk: response.ok,
-        diagnostics: {
-          status: response.status,
-          contentType: contentType.split(";", 1)[0]?.trim() || "unknown",
-          bodyLength: responseText.length,
-          keys: [],
-        },
       };
     }
 
@@ -217,12 +204,6 @@ async function requestGateway(
       message: readMessage(body, ok),
       failureKind: ok ? null : response.status >= 500 ? "UNAVAILABLE" : "REJECTED",
       httpOk: response.ok,
-      diagnostics: {
-        status: response.status,
-        contentType: contentType.split(";", 1)[0]?.trim() || "unknown",
-        bodyLength: responseText.length,
-        keys: Object.keys(body).sort(),
-      },
     };
   } catch (error: unknown) {
     if (error instanceof WhatsappNotConfiguredError) {
@@ -242,12 +223,6 @@ async function requestGateway(
         : "Could not reach the WhatsApp gateway.",
       failureKind: "UNAVAILABLE",
       httpOk: false,
-      diagnostics: {
-        status: null,
-        contentType: "unavailable",
-        bodyLength: 0,
-        keys: [],
-      },
     };
   } finally {
     clearTimeout(timeout);
@@ -558,11 +533,10 @@ export async function generateDeviceQr(
     config,
   );
   if (!response.payload) {
-    const diagnostic = response.diagnostics;
     return {
       ok: false,
       definitive: response.failureKind === "REJECTED",
-      message: `${response.message} [generate-qr status=${diagnostic.status ?? "none"} contentType=${diagnostic.contentType} length=${diagnostic.bodyLength} keys=${diagnostic.keys.join(",") || "none"} hasQr=false classification=${response.failureKind ?? "none"}]`,
+      message: response.message,
     };
   }
   const data = response.payload.data;
