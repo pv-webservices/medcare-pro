@@ -142,33 +142,37 @@ function readMessage(body: Record<string, unknown>, ok: boolean): string {
 }
 
 /**
- * One POST to the gateway.
+ * One request to the gateway.
  *
- * POST rather than GET even though both are supported: a message body in a
- * query string ends up in access logs and proxy history, and these carry
- * patient phone numbers.
+ * POST remains the default for every message and device operation. The sole
+ * GET caller is generate-qr: the live provider endpoint returned HTTP 405 for
+ * POST while its current API-doc navigation identifies that operation as GET.
  *
  * Never throws for a rejected call — a refusal is data to record, not an
  * exception. Only a missing configuration throws.
  */
-async function post(
+async function requestGateway(
   path: string,
   fields: Record<string, string | number | boolean>,
   suppliedConfig?: WhatsappConfig,
+  method: "GET" | "POST" = "POST",
 ): Promise<GatewayResponse> {
   const config = suppliedConfig ?? readWhatsappConfig();
+  const requestFields = { api_key: config.apiKey, ...fields };
+  const query = method === "GET"
+    ? `?${new URLSearchParams(Object.entries(requestFields).map(([key, value]) => [key, String(value)])).toString()}`
+    : "";
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${config.baseUrl}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: config.apiKey,
-        ...fields,
-      }),
+    const response = await fetch(`${config.baseUrl}${path}${query}`, {
+      method,
+      ...(method === "POST" ? {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestFields),
+      } : {}),
       signal: controller.signal,
       cache: "no-store",
     });
@@ -248,6 +252,22 @@ async function post(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function post(
+  path: string,
+  fields: Record<string, string | number | boolean>,
+  suppliedConfig?: WhatsappConfig,
+): Promise<GatewayResponse> {
+  return requestGateway(path, fields, suppliedConfig, "POST");
+}
+
+async function get(
+  path: string,
+  fields: Record<string, string | number | boolean>,
+  suppliedConfig?: WhatsappConfig,
+): Promise<GatewayResponse> {
+  return requestGateway(path, fields, suppliedConfig, "GET");
 }
 
 /** Message/check endpoints share the verified sender contract. */
@@ -532,7 +552,7 @@ export async function generateDeviceQr(
   config: WhatsappConfig,
   phoneNumber: string,
 ): Promise<DeviceQrResult> {
-  const response = await post(
+  const response = await get(
     GENERATE_QR_PATH,
     { device: phoneNumber, force: true },
     config,

@@ -63,15 +63,20 @@ describe("RkvRobo device adapter", () => {
     await logoutDevice(config);
     await deleteDevice(config);
     expect(postedBody(fetchMock, 0)).toEqual({ api_key: "tenant-key" });
-    expect(postedBody(fetchMock, 1)).toEqual({ api_key: "tenant-key", device: config.sender, force: true });
-    expect(typeof postedBody(fetchMock, 1).force).toBe("boolean");
-    expect(postedBody(fetchMock, 1)).not.toHaveProperty("sender");
-    expect(fetchMock.mock.calls[1][0]).toBe("https://provider.test/api/generate-qr");
+    const qrUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(qrUrl.origin + qrUrl.pathname).toBe("https://provider.test/api/generate-qr");
+    expect(Object.fromEntries(qrUrl.searchParams)).toEqual({
+      api_key: "tenant-key",
+      device: config.sender,
+      force: "true",
+    });
+    expect(qrUrl.searchParams.has("sender")).toBe(false);
     expect(fetchMock.mock.calls[1][1]).toMatchObject({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "GET",
       cache: "no-store",
     });
+    expect(fetchMock.mock.calls[1][1]).not.toHaveProperty("headers");
+    expect(fetchMock.mock.calls[1][1]).not.toHaveProperty("body");
     expect(postedBody(fetchMock, 2)).toEqual({ api_key: "tenant-key", sender: config.sender });
     expect(postedBody(fetchMock, 3)).toEqual({ api_key: "tenant-key", sender: config.sender });
   });
