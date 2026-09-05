@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +16,23 @@ const phoneSettings = readFileSync(
 );
 
 describe("booking follow-up and caller-number UI", () => {
+  it("uses the existing clinics [id] segment so the production router can start", () => {
+    expect(
+      existsSync(
+        resolve(
+          "src/app/api/clinics/[id]/telephony/booking-follow-ups/[requestId]/resolve/route.ts",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      existsSync(
+        resolve(
+          "src/app/api/clinics/[clinicId]/telephony/booking-follow-ups/[requestId]/resolve/route.ts",
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it("renders the operational panel beside call handling, outside layout widgets", () => {
     expect(component).toContain("Booking follow-ups");
     expect(component).toContain("Pending IVR requests that need staff action");

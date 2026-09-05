@@ -15,11 +15,11 @@ vi.mock("@/lib/telephony/bookingFollowUps", () => ({
   resolveTelephonyBookingFollowUpForActor: mocks.resolve,
 }));
 
-import { POST } from "@/app/api/clinics/[clinicId]/telephony/booking-follow-ups/[requestId]/resolve/route";
+import { POST } from "@/app/api/clinics/[id]/telephony/booking-follow-ups/[requestId]/resolve/route";
 
 const ACTOR: ActorContext = { userId: "user-a", tenantId: "tenant-a" };
 const context = (clinicId = "clinic-a", requestId = "request-a") => ({
-  params: Promise.resolve({ clinicId, requestId }),
+  params: Promise.resolve({ id: clinicId, requestId }),
 });
 
 describe("POST booking follow-up resolve", () => {
