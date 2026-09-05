@@ -78,6 +78,7 @@ describe("actor-scoped phone diagnostics", () => {
     counts(1);
     mocks.callFindMany.mockResolvedValue([{
       id: "internal-row-a",
+      callerNumber: "+919876544821",
       callerLast4: "4821",
       status: "COMPLETED",
       initialRoute: "IVR",
@@ -99,7 +100,8 @@ describe("actor-scoped phone diagnostics", () => {
       startedAt: "2026-09-02T10:00:00.000Z",
       endedAt: "2026-09-02T10:02:05.000Z",
       durationSeconds: 125,
-      callerLabel: "Caller ending in 4821",
+      callerNumber: "+919876544821",
+      callerLabel: "+919876544821",
       status: "COMPLETED",
       initialRoute: "IVR",
       highlights: [
@@ -111,8 +113,26 @@ describe("actor-scoped phone diagnostics", () => {
     });
     const serialized = JSON.stringify(view);
     expect(serialized).not.toMatch(
-      /providerCallUuid|providerNumber|receptionNumber|urgentNumber|Digits|patient|hangupCause|\+919876544821/i,
+      /providerCallUuid|providerNumber|receptionNumber|urgentNumber|Digits|patient|hangupCause/i,
     );
+  });
+
+  it("renders historical last-four-only rows without fabricating a number", async () => {
+    counts(1);
+    mocks.callFindMany.mockResolvedValue([{
+      id: "historical-row",
+      callerNumber: null,
+      callerLast4: "4821",
+      status: "COMPLETED",
+      initialRoute: "IVR",
+      startedAt: new Date("2026-09-02T10:00:00.000Z"),
+      endedAt: new Date("2026-09-02T10:01:00.000Z"),
+      durationSeconds: 60,
+      events: [],
+    }]);
+
+    expect((await getPhoneDiagnosticsForActor(ACTOR, "clinic-a", NOW)).recentCalls[0])
+      .toMatchObject({ callerNumber: null, callerLabel: "Caller ending in 4821" });
   });
 
   it.each([
@@ -129,6 +149,7 @@ describe("actor-scoped phone diagnostics", () => {
     mocks.callFindMany.mockResolvedValue([
       {
         id: "fresh",
+        callerNumber: null,
         callerLast4: null,
         status: "ACTIVE",
         initialRoute: "RECEPTION",
@@ -139,6 +160,7 @@ describe("actor-scoped phone diagnostics", () => {
       },
       {
         id: "stale",
+        callerNumber: null,
         callerLast4: null,
         status: "ACTIVE",
         initialRoute: "IVR",

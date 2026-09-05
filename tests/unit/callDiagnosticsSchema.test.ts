@@ -7,6 +7,10 @@ const migration = readFileSync(
   resolve("prisma/migrations/20260902200000_production_call_diagnostics/migration.sql"),
   "utf8",
 );
+const callerNumberMigration = readFileSync(
+  resolve("prisma/migrations/20260905120000_production_call_caller_number/migration.sql"),
+  "utf8",
+);
 
 function block(source: string, declaration: string): string {
   const match = source.match(new RegExp(`${declaration} \\{([\\s\\S]*?)\\n\\}`));
@@ -50,16 +54,17 @@ describe("Phase 6 production call diagnostics schema", () => {
     ]);
   });
 
-  it("stores only bounded operational metadata", () => {
+  it("stores bounded operational metadata including the transitional caller fields", () => {
     const call = block(schema, "model ClinicTelephonyCall");
     const event = block(schema, "model ClinicTelephonyCallEvent");
     expect(call).toContain("providerCallUuid");
+    expect(call).toContain("callerNumber");
     expect(call).toContain("callerLast4");
     expect(call).toContain("routingModeAtStart");
     expect(call).toContain("phoneMenuSource");
     expect(event).toContain("eventType");
     expect(`${call}\n${event}`).not.toMatch(
-      /callerNumber|providerNumber|publicPhone|receptionPhone|urgentPhone|raw|payload|body|authToken|recording|audio|transcript|digit|patient|appointment|hangupCause/i,
+      /providerNumber|publicPhone|receptionPhone|urgentPhone|raw|payload|body|authToken|recording|audio|transcript|digit|patient|appointment|hangupCause/i,
     );
   });
 
@@ -81,5 +86,14 @@ describe("Phase 6 production call diagnostics schema", () => {
     expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM|UPDATE `Clinic|INSERT INTO/i);
     expect(migration).not.toContain("ClinicTelephonyTestCall");
     expect(migration).not.toContain("TelephonyBookingRequest");
+  });
+
+  it("adds caller_number without reconstructing historical values", () => {
+    expect(callerNumberMigration).toContain(
+      "ADD COLUMN `caller_number` VARCHAR(16) NULL",
+    );
+    expect(callerNumberMigration).not.toMatch(
+      /DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM|UPDATE|INSERT INTO/i,
+    );
   });
 });

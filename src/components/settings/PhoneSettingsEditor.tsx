@@ -222,7 +222,18 @@ function PhoneDiagnosticsPanel({
               <li key={call.id} className="rounded-2xl border border-line bg-canvas px-4 py-3.5">
                 <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-label font-semibold text-ink">{call.callerLabel}</p>
+                    <p className="text-label font-semibold text-ink">
+                      {call.callerNumber ? (
+                        <a
+                          href={`tel:${call.callerNumber}`}
+                          className="hover:text-accent hover:underline"
+                        >
+                          {call.callerLabel}
+                        </a>
+                      ) : (
+                        call.callerLabel
+                      )}
+                    </p>
                     <p className="mt-1 text-meta text-muted">
                       {formatDiagnosticTime(call.startedAt, diagnostics.timezone)} · {call.initialRoute === "RECEPTION" ? "Reception" : call.initialRoute === "IVR" ? "Phone menu" : "Route unavailable"} · {formatCallDuration(call.durationSeconds)}
                     </p>

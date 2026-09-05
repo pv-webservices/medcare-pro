@@ -18,6 +18,7 @@ import {
 import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONES } from "@/components/appointments/status";
 import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
 import CallHandlingPanel from "@/components/dashboard/CallHandlingPanel";
+import BookingFollowUpsPanel from "@/components/dashboard/BookingFollowUpsPanel";
 import DashboardLayoutEditor, { type DashboardWidgetSlot } from "@/components/dashboard/DashboardLayoutEditor";
 import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import {
@@ -39,11 +40,13 @@ import type { EffectiveDashboardLayout } from "@/lib/dashboardLayouts";
 import { DASHBOARD_WIDGETS, type DashboardWidgetId } from "@/lib/dashboardWidgets";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
 import type { DashboardCallHandlingModel } from "@/lib/telephony/dashboardCallHandling";
+import type { DashboardBookingFollowUpsModel } from "@/lib/telephony/bookingFollowUps";
 
 interface Props {
   data: AdminDashboardData;
   layout: EffectiveDashboardLayout;
   callHandling: DashboardCallHandlingModel | null;
+  bookingFollowUps: DashboardBookingFollowUpsModel | null;
   now?: Date;
 }
 
@@ -121,7 +124,7 @@ function NoData({ title, guidance, icon }: { title: string; guidance: string; ic
   return <EmptyState isBare icon={icon} title={title} guidance={guidance} />;
 }
 
-export default function AdminDashboard({ data, layout, callHandling, now = new Date() }: Props) {
+export default function AdminDashboard({ data, layout, callHandling, bookingFollowUps, now = new Date() }: Props) {
   const scopeLabel = data.scope.clinicName ?? (data.scope.clinicCount > 1 ? "All accessible clinics" : "Accessible clinic");
   const slots = layout.layout.widgets.map((preference): DashboardWidgetSlot => ({
     id: preference.widgetId,
@@ -156,6 +159,8 @@ export default function AdminDashboard({ data, layout, callHandling, now = new D
         model={callHandling}
         clinicName={data.scope.clinicName}
       />
+
+      <BookingFollowUpsPanel model={bookingFollowUps} now={now} />
 
       {layout.layout.widgets.length === 0 ? (
         <EmptyState

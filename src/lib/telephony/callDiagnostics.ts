@@ -38,6 +38,7 @@ const EVENT_LABELS: Readonly<Record<ClinicTelephonyCallEventType, string>> = {
 function toCallView(
   call: {
     id: string;
+    callerNumber: string | null;
     callerLast4: string | null;
     status: "ACTIVE" | "COMPLETED";
     initialRoute: "RECEPTION" | "IVR" | null;
@@ -57,9 +58,12 @@ function toCallView(
     startedAt: call.startedAt.toISOString(),
     endedAt: call.endedAt?.toISOString() ?? null,
     durationSeconds: call.durationSeconds,
-    callerLabel: call.callerLast4
-      ? `Caller ending in ${call.callerLast4}`
-      : "Caller number unavailable",
+    callerNumber: call.callerNumber,
+    callerLabel:
+      call.callerNumber ??
+      (call.callerLast4
+        ? `Caller ending in ${call.callerLast4}`
+        : "Caller number unavailable"),
     status,
     initialRoute: call.initialRoute,
     highlights: Object.freeze(
@@ -94,6 +98,7 @@ export async function getPhoneDiagnosticsForActor(
         take: PHONE_DIAGNOSTICS_RECENT_LIMIT,
         select: {
           id: true,
+          callerNumber: true,
           callerLast4: true,
           status: true,
           initialRoute: true,

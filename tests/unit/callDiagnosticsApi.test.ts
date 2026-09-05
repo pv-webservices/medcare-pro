@@ -39,7 +39,8 @@ const VIEW = {
     startedAt: "2026-09-02T10:00:00.000Z",
     endedAt: "2026-09-02T10:01:00.000Z",
     durationSeconds: 60,
-    callerLabel: "Caller ending in 4821",
+    callerNumber: "+919876544821",
+    callerLabel: "+919876544821",
     status: "COMPLETED",
     initialRoute: "IVR",
     highlights: ["Call received", "Call ended"],
@@ -95,9 +96,9 @@ describe("GET /api/clinics/[id]/telephony/diagnostics", () => {
     const response = await GET(new Request("https://app.example/api/test"), context());
     expect(response.status).toBe(200);
     const serialized = JSON.stringify(await response.json());
-    expect(serialized).toContain("Caller ending in 4821");
+    expect(serialized).toContain("+919876544821");
     expect(serialized).not.toMatch(
-      /providerCallUuid|providerNumber|receptionNumber|urgentNumber|authId|authToken|Digits|raw|payload|patient|hangupCause|DialBLegUUID|\+919876544821/i,
+      /providerCallUuid|providerNumber|receptionNumber|urgentNumber|authId|authToken|Digits|raw|payload|patient|hangupCause|DialBLegUUID/i,
     );
   });
 

@@ -140,6 +140,7 @@ export async function observeInboundProductionCall(input: {
       data: {
         clinicId: input.clinicId,
         providerCallUuid,
+        callerNumber: normalizePlivoCallerNumber(input.callerNumber),
         callerLast4: callerLast4(input.callerNumber),
         routingModeAtStart: input.routingModeAtStart,
         initialRoute: input.initialRoute,

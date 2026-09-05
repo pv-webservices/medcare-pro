@@ -618,12 +618,14 @@ model ClinicTelephonyTestCall {
 }
 
 /// Privacy-bounded operational record for one real inbound call. Provider
-/// correlation remains server-only; no complete telephone number, raw input,
+/// correlation remains server-only; the normalized caller number is available
+/// only through the clinic-scoped telephony management boundary. No raw input,
 /// patient data, recording, transcript, or provider payload is stored here.
 model ClinicTelephonyCall {
   id                 String                           @id @default(cuid())
   clinicId           String                           @map("clinic_id")
   providerCallUuid   String                           @unique(map: "clinic_calls_provider_uuid_key") @map("provider_call_uuid") @db.VarChar(128)
+  callerNumber       String?                          @map("caller_number") @db.VarChar(16)
   callerLast4        String?                          @map("caller_last_4") @db.Char(4)
   status             ClinicTelephonyCallStatus        @default(ACTIVE)
   initialRoute       ClinicTelephonyCallInitialRoute? @map("initial_route")

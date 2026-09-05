@@ -249,6 +249,12 @@ export const AUDIT_DESCRIPTIONS: Readonly<
     side: "tenant",
     category: "organisation",
   },
+  [AUDIT_ACTIONS.TELEPHONY_BOOKING_FOLLOW_UP_RESOLVED]: {
+    label: "Booking follow-up resolved",
+    detail: "A staff member marked an IVR booking follow-up as resolved.",
+    side: "tenant",
+    category: "organisation",
+  },
   [AUDIT_ACTIONS.TENANT_ENTITLEMENTS_SET]: {
     label: "Plan or features changed",
     detail:

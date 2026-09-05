@@ -79,7 +79,7 @@ describe("production call observability", () => {
     ]);
   });
 
-  it("creates one privacy-minimized call and first-occurrence events", async () => {
+  it("stores the normalized caller number and first-occurrence events", async () => {
     const client = createClient();
     client.clinicTelephonyCall.deleteMany.mockResolvedValue({ count: 0 });
     client.clinicTelephonyCall.create.mockResolvedValue({ id: "call-row-a" });
@@ -103,6 +103,7 @@ describe("production call observability", () => {
     expect(data).toMatchObject({
       clinicId: "clinic-a",
       providerCallUuid: CALL_UUID,
+      callerNumber: "+919876543210",
       callerLast4: "3210",
       routingModeAtStart: "AUTO",
       initialRoute: "IVR",
@@ -112,8 +113,29 @@ describe("production call observability", () => {
       "CALL_RECEIVED",
       "ROUTED_TO_IVR",
     ]);
-    expect(data).not.toHaveProperty("callerNumber");
     expect(data).not.toHaveProperty("from");
+  });
+
+  it("never persists malformed provider caller input as a phone number", async () => {
+    const client = createClient();
+    client.clinicTelephonyCall.deleteMany.mockResolvedValue({ count: 0 });
+    client.clinicTelephonyCall.create.mockResolvedValue({ id: "call-row-a" });
+
+    await observeInboundProductionCall({
+      clinicId: "clinic-a",
+      providerCallUuid: CALL_UUID,
+      callerNumber: "caller=+91 98765 43210",
+      routingModeAtStart: ClinicTelephonyRoutingMode.AUTO,
+      initialRoute: ClinicTelephonyCallInitialRoute.IVR,
+      events: [],
+      now: NOW,
+      client: client as never,
+    });
+
+    expect(client.clinicTelephonyCall.create.mock.calls[0][0].data).toMatchObject({
+      callerNumber: null,
+      callerLast4: null,
+    });
   });
 
   it("ignores malformed CallUUID without touching storage", async () => {

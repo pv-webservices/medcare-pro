@@ -13,6 +13,7 @@ export interface ProductionCallDiagnosticView {
   readonly startedAt: string;
   readonly endedAt: string | null;
   readonly durationSeconds: number | null;
+  readonly callerNumber: string | null;
   readonly callerLabel: string;
   readonly status: ProductionCallDisplayStatus;
   readonly initialRoute: "RECEPTION" | "IVR" | null;
