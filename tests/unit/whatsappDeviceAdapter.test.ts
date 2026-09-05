@@ -96,7 +96,16 @@ describe("RkvRobo device adapter", () => {
 
   it("classifies a non-JSON QR response as ambiguous and does not consume its content", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response("data:image/png;base64,not-confirmed-by-docs", { contentType: "text/plain" })));
-    await expect(generateDeviceQr(config, config.sender)).resolves.toEqual({ ok: false, definitive: false, message: "The WhatsApp gateway returned an unexpected response." });
+    const result = await generateDeviceQr(config, config.sender);
+    expect(result).toEqual({
+      ok: false,
+      definitive: false,
+      message: expect.stringContaining("[generate-qr status=200 contentType=text/plain length="),
+    });
+    expect(result.message).toContain("keys=none hasQr=false classification=UNREADABLE");
+    expect(result.message).not.toContain("not-confirmed-by-docs");
+    expect(result.message).not.toContain(config.apiKey);
+    expect(result.message).not.toContain(config.sender);
   });
 
   it("selects the requested device rather than another account device", async () => {
