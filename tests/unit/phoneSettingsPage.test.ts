@@ -75,67 +75,23 @@ describe("Phone settings clinic-facing page", () => {
     expect(component).toContain("min-w-0");
   });
 
-  it("provides readiness, controlled testing, and contextual links without routing controls", () => {
-    expect(component).toContain("Phone readiness");
-    expect(component).toContain("Test phone menu");
-    expect(component).toContain("Start test call");
+  it("keeps configuration and contextual links without operational panels", () => {
+    expect(component).not.toContain("Phone readiness");
+    expect(component).not.toContain("Test phone menu");
+    expect(component).not.toContain("Phone diagnostics");
     expect(component).toContain('href="/settings/phone-menu"');
-    expect(component).toContain('href="/dashboard"');
+    expect(component).toContain('href="/ivr"');
     expect(component).not.toContain("changeRoutingMode");
     expect(component).not.toMatch(/Call me|speechSynthesis/);
   });
 
-  it("keeps the controlled test panel masked, confirmed, pending-safe, and clinic-keyed", () => {
-    expect(page).toContain("getTelephonyTestCallPanelForActor(actor, clinicId)");
-    expect(page).toContain("initialTestCall={testCall}");
+  it("no longer fetches or carries operational test and diagnostics state", () => {
+    expect(page).not.toContain("getTelephonyTestCallPanelForActor");
+    expect(page).not.toContain("getPhoneDiagnosticsForActor");
+    expect(page).not.toContain("initialTestCall");
+    expect(page).not.toContain("initialDiagnostics");
     expect(page).toContain("key={clinic.id}");
-    expect(component).toContain("testCall.destinationLabel");
-    expect(component).toContain("<ConfirmDialog");
-    expect(component).toContain('isBusy={testPending}');
-    expect(component).toContain("isActiveTelephonyTestCallStatus");
-    expect(component).toContain("lg:grid-cols-[minmax(0,1fr)_auto]");
-    expect(component).not.toMatch(/plivoNumber|providerCallUuid|providerRequestUuid/);
-  });
-
-  it("adds clinic-scoped production diagnostics without replacing Phase 5", () => {
-    expect(page).toContain("getPhoneDiagnosticsForActor(actor, clinicId)");
-    expect(page).toContain("initialDiagnostics={diagnostics}");
-    expect(page.indexOf('can(actor, "clinic:edit", clinicId)')).toBeLessThan(
-      page.indexOf("getPhoneDiagnosticsForActor(actor, clinicId)"),
-    );
-    expect(component).toContain('title="Phone diagnostics"');
-    expect(component).toContain('title="Test phone menu"');
-    expect(component.indexOf('title="Test phone menu"')).toBeLessThan(
-      component.indexOf("<PhoneDiagnosticsPanel"),
-    );
-  });
-
-  it("renders no-data, healthy, attention, recent masked calls, and clinic timezone safely", () => {
-    expect(component).toContain('"no-data": "No recent calls"');
-    expect(component).toContain('healthy: "Healthy"');
-    expect(component).toContain('attention: "Needs attention"');
-    expect(component).toContain("No production call activity is available yet.");
-    expect(component).toContain("diagnostics.recentCalls.map");
-    expect(component).toContain("call.callerLabel");
-    expect(component).toContain("Times shown in {diagnostics.timezone}");
-    expect(component).toContain('timeZone: timezone');
-    expect(component).toContain("sm:px-5");
-    expect(component).toContain("lg:grid-cols-4");
-    expect(component).not.toMatch(
-      /providerCallUuid|DialBLegUUID|hangupCause|rawPayload|recording|transcript/,
-    );
-  });
-
-  it("renders unavailable, active, terminal, permission, and safe failure states", () => {
-    expect(component).toContain("testCall.unavailableReason");
-    expect(component).toContain("!testCall.available || pending !== null || testPending");
-    expect(component).toContain('REQUESTED: "Starting…"');
-    expect(component).toContain('RINGING: "Ringing…"');
-    expect(component).toContain('ANSWERED: "Answered…"');
-    expect(component).toContain('COMPLETED: "Completed"');
-    expect(component).toContain('FAILED: "Failed"');
-    expect(component).toContain("You don't have permission to test this clinic's phone menu.");
-    expect(component).toContain("The test call could not be started. Try again later.");
+    expect(component).not.toMatch(/testCall|ConfirmDialog|providerCallUuid|providerRequestUuid/);
   });
 
   it("provides a labeled loading state", () => {

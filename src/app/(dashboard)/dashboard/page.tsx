@@ -9,7 +9,7 @@ import {
 } from "@/lib/selectedClinic";
 import { requireActor } from "@/lib/session";
 import { getDashboardCallHandlingForActor } from "@/lib/telephony/dashboardCallHandling";
-import { getDashboardBookingFollowUpsForActor } from "@/lib/telephony/bookingFollowUps";
+import { getBookingFollowUpsForActor } from "@/lib/telephony/bookingFollowUps";
 
 /**
  * One permission-driven dashboard path for every tenant user, including the
@@ -39,7 +39,7 @@ export default async function DashboardPage(props: {
     operationalClinicId === null
       ? Promise.resolve(null)
       : getDashboardCallHandlingForActor(actor, operationalClinicId, now),
-    getDashboardBookingFollowUpsForActor(actor, selectedClinicId),
+    getBookingFollowUpsForActor(actor, selectedClinicId),
   ]);
 
   return (

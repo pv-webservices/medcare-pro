@@ -30,6 +30,7 @@ import {
   resolveTelephonePatient,
 } from "@/lib/telephony/bookingIdentity";
 import {
+  formatCallerNumberForDisplay,
   normalizePlivoCallerNumber,
   patientMobileRepresentations,
 } from "@/lib/telephony/phoneNumber";
@@ -56,6 +57,12 @@ describe("telephone patient resolution", () => {
     ["919876543210", "+919876543210"],
   ])("normalizes provider caller %s", (value, expected) => {
     expect(normalizePlivoCallerNumber(value)).toBe(expected);
+  });
+
+  it("formats only exact canonical Indian callers as ten domestic digits", () => {
+    expect(formatCallerNumberForDisplay("+919876543210")).toBe("9876543210");
+    expect(formatCallerNumberForDisplay("+12025550123")).toBe("+12025550123");
+    expect(formatCallerNumberForDisplay("+910123456789")).toBe("+910123456789");
   });
 
   it.each(["9876543210", "not-a-number", "+12025550123"])(

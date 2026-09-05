@@ -8,6 +8,7 @@ import {
 } from "@/lib/telephony/callDiagnosticsContract";
 import { DEFAULT_CLINIC_TIMEZONE } from "@/lib/telephony/clinicConfig";
 import { pruneProductionCallDiagnosticsForClinic } from "@/lib/telephony/callObservability";
+import { formatCallerNumberForDisplay } from "@/lib/telephony/phoneNumber";
 
 export const PHONE_DIAGNOSTICS_WINDOW_HOURS = 24;
 export const PHONE_DIAGNOSTICS_RECENT_LIMIT = 10;
@@ -60,7 +61,9 @@ function toCallView(
     durationSeconds: call.durationSeconds,
     callerNumber: call.callerNumber,
     callerLabel:
-      call.callerNumber ??
+      (call.callerNumber
+        ? formatCallerNumberForDisplay(call.callerNumber)
+        : null) ??
       (call.callerLast4
         ? `Caller ending in ${call.callerLast4}`
         : "Caller number unavailable"),

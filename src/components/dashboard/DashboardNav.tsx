@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   ListTodo,
   MessageSquare,
+  PhoneCall,
   Settings,
   ShieldCheck,
   Stethoscope,
@@ -35,6 +36,7 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/reports": FileText,
   "/notifications": Bell,
   "/messages": MessageSquare,
+  "/ivr": PhoneCall,
   "/team": ShieldCheck,
   "/settings": Settings,
 };
@@ -55,6 +57,7 @@ function groupLinks(links: readonly NavLink[]): NavGroup[] {
     "/reports",
     "/notifications",
     "/messages",
+    "/ivr",
   ];
   const manageOrder = ["/doctors", "/clinics", "/team", "/settings"];
 

@@ -16,7 +16,7 @@ import {
 } from "@/lib/rbac";
 import { normalizePlivoCallerNumber } from "@/lib/telephony/phoneNumber";
 
-export const DASHBOARD_BOOKING_FOLLOW_UP_LIMIT = 20;
+export const BOOKING_FOLLOW_UP_LIMIT = 20;
 
 const REASON_LABELS: Readonly<Record<TelephonyBookingRequestReason, string>> = {
   NO_PATIENT_MATCH: "No matching patient found",
@@ -24,7 +24,7 @@ const REASON_LABELS: Readonly<Record<TelephonyBookingRequestReason, string>> = {
   USER_REQUESTED: "Caller requested booking follow-up",
 };
 
-export interface DashboardBookingFollowUp {
+export interface BookingFollowUp {
   readonly id: string;
   readonly clinicId: string;
   readonly clinicName: string;
@@ -35,18 +35,18 @@ export interface DashboardBookingFollowUp {
   readonly createdAt: string;
 }
 
-export interface DashboardBookingFollowUpsModel {
-  readonly items: readonly DashboardBookingFollowUp[];
+export interface BookingFollowUpsModel {
+  readonly items: readonly BookingFollowUp[];
 }
 
 /**
- * Operational dashboard read model. Full numbers require both dashboard reach
- * and the existing front-desk authority to create bookings.
+ * Operational read model shared by Dashboard and IVR. Full numbers require
+ * the existing front-desk authority to create bookings in each clinic.
  */
-export async function getDashboardBookingFollowUpsForActor(
+export async function getBookingFollowUpsForActor(
   actor: ActorContext,
   selectedClinicId: string | null,
-): Promise<DashboardBookingFollowUpsModel | null> {
+): Promise<BookingFollowUpsModel | null> {
   const [ivrLock, appointmentsLock] = await Promise.all([
     moduleLock(actor, MODULE_FEATURES.ivr),
     moduleLock(actor, MODULE_FEATURES.appointments),
@@ -59,21 +59,13 @@ export async function getDashboardBookingFollowUpsForActor(
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    accessibleClinicScopes(actor, ["dashboard:view", "appointment:create"]),
+    accessibleClinicScopes(actor, ["appointment:create"]),
   ]);
-  const dashboardIds = clinicIdsForDashboardScope(
-    scopes.get("dashboard:view"),
+  const clinicIds = clinicIdsForDashboardScope(
+    scopes.get("appointment:create"),
     clinics,
     selectedClinicId,
   );
-  const bookingIds = new Set(
-    clinicIdsForDashboardScope(
-      scopes.get("appointment:create"),
-      clinics,
-      selectedClinicId,
-    ),
-  );
-  const clinicIds = dashboardIds.filter((id) => bookingIds.has(id));
   if (clinicIds.length === 0) return null;
 
   const rows = await prisma.telephonyBookingRequest.findMany({
@@ -83,7 +75,7 @@ export async function getDashboardBookingFollowUpsForActor(
       status: TelephonyBookingRequestStatus.PENDING,
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: DASHBOARD_BOOKING_FOLLOW_UP_LIMIT,
+    take: BOOKING_FOLLOW_UP_LIMIT,
     select: {
       id: true,
       clinicId: true,

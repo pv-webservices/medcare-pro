@@ -36,6 +36,15 @@ export function normalizePlivoCallerNumber(value: unknown): string | null {
   }
 }
 
+/**
+ * Formats a canonical caller number for staff without guessing national formats.
+ * Indian +91 numbers are shown in their exact ten-digit domestic form; every
+ * other valid E.164 value remains canonical.
+ */
+export function formatCallerNumberForDisplay(canonical: string): string {
+  return /^\+91[1-9]\d{9}$/.test(canonical) ? canonical.slice(3) : canonical;
+}
+
 /** India domestic voice routes require a canonical +91 ten-digit number. */
 export function isCanonicalIndianPhoneNumber(value: string): boolean {
   return /^\+91[1-9]\d{9}$/.test(value);

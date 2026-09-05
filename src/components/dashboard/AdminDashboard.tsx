@@ -18,7 +18,7 @@ import {
 import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONES } from "@/components/appointments/status";
 import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
 import CallHandlingPanel from "@/components/dashboard/CallHandlingPanel";
-import BookingFollowUpsPanel from "@/components/dashboard/BookingFollowUpsPanel";
+import BookingFollowUpsPanel from "@/components/ivr/BookingFollowUpsPanel";
 import DashboardLayoutEditor, { type DashboardWidgetSlot } from "@/components/dashboard/DashboardLayoutEditor";
 import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import {
@@ -40,13 +40,13 @@ import type { EffectiveDashboardLayout } from "@/lib/dashboardLayouts";
 import { DASHBOARD_WIDGETS, type DashboardWidgetId } from "@/lib/dashboardWidgets";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
 import type { DashboardCallHandlingModel } from "@/lib/telephony/dashboardCallHandling";
-import type { DashboardBookingFollowUpsModel } from "@/lib/telephony/bookingFollowUps";
+import type { BookingFollowUpsModel } from "@/lib/telephony/bookingFollowUps";
 
 interface Props {
   data: AdminDashboardData;
   layout: EffectiveDashboardLayout;
   callHandling: DashboardCallHandlingModel | null;
-  bookingFollowUps: DashboardBookingFollowUpsModel | null;
+  bookingFollowUps: BookingFollowUpsModel | null;
   now?: Date;
 }
 

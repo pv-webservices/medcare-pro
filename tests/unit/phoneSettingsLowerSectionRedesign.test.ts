@@ -41,27 +41,23 @@ describe("Phone settings lower section redesign", () => {
     expect(componentSource).toContain("Save business hours");
   });
 
-  it("renders Related controls card with two equal clickable action tiles and informational QA note", () => {
+  it("keeps Related controls and links to the dedicated IVR workspace", () => {
     expect(componentSource).toContain("Related controls");
     expect(componentSource).toContain("Configure phone menu");
     expect(componentSource).toContain("Edit IVR prompts, options, and destination mapping.");
-    expect(componentSource).toContain("Dashboard Call Handling");
-    expect(componentSource).toContain("Manage call handling mode and monitor performance.");
+    expect(componentSource).toContain("Open IVR workspace");
+    expect(componentSource).toContain("Monitor calls, readiness, follow-ups and diagnostics.");
     expect(componentSource).toContain("Controlled menu tests use only the deployment-approved QA number");
   });
 
-  it("arranges cards in the exact requested vertical order: Call destinations & Business hours, Related controls, Phone readiness, Test phone menu, Phone diagnostics", () => {
+  it("ends after configuration and Related controls without operational sections", () => {
     const callDestinationsIndex = componentSource.indexOf("Call destinations");
     const businessHoursIndex = componentSource.indexOf("Business hours");
     const relatedControlsIndex = componentSource.indexOf("Related controls");
-    const phoneReadinessIndex = componentSource.indexOf("<ReadinessOverview");
-    const testPhoneMenuIndex = componentSource.indexOf('title="Test phone menu"');
-    const phoneDiagnosticsIndex = componentSource.indexOf("<PhoneDiagnosticsPanel");
-
     expect(callDestinationsIndex).toBeLessThan(relatedControlsIndex);
     expect(businessHoursIndex).toBeLessThan(relatedControlsIndex);
-    expect(relatedControlsIndex).toBeLessThan(phoneReadinessIndex);
-    expect(phoneReadinessIndex).toBeLessThan(testPhoneMenuIndex);
-    expect(testPhoneMenuIndex).toBeLessThan(phoneDiagnosticsIndex);
+    expect(componentSource).not.toContain("<ReadinessOverview");
+    expect(componentSource).not.toContain('title="Test phone menu"');
+    expect(componentSource).not.toContain("<PhoneDiagnosticsPanel");
   });
 });

@@ -101,7 +101,7 @@ describe("actor-scoped phone diagnostics", () => {
       endedAt: "2026-09-02T10:02:05.000Z",
       durationSeconds: 125,
       callerNumber: "+919876544821",
-      callerLabel: "+919876544821",
+      callerLabel: "9876544821",
       status: "COMPLETED",
       initialRoute: "IVR",
       highlights: [

@@ -77,6 +77,12 @@ export const NAV_LINKS: readonly NavLink[] = [
   { href: "/reports", label: "Reports", permission: "report:read", feature: "reports" },
   { href: "/notifications", label: "Notifications", permission: "notification:read", feature: "notifications" },
   { href: "/messages", label: "Messages", permission: "message:send", feature: "whatsapp" },
+  {
+    href: "/ivr",
+    label: "IVR",
+    permission: ["appointment:create", "clinic:edit"],
+    feature: "ivr",
+  },
   { href: "/team", label: "Team", permission: "team:view", feature: "team" },
   // Stage 10. One tab for the whole section rather than one per screen: three
   // of ten sidebar entries belonging to settings crowded out the modules staff

@@ -3,15 +3,15 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const component = readFileSync(
-  resolve("src/components/dashboard/BookingFollowUpsPanel.tsx"),
+  resolve("src/components/ivr/BookingFollowUpsPanel.tsx"),
   "utf8",
 );
 const dashboard = readFileSync(
   resolve("src/components/dashboard/AdminDashboard.tsx"),
   "utf8",
 );
-const phoneSettings = readFileSync(
-  resolve("src/components/settings/PhoneSettingsEditor.tsx"),
+const diagnostics = readFileSync(
+  resolve("src/components/ivr/PhoneDiagnosticsPanel.tsx"),
   "utf8",
 );
 
@@ -51,7 +51,7 @@ describe("booking follow-up and caller-number UI", () => {
   });
 
   it("makes new diagnostic caller numbers callable while preserving labels", () => {
-    expect(phoneSettings).toContain("href={`tel:${call.callerNumber}`}");
-    expect(phoneSettings).toContain("{call.callerLabel}");
+    expect(diagnostics).toContain("href={`tel:${call.callerNumber}`}");
+    expect(diagnostics).toContain("{call.callerLabel}");
   });
 });

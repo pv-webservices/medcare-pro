@@ -59,7 +59,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import {
-  getDashboardBookingFollowUpsForActor,
+  getBookingFollowUpsForActor,
   resolveTelephonyBookingFollowUpForActor,
 } from "@/lib/telephony/bookingFollowUps";
 
@@ -84,7 +84,7 @@ function scopes(
   ]);
 }
 
-describe("dashboard booking follow-ups", () => {
+describe("shared booking follow-ups", () => {
   beforeEach(() => {
     for (const value of Object.values(mocks)) {
       if (typeof value === "function" && "mockReset" in value) {
@@ -118,7 +118,7 @@ describe("dashboard booking follow-ups", () => {
       clinic: { name: "Sharma Clinic" },
     }]);
 
-    const model = await getDashboardBookingFollowUpsForActor(ACTOR, null);
+    const model = await getBookingFollowUpsForActor(ACTOR, null);
     expect(mocks.followUpFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -153,12 +153,11 @@ describe("dashboard booking follow-ups", () => {
     );
   });
 
-  it("does not use dashboard activity permission and cannot widen a clinic selection", async () => {
+  it("uses appointment authority only and cannot widen a clinic selection", async () => {
     expect(
-      await getDashboardBookingFollowUpsForActor(ACTOR, "clinic-b"),
+      await getBookingFollowUpsForActor(ACTOR, "clinic-b"),
     ).toBeNull();
     expect(mocks.accessibleScopes).toHaveBeenCalledWith(ACTOR, [
-      "dashboard:view",
       "appointment:create",
     ]);
     expect(mocks.followUpFindMany).not.toHaveBeenCalled();

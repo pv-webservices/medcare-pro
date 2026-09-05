@@ -9,9 +9,7 @@ import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import { SETTINGS_SECTIONS } from "@/lib/settingsSections";
 import { getClinicBusinessHoursForActor } from "@/lib/telephony/businessHours";
-import { getPhoneDiagnosticsForActor } from "@/lib/telephony/callDiagnostics";
 import { getClinicPhoneSettingsForActor } from "@/lib/telephony/clinicPhoneSettings";
-import { getTelephonyTestCallPanelForActor } from "@/lib/telephony/testCall";
 
 const PHONE_SETTINGS = SETTINGS_SECTIONS.find(
   (section) => section.href === "/settings/phone-settings",
@@ -124,11 +122,9 @@ export default async function PhoneSettingsPage() {
     );
   }
 
-  const [settings, businessHours, testCall, diagnostics] = await Promise.all([
+  const [settings, businessHours] = await Promise.all([
     getClinicPhoneSettingsForActor(actor, clinicId),
     getClinicBusinessHoursForActor(actor, clinicId),
-    getTelephonyTestCallPanelForActor(actor, clinicId),
-    getPhoneDiagnosticsForActor(actor, clinicId),
   ]);
 
   return (
@@ -149,8 +145,6 @@ export default async function PhoneSettingsPage() {
         clinicName={clinic.name}
         initialSettings={settings}
         initialHours={businessHours.hours}
-        initialTestCall={testCall}
-        initialDiagnostics={diagnostics}
         timezoneOptions={supportedTimezones(settings.timezone)}
       />
     </Shell>
