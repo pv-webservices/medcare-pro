@@ -103,31 +103,32 @@ model Tenant {
   /// NOT NULL column with no default, which MySQL cannot add to a table that
   /// already holds rows — so the expand migration adds it nullable, the backfill
   /// sets it to created_at, and the constrain migration makes it NOT NULL.
-  updatedAt                DateTime                  @updatedAt @map("updated_at")
-  users                    User[]
-  roles                    Role[]
-  clinics                  Clinic[]
-  patients                 Patient[]
-  notifications            Notification[]
-  whatsappTemplates        WhatsappTemplate[]
-  mediaAssets              MediaAsset[]
-  whatsappTemplateMedia    WhatsappTemplateMedia[]
-  whatsappProviderAccounts WhatsappProviderAccount[]
-  whatsappDevices          WhatsappDevice[]
-  whatsappSettings         TenantWhatsappSettings?
-  clinicWhatsappSettings   ClinicWhatsappSettings[]
-  plan                     Plan?                     @relation(fields: [planId], references: [id], onDelete: Restrict)
-  approvedBy               User?                     @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  rejectedBy               User?                     @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
-  suspendedBy              User?                     @relation("TenantSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
-  featureOverrides         TenantFeatureOverride[]
-  invitations              Invitation[]
-  sessions                 AppSession[]
-  auditLogs                AuditLog[]
-  tasks                    Task[]
-  dashboardLayouts         DashboardLayout[]
-  telephonyBookingRequests TelephonyBookingRequest[]
-  platformPlivoNumbers     PlatformPlivoNumber[]
+  updatedAt                    DateTime                  @updatedAt @map("updated_at")
+  users                        User[]
+  roles                        Role[]
+  clinics                      Clinic[]
+  patients                     Patient[]
+  notifications                Notification[]
+  whatsappTemplates            WhatsappTemplate[]
+  mediaAssets                  MediaAsset[]
+  whatsappTemplateMedia        WhatsappTemplateMedia[]
+  whatsappProviderAccounts     WhatsappProviderAccount[]
+  whatsappDevices              WhatsappDevice[]
+  whatsappSettings             TenantWhatsappSettings?
+  clinicWhatsappSettings       ClinicWhatsappSettings[]
+  plan                         Plan?                     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  approvedBy                   User?                     @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy                   User?                     @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  suspendedBy                  User?                     @relation("TenantSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
+  featureOverrides             TenantFeatureOverride[]
+  invitations                  Invitation[]
+  sessions                     AppSession[]
+  auditLogs                    AuditLog[]
+  tasks                        Task[]
+  dashboardLayouts             DashboardLayout[]
+  telephonyBookingRequests     TelephonyBookingRequest[]
+  platformPlivoNumbers         PlatformPlivoNumber[]     @relation("PlatformPlivoAssignedTenant")
+  quarantineSourcePlivoNumbers PlatformPlivoNumber[]     @relation("PlatformPlivoQuarantineSourceTenant")
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments     Appointment[]
@@ -427,13 +428,14 @@ model Clinic {
   invitations           Invitation[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
-  appointments             Appointment[]
-  appointmentTypes         AppointmentType[]
-  telephonyBookingRequests TelephonyBookingRequest[]
-  telephonyCalls           ClinicTelephonyCall[]
-  telephonyTestCalls       ClinicTelephonyTestCall[]
-  platformPlivoNumber      PlatformPlivoNumber?
-  tasks                    Task[]
+  appointments                 Appointment[]
+  appointmentTypes             AppointmentType[]
+  telephonyBookingRequests     TelephonyBookingRequest[]
+  telephonyCalls               ClinicTelephonyCall[]
+  telephonyTestCalls           ClinicTelephonyTestCall[]
+  platformPlivoNumber          PlatformPlivoNumber?      @relation("PlatformPlivoAssignedClinic")
+  quarantineSourcePlivoNumbers PlatformPlivoNumber[]     @relation("PlatformPlivoQuarantineSourceClinic")
+  tasks                        Task[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -530,31 +532,38 @@ enum PlatformPlivoNumberHealthStatus {
 /// Platform-owned inventory for numbers rented on the shared Plivo account.
 /// ClinicTelephonyConfig.plivoNumber remains a compatibility mirror only.
 model PlatformPlivoNumber {
-  id                      String                              @id @default(cuid())
-  phoneNumber             String                              @unique @map("phone_number") @db.VarChar(16)
-  providerApplicationId   String?                             @map("provider_application_id") @db.VarChar(64)
-  providerApplicationName String?                             @map("provider_application_name") @db.VarChar(100)
-  providerNumberType      String?                             @map("provider_number_type") @db.VarChar(32)
-  providerRegion          String?                             @map("provider_region") @db.VarChar(100)
-  providerPresent         Boolean                             @default(false) @map("provider_present")
-  assignmentStatus        PlatformPlivoNumberAssignmentStatus @default(AVAILABLE) @map("assignment_status")
-  healthStatus            PlatformPlivoNumberHealthStatus     @default(MISSING_FROM_PROVIDER) @map("health_status")
-  assignedTenantId        String?                             @map("assigned_tenant_id")
-  assignedClinicId        String?                             @unique @map("assigned_clinic_id")
-  assignedAt              DateTime?                           @map("assigned_at")
-  quarantinedAt           DateTime?                           @map("quarantined_at")
-  quarantinedUntil        DateTime?                           @map("quarantined_until")
-  lastSyncedAt            DateTime?                           @map("last_synced_at")
-  providerSeenAt          DateTime?                           @map("provider_seen_at")
-  createdAt               DateTime                            @default(now()) @map("created_at")
-  updatedAt               DateTime                            @updatedAt @map("updated_at")
+  id                               String                              @id @default(cuid())
+  phoneNumber                      String                              @unique @map("phone_number") @db.VarChar(16)
+  providerApplicationId            String?                             @map("provider_application_id") @db.VarChar(64)
+  providerApplicationName          String?                             @map("provider_application_name") @db.VarChar(100)
+  providerNumberType               String?                             @map("provider_number_type") @db.VarChar(32)
+  providerRegion                   String?                             @map("provider_region") @db.VarChar(100)
+  providerPresent                  Boolean                             @default(false) @map("provider_present")
+  assignmentStatus                 PlatformPlivoNumberAssignmentStatus @default(AVAILABLE) @map("assignment_status")
+  healthStatus                     PlatformPlivoNumberHealthStatus     @default(MISSING_FROM_PROVIDER) @map("health_status")
+  assignedTenantId                 String?                             @map("assigned_tenant_id")
+  assignedClinicId                 String?                             @unique @map("assigned_clinic_id")
+  assignedAt                       DateTime?                           @map("assigned_at")
+  quarantinedAt                    DateTime?                           @map("quarantined_at")
+  quarantinedUntil                 DateTime?                           @map("quarantined_until")
+  quarantineSourceTenantId         String?                             @map("quarantine_source_tenant_id")
+  quarantineSourceClinicId         String?                             @map("quarantine_source_clinic_id")
+  quarantineSourceTelephonyEnabled Boolean?                            @map("quarantine_source_telephony_enabled")
+  lastSyncedAt                     DateTime?                           @map("last_synced_at")
+  providerSeenAt                   DateTime?                           @map("provider_seen_at")
+  createdAt                        DateTime                            @default(now()) @map("created_at")
+  updatedAt                        DateTime                            @updatedAt @map("updated_at")
 
-  assignedTenant Tenant? @relation(fields: [assignedTenantId], references: [id], onDelete: Restrict)
-  assignedClinic Clinic? @relation(fields: [assignedClinicId], references: [id], onDelete: Restrict)
+  assignedTenant         Tenant? @relation("PlatformPlivoAssignedTenant", fields: [assignedTenantId], references: [id], onDelete: Restrict)
+  assignedClinic         Clinic? @relation("PlatformPlivoAssignedClinic", fields: [assignedClinicId], references: [id], onDelete: Restrict)
+  quarantineSourceTenant Tenant? @relation("PlatformPlivoQuarantineSourceTenant", fields: [quarantineSourceTenantId], references: [id], onDelete: Restrict)
+  quarantineSourceClinic Clinic? @relation("PlatformPlivoQuarantineSourceClinic", fields: [quarantineSourceClinicId], references: [id], onDelete: Restrict)
 
   @@index([assignmentStatus])
   @@index([healthStatus])
   @@index([assignedTenantId])
+  @@index([quarantineSourceTenantId])
+  @@index([quarantineSourceClinicId])
   @@map("platform_plivo_numbers")
 }
 

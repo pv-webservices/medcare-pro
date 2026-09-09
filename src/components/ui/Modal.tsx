@@ -271,7 +271,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-body text-ink-soft">{body}</p>
+      <div className="text-body text-ink-soft">{body}</div>
     </Modal>
   );
 }

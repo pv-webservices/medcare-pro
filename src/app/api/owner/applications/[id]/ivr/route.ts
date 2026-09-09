@@ -6,6 +6,7 @@ import {
   getPlatformTenantIvr,
   platformPlivoAssignmentSchema,
   reassignPlatformPlivoNumber,
+  restorePreviousPlatformPlivoNumber,
   unassignPlatformPlivoNumber,
 } from "@/lib/platform/plivoNumbers";
 
@@ -35,13 +36,15 @@ export async function POST(request: Request, context: Context) {
         input,
         resolvePlivoNumberQuarantineDays(),
       );
-    } else {
+    } else if (input.action === "reassign") {
       await reassignPlatformPlivoNumber(
         owner,
         id,
         input,
         resolvePlivoNumberQuarantineDays(),
       );
+    } else {
+      await restorePreviousPlatformPlivoNumber(owner, input.numberId, id);
     }
     return jsonOk(await getPlatformTenantIvr(owner, id));
   } catch (error: unknown) {

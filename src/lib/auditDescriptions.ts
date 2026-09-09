@@ -261,6 +261,8 @@ export const AUDIT_DESCRIPTIONS: Readonly<
   [AUDIT_ACTIONS.PLIVO_NUMBER_REASSIGNED]: { label: "IVR number reassigned", detail: "A platform owner moved a Plivo number to another clinic.", side: "platform", category: "organisation" },
   [AUDIT_ACTIONS.PLIVO_NUMBER_QUARANTINED]: { label: "IVR number quarantined", detail: "A released clinical number entered its safety quarantine period.", side: "platform", category: "organisation" },
   [AUDIT_ACTIONS.PLIVO_NUMBER_RELEASED]: { label: "IVR number made available", detail: "A platform owner released an expired quarantine for assignment.", side: "platform", category: "organisation" },
+  [AUDIT_ACTIONS.PLIVO_NUMBER_ASSIGNMENT_RESTORED]: { label: "IVR number assignment restored", detail: "A platform owner restored a quarantined number to its previous clinic.", side: "platform", category: "organisation" },
+  [AUDIT_ACTIONS.PLIVO_NUMBER_QUARANTINE_OVERRIDDEN]: { label: "IVR number quarantine overridden", detail: "A platform owner released a number before its safety quarantine expired and recorded a reason.", side: "platform", category: "organisation" },
   [AUDIT_ACTIONS.PLIVO_NUMBER_PROVIDER_MISMATCH]: { label: "Plivo provider mismatch detected", detail: "A synchronized number is missing from Plivo or attached to the wrong application.", side: "platform", category: "organisation" },
   [AUDIT_ACTIONS.TENANT_ENTITLEMENTS_SET]: {
     label: "Plan or features changed",

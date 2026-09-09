@@ -3,7 +3,9 @@ import { requirePlatformOwner } from "@/lib/platform/auth";
 import {
   listPlatformPlivoNumbers,
   releasePlatformPlivoNumber,
+  releasePlatformPlivoNumberEarly,
   releasePlatformPlivoNumberSchema,
+  restorePreviousPlatformPlivoNumber,
 } from "@/lib/platform/plivoNumbers";
 
 export async function GET() {
@@ -21,7 +23,13 @@ export async function POST(request: Request) {
     const input = releasePlatformPlivoNumberSchema.parse(
       await readJsonBody(request),
     );
-    await releasePlatformPlivoNumber(owner, input.numberId);
+    if (input.action === "releaseQuarantine") {
+      await releasePlatformPlivoNumber(owner, input.numberId);
+    } else if (input.action === "releaseQuarantineEarly") {
+      await releasePlatformPlivoNumberEarly(owner, input.numberId, input.reason);
+    } else {
+      await restorePreviousPlatformPlivoNumber(owner, input.numberId);
+    }
     return jsonOk(await listPlatformPlivoNumbers(owner));
   } catch (error: unknown) {
     return toErrorResponse(error, "POST /api/owner/ivr-numbers");

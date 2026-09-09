@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   numberUpdateMany: vi.fn(),
   configUpsert: vi.fn(),
   configUpdateMany: vi.fn(),
+  configFindUnique: vi.fn(),
+  configFindFirst: vi.fn(),
   audit: vi.fn(),
 }));
 
@@ -28,6 +30,8 @@ const tx = {
   clinicTelephonyConfig: {
     upsert: mocks.configUpsert,
     updateMany: mocks.configUpdateMany,
+    findUnique: mocks.configFindUnique,
+    findFirst: mocks.configFindFirst,
   },
 };
 
@@ -51,6 +55,9 @@ import {
   platformPlivoAssignmentSchema,
   reassignPlatformPlivoNumber,
   releasePlatformPlivoNumber,
+  releasePlatformPlivoNumberEarly,
+  releasePlatformPlivoNumberSchema,
+  restorePreviousPlatformPlivoNumber,
   syncPlatformPlivoNumbers,
   unassignPlatformPlivoNumber,
 } from "@/lib/platform/plivoNumbers";
@@ -76,6 +83,9 @@ const number = {
   assignedAt: null,
   quarantinedAt: null,
   quarantinedUntil: null,
+  quarantineSourceTenantId: null,
+  quarantineSourceClinicId: null,
+  quarantineSourceTelephonyEnabled: null,
   lastSyncedAt: now,
   providerSeenAt: now,
   createdAt: now,
@@ -90,22 +100,33 @@ describe("platform Plivo number ownership", () => {
     mocks.numberUpdateMany.mockResolvedValue({ count: 1 });
     mocks.configUpsert.mockResolvedValue({});
     mocks.configUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.configFindUnique.mockResolvedValue({ enabled: true });
+    mocks.configFindFirst.mockResolvedValue(null);
     mocks.audit.mockResolvedValue(undefined);
   });
 
   it("defines the additive global and per-clinic uniqueness constraints", () => {
     const schema = readFileSync(resolve("prisma/schema.prisma"), "utf8");
     const migration = readFileSync(resolve("prisma/migrations/20260909120000_platform_plivo_number_inventory/migration.sql"), "utf8");
+    const quarantineMigration = readFileSync(resolve("prisma/migrations/20260910120000_plivo_quarantine_origin/migration.sql"), "utf8");
     expect(schema).toMatch(/phoneNumber\s+String\s+@unique/);
     expect(schema).toMatch(/assignedClinicId\s+String\?\s+@unique/);
     expect(migration).toContain("platform_plivo_numbers_phone_number_key");
     expect(migration).toContain("platform_plivo_numbers_assigned_clinic_id_key");
+    expect(schema).toContain("quarantineSourceTelephonyEnabled Boolean?");
+    expect(quarantineMigration).toContain("quarantine_source_tenant_id");
+    expect(quarantineMigration).toContain("quarantine_source_clinic_id");
   });
 
   it("uses strict action schemas and rejects client-controlled tenant scope", () => {
     expect(platformPlivoAssignmentSchema.parse({ action: "assign", clinicId: "clinic-a", numberId: "number-a" })).toEqual({ action: "assign", clinicId: "clinic-a", numberId: "number-a" });
     expect(() => platformPlivoAssignmentSchema.parse({ action: "assign", clinicId: "clinic-a", numberId: "number-a", tenantId: "tenant-b" })).toThrow();
     expect(() => platformPlivoAssignmentSchema.parse({ action: "reassign", clinicId: "clinic-a", numberId: "number-a" })).toThrow();
+    expect(platformPlivoAssignmentSchema.parse({ action: "restorePreviousAssignment", numberId: "number-a", confirmed: true })).toEqual({ action: "restorePreviousAssignment", numberId: "number-a", confirmed: true });
+    expect(() => platformPlivoAssignmentSchema.parse({ action: "restorePreviousAssignment", numberId: "number-a", confirmed: true, clinicId: "clinic-b" })).toThrow();
+    expect(() => releasePlatformPlivoNumberSchema.parse({ action: "releaseQuarantineEarly", numberId: "number-a", confirmed: true, reason: "short" })).toThrow();
+    expect(() => releasePlatformPlivoNumberSchema.parse({ action: "releaseQuarantineEarly", numberId: "number-a", reason: "A sufficiently detailed reason" })).toThrow();
+    expect(() => releasePlatformPlivoNumberSchema.parse({ action: "releaseQuarantine", numberId: "number-a" })).toThrow();
   });
 
   it("does not mutate inventory when the provider listing fails", async () => {
@@ -174,12 +195,20 @@ describe("platform Plivo number ownership", () => {
     mocks.numberFindUnique.mockResolvedValue({ ...number, assignmentStatus: "ASSIGNED", assignedTenantId: "tenant-a", assignedClinicId: "clinic-a" });
     await unassignPlatformPlivoNumber(owner, "tenant-a", { clinicId: "clinic-a", numberId: "number-a" }, 14, now);
     expect(mocks.numberUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ assignmentStatus: "QUARANTINED", assignedTenantId: null, assignedClinicId: null }),
+      data: expect.objectContaining({
+        assignmentStatus: "QUARANTINED",
+        assignedTenantId: null,
+        assignedClinicId: null,
+        quarantineSourceTenantId: "tenant-a",
+        quarantineSourceClinicId: "clinic-a",
+        quarantineSourceTelephonyEnabled: true,
+      }),
     }));
     expect(mocks.configUpdateMany).toHaveBeenCalledWith({
       where: { clinicId: "clinic-a", plivoNumber: number.phoneNumber },
       data: { plivoNumber: null, enabled: false },
     });
+    expect(Object.keys(mocks.configUpdateMany.mock.calls[0][0].data).sort()).toEqual(["enabled", "plivoNumber"]);
   });
 
   it("reassigns atomically and quarantines the number being replaced", async () => {
@@ -191,6 +220,13 @@ describe("platform Plivo number ownership", () => {
       where: expect.objectContaining({ id: "number-old" }),
       data: expect.objectContaining({ assignmentStatus: "QUARANTINED", assignedClinicId: null }),
     }));
+    expect(mocks.numberUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        quarantineSourceTenantId: "tenant-a",
+        quarantineSourceClinicId: "clinic-a",
+        quarantineSourceTelephonyEnabled: true,
+      }),
+    }));
     expect(mocks.configUpdateMany).toHaveBeenCalledWith({
       where: { clinicId: "clinic-old", plivoNumber: selected.phoneNumber },
       data: { plivoNumber: null, enabled: false },
@@ -198,6 +234,106 @@ describe("platform Plivo number ownership", () => {
     expect(mocks.configUpsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { clinicId: "clinic-a" },
       update: { plivoNumber: selected.phoneNumber },
+    }));
+  });
+
+  it("restores only the recorded previous clinic and restores its known enabled state", async () => {
+    const quarantined = {
+      ...number,
+      assignmentStatus: "QUARANTINED" as const,
+      quarantinedAt: now,
+      quarantinedUntil: new Date("2026-09-23T12:00:00.000Z"),
+      quarantineSourceTenantId: "tenant-a",
+      quarantineSourceClinicId: "clinic-a",
+      quarantineSourceTelephonyEnabled: true,
+    };
+    mocks.numberFindUnique.mockResolvedValueOnce(quarantined).mockResolvedValueOnce(null);
+    const result = await restorePreviousPlatformPlivoNumber(owner, "number-a", "tenant-a", now);
+    expect(result).toEqual({ previousTelephonyStateKnown: true, telephonyEnabled: true });
+    expect(mocks.numberUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ quarantineSourceTenantId: "tenant-a", quarantineSourceClinicId: "clinic-a" }),
+      data: expect.objectContaining({
+        assignmentStatus: "ASSIGNED",
+        assignedTenantId: "tenant-a",
+        assignedClinicId: "clinic-a",
+        quarantineSourceTenantId: null,
+        quarantineSourceClinicId: null,
+        quarantineSourceTelephonyEnabled: null,
+      }),
+    }));
+    expect(mocks.configUpsert).toHaveBeenCalledWith({
+      where: { clinicId: "clinic-a" },
+      create: { clinicId: "clinic-a", plivoNumber: number.phoneNumber, enabled: true },
+      update: { plivoNumber: number.phoneNumber, enabled: true },
+    });
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: "PLIVO_NUMBER_ASSIGNMENT_RESTORED" }));
+  });
+
+  it("keeps telephony disabled when the previous activation state is unknown", async () => {
+    mocks.numberFindUnique.mockResolvedValueOnce({
+      ...number,
+      assignmentStatus: "QUARANTINED",
+      quarantineSourceTenantId: "tenant-a",
+      quarantineSourceClinicId: "clinic-a",
+      quarantineSourceTelephonyEnabled: null,
+    }).mockResolvedValueOnce(null);
+    const result = await restorePreviousPlatformPlivoNumber(owner, "number-a", undefined, now);
+    expect(result).toEqual({ previousTelephonyStateKnown: false, telephonyEnabled: false });
+    expect(mocks.configUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: { plivoNumber: number.phoneNumber, enabled: false },
+    }));
+  });
+
+  it("refuses restore when the previous clinic already has another number", async () => {
+    mocks.numberFindUnique.mockResolvedValueOnce({
+      ...number,
+      assignmentStatus: "QUARANTINED",
+      quarantineSourceTenantId: "tenant-a",
+      quarantineSourceClinicId: "clinic-a",
+    }).mockResolvedValueOnce({ id: "another-number" });
+    await expect(restorePreviousPlatformPlivoNumber(owner, "number-a", undefined, now)).rejects.toThrow("already has another IVR number");
+    expect(mocks.configUpsert).not.toHaveBeenCalled();
+  });
+
+  it("cannot restore through a different organisation route", async () => {
+    mocks.numberFindUnique.mockResolvedValueOnce({
+      ...number,
+      assignmentStatus: "QUARANTINED",
+      quarantineSourceTenantId: "tenant-a",
+      quarantineSourceClinicId: "clinic-a",
+    });
+    await expect(restorePreviousPlatformPlivoNumber(owner, "number-a", "tenant-b", now)).rejects.toThrow("cannot be restored");
+    expect(mocks.numberUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("requires a healthy provider-present quarantine for restore", async () => {
+    mocks.numberFindUnique.mockResolvedValueOnce({
+      ...number,
+      assignmentStatus: "QUARANTINED",
+      healthStatus: "OUT_OF_SYNC",
+      quarantineSourceTenantId: "tenant-a",
+      quarantineSourceClinicId: "clinic-a",
+    });
+    await expect(restorePreviousPlatformPlivoNumber(owner, "number-a", undefined, now)).rejects.toThrow("cannot be restored");
+    expect(mocks.numberUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("releases quarantine early without assigning and audits the mandatory reason", async () => {
+    mocks.numberFindUnique.mockResolvedValue({
+      ...number,
+      assignmentStatus: "QUARANTINED",
+      quarantineSourceTenantId: "tenant-a",
+      quarantineSourceClinicId: "clinic-a",
+    });
+    await releasePlatformPlivoNumberEarly(owner, "number-a", "Acceptance testing recovery");
+    expect(mocks.numberUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ assignmentStatus: "AVAILABLE", quarantineSourceTenantId: null }),
+    }));
+    expect(mocks.numberUpdateMany.mock.calls[0][0].data).not.toHaveProperty("assignedTenantId");
+    expect(mocks.numberUpdateMany.mock.calls[0][0].data).not.toHaveProperty("assignedClinicId");
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: "PLIVO_NUMBER_QUARANTINE_OVERRIDDEN",
+      reason: "Acceptance testing recovery",
     }));
   });
 
@@ -211,8 +347,25 @@ describe("platform Plivo number ownership", () => {
     await releasePlatformPlivoNumber(owner, "number-a", now);
     expect(mocks.numberUpdateMany).toHaveBeenCalledWith({
       where: { id: "number-a", assignmentStatus: "QUARANTINED", quarantinedUntil: { lte: now } },
-      data: { assignmentStatus: "AVAILABLE", quarantinedAt: null, quarantinedUntil: null },
+      data: {
+        assignmentStatus: "AVAILABLE",
+        quarantinedAt: null,
+        quarantinedUntil: null,
+        quarantineSourceTenantId: null,
+        quarantineSourceClinicId: null,
+        quarantineSourceTelephonyEnabled: null,
+      },
     });
+  });
+
+  it("rejects normal release before quarantine expiry", async () => {
+    mocks.numberFindUnique.mockResolvedValue({
+      ...number,
+      assignmentStatus: "QUARANTINED",
+      quarantinedUntil: new Date("2026-09-23T12:00:00.000Z"),
+    });
+    await expect(releasePlatformPlivoNumber(owner, "number-a", now)).rejects.toThrow("not ready");
+    expect(mocks.numberUpdateMany).not.toHaveBeenCalled();
   });
 
   it("keeps every Owner endpoint behind requirePlatformOwner", () => {
@@ -231,5 +384,25 @@ describe("platform Plivo number ownership", () => {
     expect(source).toContain("DRY RUN");
     expect(source).toContain("Backfill aborted because ambiguous conflicts");
     expect(source).not.toContain("PLIVO_AUTH_TOKEN");
+  });
+
+  it("keeps quarantine-origin repair dry-run by default and never guesses enabled state", () => {
+    const source = readFileSync(resolve("scripts/backfill-plivo-quarantine-origin.mts"), "utf8");
+    expect(source).toContain('process.argv.includes("--apply")');
+    expect(source).toContain("DRY RUN");
+    expect(source).toContain("previous telephony state: UNKNOWN");
+    expect(source).toContain("quarantineSourceTelephonyEnabled: null");
+  });
+
+  it("uses MEDCARE confirmation dialogs for every destructive Platform action", () => {
+    const tenantUi = readFileSync(resolve("src/components/owner/PlatformTenantIvr.tsx"), "utf8");
+    const inventoryUi = readFileSync(resolve("src/components/owner/PlatformPlivoNumbers.tsx"), "utf8");
+    expect(tenantUi).not.toContain("window.confirm");
+    expect(tenantUi).toContain("ConfirmDialog");
+    expect(tenantUi).toContain("Unassign and quarantine");
+    expect(tenantUi).toContain("The current number will enter quarantine");
+    expect(inventoryUi).toContain("Release quarantined number early?");
+    expect(inventoryUi).toContain("Quarantined until");
+    expect(inventoryUi).not.toContain("row.assignmentStatus === \"QUARANTINED\" ? <span className=\"text-slate-500\">View after provider fix");
   });
 });

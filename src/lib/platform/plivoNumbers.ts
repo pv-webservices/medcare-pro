@@ -8,6 +8,7 @@ import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
 import { BadRequestError, ConflictError } from "@/lib/apiHandler";
 import type { PlatformActorContext } from "@/lib/platform/context";
 import type { PlatformPlivoNumberProvider } from "@/lib/platform/plivoNumberProvider";
+import { resolvePlivoNumberQuarantineDays } from "@/lib/platform/plivoNumberEnvironment";
 import { prisma } from "@/lib/prisma";
 import { CUSTOMER_TENANT_WHERE } from "@/lib/platformTenant";
 
@@ -29,12 +30,31 @@ export const platformPlivoAssignmentSchema = z.discriminatedUnion("action", [
     numberId: z.string().trim().min(1).max(191),
     confirmed: z.literal(true),
   }).strict(),
+  z.object({
+    action: z.literal("restorePreviousAssignment"),
+    numberId: z.string().trim().min(1).max(191),
+    confirmed: z.literal(true),
+  }).strict(),
 ]);
 
-export const releasePlatformPlivoNumberSchema = z.object({
-  action: z.literal("releaseQuarantine"),
-  numberId: z.string().trim().min(1).max(191),
-}).strict();
+export const releasePlatformPlivoNumberSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("releaseQuarantine"),
+    numberId: z.string().trim().min(1).max(191),
+    confirmed: z.literal(true),
+  }).strict(),
+  z.object({
+    action: z.literal("releaseQuarantineEarly"),
+    numberId: z.string().trim().min(1).max(191),
+    confirmed: z.literal(true),
+    reason: z.string().trim().min(10).max(500),
+  }).strict(),
+  z.object({
+    action: z.literal("restorePreviousAssignment"),
+    numberId: z.string().trim().min(1).max(191),
+    confirmed: z.literal(true),
+  }).strict(),
+]);
 
 export interface PlatformPlivoNumberView {
   id: string;
@@ -50,7 +70,14 @@ export interface PlatformPlivoNumberView {
   assignedTenantName: string | null;
   assignedClinicId: string | null;
   assignedClinicName: string | null;
+  telephonyEnabled: boolean | null;
+  quarantinedAt: string | null;
   quarantinedUntil: string | null;
+  quarantineSourceTenantId: string | null;
+  quarantineSourceTenantName: string | null;
+  quarantineSourceClinicId: string | null;
+  quarantineSourceClinicName: string | null;
+  quarantineSourceTelephonyEnabled: boolean | null;
   quarantineExpired: boolean;
   lastSyncedAt: string | null;
   lastActivityAt: string | null;
@@ -70,10 +97,12 @@ export interface PlatformPlivoInventoryView {
 
 export interface PlatformTenantIvrView {
   tenant: { id: string; name: string; status: string };
+  quarantineDays: number;
   clinics: Array<{
     id: string;
     name: string;
     assignment: PlatformPlivoNumberView | null;
+    recoverableQuarantine: PlatformPlivoNumberView | null;
   }>;
   availableNumbers: Array<{ id: string; phoneNumber: string }>;
 }
@@ -90,11 +119,13 @@ async function loadInventoryRows() {
     orderBy: { phoneNumber: "asc" },
     include: {
       assignedTenant: { select: { businessName: true } },
+      quarantineSourceTenant: { select: { businessName: true } },
+      quarantineSourceClinic: { select: { name: true, tenantId: true } },
       assignedClinic: {
         select: {
           name: true,
           tenantId: true,
-          telephonyConfig: { select: { plivoNumber: true } },
+          telephonyConfig: { select: { plivoNumber: true, enabled: true } },
           telephonyCalls: {
             orderBy: { startedAt: "desc" },
             take: 1,
@@ -127,7 +158,14 @@ function toNumberView(row: InventoryRow, now: Date): PlatformPlivoNumberView {
     assignedTenantName: row.assignedTenant?.businessName ?? null,
     assignedClinicId: row.assignedClinicId,
     assignedClinicName: row.assignedClinic?.name ?? null,
+    telephonyEnabled: row.assignedClinic?.telephonyConfig?.enabled ?? null,
+    quarantinedAt: row.quarantinedAt?.toISOString() ?? null,
     quarantinedUntil: row.quarantinedUntil?.toISOString() ?? null,
+    quarantineSourceTenantId: row.quarantineSourceTenantId,
+    quarantineSourceTenantName: row.quarantineSourceTenant?.businessName ?? null,
+    quarantineSourceClinicId: row.quarantineSourceClinicId,
+    quarantineSourceClinicName: row.quarantineSourceClinic?.name ?? null,
+    quarantineSourceTelephonyEnabled: row.quarantineSourceTelephonyEnabled,
     quarantineExpired:
       row.assignmentStatus === "QUARANTINED" &&
       row.quarantinedUntil !== null &&
@@ -163,7 +201,7 @@ export async function getPlatformTenantIvr(
   tenantId: string,
   now = new Date(),
 ): Promise<PlatformTenantIvrView | null> {
-  const [tenant, availableNumbers] = await Promise.all([
+  const [tenant, availableNumbers, recoverableQuarantines] = await Promise.all([
     prisma.tenant.findFirst({
       where: { id: tenantId, ...CUSTOMER_TENANT_WHERE },
       select: {
@@ -178,11 +216,13 @@ export async function getPlatformTenantIvr(
             platformPlivoNumber: {
               include: {
                 assignedTenant: { select: { businessName: true } },
+                quarantineSourceTenant: { select: { businessName: true } },
+                quarantineSourceClinic: { select: { name: true, tenantId: true } },
                 assignedClinic: {
                   select: {
                     name: true,
                     tenantId: true,
-                    telephonyConfig: { select: { plivoNumber: true } },
+                    telephonyConfig: { select: { plivoNumber: true, enabled: true } },
                     telephonyCalls: {
                       orderBy: { startedAt: "desc" },
                       take: 1,
@@ -207,16 +247,51 @@ export async function getPlatformTenantIvr(
       orderBy: { phoneNumber: "asc" },
       select: { id: true, phoneNumber: true },
     }),
+    prisma.platformPlivoNumber.findMany({
+      where: {
+        assignmentStatus: "QUARANTINED",
+        assignedTenantId: null,
+        assignedClinicId: null,
+        quarantineSourceTenantId: tenantId,
+        quarantineSourceClinicId: { not: null },
+      },
+      orderBy: { quarantinedAt: "desc" },
+      include: {
+        assignedTenant: { select: { businessName: true } },
+        quarantineSourceTenant: { select: { businessName: true } },
+        quarantineSourceClinic: { select: { name: true, tenantId: true } },
+        assignedClinic: {
+          select: {
+            name: true,
+            tenantId: true,
+            telephonyConfig: { select: { plivoNumber: true, enabled: true } },
+            telephonyCalls: {
+              orderBy: { startedAt: "desc" },
+              take: 1,
+              select: { startedAt: true },
+            },
+          },
+        },
+      },
+    }),
   ]);
   if (!tenant) return null;
+  const recoverableByClinic = new Map<string, PlatformPlivoNumberView>();
+  for (const row of recoverableQuarantines) {
+    if (row.quarantineSourceClinicId && !recoverableByClinic.has(row.quarantineSourceClinicId)) {
+      recoverableByClinic.set(row.quarantineSourceClinicId, toNumberView(row, now));
+    }
+  }
   return {
     tenant: { id: tenant.id, name: tenant.businessName, status: tenant.status },
+    quarantineDays: resolvePlivoNumberQuarantineDays(),
     clinics: tenant.clinics.map((clinic) => ({
       id: clinic.id,
       name: clinic.name,
       assignment: clinic.platformPlivoNumber
         ? toNumberView(clinic.platformPlivoNumber, now)
         : null,
+      recoverableQuarantine: recoverableByClinic.get(clinic.id) ?? null,
     })),
     availableNumbers,
   };
@@ -387,6 +462,9 @@ export async function assignPlatformPlivoNumber(
           assignedAt: now,
           quarantinedAt: null,
           quarantinedUntil: null,
+          quarantineSourceTenantId: null,
+          quarantineSourceClinicId: null,
+          quarantineSourceTelephonyEnabled: null,
         },
       });
       if (changed.count !== 1) throw new ConflictError("This IVR number is already assigned.");
@@ -424,7 +502,13 @@ export async function unassignPlatformPlivoNumber(
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await assertCustomerClinic(tx, tenantId, input.clinicId);
-    const number = await tx.platformPlivoNumber.findUnique({ where: { id: input.numberId } });
+    const [number, telephonyConfig] = await Promise.all([
+      tx.platformPlivoNumber.findUnique({ where: { id: input.numberId } }),
+      tx.clinicTelephonyConfig.findUnique({
+        where: { clinicId: input.clinicId },
+        select: { enabled: true },
+      }),
+    ]);
     if (!number || number.assignmentStatus !== "ASSIGNED" ||
         number.assignedTenantId !== tenantId || number.assignedClinicId !== input.clinicId) {
       throw new ConflictError("This IVR number is not assigned to that clinic.");
@@ -444,6 +528,9 @@ export async function unassignPlatformPlivoNumber(
         assignedAt: null,
         quarantinedAt: now,
         quarantinedUntil: until,
+        quarantineSourceTenantId: tenantId,
+        quarantineSourceClinicId: input.clinicId,
+        quarantineSourceTelephonyEnabled: telephonyConfig?.enabled ?? null,
       },
     });
     if (changed.count !== 1) {
@@ -459,6 +546,7 @@ export async function unassignPlatformPlivoNumber(
       clinicId: input.clinicId,
       assignmentStatus: "QUARANTINED",
       quarantinedUntil: until.toISOString(),
+      previousTelephonyEnabled: telephonyConfig?.enabled ?? null,
     };
     await writeAuditLog(tx, { ...ownerAudit(owner, tenantId), action: AUDIT_ACTIONS.PLIVO_NUMBER_UNASSIGNED, afterValue: metadata });
     await writeAuditLog(tx, { ...ownerAudit(owner, tenantId), action: AUDIT_ACTIONS.PLIVO_NUMBER_QUARANTINED, afterValue: metadata });
@@ -492,6 +580,10 @@ export async function reassignPlatformPlivoNumber(
       });
       if (replaced && replaced.id !== number.id) {
         const until = quarantineUntil(now, quarantineDays);
+        const replacedTelephonyConfig = await tx.clinicTelephonyConfig.findUnique({
+          where: { clinicId: input.clinicId },
+          select: { enabled: true },
+        });
         const quarantined = await tx.platformPlivoNumber.updateMany({
           where: {
             id: replaced.id,
@@ -506,6 +598,9 @@ export async function reassignPlatformPlivoNumber(
             assignedAt: null,
             quarantinedAt: now,
             quarantinedUntil: until,
+            quarantineSourceTenantId: replaced.assignedTenantId,
+            quarantineSourceClinicId: input.clinicId,
+            quarantineSourceTelephonyEnabled: replacedTelephonyConfig?.enabled ?? null,
           },
         });
         if (quarantined.count !== 1) {
@@ -520,6 +615,7 @@ export async function reassignPlatformPlivoNumber(
             clinicId: input.clinicId,
             assignmentStatus: "QUARANTINED",
             quarantinedUntil: until.toISOString(),
+            previousTelephonyEnabled: replacedTelephonyConfig?.enabled ?? null,
           },
         });
       }
@@ -543,6 +639,9 @@ export async function reassignPlatformPlivoNumber(
           assignedAt: now,
           quarantinedAt: null,
           quarantinedUntil: null,
+          quarantineSourceTenantId: null,
+          quarantineSourceClinicId: null,
+          quarantineSourceTelephonyEnabled: null,
         },
       });
       if (changed.count !== 1) throw new ConflictError("This IVR number is already assigned.");
@@ -594,6 +693,9 @@ export async function releasePlatformPlivoNumber(
         assignmentStatus: "AVAILABLE",
         quarantinedAt: null,
         quarantinedUntil: null,
+        quarantineSourceTenantId: null,
+        quarantineSourceClinicId: null,
+        quarantineSourceTelephonyEnabled: null,
       },
     });
     if (changed.count !== 1) {
@@ -609,6 +711,170 @@ export async function releasePlatformPlivoNumber(
         phoneNumber: number.phoneNumber,
         assignmentStatus: "AVAILABLE",
         healthStatus: number.healthStatus,
+      },
+    });
+  });
+}
+
+export interface RestorePlatformPlivoNumberResult {
+  previousTelephonyStateKnown: boolean;
+  telephonyEnabled: boolean;
+}
+
+export async function restorePreviousPlatformPlivoNumber(
+  owner: PlatformActorContext,
+  numberId: string,
+  expectedTenantId?: string,
+  now = new Date(),
+): Promise<RestorePlatformPlivoNumberResult> {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const number = await tx.platformPlivoNumber.findUnique({ where: { id: numberId } });
+      if (!number || number.assignmentStatus !== "QUARANTINED" ||
+          !number.providerPresent || number.healthStatus !== "HEALTHY" ||
+          number.assignedTenantId !== null || number.assignedClinicId !== null ||
+          !number.quarantineSourceTenantId || !number.quarantineSourceClinicId ||
+          (expectedTenantId !== undefined &&
+            number.quarantineSourceTenantId !== expectedTenantId)) {
+        throw new ConflictError("This IVR number cannot be restored to a previous assignment.");
+      }
+
+      await assertCustomerClinic(
+        tx,
+        number.quarantineSourceTenantId,
+        number.quarantineSourceClinicId,
+      );
+      const [currentAssignment, conflictingMirror] = await Promise.all([
+        tx.platformPlivoNumber.findUnique({
+          where: { assignedClinicId: number.quarantineSourceClinicId },
+        }),
+        tx.clinicTelephonyConfig.findFirst({
+          where: {
+            plivoNumber: number.phoneNumber,
+            clinicId: { not: number.quarantineSourceClinicId },
+          },
+          select: { clinicId: true },
+        }),
+      ]);
+      if (currentAssignment) {
+        throw new ConflictError("The previous clinic already has another IVR number.");
+      }
+      if (conflictingMirror) {
+        throw new ConflictError("This IVR number is still mirrored by another clinic.");
+      }
+
+      const sourceTenantId = number.quarantineSourceTenantId;
+      const sourceClinicId = number.quarantineSourceClinicId;
+      const previousEnabled = number.quarantineSourceTelephonyEnabled;
+      const changed = await tx.platformPlivoNumber.updateMany({
+        where: {
+          id: number.id,
+          assignmentStatus: "QUARANTINED",
+          assignedTenantId: null,
+          assignedClinicId: null,
+          quarantineSourceTenantId: sourceTenantId,
+          quarantineSourceClinicId: sourceClinicId,
+          quarantineSourceTelephonyEnabled: previousEnabled,
+        },
+        data: {
+          assignmentStatus: "ASSIGNED",
+          assignedTenantId: sourceTenantId,
+          assignedClinicId: sourceClinicId,
+          assignedAt: now,
+          quarantinedAt: null,
+          quarantinedUntil: null,
+          quarantineSourceTenantId: null,
+          quarantineSourceClinicId: null,
+          quarantineSourceTelephonyEnabled: null,
+        },
+      });
+      if (changed.count !== 1) {
+        throw new ConflictError("This IVR number changed. Refresh and try again.");
+      }
+
+      const restoredEnabled = previousEnabled ?? false;
+      await tx.clinicTelephonyConfig.upsert({
+        where: { clinicId: sourceClinicId },
+        create: {
+          clinicId: sourceClinicId,
+          plivoNumber: number.phoneNumber,
+          enabled: restoredEnabled,
+        },
+        update: {
+          plivoNumber: number.phoneNumber,
+          enabled: restoredEnabled,
+        },
+      });
+      await writeAuditLog(tx, {
+        ...ownerAudit(owner, sourceTenantId),
+        action: AUDIT_ACTIONS.PLIVO_NUMBER_ASSIGNMENT_RESTORED,
+        afterValue: {
+          phoneNumber: number.phoneNumber,
+          tenantId: sourceTenantId,
+          clinicId: sourceClinicId,
+          assignmentStatus: "ASSIGNED",
+          telephonyEnabled: restoredEnabled,
+          previousTelephonyStateKnown: previousEnabled !== null,
+        },
+      });
+      return {
+        previousTelephonyStateKnown: previousEnabled !== null,
+        telephonyEnabled: restoredEnabled,
+      };
+    });
+  } catch (error: unknown) {
+    if (isUniqueConstraintError(error)) {
+      throw new ConflictError("The previous clinic already has another IVR number.");
+    }
+    throw error;
+  }
+}
+
+export async function releasePlatformPlivoNumberEarly(
+  owner: PlatformActorContext,
+  numberId: string,
+  reason: string,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const number = await tx.platformPlivoNumber.findUnique({ where: { id: numberId } });
+    if (!number || number.assignmentStatus !== "QUARANTINED" ||
+        !number.providerPresent || number.healthStatus !== "HEALTHY" ||
+        number.assignedTenantId !== null || number.assignedClinicId !== null) {
+      throw new ConflictError("This IVR number cannot be released early.");
+    }
+    const changed = await tx.platformPlivoNumber.updateMany({
+      where: {
+        id: number.id,
+        assignmentStatus: "QUARANTINED",
+        providerPresent: true,
+        healthStatus: "HEALTHY",
+        assignedTenantId: null,
+        assignedClinicId: null,
+      },
+      data: {
+        assignmentStatus: "AVAILABLE",
+        quarantinedAt: null,
+        quarantinedUntil: null,
+        quarantineSourceTenantId: null,
+        quarantineSourceClinicId: null,
+        quarantineSourceTelephonyEnabled: null,
+      },
+    });
+    if (changed.count !== 1) {
+      throw new ConflictError("This IVR number changed. Refresh and try again.");
+    }
+    await writeAuditLog(tx, {
+      action: AUDIT_ACTIONS.PLIVO_NUMBER_QUARANTINE_OVERRIDDEN,
+      targetType: "PlatformPlivoNumber",
+      targetId: number.id,
+      actorUserId: owner.userId,
+      actorPlatformRole: owner.platformRole,
+      reason,
+      afterValue: {
+        phoneNumber: number.phoneNumber,
+        assignmentStatus: "AVAILABLE",
+        previousTenantId: number.quarantineSourceTenantId,
+        previousClinicId: number.quarantineSourceClinicId,
       },
     });
   });
