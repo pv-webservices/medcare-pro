@@ -212,6 +212,13 @@ export default async function OwnerApplicationDetailPage({ params }: PageProps) 
             WhatsApp integration
             <ChevronRight className="h-3.5 w-3.5" />
           </Link>
+          <Link
+            href={`/owner/applications/${application.id}/ivr`}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-[#0d1427]/80 px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-600"
+          >
+            IVR / Plivo
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
 
@@ -462,7 +469,7 @@ export default async function OwnerApplicationDetailPage({ params }: PageProps) 
                         <div className="flex items-baseline justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-xs font-bold text-slate-200">
-                              {record.action}
+                              {desc.label}
                             </span>
                             {isCurrent && (
                               <span className="rounded bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-emerald-400">

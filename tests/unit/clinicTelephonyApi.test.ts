@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConflictError } from "@/lib/apiHandler";
 import { PermissionError, ScopeError, type ActorContext } from "@/lib/rbac";
 
 const mocks = vi.hoisted(() => ({
@@ -68,7 +67,6 @@ describe("clinic telephony configuration API", () => {
     mocks.updateConfig.mockResolvedValue({
       ...CONFIG,
       enabled: true,
-      plivoNumber: "+14155550101",
     });
   });
 
@@ -78,7 +76,7 @@ describe("clinic telephony configuration API", () => {
       context(),
     );
     const patchResponse = await PATCH(
-      patchRequest({ enabled: true, plivoNumber: "+14155550101" }),
+      patchRequest({ enabled: true }),
       context(),
     );
 
@@ -87,7 +85,6 @@ describe("clinic telephony configuration API", () => {
     expect(mocks.getConfig).toHaveBeenCalledWith(ACTOR, "clinic-a");
     expect(mocks.updateConfig).toHaveBeenCalledWith(ACTOR, "clinic-a", {
       enabled: true,
-      plivoNumber: "+14155550101",
     });
   });
 
@@ -133,20 +130,12 @@ describe("clinic telephony configuration API", () => {
     },
   );
 
-  it("returns a generic conflict for a duplicate provider number", async () => {
-    mocks.updateConfig.mockRejectedValueOnce(
-      new ConflictError("That provider number is already assigned."),
-    );
-
+  it("strictly rejects tenant attempts to claim a provider number", async () => {
     const response = await PATCH(
       patchRequest({ plivoNumber: "+14155550101" }),
       context(),
     );
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      success: false,
-      error: "That provider number is already assigned.",
-    });
+    expect(response.status).toBe(400);
+    expect(mocks.updateConfig).not.toHaveBeenCalled();
   });
 });

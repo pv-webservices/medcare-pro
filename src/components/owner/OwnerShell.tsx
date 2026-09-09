@@ -10,6 +10,7 @@ import {
   Layers,
   LogOut,
   Menu as MenuIcon,
+  PhoneIncoming,
   ScrollText,
   Shield,
   ToggleLeft,
@@ -68,6 +69,11 @@ const MANAGEMENT_NAV: NavItem[] = [
     label: "Platform features",
     href: "/owner/features",
     icon: ToggleLeft,
+  },
+  {
+    label: "IVR numbers",
+    href: "/owner/ivr-numbers",
+    icon: PhoneIncoming,
   },
   {
     label: "Plans",

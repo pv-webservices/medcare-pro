@@ -11,6 +11,7 @@ import { can, holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor } from "@/lib/session";
 import { getBookingFollowUpsForActor } from "@/lib/telephony/bookingFollowUps";
+import { getAssignedIvrNumberForActor } from "@/lib/telephony/assignedIvrNumber";
 import { getPhoneDiagnosticsForActor } from "@/lib/telephony/callDiagnostics";
 import { getClinicPhoneSettingsForActor } from "@/lib/telephony/clinicPhoneSettings";
 import { getTelephonyTestCallPanelForActor } from "@/lib/telephony/testCall";
@@ -74,13 +75,14 @@ export default async function IvrPage() {
     ? await getBookingFollowUpsForActor(actor, selectedClinicId)
     : null;
   const operations = canManageSelectedTelephony && clinic
-    ? await Promise.all([
+      ? await Promise.all([
         getClinicPhoneSettingsForActor(actor, clinic.id),
         getTelephonyTestCallPanelForActor(actor, clinic.id),
         getPhoneDiagnosticsForActor(actor, clinic.id, now),
+        getAssignedIvrNumberForActor(actor, clinic.id),
       ])
     : null;
-  const [settings, testCall, diagnostics] = operations ?? [null, null, null];
+  const [settings, testCall, diagnostics, assignedNumber] = operations ?? [null, null, null, null];
   const pendingCount = bookingFollowUps?.items.length ?? 0;
   const issues = diagnostics
     ? diagnostics.health.incompleteCalls +
@@ -118,8 +120,14 @@ export default async function IvrPage() {
               <h2 id="ivr-overview-title" className="text-section font-semibold text-ink">IVR operational overview</h2>
               <p className="mt-0.5 text-meta text-muted">Current operational signals from existing phone records.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <OverviewCard label="Phone status" value={readinessLabel} detail={settings ? clinic!.name : "Clinic-specific"} icon={settings?.readiness.status === "ready" ? CheckCircle2 : PhoneCall} />
+              <OverviewCard
+                label="Assigned IVR number"
+                value={assignedNumber?.displayNumber ?? "No IVR number assigned"}
+                detail={assignedNumber?.status === "needs-platform-attention" ? "Needs platform attention" : assignedNumber?.status === "assigned" ? "Managed by MEDCARE PRO" : "Managed by MEDCARE PRO"}
+                icon={PhoneCall}
+              />
               <OverviewCard
                 label="Pending booking follow-ups"
                 value={canHandleBookings ? pendingCount : "—"}

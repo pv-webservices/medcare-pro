@@ -4,7 +4,8 @@ import type {
 } from "@prisma/client";
 import { z } from "zod";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
-import { BadRequestError, ConflictError } from "@/lib/apiHandler";
+import { BadRequestError } from "@/lib/apiHandler";
+import { isPlatformPlivoInventoryAuthoritative } from "@/lib/platform/plivoNumberEnvironment";
 import { prisma } from "@/lib/prisma";
 import type { ActorContext } from "@/lib/rbac";
 import { assertActorCanManageTelephony } from "@/lib/telephony/access";
@@ -25,7 +26,6 @@ export const CLINIC_TELEPHONY_ROUTING_MODES = [
 export const updateClinicTelephonyConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
-    plivoNumber: optionalConfiguredPhoneNumberSchema.optional(),
     publicPhoneNumber: optionalConfiguredPhoneNumberSchema.optional(),
     receptionPhoneNumber: optionalConfiguredPhoneNumberSchema.optional(),
     urgentPhoneNumber: optionalConfiguredPhoneNumberSchema.optional(),
@@ -164,15 +164,6 @@ export async function getClinicTelephonyConfigForActor(
   return config ? toView(config) : defaultView(clinicId);
 }
 
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "P2002"
-  );
-}
-
 export async function updateClinicTelephonyConfigForActor(
   actor: ActorContext,
   clinicId: string,
@@ -185,8 +176,7 @@ export async function updateClinicTelephonyConfigForActor(
   const current = existing ? toView(existing) : defaultView(clinicId);
   const next: ConfigState = {
     enabled: input.enabled ?? current.enabled,
-    plivoNumber:
-      input.plivoNumber === undefined ? current.plivoNumber : input.plivoNumber,
+    plivoNumber: current.plivoNumber,
     publicPhoneNumber:
       input.publicPhoneNumber === undefined
         ? current.publicPhoneNumber
@@ -212,8 +202,7 @@ export async function updateClinicTelephonyConfigForActor(
     return current;
   }
 
-  try {
-    const updated = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
       const config = await tx.clinicTelephonyConfig.upsert({
         where: { clinicId },
         create: { clinicId, ...next },
@@ -228,17 +217,11 @@ export async function updateClinicTelephonyConfigForActor(
         afterValue: { clinicId, changedFields, enabled: next.enabled },
       });
       return config;
-    });
-    return toView(updated);
-  } catch (error: unknown) {
-    if (isUniqueConstraintError(error)) {
-      throw new ConflictError("That provider number is already assigned.");
-    }
-    throw error;
-  }
+  });
+  return toView(updated);
 }
 
-const lookupInboundClinic: InboundClinicLookup = async (plivoNumber) =>
+const lookupInboundClinicFromLegacyMirror: InboundClinicLookup = async (plivoNumber) =>
   prisma.clinicTelephonyConfig.findUnique({
     where: { plivoNumber },
     select: {
@@ -259,6 +242,83 @@ const lookupInboundClinic: InboundClinicLookup = async (plivoNumber) =>
       },
     },
   });
+
+interface InboundInventoryRow {
+  assignmentStatus: "AVAILABLE" | "ASSIGNED" | "QUARANTINED";
+  assignedTenantId: string | null;
+  assignedClinicId: string | null;
+  assignedClinic: null | {
+    id: string;
+    tenantId: string;
+    name: string;
+    address: string | null;
+    city: string | null;
+    telephonyConfig: null | Omit<InboundConfigRow, "clinic">;
+  };
+}
+
+export function inboundConfigFromInventoryRow(
+  row: InboundInventoryRow | null,
+): InboundConfigRow | null {
+  if (
+    !row ||
+    row.assignmentStatus !== "ASSIGNED" ||
+    row.assignedTenantId === null ||
+    row.assignedClinicId === null ||
+    row.assignedClinic === null ||
+    row.assignedClinic.id !== row.assignedClinicId ||
+    row.assignedClinic.tenantId !== row.assignedTenantId ||
+    row.assignedClinic.telephonyConfig === null
+  ) {
+    return null;
+  }
+  return {
+    ...row.assignedClinic.telephonyConfig,
+    clinic: {
+      id: row.assignedClinic.id,
+      tenantId: row.assignedClinic.tenantId,
+      name: row.assignedClinic.name,
+      address: row.assignedClinic.address,
+      city: row.assignedClinic.city,
+    },
+  };
+}
+
+const lookupInboundClinicFromInventory: InboundClinicLookup = async (phoneNumber) => {
+  const row = await prisma.platformPlivoNumber.findUnique({
+    where: { phoneNumber },
+    select: {
+      assignmentStatus: true,
+      assignedTenantId: true,
+      assignedClinicId: true,
+      assignedClinic: {
+        select: {
+          id: true,
+          tenantId: true,
+          name: true,
+          address: true,
+          city: true,
+          telephonyConfig: {
+            select: {
+              enabled: true,
+              timezone: true,
+              routingMode: true,
+              publicPhoneNumber: true,
+              receptionPhoneNumber: true,
+              urgentPhoneNumber: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  return inboundConfigFromInventoryRow(row);
+};
+
+const lookupInboundClinic: InboundClinicLookup = (phoneNumber) =>
+  isPlatformPlivoInventoryAuthoritative()
+    ? lookupInboundClinicFromInventory(phoneNumber)
+    : lookupInboundClinicFromLegacyMirror(phoneNumber);
 
 /** Call only with `To` read from a successfully validated Plivo request. */
 export async function resolveInboundClinicByPlivoNumber(

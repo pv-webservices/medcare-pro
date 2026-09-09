@@ -8,6 +8,7 @@ vi.mock("@/lib/session", () => ({
 import { BadRequestError } from "@/lib/apiHandler";
 import {
   resolveInboundClinicByPlivoNumber,
+  inboundConfigFromInventoryRow,
   updateClinicTelephonyConfigSchema,
   validateClinicTelephonyConfigState,
   type InboundClinicLookup,
@@ -62,14 +63,13 @@ describe("clinic telephony configuration", () => {
   it("normalizes valid configuration numbers and empty optional values", () => {
     expect(
       updateClinicTelephonyConfigSchema.parse({
-        plivoNumber: "+14155550101",
         receptionPhoneNumber: "",
       }),
-    ).toEqual({ plivoNumber: "+14155550101", receptionPhoneNumber: null });
+    ).toEqual({ receptionPhoneNumber: null });
   });
 
   it.each(["14155550101", "+123", "+1415ABC0101", "+14155550101x2"])(
-    "rejects malformed or ambiguous configuration number %s",
+    "rejects every tenant-submitted provider number %s",
     (plivoNumber) => {
       expect(() =>
         updateClinicTelephonyConfigSchema.parse({ plivoNumber }),
@@ -127,6 +127,33 @@ describe("clinic telephony configuration", () => {
         clinicId: "clinic-b",
       }),
     ).toThrow();
+  });
+
+  it("fails closed for invalid platform assignment relationships", () => {
+    const valid = {
+      assignmentStatus: "ASSIGNED" as const,
+      assignedTenantId: "tenant-a",
+      assignedClinicId: "clinic-a",
+      assignedClinic: {
+        id: "clinic-a",
+        tenantId: "tenant-a",
+        name: "Clinic A",
+        address: null,
+        city: null,
+        telephonyConfig: {
+          enabled: true,
+          timezone: "Asia/Kolkata",
+          publicPhoneNumber: null,
+          receptionPhoneNumber: null,
+          urgentPhoneNumber: null,
+        },
+      },
+    };
+    expect(inboundConfigFromInventoryRow(valid)?.clinic.id).toBe("clinic-a");
+    expect(inboundConfigFromInventoryRow({ ...valid, assignmentStatus: "AVAILABLE" })).toBeNull();
+    expect(inboundConfigFromInventoryRow({ ...valid, assignmentStatus: "QUARANTINED" })).toBeNull();
+    expect(inboundConfigFromInventoryRow({ ...valid, assignedTenantId: "tenant-b" })).toBeNull();
+    expect(inboundConfigFromInventoryRow({ ...valid, assignedClinicId: "clinic-b" })).toBeNull();
   });
 });
 

@@ -45,6 +45,13 @@ export function formatCallerNumberForDisplay(canonical: string): string {
   return /^\+91[1-9]\d{9}$/.test(canonical) ? canonical.slice(3) : canonical;
 }
 
+/** Human-friendly provider DID display without changing its canonical value. */
+export function formatProviderNumberForDisplay(canonical: string): string {
+  return /^\+91\d{10}$/.test(canonical)
+    ? `${canonical.slice(0, 3)} ${canonical.slice(3, 5)} ${canonical.slice(5, 9)} ${canonical.slice(9)}`
+    : canonical;
+}
+
 /** India domestic voice routes require a canonical +91 ten-digit number. */
 export function isCanonicalIndianPhoneNumber(value: string): boolean {
   return /^\+91[1-9]\d{9}$/.test(value);

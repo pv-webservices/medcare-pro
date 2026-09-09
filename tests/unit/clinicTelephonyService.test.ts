@@ -36,7 +36,6 @@ vi.mock("@/lib/audit", async (importOriginal) => {
   return { ...actual, writeAuditLog: mocks.writeAuditLog };
 });
 
-import { ConflictError } from "@/lib/apiHandler";
 import { PermissionError, ScopeError } from "@/lib/rbac";
 import {
   getClinicTelephonyConfigForActor,
@@ -120,9 +119,13 @@ describe("clinic telephony domain authorization and writes", () => {
   });
 
   it("audits only field names and enabled state in the write transaction", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      ...STORED_CONFIG,
+      plivoNumber: "+14155550101",
+    });
     await updateClinicTelephonyConfigForActor(ACTOR, "clinic-a", {
       enabled: true,
-      plivoNumber: "+14155550101",
+      publicPhoneNumber: "+14155550110",
     });
 
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(
@@ -134,7 +137,7 @@ describe("clinic telephony domain authorization and writes", () => {
         actorTenantId: "tenant-a",
         afterValue: {
           clinicId: "clinic-a",
-          changedFields: ["enabled", "plivoNumber"],
+          changedFields: ["enabled", "publicPhoneNumber"],
           enabled: true,
         },
       }),
@@ -144,15 +147,16 @@ describe("clinic telephony domain authorization and writes", () => {
     );
   });
 
-  it("maps database uniqueness failures to a non-disclosing conflict", async () => {
-    mocks.transaction.mockRejectedValueOnce({ code: "P2002" });
-
-    await expect(
-      updateClinicTelephonyConfigForActor(ACTOR, "clinic-a", {
-        plivoNumber: "+14155550101",
-      }),
-    ).rejects.toEqual(
-      new ConflictError("That provider number is already assigned."),
-    );
+  it("preserves the platform-managed provider-number mirror on tenant writes", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      ...STORED_CONFIG,
+      plivoNumber: "+14155550101",
+    });
+    await updateClinicTelephonyConfigForActor(ACTOR, "clinic-a", {
+      publicPhoneNumber: "+14155550110",
+    });
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({ plivoNumber: "+14155550101" }),
+    }));
   });
 });
