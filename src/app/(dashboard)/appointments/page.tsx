@@ -19,6 +19,7 @@ import { listClinicsForActor } from "@/lib/clinics";
 import { listDoctorsForActor } from "@/lib/doctors";
 import { MODULE_FEATURES, moduleLock } from "@/lib/features";
 import { can } from "@/lib/rbac";
+import { resolveAppointmentReadScope } from "@/lib/appointmentScope";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
@@ -121,6 +122,7 @@ export default async function AppointmentBoardPage({
     canConvert,
     canCancel,
     canConfirm,
+    appointmentScope,
   ] = await Promise.all([
     listAppointments(actor, filters),
     listClinicsForActor(actor),
@@ -138,7 +140,14 @@ export default async function AppointmentBoardPage({
     // AP-9. The same key that governs correcting a booking, because confirming
     // is the desk writing down something the patient said about theirs.
     can(actor, "appointment:update", selectedClinicId ?? undefined),
+    resolveAppointmentReadScope(actor, { requestedClinicId: selectedClinicId }),
   ]);
+
+  const appointmentDoctors = doctors.filter(
+    (doctor) =>
+      appointmentScope.broadClinicIds.includes(doctor.clinicId) ||
+      appointmentScope.linkedDoctorIds.includes(doctor.id),
+  );
 
   const selectedClinic = selectedClinicId
     ? clinics.find((clinic) => clinic.id === selectedClinicId)
@@ -180,12 +189,14 @@ export default async function AppointmentBoardPage({
                 and the screen is read-only for a role without
                 `appointment:type:manage`. It is also the only way in — there is
                 deliberately no sidebar entry of its own. */}
-            <Link
-              href="/appointments/types"
-              className={buttonClasses("secondary", "md")}
-            >
-              Services
-            </Link>
+            {appointmentScope.broadClinicIds.length > 0 && (
+              <Link
+                href="/appointments/types"
+                className={buttonClasses("secondary", "md")}
+              >
+                Services
+              </Link>
+            )}
             {canCreate && (
               <Link
                 href="/appointments/new"
@@ -199,8 +210,18 @@ export default async function AppointmentBoardPage({
         }
       />
 
+      {appointmentScope.kind === "doctor-self" &&
+        appointmentScope.linkedDoctorIds.length === 0 && (
+          <div className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-4 text-warn-ink" role="status">
+            <p className="font-semibold">Your doctor profile is not linked yet.</p>
+            <p className="mt-1 text-label opacity-85">
+              Ask your clinic administrator to link your portal account to your Doctor profile before your personal schedule can be shown.
+            </p>
+          </div>
+        )}
+
       <AppointmentFilters
-        doctors={doctors.map(({ id, name }) => ({ id, name }))}
+        doctors={appointmentDoctors.map(({ id, name }) => ({ id, name }))}
         today={today}
         initialIndicators={indicators}
         clinicId={selectedClinicId ?? undefined}

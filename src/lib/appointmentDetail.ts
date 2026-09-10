@@ -16,7 +16,7 @@ import { ScopeError, type ActorContext } from "@/lib/rbac";
  *
  * SCOPE IS NOT RE-IMPLEMENTED HERE. `getAppointmentForActor` is AP-4's, and it
  * is what decides whether this caller may see the row at all — filtered by
- * tenant and by `appointment:read` clinic scope, refusing with a 404 that does
+ * tenant and by the central broad-or-self appointment scope, refusing with a 404 that does
  * not confirm existence. This module only enriches what that returns, so there
  * is exactly one definition of "may this person see this appointment".
  */

@@ -14,7 +14,7 @@ interface FakeRole {
 }
 
 /**
- * The two Prisma calls `addMissingDefaultRoles` makes, and nothing else.
+ * The role calls and the create-only Doctor dashboard default.
  *
  * Written as a fake rather than a mock so the test asserts on the resulting
  * ROWS — what the tenant is left holding — instead of on which methods were
@@ -29,8 +29,11 @@ function fakeClient(rows: FakeRole[]) {
         rows.filter((row) => row.tenantId === where.tenantId),
       create: async ({ data }: { data: FakeRole }) => {
         rows.push({ ...data });
-        return data;
+        return { ...data, id: `role-${rows.length}` };
       },
+    },
+    dashboardLayout: {
+      create: async () => undefined,
     },
   };
   return client as unknown as PrismaClientOrTransaction;

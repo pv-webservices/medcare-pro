@@ -26,7 +26,7 @@ function getDoctorInitials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export default function DoctorsTable({ doctors, showClinic }: DoctorsTableProps) {
+export default function DoctorsTable({ doctors, showClinic: _showClinic }: DoctorsTableProps) {
   if (doctors.length === 0) {
     return (
       <EmptyState
@@ -101,6 +101,13 @@ export default function DoctorsTable({ doctors, showClinic }: DoctorsTableProps)
                           {doctor.isOnLeaveToday && (
                             <div className="mt-1">
                               <OnLeaveBadge />
+                            </div>
+                          )}
+                          {doctor.canManagePortalLink && !doctor.linkedPortalUser && (
+                            <div className="mt-1">
+                              <StatusPill tone="warn" hasDot={false}>
+                                Portal account not linked
+                              </StatusPill>
                             </div>
                           )}
                         </div>

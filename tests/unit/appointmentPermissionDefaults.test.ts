@@ -3,6 +3,7 @@ import {
   ALL_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
+  DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   HISTORICAL_ALL_PERMISSIONS,
   PERMISSION_GROUPS,
   PRE_APPOINTMENTS_PERMISSIONS,
@@ -21,7 +22,9 @@ import {
   APPOINTMENT_ROLE_TOP_UPS,
   DEFAULT_ROLES,
   PRE_APPOINTMENTS_ROLE_PERMISSIONS,
+  PRE_DOCTOR_SELF_ROLE_PERMISSIONS,
   ROLE_KEYS,
+  isUntouchedPreDoctorSelfRole,
   isUntouchedPreAppointmentsRole,
   type RoleKey,
 } from "@/lib/defaultRoles";
@@ -51,6 +54,7 @@ import {
  */
 const ENFORCED_APPOINTMENT_PERMISSIONS: readonly string[] = [
   "appointment:read",
+  "appointment:self:read",
   "appointment:create",
   "appointment:type:manage",
   "appointment:reschedule",
@@ -85,7 +89,7 @@ describe("the AP-1 permission keys", () => {
     const group = PERMISSION_GROUPS.find((g) => g.module === "Appointments");
     expect(group).toBeDefined();
     expect(group?.permissions.map((p) => p.key).sort()).toEqual(
-      [...STAGE_AP1_PERMISSIONS].sort(),
+      [...STAGE_AP1_PERMISSIONS, ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS].sort(),
     );
   });
 
@@ -125,7 +129,7 @@ describe("the AP-1 permission keys", () => {
 
   it("has dropped the mark from every key that is now enforced", () => {
     for (const permission of ENFORCED_APPOINTMENT_PERMISSIONS) {
-      expect(STAGE_AP1_PERMISSIONS).toContain(permission);
+      expect([...STAGE_AP1_PERMISSIONS, ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS]).toContain(permission);
       const definition = findPermission(permission);
       expect(definition?.pending).toBeUndefined();
       expect(definition?.pendingNote).toBeUndefined();
@@ -197,6 +201,7 @@ describe("the stage sets stay disjoint", () => {
       (permission) =>
         !STAGE_11_PERMISSIONS.includes(permission) &&
         !STAGE_AP1_PERMISSIONS.includes(permission) &&
+        !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
         !TASK_PERMISSIONS.includes(
           permission as (typeof TASK_PERMISSIONS)[number],
         ) &&
@@ -216,6 +221,7 @@ describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
     expect(PRE_APPOINTMENTS_PERMISSIONS.length).toBe(
       ALL_PERMISSIONS.length -
         STAGE_AP1_PERMISSIONS.length -
+        DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_LAYOUT_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length,
@@ -316,11 +322,11 @@ describe("what each seeded role holds after AP-1", () => {
     );
   });
 
-  it("gives Doctor read access and nothing more", () => {
+  it("gives Doctor self read access without clinic-wide read", () => {
     const held = permissionsFor(ROLE_KEYS.DOCTOR);
-    expect(held).toContain("appointment:read");
+    expect(held).toContain("appointment:self:read");
+    expect(held).not.toContain("appointment:read");
     for (const permission of STAGE_AP1_PERMISSIONS) {
-      if (permission === "appointment:read") continue;
       expect(held).not.toContain(permission);
     }
   });
@@ -461,19 +467,56 @@ describe("what the backfill would append", () => {
         ...PRE_APPOINTMENTS_ROLE_PERMISSIONS[role.key],
         ...(APPOINTMENT_ROLE_TOP_UPS[role.key] ?? []),
       ]);
-      expect([...after].sort()).toEqual(
-        [
-          ...new Set(
-            role.permissions.filter(
-              (permission) =>
-                !permission.startsWith("dashboard:") &&
-                !TASK_PERMISSIONS.includes(
-                  permission as (typeof TASK_PERMISSIONS)[number],
-                ),
-            ),
+      const expected = role.permissions.filter(
+        (permission) =>
+          !permission.startsWith("dashboard:") &&
+          !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
+          !TASK_PERMISSIONS.includes(
+            permission as (typeof TASK_PERMISSIONS)[number],
           ),
-        ].sort(),
+      );
+      if (role.key === ROLE_KEYS.DOCTOR) expected.push("appointment:read");
+      expect([...after].sort()).toEqual(
+        [...new Set(expected)].sort(),
       );
     }
+  });
+});
+
+describe("doctor-self role migration safety", () => {
+  it("recognises only the untouched pre-change Doctor and Admin defaults", () => {
+    for (const key of [ROLE_KEYS.DOCTOR, ROLE_KEYS.CLINIC_ADMIN]) {
+      expect(
+        isUntouchedPreDoctorSelfRole(
+          key,
+          PRE_DOCTOR_SELF_ROLE_PERMISSIONS[key]!,
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("preserves a customised Doctor role byte-for-byte by refusing a match", () => {
+    const oldDoctor = PRE_DOCTOR_SELF_ROLE_PERMISSIONS[ROLE_KEYS.DOCTOR]!;
+    expect(
+      isUntouchedPreDoctorSelfRole(ROLE_KEYS.DOCTOR, [
+        ...oldDoctor,
+        "appointment:cancel",
+      ]),
+    ).toBe(false);
+    expect(
+      isUntouchedPreDoctorSelfRole(
+        ROLE_KEYS.DOCTOR,
+        oldDoctor.filter((permission) => permission !== "patient:read"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not reclassify the new Doctor default as pre-change", () => {
+    expect(
+      isUntouchedPreDoctorSelfRole(
+        ROLE_KEYS.DOCTOR,
+        permissionsFor(ROLE_KEYS.DOCTOR),
+      ),
+    ).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import {
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
+  Clock3,
   CircleAlert,
   IndianRupee,
   ListTodo,
@@ -13,6 +14,7 @@ import {
   Plus,
   Stethoscope,
   UserRoundPlus,
+  UserRoundCheck,
   UsersRound,
 } from "lucide-react";
 import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONES } from "@/components/appointments/status";
@@ -35,7 +37,11 @@ import {
   TR,
   buttonClasses,
 } from "@/components/ui";
-import type { AdminDashboardData, DashboardTrendPoint } from "@/lib/adminDashboard";
+import type {
+  AdminDashboardData,
+  DashboardAppointmentScheduleItem,
+  DashboardTrendPoint,
+} from "@/lib/adminDashboard";
 import type { EffectiveDashboardLayout } from "@/lib/dashboardLayouts";
 import { DASHBOARD_WIDGETS, type DashboardWidgetId } from "@/lib/dashboardWidgets";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
@@ -135,7 +141,9 @@ export default function AdminDashboard({ data, layout, callHandling, bookingFoll
     <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
       <PageHeader
         title={`${greeting(now.getHours())}, ${firstName(data.userName)} 👋`}
-        description="A live operational view of patient care, appointments, collections, and team workload."
+        description={data.appointmentAccess.kind === "doctor-self"
+          ? "My Day — waiting patients, today's complete timeline, and what comes next."
+          : "A live operational view of patient care, appointments, collections, and team workload."}
         meta={`${scopeLabel} · ${data.rangeLabel}`}
         className="mb-0"
         actions={
@@ -161,6 +169,18 @@ export default function AdminDashboard({ data, layout, callHandling, bookingFoll
       />
 
       <BookingFollowUpsPanel model={bookingFollowUps} now={now} />
+
+      {data.appointmentAccess.unlinkedClinicNames.length > 0 && (
+        <div className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-4 text-warn-ink sm:px-5" role="status">
+          <p className="font-semibold">Your doctor profile is not linked yet.</p>
+          <p className="mt-1 text-label opacity-85">
+            Ask your clinic administrator to link your portal account to your Doctor profile before your personal schedule can be shown
+            {data.appointmentAccess.unlinkedClinicNames.length > 0
+              ? ` for ${data.appointmentAccess.unlinkedClinicNames.join(", ")}.`
+              : "."}
+          </p>
+        </div>
+      )}
 
       {layout.layout.widgets.length === 0 ? (
         <EmptyState
@@ -195,6 +215,12 @@ function renderDashboardWidget(widgetId: DashboardWidgetId, data: AdminDashboard
       return data.summary.totalPatients === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Total patients" value={data.summary.totalPatients.toLocaleString("en-IN")} footnote={data.patients ? `${data.patients.new} new in period` : undefined} tone="violet" icon={<UsersRound className="h-[18px] w-[18px]" />} />;
     case "todays-appointments":
       return data.summary.todaysAppointments === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Today's appointments" value={data.summary.todaysAppointments.toLocaleString("en-IN")} delta={roundedDelta(data.summary.appointmentChange)} deltaCaption={data.comparisonLabel} tone="blue" icon={<CalendarDays className="h-[18px] w-[18px]" />} />;
+    case "waiting-now":
+      return data.summary.waitingNow === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Waiting now" value={data.summary.waitingNow.toLocaleString("en-IN")} footnote="Checked in" tone="orange" icon={<UserRoundCheck className="h-[18px] w-[18px]" />} />;
+    case "upcoming-appointments-count":
+      return data.summary.upcomingAppointments === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Upcoming" value={data.summary.upcomingAppointments.toLocaleString("en-IN")} footnote="Active future bookings" tone="cyan" icon={<Clock3 className="h-[18px] w-[18px]" />} />;
+    case "completed-today":
+      return data.summary.completedToday === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Completed" value={data.summary.completedToday.toLocaleString("en-IN")} footnote="Converted today" tone="green" icon={<CheckCircle2 className="h-[18px] w-[18px]" />} />;
     case "todays-collection":
       return data.summary.todaysCollection === undefined ? <DeferredWidget widgetId={widgetId} /> : <MetricCard label="Today's collection" value={formatRupees(data.summary.todaysCollection)} footnote="Recorded registrations" tone="green" icon={<IndianRupee className="h-[18px] w-[18px]" />} />;
     case "month-revenue":
@@ -211,6 +237,8 @@ function renderDashboardWidget(widgetId: DashboardWidgetId, data: AdminDashboard
     case "revenue-summary": return data.revenue ? <RevenueSummaryPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
     case "revenue-by-doctor": return data.revenue ? <RevenueByDoctorPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
     case "today-schedule": return data.schedule ? <SchedulePanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
+    case "next-patient": return data.nextPatient !== undefined ? <NextPatientPanel patient={data.nextPatient} /> : <DeferredWidget widgetId={widgetId} />;
+    case "upcoming-schedule": return data.upcomingSchedule ? <UpcomingSchedulePanel rows={data.upcomingSchedule} /> : <DeferredWidget widgetId={widgetId} />;
     case "recent-patient-activity": return data.recentActivity ? <ActivityPanel data={data} now={now} /> : <DeferredWidget widgetId={widgetId} />;
     case "doctor-overview": return data.doctors ? <DoctorPanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
     case "message-health": return data.messages ? <MessagePanel data={data} /> : <DeferredWidget widgetId={widgetId} />;
@@ -299,27 +327,139 @@ function RevenueByDoctorPanel({ data }: { data: AdminDashboardData }) {
   </Panel>;
 }
 
+function patientContext(row: DashboardAppointmentScheduleItem): string {
+  const demographic = [
+    row.age === null ? null : String(row.age),
+    row.gender?.trim() || null,
+  ].filter(Boolean).join(" · ");
+  return [row.patientCode, demographic].filter(Boolean).join(" · ") || "Basic details not recorded";
+}
+
+function eventTime(value: string | null): string | null {
+  if (!value) return null;
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function operationalInfo(row: DashboardAppointmentScheduleItem): string {
+  if (row.status === "CHECKED_IN") return `Arrived ${eventTime(row.checkedInAt) ?? "—"}`;
+  if (row.status === "CONVERTED") return "Completed";
+  if (row.status === "CANCELLED") return `Cancelled${eventTime(row.cancelledAt) ? ` ${eventTime(row.cancelledAt)}` : ""}`;
+  if (row.status === "NO_SHOW") return "Marked no-show";
+  if (row.status === "RESCHEDULED") return "Rescheduled";
+  if (row.bookingSource === "PHONE_IVR") return "Booked via Phone IVR";
+  return "—";
+}
+
+function scheduleEmphasis(row: DashboardAppointmentScheduleItem, isNext: boolean): string {
+  if (row.status === "CHECKED_IN") return "bg-info-bg/65";
+  if (isNext) return "bg-accent-soft/35";
+  if (["CONVERTED", "CANCELLED", "NO_SHOW", "RESCHEDULED"].includes(row.status)) {
+    return "opacity-65";
+  }
+  return "";
+}
+
 function SchedulePanel({ data }: { data: AdminDashboardData }) {
   const schedule = data.schedule!;
+  const nextId = data.nextPatient?.status === "CHECKED_IN" ? null : data.nextPatient?.id;
   return (
-    <Panel title="Today's schedule" description="Next appointments in chronological order" className="h-full" actions={<ViewAll href="/appointments">View all appointments</ViewAll>} isFlush hasDivider>
-      {schedule.length === 0 ? <NoData icon={<CalendarCheck className="h-5 w-5" />} title="No upcoming appointments today" guidance="Bookings later today will appear here." /> : (
+    <Panel title="Today's timeline" description={`${schedule.length} ${schedule.length === 1 ? "appointment" : "appointments"} across the complete operational day`} className="h-full" actions={<ViewAll href="/appointments">View full schedule</ViewAll>} isFlush hasDivider>
+      {schedule.length === 0 ? <NoData icon={<CalendarCheck className="h-5 w-5" />} title="No appointments today" guidance="Bookings for the selected clinic scope will appear here." /> : (
         <>
           <div className="divide-y divide-line px-4 md:hidden">
             {schedule.map((row) => (
-              <div key={row.id} className="py-3.5">
+              <div key={row.id} className={`-mx-4 px-4 py-3.5 ${scheduleEmphasis(row, row.id === nextId)}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0"><Link href={`/appointments/${row.id}`} className="truncate font-semibold text-ink hover:text-accent">{row.patientName}</Link><p className="mt-0.5 truncate text-meta text-muted">{row.appointmentType} · {row.clinicName}</p></div>
+                  <div className="min-w-0"><Link href={`/appointments/${row.id}`} className="truncate font-semibold text-ink hover:text-accent">{row.patientName}</Link><p className="mt-0.5 text-meta text-muted">{patientContext(row)}</p></div>
                   <StatusPill tone={APPOINTMENT_STATUS_TONES[row.status]}>{APPOINTMENT_STATUS_LABELS[row.status]}</StatusPill>
                 </div>
-                <p className="tnum mt-2 text-label font-semibold text-ink">{row.time} <span className="font-normal text-muted">with {row.doctorName}</span></p>
+                <p className="tnum mt-2 text-label font-semibold text-ink">{row.startTime}–{row.endTime}</p>
+                <p className="mt-1 text-label text-muted">{row.appointmentType} · {row.clinicName}</p>
+                <p className="mt-2 text-meta font-medium text-ink-soft">{operationalInfo(row)}</p>
               </div>
             ))}
           </div>
-          <div className="hidden overflow-x-auto md:block"><Table caption="Upcoming appointments today" className="min-w-[760px] rounded-none border-0 shadow-none"><THead><TH>Time</TH><TH>Patient</TH><TH>Doctor</TH><TH>Type</TH><TH>Clinic</TH><TH>Status</TH></THead><TBody>
-          {schedule.map((row) => <TR key={row.id}><TD isNumeric>{row.time}</TD><TD isPrimary><Link href={`/appointments/${row.id}`} className="hover:text-accent">{row.patientName}</Link></TD><TD>{row.doctorName}</TD><TD>{row.appointmentType}</TD><TD>{row.clinicName}</TD><TD><StatusPill tone={APPOINTMENT_STATUS_TONES[row.status]}>{APPOINTMENT_STATUS_LABELS[row.status]}</StatusPill></TD></TR>)}
+          <div className="hidden overflow-x-auto md:block"><Table caption="Today's complete appointment timeline" className="min-w-[760px] rounded-none border-0 shadow-none"><THead><TH>Time</TH><TH>Patient</TH><TH>Service</TH><TH>Status</TH><TH>Operational info</TH></THead><TBody>
+          {schedule.map((row) => <TR key={row.id} className={scheduleEmphasis(row, row.id === nextId)}><TD isNumeric>{row.startTime}–{row.endTime}</TD><TD isPrimary><Link href={`/appointments/${row.id}`} className="hover:text-accent">{row.patientName}</Link><p className="mt-0.5 text-meta font-normal text-muted">{patientContext(row)}</p></TD><TD>{row.appointmentType}<p className="mt-0.5 text-meta text-muted">{row.clinicName}</p></TD><TD><StatusPill tone={APPOINTMENT_STATUS_TONES[row.status]}>{APPOINTMENT_STATUS_LABELS[row.status]}</StatusPill></TD><TD>{operationalInfo(row)}</TD></TR>)}
           </TBody></Table></div>
         </>
+      )}
+    </Panel>
+  );
+}
+
+function NextPatientPanel({ patient }: { patient: DashboardAppointmentScheduleItem | null }) {
+  if (!patient) {
+    return (
+      <Panel title="Next patient" description="Today's immediate clinical priority" className="h-full">
+        <NoData icon={<CheckCircle2 className="h-5 w-5" />} title="No more appointments today" guidance="The complete day remains available in Today's Timeline." />
+      </Panel>
+    );
+  }
+  const waiting = patient.status === "CHECKED_IN";
+  return (
+    <Panel
+      title={waiting ? "Waiting patient" : "Next patient"}
+      description={waiting ? "Checked in and ready for attention" : "Nearest active appointment today"}
+      className={waiting ? "h-full border-info-line bg-info-bg/30" : "h-full"}
+      actions={<ViewAll href={`/appointments/${patient.id}`}>Open appointment</ViewAll>}
+    >
+      <div className="flex items-start gap-4">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${waiting ? "bg-info-bg text-info-ink" : "bg-accent-soft text-accent-soft-ink"}`}>
+          {waiting ? <UserRoundCheck className="h-5 w-5" /> : <Clock3 className="h-5 w-5" />}
+        </span>
+        <div className="min-w-0">
+          <Link href={`/appointments/${patient.id}`} className="text-section font-semibold text-ink hover:text-accent">{patient.patientName}</Link>
+          <p className="mt-1 text-label text-muted">{patientContext(patient)}</p>
+          <p className="tnum mt-4 text-lg font-semibold text-ink">{patient.startTime}–{patient.endTime}</p>
+          <p className="mt-1 text-body text-ink-soft">{patient.appointmentType}</p>
+          <p className="mt-3 text-label font-medium text-muted">{waiting ? operationalInfo(patient) : APPOINTMENT_STATUS_LABELS[patient.status]} · {patient.clinicName}</p>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function upcomingDateLabel(date: string): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00.000Z`));
+}
+
+function UpcomingSchedulePanel({ rows }: { rows: readonly DashboardAppointmentScheduleItem[] }) {
+  const groups = new Map<string, DashboardAppointmentScheduleItem[]>();
+  for (const row of rows) groups.set(row.date, [...(groups.get(row.date) ?? []), row]);
+  return (
+    <Panel title="Upcoming · Next 7 days" description="Active appointments after today, grouped by date" actions={<ViewAll href="/appointments?view=upcoming">View all appointments</ViewAll>} className="h-full">
+      {rows.length === 0 ? (
+        <NoData icon={<CalendarDays className="h-5 w-5" />} title="No upcoming appointments" guidance="The next seven days are clear in the selected clinic scope." />
+      ) : (
+        <div className="space-y-5">
+          {[...groups].map(([date, appointments]) => (
+            <section key={date} aria-labelledby={`upcoming-${date}`}>
+              <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2">
+                <h3 id={`upcoming-${date}`} className="font-semibold text-ink">{upcomingDateLabel(date)}</h3>
+                <span className="text-meta text-muted">{appointments.length} {appointments.length === 1 ? "appointment" : "appointments"}</span>
+              </div>
+              <ul className="divide-y divide-line/70">
+                {appointments.map((row) => (
+                  <li key={row.id} className="grid gap-1 py-2.5 sm:grid-cols-[5rem_minmax(0,1fr)_minmax(9rem,0.8fr)_auto] sm:items-center sm:gap-3">
+                    <span className="tnum text-label font-semibold text-ink">{row.startTime}</span>
+                    <Link href={`/appointments/${row.id}`} className="truncate font-medium text-ink hover:text-accent">{row.patientName}</Link>
+                    <span className="truncate text-label text-muted">{row.appointmentType}</span>
+                    <StatusPill tone={APPOINTMENT_STATUS_TONES[row.status]}>{APPOINTMENT_STATUS_LABELS[row.status]}</StatusPill>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </Panel>
   );
@@ -378,8 +518,8 @@ function MessagePanel({ data }: { data: AdminDashboardData }) {
 function TaskPanel({ data }: { data: AdminDashboardData }) {
   const tasks = data.tasks!;
   return (
-    <Panel title="Task overview" description="Deadlines and current workload" actions={<ViewAll href="/tasks">View tasks</ViewAll>}>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><MiniStat label="My pending" value={tasks.myPending} /><MiniStat label="Due today" value={tasks.dueToday} /><MiniStat label="Overdue" value={tasks.overdue} tone={tasks.overdue > 0 ? "alert" : "default"} /><MiniStat label="Completed today" value={tasks.completedToday} tone="ok" />{tasks.teamPending !== undefined && <MiniStat label="Team pending" value={tasks.teamPending} />}</div>
+    <Panel title="My tasks" description="Due today, overdue, completed, and in-progress work" actions={<ViewAll href="/tasks">View tasks</ViewAll>}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><MiniStat label="My pending" value={tasks.myPending} /><MiniStat label="Due today" value={tasks.dueToday} /><MiniStat label="Overdue" value={tasks.overdue} tone={tasks.overdue > 0 ? "alert" : "default"} /><MiniStat label="In progress" value={tasks.inProgress} tone="info" /><MiniStat label="Upcoming" value={tasks.upcoming} /><MiniStat label="Completed today" value={tasks.completedToday} tone="ok" />{tasks.teamPending !== undefined && <MiniStat label="Team pending" value={tasks.teamPending} />}</div>
       {tasks.dueToday === 0 && tasks.overdue === 0 && <p className="mt-4 flex items-center gap-2 text-label text-muted"><CheckCircle2 className="h-4 w-4 text-ok-ink" />Nothing is due or overdue today.</p>}
     </Panel>
   );

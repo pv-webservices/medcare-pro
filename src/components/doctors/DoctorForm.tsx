@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, Calendar, Phone, User } from "lucide-react";
+import { Briefcase, Calendar, Link2, Phone, User } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -23,6 +23,7 @@ export interface DoctorFormValues {
   gender: string;
   age: string;
   phone: string;
+  userId: string;
 }
 
 export interface ClinicOption {
@@ -30,8 +31,16 @@ export interface ClinicOption {
   name: string;
 }
 
+export interface PortalUserOption {
+  id: string;
+  name: string | null;
+  email: string;
+  linkedClinicIds: readonly string[];
+}
+
 interface DoctorFormProps {
   clinics: readonly ClinicOption[];
+  portalUsers?: readonly PortalUserOption[];
   /** Present = edit an existing doctor; absent = add a new one. */
   initial?: DoctorFormValues;
   onCancel?: () => void;
@@ -68,7 +77,7 @@ function validate(values: DoctorFormValues): FieldErrors {
   return errors;
 }
 
-export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormProps) {
+export default function DoctorForm({ clinics, portalUsers = [], initial, onCancel }: DoctorFormProps) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
 
@@ -80,6 +89,7 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
       gender: "",
       age: "",
       phone: "",
+      userId: "",
     },
   );
   const [touched, setTouched] = useState<Partial<Record<keyof DoctorFormValues, boolean>>>({});
@@ -106,6 +116,7 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
         gender: true,
         age: true,
         phone: true,
+        userId: true,
       });
       return;
     }
@@ -118,6 +129,9 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
         gender: values.gender.trim(),
         age: values.age.trim() === "" ? null : Number(values.age),
         phone: values.phone.trim(),
+        ...(!isEdit || values.userId !== initial?.userId
+          ? { userId: values.userId || null }
+          : {}),
         ...(isEdit ? {} : { clinicId: values.clinicId }),
       };
 
@@ -175,6 +189,29 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
           </div>
 
           <div className="space-y-4">
+            <Select
+              id="doctor-portal-user"
+              name="userId"
+              label="Linked portal user"
+              icon={<Link2 className="h-4 w-4 text-muted" />}
+              value={values.userId}
+              onChange={(e) => update("userId", e.target.value)}
+              hint="Optional. This explicit link controls the doctor's personal appointment access."
+            >
+              <option value="">Not linked</option>
+              {portalUsers.map((user) => {
+                const unavailable =
+                  user.linkedClinicIds.includes(values.clinicId) &&
+                  user.id !== initial?.userId;
+                return (
+                  <option key={user.id} value={user.id} disabled={unavailable}>
+                    {user.name?.trim() || "Unnamed user"} · {user.email}
+                    {unavailable ? " · already linked in this clinic" : ""}
+                  </option>
+                );
+              })}
+            </Select>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 id="doctor-name"
@@ -302,6 +339,26 @@ export default function DoctorForm({ clinics, initial, onCancel }: DoctorFormPro
                 {clinic.name}
               </option>
             ))}
+          </Select>
+
+          <Select
+            id="doctor-portal-user"
+            name="userId"
+            label="Linked portal user"
+            value={values.userId}
+            onChange={(e) => update("userId", e.target.value)}
+            hint="Optional. Link only when an administrator has confirmed the account belongs to this doctor."
+          >
+            <option value="">Not linked</option>
+            {portalUsers.map((user) => {
+              const unavailable = user.linkedClinicIds.includes(values.clinicId);
+              return (
+                <option key={user.id} value={user.id} disabled={unavailable}>
+                  {user.name?.trim() || "Unnamed user"} · {user.email}
+                  {unavailable ? " · already linked in this clinic" : ""}
+                </option>
+              );
+            })}
           </Select>
 
           <div className="grid gap-4 sm:grid-cols-2">

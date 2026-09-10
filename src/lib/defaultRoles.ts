@@ -1,13 +1,18 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   ALL_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
+  DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   PRE_APPOINTMENTS_PERMISSIONS,
   STAGE_AP1_PERMISSIONS,
   TASK_PERMISSIONS,
   WILDCARD,
 } from "@/lib/permissions";
+import {
+  DASHBOARD_LAYOUT_VERSION,
+  doctorDefaultDashboardLayout,
+} from "@/lib/dashboardWidgets";
 
 /**
  * The default role set every tenant starts with — PRD §4.
@@ -125,7 +130,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       // Read only, matching the rest of this role. A doctor looks at their own
       // day; they do not run the booking desk. Notably NOT appointment:cancel —
       // a doctor deciding a slot is free is a front-desk decision.
-      "appointment:read",
+      "appointment:self:read",
       "dashboard:view",
       "dashboard:customize",
       "dashboard:appointments:view",
@@ -451,21 +456,41 @@ export const PRE_APPOINTMENTS_ROLE_PERMISSIONS: Readonly<
  */
 export const APPOINTMENT_ROLE_TOP_UPS: Readonly<
   Partial<Record<RoleKey, readonly string[]>>
-> = Object.fromEntries(
-  DEFAULT_ROLES.filter(
-    (role) => role.key !== ROLE_KEYS.OWNER && role.key !== ROLE_KEYS.STAFF,
-  ).map((role) => {
-    const before = new Set(PRE_APPOINTMENTS_ROLE_PERMISSIONS[role.key]);
-    return [
-      role.key,
-      role.permissions.filter(
-        (permission) =>
-          !before.has(permission) &&
-          STAGE_AP1_PERMISSIONS.includes(permission),
-      ),
-    ] as const;
-  }),
-);
+> = {
+  [ROLE_KEYS.CLINIC_ADMIN]: [...STAGE_AP1_PERMISSIONS],
+  [ROLE_KEYS.DOCTOR]: ["appointment:read"],
+  [ROLE_KEYS.RECEPTIONIST]: STAGE_AP1_PERMISSIONS.filter(
+    (permission) => permission !== "appointment:type:manage",
+  ),
+};
+
+/**
+ * Frozen role states immediately before doctor-self visibility was added.
+ * The one-off backfill may replace broad Doctor read only when this exact set
+ * still matches; customised roles are left byte-for-byte unchanged.
+ */
+export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
+  Partial<Record<RoleKey, readonly string[]>>
+> = {
+  [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
+    (permission) => !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
+  ),
+  [ROLE_KEYS.DOCTOR]: DEFAULT_ROLES.find(
+    (role) => role.key === ROLE_KEYS.DOCTOR,
+  )!.permissions.map((permission) =>
+    permission === "appointment:self:read" ? "appointment:read" : permission,
+  ),
+};
+
+export function isUntouchedPreDoctorSelfRole(
+  key: RoleKey,
+  permissions: readonly string[],
+): boolean {
+  const before = PRE_DOCTOR_SELF_ROLE_PERMISSIONS[key];
+  if (!before) return false;
+  const held = new Set(permissions);
+  return held.size === before.length && before.every((permission) => held.has(permission));
+}
 
 /**
  * True when `permissions` is exactly what this seeded role held before AP-1.
@@ -518,7 +543,7 @@ export async function seedDefaultRoles(
   tenantId: string,
 ): Promise<void> {
   for (const role of DEFAULT_ROLES) {
-    await client.role.upsert({
+    const stored = await client.role.upsert({
       where: { tenantId_name: { tenantId, name: role.name } },
       update: {
         permissions: [...role.permissions],
@@ -535,6 +560,19 @@ export async function seedDefaultRoles(
         permissions: [...role.permissions],
       },
     });
+    if (role.key === ROLE_KEYS.DOCTOR) {
+      await client.dashboardLayout.upsert({
+        where: { tenantId_roleId: { tenantId, roleId: stored.id } },
+        create: {
+          tenantId,
+          roleId: stored.id,
+          version: DASHBOARD_LAYOUT_VERSION,
+          layout: doctorDefaultDashboardLayout() as unknown as Prisma.InputJsonValue,
+        },
+        // Existing role defaults are administrator-owned configuration.
+        update: {},
+      });
+    }
   }
 }
 
@@ -575,7 +613,7 @@ export async function addMissingDefaultRoles(
       continue;
     }
 
-    await client.role.create({
+    const stored = await client.role.create({
       data: {
         tenantId,
         name: role.name,
@@ -585,6 +623,17 @@ export async function addMissingDefaultRoles(
         permissions: [...role.permissions],
       },
     });
+
+    if (role.key === ROLE_KEYS.DOCTOR) {
+      await client.dashboardLayout.create({
+        data: {
+          tenantId,
+          roleId: stored.id,
+          version: DASHBOARD_LAYOUT_VERSION,
+          layout: doctorDefaultDashboardLayout() as unknown as Prisma.InputJsonValue,
+        },
+      });
+    }
 
     takenNames.add(role.name);
     takenKeys.add(role.key);

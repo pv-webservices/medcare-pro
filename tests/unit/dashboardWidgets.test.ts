@@ -9,6 +9,7 @@ import {
   dashboardLayoutInputSchema,
   filterDashboardLayout,
   normalizeDashboardLayout,
+  doctorDefaultDashboardLayout,
   resolveDashboardLayoutLayers,
   systemDashboardLayout,
   widgetGridClass,
@@ -21,9 +22,12 @@ describe("dashboard widget registry", () => {
   it("keeps stable unique ids and the approved system order", () => {
     const ids = DASHBOARD_WIDGET_LIST.map((widget) => widget.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.slice(0, 9)).toEqual([
+    expect(ids.slice(0, 12)).toEqual([
       "total-patients",
       "todays-appointments",
+      "waiting-now",
+      "upcoming-appointments-count",
+      "completed-today",
       "todays-collection",
       "month-revenue",
       "active-doctors",
@@ -116,6 +120,9 @@ describe("dashboard widget registry", () => {
     const kpiIds = [
       "total-patients",
       "todays-appointments",
+      "waiting-now",
+      "upcoming-appointments-count",
+      "completed-today",
       "todays-collection",
       "month-revenue",
       "active-doctors",
@@ -133,6 +140,8 @@ describe("dashboard widget registry", () => {
       "revenue-trend",
       "revenue-by-doctor",
       "today-schedule",
+      "next-patient",
+      "upcoming-schedule",
       "recent-patient-activity",
       "doctor-overview",
       "message-health",
@@ -156,5 +165,24 @@ describe("dashboard widget registry", () => {
       size: "medium",
       order: 0,
     });
+  });
+
+  it("provides a focused Doctor My Day default without exposing admin analytics", () => {
+    const visible = doctorDefaultDashboardLayout().widgets
+      .filter((widget) => widget.visible)
+      .map((widget) => widget.widgetId);
+    expect(visible).toEqual([
+      "todays-appointments",
+      "waiting-now",
+      "upcoming-appointments-count",
+      "completed-today",
+      "next-patient",
+      "today-schedule",
+      "upcoming-schedule",
+      "task-overview",
+    ]);
+    expect(visible).not.toContain("revenue-by-doctor");
+    expect(visible).not.toContain("message-health");
+    expect(visible).not.toContain("clinic-performance");
   });
 });

@@ -13,12 +13,15 @@ import {
 import { notifyAppointmentBookedById } from "@/lib/appointmentNotifications";
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import {
+  resolveAppointmentReadScope,
+  withinAppointmentReadScope,
+} from "@/lib/appointmentScope";
+import {
+  appointmentWallClockNow,
   formatClockTime,
   formatDateOnly,
   isDateOnly,
-  nowClockTime,
   parseDateTime,
-  todayDateOnly,
 } from "@/lib/dates";
 import { MODULE_FEATURES, requireModule } from "@/lib/features";
 import { prisma } from "@/lib/prisma";
@@ -288,25 +291,19 @@ export async function listAppointments(
 
   const page = filters.page ?? 1;
 
-  const clinicWhere = await clinicWhereForActor(
-    actor,
-    "appointment:read",
-    filters.clinicId,
-  );
+  const scope = await resolveAppointmentReadScope(actor, {
+    requestedClinicId: filters.clinicId,
+  });
 
   // Reaches no clinic at all — an empty board, not an error. Matches how
   // lib/registrations.ts answers the same situation.
-  if (!clinicWhere) {
+  if (!scope.where) {
     return { rows: [], total: 0, page, pageSize: PAGE_SIZE };
   }
 
   const statuses = resolveListStatuses(filters);
 
-  const where: Prisma.AppointmentWhereInput = {
-    // Belt and braces: the tenant is filtered on the appointment's own
-    // denormalised column AND through the clinic relation.
-    tenantId: actor.tenantId,
-    clinic: clinicWhere,
+  const where = withinAppointmentReadScope(scope, {
     status: { in: [...statuses] },
     ...(filters.doctorId?.trim()
       ? // Scoped by the clinic relation above, so a doctor id from another
@@ -314,7 +311,7 @@ export async function listAppointments(
         { doctorId: filters.doctorId.trim() }
       : {}),
     ...slotWindowFilter(filters),
-  };
+  })!;
 
   const [total, rows] = await Promise.all([
     prisma.appointment.count({ where }),
@@ -386,7 +383,7 @@ function slotWindowFilter(
   filters: AppointmentFilters,
 ): Prisma.AppointmentWhereInput {
   if (filters.view === "upcoming") {
-    const now = parseDateTime(todayDateOnly(), nowClockTime());
+    const now = appointmentWallClockNow();
     const window: Prisma.DateTimeFilter = { gte: now };
     if (filters.dateTo?.trim()) {
       window.lt = new Date(
@@ -443,17 +440,15 @@ export async function getAppointmentDateIndicators(
 ): Promise<Record<string, AppointmentDateIndicator>> {
   await requireModule(actor, MODULE_FEATURES.appointments);
 
-  const clinicWhere = await clinicWhereForActor(
-    actor,
-    "appointment:read",
-    query.clinicId,
-  );
+  const scope = await resolveAppointmentReadScope(actor, {
+    requestedClinicId: query.clinicId,
+  });
 
-  if (!clinicWhere) {
+  if (!scope.where) {
     return {};
   }
 
-  const now = parseDateTime(todayDateOnly(), nowClockTime());
+  const now = appointmentWallClockNow();
   const statuses = resolveListStatuses({
     status: query.status,
     includeHistory: query.includeHistory,
@@ -475,13 +470,11 @@ export async function getAppointmentDateIndicators(
     );
   }
 
-  const where: Prisma.AppointmentWhereInput = {
-    tenantId: actor.tenantId,
-    clinic: clinicWhere,
+  const where = withinAppointmentReadScope(scope, {
     status: { in: [...statuses] },
     slotStart: window,
     ...(query.doctorId?.trim() ? { doctorId: query.doctorId.trim() } : {}),
-  };
+  })!;
 
   const rows = await prisma.appointment.findMany({
     where,

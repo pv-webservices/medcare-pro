@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import DoctorForm, { type ClinicOption } from "@/components/doctors/DoctorForm";
+import DoctorForm, {
+  type ClinicOption,
+  type PortalUserOption,
+} from "@/components/doctors/DoctorForm";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 
@@ -23,9 +26,10 @@ import Drawer from "@/components/ui/Drawer";
 
 interface AddDoctorPanelProps {
   clinics: readonly ClinicOption[];
+  portalUsers: readonly PortalUserOption[];
 }
 
-export default function AddDoctorPanel({ clinics }: AddDoctorPanelProps) {
+export default function AddDoctorPanel({ clinics, portalUsers }: AddDoctorPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // A doctor must belong to a clinic (FR-4.2), so with none created there is
@@ -56,7 +60,11 @@ export default function AddDoctorPanel({ clinics }: AddDoctorPanelProps) {
         description="They will appear on the list and can be given availability straight away."
         className="sm:w-[32rem] md:w-[36rem] max-w-full"
       >
-        <DoctorForm clinics={clinics} onCancel={() => setIsOpen(false)} />
+        <DoctorForm
+          clinics={clinics}
+          portalUsers={portalUsers}
+          onCancel={() => setIsOpen(false)}
+        />
       </Drawer>
     </>
   );

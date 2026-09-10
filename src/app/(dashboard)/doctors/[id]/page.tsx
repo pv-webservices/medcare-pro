@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import DoctorProfile from "@/components/doctors/DoctorProfile";
 import { todayDateOnly } from "@/lib/dates";
-import { getDoctorForActor } from "@/lib/doctors";
+import { getDoctorForActor, listDoctorPortalUsersForActor } from "@/lib/doctors";
 import { can, ScopeError } from "@/lib/rbac";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import ModuleLocked from "@/components/ui/ModuleLocked";
@@ -45,14 +45,18 @@ export default async function DoctorDetailPage({ params }: DoctorDetailPageProps
   }
 
   const canEdit = await can(actor, "doctor:edit", doctor.clinicId);
+  const portalUsers = canEdit
+    ? await listDoctorPortalUsersForActor(actor, { clinicIds: [doctor.clinicId] })
+    : [];
 
   return (
     <section className="w-full">
       <DoctorProfile
         doctor={doctor}
         canEdit={canEdit}
-        // Resolved on the server so "today" matches the UTC dates in storage
-        // rather than the viewer's local clock.
+        portalUsers={portalUsers}
+        // Resolved on the server so "today" follows the clinic wall-clock
+        // convention used by availability and appointment dates.
         today={todayDateOnly()}
       />
     </section>

@@ -20,7 +20,10 @@ import {
   notifyAppointmentNoShowById,
 } from "@/lib/appointmentNotifications";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
-import { clinicWhereForActor } from "@/lib/clinicScope";
+import {
+  resolveAppointmentReadScope,
+  withinAppointmentReadScope,
+} from "@/lib/appointmentScope";
 import { formatClockTime, formatDateOnly } from "@/lib/dates";
 import { MODULE_FEATURES, requireModule } from "@/lib/features";
 import { prisma } from "@/lib/prisma";
@@ -136,7 +139,8 @@ export type AppointmentRow = Prisma.AppointmentGetPayload<{
 /**
  * Loads one appointment, or refuses with a 404.
  *
- * SCOPED BY `appointment:read`, then each caller checks its OWN permission
+ * Scoped by the central broad-or-self appointment read union, then each caller
+ * checks its OWN mutation permission
  * against the clinic this returns. That is the shape lib/registrations.ts
  * already uses for an edit — `getRegistrationForActor` then
  * `requirePermission(..., "registration:edit", current.clinicId)` — and it is
@@ -146,27 +150,22 @@ export type AppointmentRow = Prisma.AppointmentGetPayload<{
  *
  * The consequence is deliberate: acting on an appointment requires being able
  * to read it. Every seeded role that can cancel or check in also holds
- * `appointment:read`, and a permission to change something you cannot see is
+ * appointment read access, and a permission to change something you cannot see is
  * not a permission anybody should be granted.
  */
 export async function getAppointmentForActor(
   actor: ActorContext,
   appointmentId: string,
 ): Promise<AppointmentRow> {
-  const clinicWhere = await clinicWhereForActor(actor, "appointment:read");
+  const scope = await resolveAppointmentReadScope(actor);
 
-  if (!clinicWhere) {
+  const where = withinAppointmentReadScope(scope, { id: appointmentId });
+  if (!where) {
     throw new ScopeError();
   }
 
   const appointment = await prisma.appointment.findFirst({
-    where: {
-      id: appointmentId,
-      // Belt and braces: the tenant is filtered on the appointment's own
-      // denormalised column AND through the clinic relation.
-      tenantId: actor.tenantId,
-      clinic: clinicWhere,
-    },
+    where,
     select: APPOINTMENT_ROW_SELECT,
   });
 

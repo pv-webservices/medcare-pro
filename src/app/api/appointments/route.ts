@@ -10,7 +10,7 @@ import { requireActor } from "@/lib/session";
 
 // Appointments — AP-3. The board, and booking onto it.
 //
-// GET  needs `appointment:read`   — the board, defaulting to what is still
+// GET  needs broad or doctor-self read — the board, defaulting to what is still
 //                                   going to happen and hiding outcomes unless
 //                                   ?includeHistory=true asks for them.
 // POST needs `appointment:create` — one booking, under the DoctorScheduleLock

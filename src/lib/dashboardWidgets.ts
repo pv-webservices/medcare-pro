@@ -40,6 +40,9 @@ export type DashboardWidgetDataGroup =
 export const DASHBOARD_WIDGET_IDS = [
   "total-patients",
   "todays-appointments",
+  "waiting-now",
+  "upcoming-appointments-count",
+  "completed-today",
   "todays-collection",
   "month-revenue",
   "active-doctors",
@@ -51,6 +54,8 @@ export const DASHBOARD_WIDGET_IDS = [
   "revenue-summary",
   "revenue-by-doctor",
   "today-schedule",
+  "next-patient",
+  "upcoming-schedule",
   "recent-patient-activity",
   "doctor-overview",
   "message-health",
@@ -98,6 +103,18 @@ const kpi = (
 export const DASHBOARD_WIDGET_LIST = [
   kpi("total-patients", "Total patients", "Patient count and period growth.", "dashboard:patients:view", MODULE_FEATURES.registrations, "patients", "summary"),
   kpi("todays-appointments", "Today's appointments", "Today's booked clinical workload.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+  {
+    ...kpi("waiting-now", "Waiting now", "Patients currently checked in and waiting.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+    defaultVisible: false,
+  },
+  {
+    ...kpi("upcoming-appointments-count", "Upcoming", "Active appointments still ahead.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+    defaultVisible: false,
+  },
+  {
+    ...kpi("completed-today", "Completed", "Appointments converted to visits today.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+    defaultVisible: false,
+  },
   kpi("todays-collection", "Today's collection", "Registration-backed collections today.", "dashboard:revenue:view", MODULE_FEATURES.reports, "revenue", "summary"),
   kpi("month-revenue", "Month-to-date revenue", "Collections recorded this month.", "dashboard:revenue:view", MODULE_FEATURES.reports, "revenue", "summary"),
   kpi("active-doctors", "Active doctors", "Current doctor coverage and availability.", "dashboard:doctors:view", MODULE_FEATURES.doctors, "doctors", "summary"),
@@ -165,13 +182,37 @@ export const DASHBOARD_WIDGET_LIST = [
   },
   {
     id: "today-schedule",
-    title: "Today's schedule",
-    description: "Next appointments in chronological order.",
+    title: "Today's timeline",
+    description: "The complete operational day in chronological order.",
     requiredPermission: "dashboard:schedule:view",
     requiredModule: MODULE_FEATURES.appointments,
     dataGroup: "schedule",
     defaultVisible: true,
     defaultSize: "large",
+    allowedSizes: ["medium", "large", "full"],
+    category: "appointments",
+  },
+  {
+    id: "next-patient",
+    title: "Waiting / next patient",
+    description: "Prioritises a checked-in patient, then the nearest upcoming booking.",
+    requiredPermission: "dashboard:schedule:view",
+    requiredModule: MODULE_FEATURES.appointments,
+    dataGroup: "schedule",
+    defaultVisible: false,
+    defaultSize: "medium",
+    allowedSizes: ["medium", "large", "full"],
+    category: "appointments",
+  },
+  {
+    id: "upcoming-schedule",
+    title: "Upcoming appointments",
+    description: "The doctor's next seven days grouped by date.",
+    requiredPermission: "dashboard:schedule:view",
+    requiredModule: MODULE_FEATURES.appointments,
+    dataGroup: "schedule",
+    defaultVisible: false,
+    defaultSize: "full",
     allowedSizes: ["medium", "large", "full"],
     category: "appointments",
   },
@@ -294,6 +335,47 @@ export function systemDashboardLayout(): DashboardLayoutConfig {
       order,
       visible: widget.defaultVisible,
       size: widget.defaultSize,
+    })),
+  };
+}
+
+/**
+ * Permission-filtered Doctor role default: an operational My Day workspace.
+ * Every registry id is stored so future normalization cannot make unrelated
+ * system-default analytics visible. Personal layouts remain a higher layer.
+ */
+export function doctorDefaultDashboardLayout(): DashboardLayoutConfig {
+  const order = [
+    "todays-appointments",
+    "waiting-now",
+    "upcoming-appointments-count",
+    "completed-today",
+    "next-patient",
+    "today-schedule",
+    "upcoming-schedule",
+    "task-overview",
+  ] as const satisfies readonly DashboardWidgetId[];
+  const selected = new Map<DashboardWidgetId, DashboardWidgetSize>([
+    ["todays-appointments", "small"],
+    ["waiting-now", "small"],
+    ["upcoming-appointments-count", "small"],
+    ["completed-today", "small"],
+    ["next-patient", "medium"],
+    ["today-schedule", "full"],
+    ["upcoming-schedule", "full"],
+    ["task-overview", "medium"],
+  ]);
+  const orderedIds = [
+    ...order,
+    ...DASHBOARD_WIDGET_IDS.filter((id) => !selected.has(id)),
+  ];
+  return {
+    version: DASHBOARD_LAYOUT_VERSION,
+    widgets: orderedIds.map((widgetId, index) => ({
+      widgetId,
+      order: index,
+      visible: selected.has(widgetId),
+      size: selected.get(widgetId) ?? DASHBOARD_WIDGETS.get(widgetId)!.defaultSize,
     })),
   };
 }

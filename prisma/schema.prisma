@@ -246,6 +246,11 @@ model User {
   appointmentsCheckedIn Appointment[] @relation("AppointmentCheckedInBy")
   appointmentsCancelled Appointment[] @relation("AppointmentCancelledBy")
 
+  /// Optional portal identities for this clinician. A user can be linked to
+  /// one Doctor row per clinic, while historical Doctor rows remain valid when
+  /// the login is removed.
+  doctorProfiles Doctor[] @relation("DoctorPortalUser")
+
   tasksCreated   Task[] @relation("TaskCreatedBy")
   tasksAssigned  Task[] @relation("TaskAssignedTo")
   tasksCompleted Task[] @relation("TaskCompletedBy")
@@ -758,6 +763,7 @@ model TelephonyBookingRequest {
 model Doctor {
   id         String  @id @default(cuid())
   clinicId   String  @map("clinic_id")
+  userId     String? @map("user_id")
   name       String
   department String
   /// Free-text rather than an enum: the PRD does not fix the accepted values,
@@ -769,6 +775,7 @@ model Doctor {
   createdAt DateTime @default(now()) @map("created_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user   User?  @relation("DoctorPortalUser", fields: [userId], references: [id], onDelete: SetNull)
 
   availability  DoctorAvailability[]
   leave         DoctorLeave[]
@@ -782,6 +789,11 @@ model Doctor {
 
   /// FR-4.1 counts doctors per clinic; the registration form filters by department.
   @@index([clinicId])
+  /// One portal login may represent the same clinician at multiple clinics,
+  /// but never two Doctor profiles inside one clinic. MySQL permits multiple
+  /// NULL values here, so existing unlinked profiles remain valid.
+  @@unique([clinicId, userId])
+  @@index([userId])
   @@index([department])
   @@map("doctors")
 }

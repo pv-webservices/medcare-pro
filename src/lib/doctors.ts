@@ -1,14 +1,17 @@
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { ConflictError } from "@/lib/apiHandler";
+import { BadRequestError, ConflictError } from "@/lib/apiHandler";
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import { notifyDoctorCreated, notifyDoctorUpdated } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import {
   assertClinicInTenant,
+  accessibleClinicScopes,
   can,
   requirePermission,
   ScopeError,
   type ActorContext,
+  type ClinicScope,
 } from "@/lib/rbac";
 import {
   formatDateOnly,
@@ -52,6 +55,8 @@ export const createDoctorSchema = z.object({
   gender: z.string().trim().max(50).optional().or(z.literal("")),
   age: z.coerce.number().int().min(0).max(120).optional().nullable(),
   phone: phoneSchema.optional().or(z.literal("")),
+  /** Explicit only: never inferred from any demographic field. */
+  userId: z.union([z.string().trim().min(1), z.literal(""), z.null()]).optional(),
 });
 
 /** Clinic is omitted: moving a doctor between clinics would re-home their
@@ -103,6 +108,9 @@ export interface DoctorSummary {
   gender: string | null;
   age: number | null;
   phone: string | null;
+  canManagePortalLink: boolean;
+  userId: string | null;
+  linkedPortalUser: { name: string | null; email: string } | null;
   /** FR-4.4 — true when today falls inside a leave period. */
   isOnLeaveToday: boolean;
 }
@@ -126,9 +134,61 @@ export interface DoctorDetail extends DoctorSummary {
   leave: LeaveEntry[];
 }
 
+export interface DoctorPortalUserOption {
+  id: string;
+  name: string | null;
+  email: string;
+  linkedClinicIds: string[];
+}
+
 function emptyToNull(value: string | undefined): string | null | undefined {
   if (value === undefined) return undefined;
   return value === "" ? null : value;
+}
+
+function scopeClinicIds(
+  scope: ClinicScope,
+  tenantClinicIds: readonly string[],
+): string[] {
+  if (scope.scope === "none") return [];
+  if (scope.scope === "all") return [...tenantClinicIds];
+  return tenantClinicIds.filter((id) => scope.clinicIds.includes(id));
+}
+
+async function assertPortalUserEligible(
+  actor: ActorContext,
+  clinicId: string,
+  userId: string | null | undefined,
+  excludeDoctorId?: string,
+): Promise<void> {
+  if (!userId) return;
+
+  const user = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId: actor.tenantId,
+      accountStatus: "ACTIVE",
+      membershipStatus: "ACTIVE",
+      removedAt: null,
+    },
+    select: { id: true },
+  });
+  if (!user) {
+    throw new BadRequestError("Choose an active portal user from this organisation.");
+  }
+
+  const duplicate = await prisma.doctor.findFirst({
+    where: {
+      clinicId,
+      userId,
+      ...(excludeDoctorId ? { id: { not: excludeDoctorId } } : {}),
+      clinic: { tenantId: actor.tenantId },
+    },
+    select: { id: true },
+  });
+  if (duplicate) {
+    throw new ConflictError("That portal user is already linked to a doctor in this clinic.");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +270,8 @@ export async function listDoctorsForActor(
       gender: true,
       age: true,
       phone: true,
+      userId: true,
+      user: { select: { name: true, email: true } },
       clinic: { select: { name: true } },
       // Only need to know whether at least one leave period covers today.
       leave: {
@@ -219,10 +281,18 @@ export async function listDoctorsForActor(
       },
     },
   });
+  const editScope = (await accessibleClinicScopes(actor, ["doctor:edit"]))
+    .get("doctor:edit") ?? { scope: "none" };
+  const canEditClinic = (clinicId: string) =>
+    editScope.scope === "all" ||
+    (editScope.scope === "clinics" && editScope.clinicIds.includes(clinicId));
 
-  return doctors.map(({ clinic, leave, ...doctor }) => ({
+  return doctors.map(({ clinic, leave, user, ...doctor }) => ({
     ...doctor,
+    canManagePortalLink: canEditClinic(doctor.clinicId),
+    userId: canEditClinic(doctor.clinicId) ? doctor.userId : null,
     clinicName: clinic.name,
+    linkedPortalUser: canEditClinic(doctor.clinicId) ? user : null,
     isOnLeaveToday: leave.length > 0,
   }));
 }
@@ -244,6 +314,8 @@ export async function getDoctorForActor(
       gender: true,
       age: true,
       phone: true,
+      userId: true,
+      user: { select: { name: true, email: true } },
       clinic: { select: { name: true } },
       availability: {
         orderBy: [{ date: "asc" }, { startTime: "asc" }],
@@ -257,6 +329,7 @@ export async function getDoctorForActor(
   });
 
   const today = todayDateOnly();
+  const mayEdit = await can(actor, "doctor:edit", doctor.clinicId);
 
   return {
     id: doctor.id,
@@ -267,6 +340,9 @@ export async function getDoctorForActor(
     gender: doctor.gender,
     age: doctor.age,
     phone: doctor.phone,
+    canManagePortalLink: mayEdit,
+    userId: mayEdit ? doctor.userId : null,
+    linkedPortalUser: mayEdit ? doctor.user : null,
     isOnLeaveToday: doctor.leave.some(
       (entry) =>
         formatDateOnly(entry.startDate) <= today &&
@@ -287,6 +363,61 @@ export async function getDoctorForActor(
   };
 }
 
+/**
+ * Active portal users an authorised doctor editor may explicitly link.
+ *
+ * The query never attempts identity matching. Existing links are returned as
+ * clinic ids so the form can explain why an option is unavailable, while the
+ * write path independently enforces tenant membership and compound uniqueness.
+ */
+export async function listDoctorPortalUsersForActor(
+  actor: ActorContext,
+  options: { clinicIds?: readonly string[] } = {},
+): Promise<DoctorPortalUserOption[]> {
+  const [clinics, scopes] = await Promise.all([
+    prisma.clinic.findMany({
+      where: { tenantId: actor.tenantId },
+      select: { id: true },
+    }),
+    accessibleClinicScopes(actor, ["doctor:create", "doctor:edit"]),
+  ]);
+  const tenantClinicIds = clinics.map((clinic) => clinic.id);
+  const allowed = new Set([
+    ...scopeClinicIds(scopes.get("doctor:create") ?? { scope: "none" }, tenantClinicIds),
+    ...scopeClinicIds(scopes.get("doctor:edit") ?? { scope: "none" }, tenantClinicIds),
+  ]);
+  const requested = options.clinicIds
+    ? options.clinicIds.filter((id) => allowed.has(id))
+    : [...allowed];
+  if (requested.length === 0) return [];
+
+  const users = await prisma.user.findMany({
+    where: {
+      tenantId: actor.tenantId,
+      accountStatus: "ACTIVE",
+      membershipStatus: "ACTIVE",
+      removedAt: null,
+    },
+    orderBy: [{ name: "asc" }, { email: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      doctorProfiles: {
+        where: { clinicId: { in: requested } },
+        select: { clinicId: true },
+      },
+    },
+  });
+
+  return users.map((user) => ({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    linkedClinicIds: user.doctorProfiles.map((doctor) => doctor.clinicId),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
@@ -300,29 +431,43 @@ export async function createDoctor(
   // guessed id from another tenant cannot even reach it.
   await assertClinicInTenant(actor.tenantId, input.clinicId);
   await requirePermission(actor, "doctor:create", input.clinicId);
+  const mayEdit = await can(actor, "doctor:edit", input.clinicId);
+  const userId = emptyToNull(input.userId ?? undefined) ?? null;
+  await assertPortalUserEligible(actor, input.clinicId, userId);
 
-  const doctor = await prisma.doctor.create({
-    data: {
-      clinicId: input.clinicId,
-      name: input.name,
-      department: input.department,
-      gender: emptyToNull(input.gender) ?? null,
-      age: input.age ?? null,
-      phone: emptyToNull(input.phone) ?? null,
-    },
-    select: {
-      id: true,
-      clinicId: true,
-      name: true,
-      department: true,
-      gender: true,
-      age: true,
-      phone: true,
-      clinic: { select: { name: true } },
-    },
-  });
+  let doctor;
+  try {
+    doctor = await prisma.doctor.create({
+      data: {
+        clinicId: input.clinicId,
+        userId,
+        name: input.name,
+        department: input.department,
+        gender: emptyToNull(input.gender) ?? null,
+        age: input.age ?? null,
+        phone: emptyToNull(input.phone) ?? null,
+      },
+      select: {
+        id: true,
+        clinicId: true,
+        name: true,
+        department: true,
+        gender: true,
+        age: true,
+        phone: true,
+        userId: true,
+        user: { select: { name: true, email: true } },
+        clinic: { select: { name: true } },
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ConflictError("That portal user is already linked to a doctor in this clinic.");
+    }
+    throw error;
+  }
 
-  const { clinic, ...rest } = doctor;
+  const { clinic, user, ...rest } = doctor;
 
   // FR-7.1 — after the write, and never allowed to fail it.
   await notifyDoctorCreated(actor, {
@@ -332,7 +477,14 @@ export async function createDoctor(
     clinicName: clinic.name,
   });
 
-  return { ...rest, clinicName: clinic.name, isOnLeaveToday: false };
+  return {
+    ...rest,
+    clinicName: clinic.name,
+    canManagePortalLink: mayEdit,
+    userId: mayEdit ? rest.userId : null,
+    linkedPortalUser: mayEdit ? user : null,
+    isOnLeaveToday: false,
+  };
 }
 
 export async function updateDoctor(
@@ -340,18 +492,33 @@ export async function updateDoctor(
   doctorId: string,
   input: UpdateDoctorInput,
 ): Promise<DoctorDetail> {
-  await assertDoctorEditable(actor, doctorId);
+  const editable = await assertDoctorEditable(actor, doctorId);
+  const userId =
+    input.userId === undefined
+      ? undefined
+      : (emptyToNull(input.userId ?? undefined) ?? null);
+  if (userId !== undefined) {
+    await assertPortalUserEligible(actor, editable.clinicId, userId, doctorId);
+  }
 
-  await prisma.doctor.update({
-    where: { id: doctorId },
-    data: {
-      ...(input.name === undefined ? {} : { name: input.name }),
-      ...(input.department === undefined ? {} : { department: input.department }),
-      ...(input.gender === undefined ? {} : { gender: emptyToNull(input.gender) }),
-      ...(input.age === undefined ? {} : { age: input.age }),
-      ...(input.phone === undefined ? {} : { phone: emptyToNull(input.phone) }),
-    },
-  });
+  try {
+    await prisma.doctor.update({
+      where: { id: doctorId },
+      data: {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.department === undefined ? {} : { department: input.department }),
+        ...(input.gender === undefined ? {} : { gender: emptyToNull(input.gender) }),
+        ...(input.age === undefined ? {} : { age: input.age }),
+        ...(input.phone === undefined ? {} : { phone: emptyToNull(input.phone) }),
+        ...(userId === undefined ? {} : { userId }),
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ConflictError("That portal user is already linked to a doctor in this clinic.");
+    }
+    throw error;
+  }
 
   const updated = await getDoctorForActor(actor, doctorId);
 

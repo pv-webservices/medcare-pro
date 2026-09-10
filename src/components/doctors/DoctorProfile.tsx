@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Pencil, Phone, User } from "lucide-react";
+import { Calendar, Link2, Pencil, Phone, User } from "lucide-react";
 import DoctorForm from "@/components/doctors/DoctorForm";
 import AvailabilityManager from "@/components/doctors/AvailabilityManager";
 import LeaveManager from "@/components/doctors/LeaveManager";
@@ -22,10 +22,25 @@ interface DoctorProfileProps {
   doctor: DoctorDetail;
   canEdit: boolean;
   today: string;
+  portalUsers: readonly import("@/components/doctors/DoctorForm").PortalUserOption[];
 }
 
-export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileProps) {
+export default function DoctorProfile({ doctor, canEdit, today, portalUsers }: DoctorProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const portalUserOptions =
+    doctor.userId &&
+    doctor.linkedPortalUser &&
+    !portalUsers.some((user) => user.id === doctor.userId)
+      ? [
+          ...portalUsers,
+          {
+            id: doctor.userId,
+            name: doctor.linkedPortalUser.name,
+            email: doctor.linkedPortalUser.email,
+            linkedClinicIds: [doctor.clinicId],
+          },
+        ]
+      : portalUsers;
 
   return (
     <div className="space-y-6">
@@ -42,6 +57,7 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
           <div className="rounded-3xl border border-line bg-canvas p-6 sm:p-7 shadow-card">
             <DoctorForm
               clinics={[{ id: doctor.clinicId, name: doctor.clinicName }]}
+              portalUsers={portalUserOptions}
               initial={{
                 id: doctor.id,
                 clinicId: doctor.clinicId,
@@ -50,6 +66,7 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
                 gender: doctor.gender ?? "",
                 age: doctor.age === null ? "" : String(doctor.age),
                 phone: doctor.phone ?? "",
+                userId: doctor.userId ?? "",
               }}
               onCancel={() => setIsEditing(false)}
             />
@@ -86,6 +103,17 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
 
           {/* Quick Info Summary Card */}
           <div className="rounded-3xl border border-line bg-canvas p-6 shadow-card">
+            {canEdit && !doctor.linkedPortalUser && (
+              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-label text-warn-ink">
+                <Link2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <div>
+                  <p className="font-semibold">Portal account not linked</p>
+                  <p className="mt-0.5 opacity-80">
+                    Link the confirmed portal user so this doctor can see their personal schedule.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line/60">
               {/* Phone */}
               <div className="flex items-center gap-3.5 pt-0">
@@ -126,6 +154,17 @@ export default function DoctorProfile({ doctor, canEdit, today }: DoctorProfileP
                 </div>
               </div>
             </div>
+            {canEdit && doctor.linkedPortalUser && (
+              <div className="mt-5 flex items-center gap-3 border-t border-line/60 pt-5 text-label">
+                <Link2 className="h-4 w-4 text-accent" aria-hidden="true" />
+                <span className="text-muted">Linked portal user</span>
+                <span className="font-semibold text-ink">
+                  {doctor.linkedPortalUser.name?.trim()
+                    ? `${doctor.linkedPortalUser.name.trim()} · ${doctor.linkedPortalUser.email}`
+                    : doctor.linkedPortalUser.email}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

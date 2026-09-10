@@ -3,7 +3,7 @@ import DoctorsTable from "@/components/doctors/DoctorsTable";
 import AddDoctorPanel from "@/components/doctors/AddDoctorPanel";
 import PageHeader from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
-import { listDoctorsForActor } from "@/lib/doctors";
+import { listDoctorPortalUsersForActor, listDoctorsForActor } from "@/lib/doctors";
 import { can } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
@@ -34,12 +34,13 @@ export default async function DoctorsListPage() {
 
   const selectedClinicId = await resolveSelectedClinicId(actor);
 
-  const [doctors, clinics, canCreate] = await Promise.all([
+  const [doctors, clinics, canCreate, portalUsers] = await Promise.all([
     listDoctorsForActor(actor, { clinicId: selectedClinicId }),
     // The add form needs somewhere to put a new doctor; only clinics this user
     // can actually reach are offered.
     listClinicsForActor(actor),
     can(actor, "doctor:create", selectedClinicId ?? undefined),
+    listDoctorPortalUsersForActor(actor),
   ]);
 
   const selectedClinic = selectedClinicId
@@ -61,7 +62,10 @@ export default async function DoctorsListPage() {
         }
         actions={
           canCreate ? (
-            <AddDoctorPanel clinics={clinics.map(({ id, name }) => ({ id, name }))} />
+            <AddDoctorPanel
+              clinics={clinics.map(({ id, name }) => ({ id, name }))}
+              portalUsers={portalUsers}
+            />
           ) : undefined
         }
       />

@@ -482,10 +482,16 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "appointment:read",
         label: "View appointments",
         description:
-          "See the appointment board and each booking's details, within the clinics this person can reach.",
+          "See every appointment within the clinics this person can reach.",
         // LIVE since AP-2. Checked by getAppointmentSlots and listAppointments
         // in lib/appointments.ts, and by listAppointmentTypes — the booking
         // form has to be able to read the price list it books against.
+      },
+      {
+        key: "appointment:self:read",
+        label: "View own appointments",
+        description:
+          "View appointments assigned to the doctor profile explicitly linked to this user.",
       },
       {
         key: "appointment:create",
@@ -738,6 +744,11 @@ export const STAGE_AP1_PERMISSIONS: readonly string[] = [
   "appointment:type:manage",
 ];
 
+/** Doctor/User linkage and per-clinic personal diary visibility. */
+export const DOCTOR_SELF_APPOINTMENT_PERMISSIONS: readonly string[] = [
+  "appointment:self:read",
+];
+
 /**
  * Everything added to the catalogue by Stage 1.
  *
@@ -758,6 +769,7 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
     !DASHBOARD_LAYOUT_PERMISSIONS.includes(
       permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
@@ -810,6 +822,7 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
   (permission) =>
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
     !DASHBOARD_LAYOUT_PERMISSIONS.includes(
       permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
@@ -854,6 +867,7 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
   ALL_PERMISSIONS.filter(
     (permission) =>
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
+      !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
       !DASHBOARD_LAYOUT_PERMISSIONS.includes(
         permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],

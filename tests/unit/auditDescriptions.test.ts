@@ -12,6 +12,7 @@ import {
   ALL_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
+  DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   HISTORICAL_ALL_PERMISSIONS,
   PRE_STAGE_11_PERMISSIONS,
   STAGE_1_PERMISSIONS,
@@ -180,6 +181,7 @@ describe("the audit:read permission", () => {
       ...TASK_PERMISSIONS,
       ...DASHBOARD_DATA_PERMISSIONS,
       ...DASHBOARD_LAYOUT_PERMISSIONS,
+      ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
     ];
     expect(new Set(combined).size).toBe(combined.length);
 
@@ -208,6 +210,7 @@ describe("the audit:read permission", () => {
       ALL_PERMISSIONS.length -
         STAGE_11_PERMISSIONS.length -
         STAGE_AP1_PERMISSIONS.length -
+        DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length -
         DASHBOARD_LAYOUT_PERMISSIONS.length,
@@ -215,6 +218,7 @@ describe("the audit:read permission", () => {
     for (const permission of [
       ...STAGE_11_PERMISSIONS,
       ...STAGE_AP1_PERMISSIONS,
+      ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
       ...TASK_PERMISSIONS,
       ...DASHBOARD_DATA_PERMISSIONS,
       ...DASHBOARD_LAYOUT_PERMISSIONS,

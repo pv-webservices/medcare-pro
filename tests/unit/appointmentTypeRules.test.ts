@@ -384,7 +384,8 @@ describe("who may manage the price list", () => {
     const held = permissionsFor(ROLE_KEYS.DOCTOR);
     expect(held).not.toContain("appointment:type:manage");
     expect(held).not.toContain("appointment:create");
-    expect(held).toContain("appointment:read");
+    expect(held).toContain("appointment:self:read");
+    expect(held).not.toContain("appointment:read");
   });
 
   it("does not let Staff near appointments at all", () => {

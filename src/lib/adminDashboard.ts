@@ -24,11 +24,26 @@ import {
   type DashboardWidgetDataGroup,
   type DashboardWidgetId,
 } from "@/lib/dashboardWidgets";
-import { formatClockTime } from "@/lib/dates";
+import {
+  appointmentDayBounds,
+  appointmentWallClockNow,
+  formatClockTime,
+  formatDateOnly,
+} from "@/lib/dates";
 import { resolveModulesForActor } from "@/lib/features";
 import { MODULE_FEATURES } from "@/lib/moduleFeatures";
 import { APPOINTMENT_STATUSES, type AppointmentStatus } from "@/lib/appointmentRules";
 import { accessibleClinicScopes, type ActorContext } from "@/lib/rbac";
+import {
+  resolveAppointmentReadScope,
+  withinAppointmentReadScope,
+  type AppointmentReadScope,
+  type AppointmentScopeKind,
+} from "@/lib/appointmentScope";
+import {
+  chooseNextDoctorAppointment,
+  orderCompleteDoctorDay,
+} from "@/lib/doctorDashboard";
 
 export interface DashboardCapabilities {
   dashboard: {
@@ -72,6 +87,11 @@ export interface AdminDashboardData {
     clinicCount: number;
   };
   capabilities: DashboardCapabilities;
+  appointmentAccess: {
+    kind: AppointmentScopeKind;
+    linkedDoctorCount: number;
+    unlinkedClinicNames: string[];
+  };
   summary: {
     totalPatients?: number;
     todaysAppointments?: number;
@@ -83,6 +103,9 @@ export interface AdminDashboardData {
     messageHealth?: number | null;
     patientChange?: number | null;
     appointmentChange?: number | null;
+    waitingNow?: number;
+    upcomingAppointments?: number;
+    completedToday?: number;
     revenueChange?: number | null;
   };
   patients?: {
@@ -103,20 +126,16 @@ export interface AdminDashboardData {
   appointments?: {
     today: number;
     upcoming: number;
+    waitingNow: number;
+    completedToday: number;
     total: number;
     byStatus: Record<AppointmentStatus, number>;
     change: number | null;
     trend: DashboardTrendPoint[];
   };
-  schedule?: Array<{
-    id: string;
-    time: string;
-    patientName: string;
-    doctorName: string;
-    appointmentType: string;
-    clinicName: string;
-    status: AppointmentStatus;
-  }>;
+  schedule?: DashboardAppointmentScheduleItem[];
+  nextPatient?: DashboardAppointmentScheduleItem | null;
+  upcomingSchedule?: DashboardAppointmentScheduleItem[];
   revenue?: {
     current: number;
     today: number;
@@ -158,6 +177,8 @@ export interface AdminDashboardData {
     teamPending?: number;
     dueToday: number;
     overdue: number;
+    inProgress: number;
+    upcoming: number;
     completedToday: number;
   };
   clinicPerformance?: Array<{
@@ -176,6 +197,27 @@ export interface AdminDashboardData {
     clinicName: string;
     occurredAt: Date;
   }>;
+}
+
+export interface DashboardAppointmentScheduleItem {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  patientId: string | null;
+  patientCode: string | null;
+  patientName: string;
+  age: number | null;
+  gender: string | null;
+  doctorId: string;
+  doctorName: string;
+  appointmentType: string;
+  clinicName: string;
+  status: AppointmentStatus;
+  checkedInAt: string | null;
+  cancelledAt: string | null;
+  bookingSource: "STAFF" | "PHONE_IVR";
+  createdAt: string;
 }
 
 const DAY_MS = 86_400_000;
@@ -318,39 +360,60 @@ async function loadPatientDashboardStats(
 }
 
 async function loadAppointmentDashboardStats(
-  actor: ActorContext,
   clinicIds: readonly string[],
+  scope: AppointmentReadScope,
   range: DateRange,
   previous: DateRange,
   interval: TrendInterval,
   now: Date,
 ): Promise<NonNullable<AdminDashboardData["appointments"]>> {
-  const ids = [...clinicIds];
-  const today = startOfUtcDay(now);
-  const tomorrow = new Date(today.getTime() + DAY_MS);
-  const base: Prisma.AppointmentWhereInput = { tenantId: actor.tenantId, clinicId: { in: ids } };
-  const currentWhere: Prisma.AppointmentWhereInput = { ...base, slotStart: { gte: range.start, lt: range.end } };
-  const [grouped, previousTotal, todayCount, upcoming, trendRows] = await Promise.all([
+  const empty = {
+    today: 0,
+    upcoming: 0,
+    waitingNow: 0,
+    completedToday: 0,
+    total: 0,
+    byStatus: emptyStatusCounts(),
+    change: 0,
+    trend: zeroFillTrend([], range, interval),
+  };
+  const base = withinAppointmentReadScope(scope, {
+    clinicId: { in: [...clinicIds] },
+  });
+  if (!base) return empty;
+
+  const appointmentNow = appointmentWallClockNow(now);
+  const today = appointmentDayBounds(now);
+  const currentWhere: Prisma.AppointmentWhereInput = {
+    AND: [base, { slotStart: { gte: range.start, lt: range.end } }],
+  };
+  const [grouped, previousTotal, todayCount, upcoming, waitingNow, completedToday, trendAppointments] = await Promise.all([
     prisma.appointment.groupBy({ by: ["status"], where: currentWhere, _count: { _all: true } }),
-    prisma.appointment.count({ where: { ...base, slotStart: { gte: previous.start, lt: previous.end }, status: { not: "RESCHEDULED" } } }),
-    prisma.appointment.count({ where: { ...base, slotStart: { gte: today, lt: tomorrow }, status: { not: "RESCHEDULED" } } }),
-    prisma.appointment.count({ where: { ...base, slotStart: { gte: now }, status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN"] } } }),
-    loadOptionalTrendRows("appointments", actor, prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
-      SELECT ${dashboardBucketSql("appointments", interval)} AS bucket, COUNT(*) AS value
-      FROM appointments a
-      WHERE a.tenant_id = ${actor.tenantId}
-        AND a.clinic_id IN (${Prisma.join(ids)})
-        AND a.slot_start >= ${range.start} AND a.slot_start < ${range.end}
-        AND a.status <> 'RESCHEDULED'
-      GROUP BY bucket
-    `)),
+    prisma.appointment.count({ where: { AND: [base, { slotStart: { gte: previous.start, lt: previous.end }, status: { not: "RESCHEDULED" } }] } }),
+    prisma.appointment.count({ where: { AND: [base, { slotStart: { gte: today.start, lt: today.end }, status: { not: "RESCHEDULED" } }] } }),
+    prisma.appointment.count({ where: { AND: [base, { slotStart: { gte: appointmentNow }, status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN"] } }] } }),
+    prisma.appointment.count({ where: { AND: [base, { slotStart: { gte: today.start, lt: today.end }, status: "CHECKED_IN" }] } }),
+    prisma.appointment.count({ where: { AND: [base, { slotStart: { gte: today.start, lt: today.end }, status: "CONVERTED" }] } }),
+    prisma.appointment.findMany({
+      where: { AND: [currentWhere, { status: { not: "RESCHEDULED" } }] },
+      select: { slotStart: true },
+    }),
   ]);
+  const trendCounts = new Map<string, number>();
+  for (const row of trendAppointments) {
+    const date = formatDateOnly(row.slotStart);
+    const bucket = interval === "monthly" ? `${date.slice(0, 7)}-01` : date;
+    trendCounts.set(bucket, (trendCounts.get(bucket) ?? 0) + 1);
+  }
+  const trendRows: RawTrendRow[] = [...trendCounts].map(([bucket, value]) => ({ bucket, value }));
   const byStatus = emptyStatusCounts();
   for (const row of grouped) byStatus[row.status] = row._count._all;
   const total = APPOINTMENT_STATUSES.filter((status) => status !== "RESCHEDULED").reduce((sum, status) => sum + byStatus[status], 0);
   return {
     today: todayCount,
     upcoming,
+    waitingNow,
+    completedToday,
     total,
     byStatus,
     change: percentChange(total, previousTotal),
@@ -358,38 +421,97 @@ async function loadAppointmentDashboardStats(
   };
 }
 
-async function loadTodaySchedule(
-  actor: ActorContext,
-  clinicIds: readonly string[],
-  now: Date,
-): Promise<NonNullable<AdminDashboardData["schedule"]>> {
-  const today = startOfUtcDay(now);
-  const tomorrow = new Date(today.getTime() + DAY_MS);
-  const rows = await prisma.appointment.findMany({
-    where: {
-      tenantId: actor.tenantId,
-      clinicId: { in: [...clinicIds] },
-      slotStart: { gte: now > today ? now : today, lt: tomorrow },
-      status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN"] },
-    },
-    orderBy: [{ slotStart: "asc" }, { id: "asc" }],
-    take: 10,
-    select: {
-      id: true, name: true, slotStart: true, status: true,
-      doctor: { select: { name: true } },
-      clinic: { select: { name: true } },
-      appointmentType: { select: { name: true } },
-    },
-  });
-  return rows.map((row) => ({
+const DASHBOARD_APPOINTMENT_SELECT = {
+  id: true,
+  patientId: true,
+  name: true,
+  age: true,
+  gender: true,
+  doctorId: true,
+  slotStart: true,
+  slotEnd: true,
+  status: true,
+  checkedInAt: true,
+  cancelledAt: true,
+  bookingSource: true,
+  createdAt: true,
+  patient: { select: { patientCode: true } },
+  doctor: { select: { name: true } },
+  clinic: { select: { name: true } },
+  appointmentType: { select: { name: true } },
+} as const;
+
+function toScheduleItem(
+  row: Prisma.AppointmentGetPayload<{ select: typeof DASHBOARD_APPOINTMENT_SELECT }>,
+): DashboardAppointmentScheduleItem {
+  return {
     id: row.id,
-    time: formatClockTime(row.slotStart),
+    date: formatDateOnly(row.slotStart),
+    startTime: formatClockTime(row.slotStart),
+    endTime: formatClockTime(row.slotEnd),
+    patientId: row.patientId,
+    patientCode: row.patient?.patientCode ?? null,
     patientName: row.name,
+    age: row.age,
+    gender: row.gender,
+    doctorId: row.doctorId,
     doctorName: row.doctor.name,
     appointmentType: row.appointmentType.name,
     clinicName: row.clinic.name,
     status: row.status,
-  }));
+    checkedInAt: row.checkedInAt?.toISOString() ?? null,
+    cancelledAt: row.cancelledAt?.toISOString() ?? null,
+    bookingSource: row.bookingSource,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+async function loadAppointmentSchedules(
+  clinicIds: readonly string[],
+  scope: AppointmentReadScope,
+  now: Date,
+): Promise<{
+  today: DashboardAppointmentScheduleItem[];
+  next: DashboardAppointmentScheduleItem | null;
+  upcoming: DashboardAppointmentScheduleItem[];
+}> {
+  const base = withinAppointmentReadScope(scope, {
+    clinicId: { in: [...clinicIds] },
+  });
+  if (!base) return { today: [], next: null, upcoming: [] };
+
+  const day = appointmentDayBounds(now);
+  const appointmentNow = appointmentWallClockNow(now);
+  const upcomingEnd = new Date(day.end.getTime() + 7 * DAY_MS);
+  const [todayRows, upcomingRows] = await Promise.all([
+    prisma.appointment.findMany({
+      where: { AND: [base, { slotStart: { gte: day.start, lt: day.end } }] },
+      orderBy: [{ slotStart: "asc" }, { id: "asc" }],
+      select: DASHBOARD_APPOINTMENT_SELECT,
+    }),
+    prisma.appointment.findMany({
+      where: {
+        AND: [
+          base,
+          {
+            slotStart: { gte: day.end, lt: upcomingEnd },
+            status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN"] },
+          },
+        ],
+      },
+      orderBy: [{ slotStart: "asc" }, { id: "asc" }],
+      select: DASHBOARD_APPOINTMENT_SELECT,
+    }),
+  ]);
+
+  const orderedToday = orderCompleteDoctorDay(todayRows);
+  const next = chooseNextDoctorAppointment(orderedToday, appointmentNow);
+
+  return {
+    today: orderedToday.map(toScheduleItem),
+    next: next ? toScheduleItem(next) : null,
+    upcoming: upcomingRows.map(toScheduleItem),
+  };
 }
 
 async function loadRevenueDashboardStats(
@@ -458,17 +580,23 @@ async function loadRevenueDashboardStats(
 async function loadDoctorDashboardStats(
   actor: ActorContext,
   clinicIds: readonly string[],
+  appointmentScope: AppointmentReadScope,
   range: DateRange,
   now: Date,
   revenueByDoctor: ReadonlyMap<string, number>,
 ): Promise<NonNullable<AdminDashboardData["doctors"]>> {
   const ids = [...clinicIds];
   const today = startOfUtcDay(now);
+  const appointmentWhere = withinAppointmentReadScope(appointmentScope, {
+    clinicId: { in: ids },
+    slotStart: { gte: range.start, lt: range.end },
+    status: { not: "RESCHEDULED" },
+  });
   const [doctors, availability, leave, appointments, patients] = await Promise.all([
     prisma.doctor.findMany({ where: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } }, select: { id: true, name: true, clinic: { select: { name: true } } } }),
     prisma.doctorAvailability.findMany({ where: { date: today, doctor: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } } }, distinct: ["doctorId"], select: { doctorId: true } }),
     prisma.doctorLeave.findMany({ where: { startDate: { lte: today }, endDate: { gte: today }, doctor: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } } }, distinct: ["doctorId"], select: { doctorId: true } }),
-    prisma.appointment.groupBy({ by: ["doctorId"], where: { tenantId: actor.tenantId, clinicId: { in: ids }, slotStart: { gte: range.start, lt: range.end }, status: { not: "RESCHEDULED" } }, _count: { _all: true } }),
+    appointmentWhere ? prisma.appointment.groupBy({ by: ["doctorId"], where: appointmentWhere, _count: { _all: true } }) : Promise.resolve([]),
     prisma.registration.groupBy({ by: ["doctorId"], where: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId }, visitDate: { gte: range.start, lt: range.end }, doctorId: { not: null } }, _count: { _all: true } }),
   ]);
   const availableIds = new Set(availability.map((row) => row.doctorId));
@@ -524,30 +652,36 @@ async function loadTaskDashboardStats(
   const tomorrow = new Date(today.getTime() + DAY_MS);
   const base: Prisma.TaskWhereInput = { tenantId: actor.tenantId, clinicId: { in: [...clinicIds] }, archivedAt: null };
   const mine: Prisma.TaskWhereInput = { ...base, assignedToId: actor.userId };
-  const [myPending, dueToday, overdue, completedToday, teamPending] = await Promise.all([
+  const [myPending, dueToday, overdue, inProgress, upcoming, completedToday, teamPending] = await Promise.all([
     prisma.task.count({ where: { ...mine, status: { in: [...OPEN_TASK_STATUSES] } } }),
     prisma.task.count({ where: { ...mine, status: { in: [...OPEN_TASK_STATUSES] }, dueAt: { gte: today, lt: tomorrow } } }),
     prisma.task.count({ where: { ...mine, status: { in: [...OPEN_TASK_STATUSES] }, dueAt: { lt: now } } }),
+    prisma.task.count({ where: { ...mine, status: "IN_PROGRESS" } }),
+    prisma.task.count({ where: { ...mine, status: { in: [...OPEN_TASK_STATUSES] }, dueAt: { gte: tomorrow } } }),
     prisma.task.count({ where: { ...mine, status: "COMPLETED", completedAt: { gte: today, lt: tomorrow } } }),
     teamClinicIds.length > 0 ? prisma.task.count({ where: { tenantId: actor.tenantId, clinicId: { in: [...teamClinicIds] }, archivedAt: null, status: { in: [...OPEN_TASK_STATUSES] } } }) : Promise.resolve(undefined),
   ]);
-  return { myPending, dueToday, overdue, completedToday, ...(teamPending === undefined ? {} : { teamPending }) };
+  return { myPending, dueToday, overdue, inProgress, upcoming, completedToday, ...(teamPending === undefined ? {} : { teamPending }) };
 }
 
 async function loadRecentPatientActivity(
   actor: ActorContext,
   clinicIds: readonly string[],
+  appointmentScope: AppointmentReadScope,
 ): Promise<NonNullable<AdminDashboardData["recentActivity"]>> {
   const ids = [...clinicIds];
+  const appointmentWhere = withinAppointmentReadScope(appointmentScope, {
+    clinicId: { in: ids },
+  });
   const [registrations, appointments] = await Promise.all([
     prisma.registration.findMany({
       where: { clinicId: { in: ids }, clinic: { tenantId: actor.tenantId } }, orderBy: { createdAt: "desc" }, take: 8,
       select: { id: true, createdAt: true, visitType: true, patient: { select: { name: true } }, clinic: { select: { name: true } } },
     }),
-    prisma.appointment.findMany({
-      where: { tenantId: actor.tenantId, clinicId: { in: ids } }, orderBy: { updatedAt: "desc" }, take: 8,
+    appointmentWhere ? prisma.appointment.findMany({
+      where: appointmentWhere, orderBy: { updatedAt: "desc" }, take: 8,
       select: { id: true, name: true, status: true, createdAt: true, updatedAt: true, clinic: { select: { name: true } } },
-    }),
+    }) : Promise.resolve([]),
   ]);
   return [
     ...registrations.map((row) => ({
@@ -573,6 +707,7 @@ async function loadClinicPerformance(
   actor: ActorContext,
   clinics: readonly { id: string; name: string }[],
   range: DateRange,
+  appointmentScope: AppointmentReadScope,
   metricIds: {
     patients: readonly string[];
     appointments: readonly string[];
@@ -585,9 +720,14 @@ async function loadClinicPerformance(
   const within = (ids: readonly string[]) => ids.filter((id) => allowed.has(id));
   const patientIds = within(metricIds.patients), appointmentIds = within(metricIds.appointments);
   const doctorIds = within(metricIds.doctors), revenueIds = within(metricIds.revenue);
+  const appointmentWhere = withinAppointmentReadScope(appointmentScope, {
+    clinicId: { in: appointmentIds },
+    slotStart: { gte: range.start, lt: range.end },
+    status: { not: "RESCHEDULED" },
+  });
   const [patients, appointments, doctors, revenue] = await Promise.all([
     patientIds.length ? prisma.patient.groupBy({ by: ["clinicId"], where: { tenantId: actor.tenantId, clinicId: { in: patientIds } }, _count: { _all: true } }) : Promise.resolve([]),
-    appointmentIds.length ? prisma.appointment.groupBy({ by: ["clinicId"], where: { tenantId: actor.tenantId, clinicId: { in: appointmentIds }, slotStart: { gte: range.start, lt: range.end }, status: { not: "RESCHEDULED" } }, _count: { _all: true } }) : Promise.resolve([]),
+    appointmentIds.length && appointmentWhere ? prisma.appointment.groupBy({ by: ["clinicId"], where: appointmentWhere, _count: { _all: true } }) : Promise.resolve([]),
     doctorIds.length ? prisma.doctor.groupBy({ by: ["clinicId"], where: { clinicId: { in: doctorIds }, clinic: { tenantId: actor.tenantId } }, _count: { _all: true } }) : Promise.resolve([]),
     revenueIds.length ? prisma.registration.groupBy({ by: ["clinicId"], where: { clinicId: { in: revenueIds }, clinic: { tenantId: actor.tenantId }, visitDate: { gte: range.start, lt: range.end } }, _sum: { amount: true } }) : Promise.resolve([]),
   ]);
@@ -650,6 +790,8 @@ export async function getAdminDashboardData(
   const range = presetRange(period, now);
   const previous = previousPeriod(range);
   const interval = trendInterval(period);
+  const appointmentRange = presetRange(period, appointmentWallClockNow(now));
+  const appointmentPrevious = previousPeriod(appointmentRange);
   const patientIds = dashboardIdsFor("dashboard:patients:view");
   const appointmentIds = dashboardIdsFor("dashboard:appointments:view");
   const revenueIds = dashboardIdsFor("dashboard:revenue:view");
@@ -659,6 +801,16 @@ export async function getAdminDashboardData(
   const scheduleIds = dashboardIdsFor("dashboard:schedule:view");
   const activityIds = dashboardIdsFor("dashboard:activity:view");
   const clinicIds = dashboardIdsFor("dashboard:clinics:view");
+  const appointmentScope = await resolveAppointmentReadScope(actor, {
+    candidateClinicIds: [...new Set([
+      ...appointmentIds,
+      ...scheduleIds,
+      ...doctorIds,
+      ...activityIds,
+      ...clinicIds,
+    ])],
+    requestedClinicId: selectedClinicId,
+  });
   const teamTaskIds = capabilities.dashboard.team
     ? taskIds.filter((id) => actionIdsFor("task:manage").includes(id))
     : [];
@@ -671,23 +823,24 @@ export async function getAdminDashboardData(
   const wants = (group: DashboardWidgetDataGroup) =>
     requestedGroups === null || requestedGroups.has(group);
 
-  const [patients, appointments, schedule, revenue, messages, tasks, recentActivity] = await Promise.all([
+  const [patients, appointments, scheduleBundle, revenue, messages, tasks, recentActivity] = await Promise.all([
     capabilities.dashboard.patients && wants("patients") ? loadPatientDashboardStats(actor, patientIds, range, previous, interval) : Promise.resolve(undefined),
-    capabilities.dashboard.appointments && wants("appointments") ? loadAppointmentDashboardStats(actor, appointmentIds, range, previous, interval, now) : Promise.resolve(undefined),
-    capabilities.dashboard.schedule && wants("schedule") ? loadTodaySchedule(actor, scheduleIds, now) : Promise.resolve(undefined),
+    capabilities.dashboard.appointments && wants("appointments") ? loadAppointmentDashboardStats(appointmentIds, appointmentScope, appointmentRange, appointmentPrevious, interval, now) : Promise.resolve(undefined),
+    capabilities.dashboard.schedule && wants("schedule") ? loadAppointmentSchedules(scheduleIds, appointmentScope, now) : Promise.resolve(undefined),
     capabilities.dashboard.revenue && wants("revenue") ? loadRevenueDashboardStats(actor, revenueIds, range, previous, interval, now) : Promise.resolve(undefined),
     capabilities.dashboard.messages && wants("messages") ? loadMessageDashboardStats(actor, messageIds, now) : Promise.resolve(undefined),
     capabilities.dashboard.tasks && wants("tasks") ? loadTaskDashboardStats(actor, taskIds, teamTaskIds, now) : Promise.resolve(undefined),
-    capabilities.dashboard.activity && wants("activity") ? loadRecentPatientActivity(actor, activityIds) : Promise.resolve(undefined),
+    capabilities.dashboard.activity && wants("activity") ? loadRecentPatientActivity(actor, activityIds, appointmentScope) : Promise.resolve(undefined),
   ]);
 
   const revenueByDoctor = new Map(revenue?.byDoctor.map((row) => [row.doctorId, row.revenue]) ?? []);
   const [doctors, clinicPerformance] = await Promise.all([
-    capabilities.dashboard.doctors && wants("doctors") ? loadDoctorDashboardStats(actor, doctorIds, range, now, revenueByDoctor) : Promise.resolve(undefined),
+    capabilities.dashboard.doctors && wants("doctors") ? loadDoctorDashboardStats(actor, doctorIds, appointmentScope, range, now, revenueByDoctor) : Promise.resolve(undefined),
     capabilities.dashboard.clinics && wants("clinics") && clinicIds.length > 1 ? loadClinicPerformance(
       actor,
       clinics.filter((clinic) => clinicIds.includes(clinic.id)),
       range,
+      appointmentScope,
       { patients: patientIds, appointments: appointmentIds, doctors: doctorIds, revenue: revenueIds },
     ) : Promise.resolve(undefined),
   ]);
@@ -707,10 +860,23 @@ export async function getAdminDashboardData(
       clinicName: selectedClinic?.name ?? (visibleClinics.length === 1 ? visibleClinics[0].name : null),
       clinicCount: visibleClinics.length,
     },
+    appointmentAccess: {
+      kind: appointmentScope.kind,
+      linkedDoctorCount: appointmentScope.linkedDoctorIds.length,
+      unlinkedClinicNames: clinics
+        .filter((clinic) => appointmentScope.unlinkedSelfClinicIds.includes(clinic.id))
+        .map((clinic) => clinic.name),
+    },
     capabilities,
     summary: {
       ...(patients ? { totalPatients: patients.total, patientChange: patients.change } : {}),
-      ...(appointments ? { todaysAppointments: appointments.today, appointmentChange: appointments.change } : {}),
+      ...(appointments ? {
+        todaysAppointments: appointments.today,
+        appointmentChange: appointments.change,
+        waitingNow: appointments.waitingNow,
+        upcomingAppointments: appointments.upcoming,
+        completedToday: appointments.completedToday,
+      } : {}),
       ...(revenue ? { todaysCollection: revenue.today, monthRevenue: revenue.thisMonth, revenueChange: revenue.change } : {}),
       ...(doctors ? { activeDoctors: doctors.active } : {}),
       ...(tasks ? { pendingTasks: tasks.myPending, overdueTasks: tasks.overdue } : {}),
@@ -718,7 +884,11 @@ export async function getAdminDashboardData(
     },
     ...(patients ? { patients } : {}),
     ...(appointments ? { appointments } : {}),
-    ...(schedule ? { schedule } : {}),
+    ...(scheduleBundle ? {
+      schedule: scheduleBundle.today,
+      nextPatient: scheduleBundle.next,
+      upcomingSchedule: scheduleBundle.upcoming,
+    } : {}),
     ...(revenue ? { revenue } : {}),
     ...(doctors ? { doctors } : {}),
     ...(messages ? { messages } : {}),

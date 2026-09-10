@@ -67,6 +67,27 @@ export function todayDateOnly(now: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * The effective "now" used by appointment queries.
+ *
+ * Appointment slots are clinic wall-clock values tagged as UTC, not real UTC
+ * instants. Rebuild the server's local calendar date and clock as that tagged
+ * value before comparing it with `slotStart`; comparing a raw `new Date()`
+ * would shift the operational day by the host's UTC offset.
+ */
+export function appointmentWallClockNow(now: Date = new Date()): Date {
+  return parseDateTime(todayDateOnly(now), nowClockTime(now));
+}
+
+/** Half-open bounds for the complete appointment wall-clock day. */
+export function appointmentDayBounds(now: Date = new Date()): {
+  start: Date;
+  end: Date;
+} {
+  const start = parseDateTime(todayDateOnly(now), "00:00");
+  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+}
+
 /** Calendar date at an instant in an explicit IANA timezone. */
 export function dateOnlyInTimeZone(now: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {

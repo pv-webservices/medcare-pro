@@ -56,7 +56,7 @@ export const NAV_LINKS: readonly NavLink[] = [
   // slot is booked, the patient arrives, and the arrival becomes a
   // registration. An Appointment and a Registration are different records —
   // see the vocabulary rule in .claude/skills/admin-dashboard-ui.
-  { href: "/appointments", label: "Appointments", permission: "appointment:read", feature: "appointments" },
+  { href: "/appointments", label: "Appointments", permission: ["appointment:read", "appointment:self:read"], feature: "appointments" },
   {
     href: "/tasks",
     label: "Tasks",
