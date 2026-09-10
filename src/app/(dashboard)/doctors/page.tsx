@@ -4,7 +4,7 @@ import AddDoctorPanel from "@/components/doctors/AddDoctorPanel";
 import PageHeader from "@/components/ui/PageHeader";
 import { listClinicsForActor } from "@/lib/clinics";
 import { listDoctorPortalUsersForActor, listDoctorsForActor } from "@/lib/doctors";
-import { can } from "@/lib/rbac";
+import { accessibleClinicScope, can } from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import ModuleLocked from "@/components/ui/ModuleLocked";
@@ -34,14 +34,24 @@ export default async function DoctorsListPage() {
 
   const selectedClinicId = await resolveSelectedClinicId(actor);
 
-  const [doctors, clinics, canCreate, portalUsers] = await Promise.all([
-    listDoctorsForActor(actor, { clinicId: selectedClinicId }),
-    // The add form needs somewhere to put a new doctor; only clinics this user
-    // can actually reach are offered.
-    listClinicsForActor(actor),
-    can(actor, "doctor:create", selectedClinicId ?? undefined),
-    listDoctorPortalUsersForActor(actor),
-  ]);
+  const [doctors, clinics, canCreate, portalUsers, portalLinkScope] =
+    await Promise.all([
+      listDoctorsForActor(actor, { clinicId: selectedClinicId }),
+      // The add form needs somewhere to put a new doctor; only clinics this user
+      // can actually reach are offered.
+      listClinicsForActor(actor),
+      can(actor, "doctor:create", selectedClinicId ?? undefined),
+      listDoctorPortalUsersForActor(actor),
+      accessibleClinicScope(actor, "doctor:edit"),
+    ]);
+  const portalLinkClinicIds =
+    portalLinkScope.scope === "all"
+      ? clinics.map((clinic) => clinic.id)
+      : portalLinkScope.scope === "clinics"
+        ? clinics
+            .filter((clinic) => portalLinkScope.clinicIds.includes(clinic.id))
+            .map((clinic) => clinic.id)
+        : [];
 
   const selectedClinic = selectedClinicId
     ? clinics.find((clinic) => clinic.id === selectedClinicId)
@@ -65,6 +75,7 @@ export default async function DoctorsListPage() {
             <AddDoctorPanel
               clinics={clinics.map(({ id, name }) => ({ id, name }))}
               portalUsers={portalUsers}
+              portalLinkClinicIds={portalLinkClinicIds}
             />
           ) : undefined
         }

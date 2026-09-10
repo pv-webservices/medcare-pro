@@ -27,9 +27,14 @@ import Drawer from "@/components/ui/Drawer";
 interface AddDoctorPanelProps {
   clinics: readonly ClinicOption[];
   portalUsers: readonly PortalUserOption[];
+  portalLinkClinicIds: readonly string[];
 }
 
-export default function AddDoctorPanel({ clinics, portalUsers }: AddDoctorPanelProps) {
+export default function AddDoctorPanel({
+  clinics,
+  portalUsers,
+  portalLinkClinicIds,
+}: AddDoctorPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // A doctor must belong to a clinic (FR-4.2), so with none created there is
@@ -63,6 +68,7 @@ export default function AddDoctorPanel({ clinics, portalUsers }: AddDoctorPanelP
         <DoctorForm
           clinics={clinics}
           portalUsers={portalUsers}
+          portalLinkClinicIds={portalLinkClinicIds}
           onCancel={() => setIsOpen(false)}
         />
       </Drawer>

@@ -41,6 +41,8 @@ export interface PortalUserOption {
 interface DoctorFormProps {
   clinics: readonly ClinicOption[];
   portalUsers?: readonly PortalUserOption[];
+  /** Clinics where this actor may establish or change portal identity links. */
+  portalLinkClinicIds?: readonly string[];
   /** Present = edit an existing doctor; absent = add a new one. */
   initial?: DoctorFormValues;
   onCancel?: () => void;
@@ -77,7 +79,13 @@ function validate(values: DoctorFormValues): FieldErrors {
   return errors;
 }
 
-export default function DoctorForm({ clinics, portalUsers = [], initial, onCancel }: DoctorFormProps) {
+export default function DoctorForm({
+  clinics,
+  portalUsers = [],
+  portalLinkClinicIds = [],
+  initial,
+  onCancel,
+}: DoctorFormProps) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
 
@@ -95,6 +103,7 @@ export default function DoctorForm({ clinics, portalUsers = [], initial, onCance
   const [touched, setTouched] = useState<Partial<Record<keyof DoctorFormValues, boolean>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const canManagePortalLink = portalLinkClinicIds.includes(values.clinicId);
 
   const errors = validate(values);
 
@@ -129,7 +138,7 @@ export default function DoctorForm({ clinics, portalUsers = [], initial, onCance
         gender: values.gender.trim(),
         age: values.age.trim() === "" ? null : Number(values.age),
         phone: values.phone.trim(),
-        ...(!isEdit || values.userId !== initial?.userId
+        ...(canManagePortalLink && (!isEdit || values.userId !== initial?.userId)
           ? { userId: values.userId || null }
           : {}),
         ...(isEdit ? {} : { clinicId: values.clinicId }),
@@ -189,28 +198,30 @@ export default function DoctorForm({ clinics, portalUsers = [], initial, onCance
           </div>
 
           <div className="space-y-4">
-            <Select
-              id="doctor-portal-user"
-              name="userId"
-              label="Linked portal user"
-              icon={<Link2 className="h-4 w-4 text-muted" />}
-              value={values.userId}
-              onChange={(e) => update("userId", e.target.value)}
-              hint="Optional. This explicit link controls the doctor's personal appointment access."
-            >
-              <option value="">Not linked</option>
-              {portalUsers.map((user) => {
-                const unavailable =
-                  user.linkedClinicIds.includes(values.clinicId) &&
-                  user.id !== initial?.userId;
-                return (
-                  <option key={user.id} value={user.id} disabled={unavailable}>
-                    {user.name?.trim() || "Unnamed user"} · {user.email}
-                    {unavailable ? " · already linked in this clinic" : ""}
-                  </option>
-                );
-              })}
-            </Select>
+            {canManagePortalLink && (
+              <Select
+                id="doctor-portal-user"
+                name="userId"
+                label="Linked portal user (optional)"
+                icon={<Link2 className="h-4 w-4 text-muted" />}
+                value={values.userId}
+                onChange={(e) => update("userId", e.target.value)}
+                hint="This explicit link controls the doctor's personal appointment access."
+              >
+                <option value="">Not linked</option>
+                {portalUsers.map((user) => {
+                  const unavailable =
+                    user.linkedClinicIds.includes(values.clinicId) &&
+                    user.id !== initial?.userId;
+                  return (
+                    <option key={user.id} value={user.id} disabled={unavailable}>
+                      {user.name?.trim() || "Unnamed user"} · {user.email}
+                      {unavailable ? " · already linked in this clinic" : ""}
+                    </option>
+                  );
+                })}
+              </Select>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
@@ -341,25 +352,27 @@ export default function DoctorForm({ clinics, portalUsers = [], initial, onCance
             ))}
           </Select>
 
-          <Select
-            id="doctor-portal-user"
-            name="userId"
-            label="Linked portal user"
-            value={values.userId}
-            onChange={(e) => update("userId", e.target.value)}
-            hint="Optional. Link only when an administrator has confirmed the account belongs to this doctor."
-          >
-            <option value="">Not linked</option>
-            {portalUsers.map((user) => {
-              const unavailable = user.linkedClinicIds.includes(values.clinicId);
-              return (
-                <option key={user.id} value={user.id} disabled={unavailable}>
-                  {user.name?.trim() || "Unnamed user"} · {user.email}
-                  {unavailable ? " · already linked in this clinic" : ""}
-                </option>
-              );
-            })}
-          </Select>
+          {canManagePortalLink && (
+            <Select
+              id="doctor-portal-user"
+              name="userId"
+              label="Linked portal user (optional)"
+              value={values.userId}
+              onChange={(e) => update("userId", e.target.value)}
+              hint="Link only when an administrator has confirmed the account belongs to this doctor."
+            >
+              <option value="">Not linked</option>
+              {portalUsers.map((user) => {
+                const unavailable = user.linkedClinicIds.includes(values.clinicId);
+                return (
+                  <option key={user.id} value={user.id} disabled={unavailable}>
+                    {user.name?.trim() || "Unnamed user"} · {user.email}
+                    {unavailable ? " · already linked in this clinic" : ""}
+                  </option>
+                );
+              })}
+            </Select>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Input

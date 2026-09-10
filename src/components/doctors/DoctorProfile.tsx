@@ -58,6 +58,7 @@ export default function DoctorProfile({ doctor, canEdit, today, portalUsers }: D
             <DoctorForm
               clinics={[{ id: doctor.clinicId, name: doctor.clinicName }]}
               portalUsers={portalUserOptions}
+              portalLinkClinicIds={[doctor.clinicId]}
               initial={{
                 id: doctor.id,
                 clinicId: doctor.clinicId,

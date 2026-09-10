@@ -379,13 +379,12 @@ export async function listDoctorPortalUsersForActor(
       where: { tenantId: actor.tenantId },
       select: { id: true },
     }),
-    accessibleClinicScopes(actor, ["doctor:create", "doctor:edit"]),
+    accessibleClinicScopes(actor, ["doctor:edit"]),
   ]);
   const tenantClinicIds = clinics.map((clinic) => clinic.id);
-  const allowed = new Set([
-    ...scopeClinicIds(scopes.get("doctor:create") ?? { scope: "none" }, tenantClinicIds),
-    ...scopeClinicIds(scopes.get("doctor:edit") ?? { scope: "none" }, tenantClinicIds),
-  ]);
+  const allowed = new Set(
+    scopeClinicIds(scopes.get("doctor:edit") ?? { scope: "none" }, tenantClinicIds),
+  );
   const requested = options.clinicIds
     ? options.clinicIds.filter((id) => allowed.has(id))
     : [...allowed];
@@ -431,9 +430,17 @@ export async function createDoctor(
   // guessed id from another tenant cannot even reach it.
   await assertClinicInTenant(actor.tenantId, input.clinicId);
   await requirePermission(actor, "doctor:create", input.clinicId);
-  const mayEdit = await can(actor, "doctor:edit", input.clinicId);
   const userId = emptyToNull(input.userId ?? undefined) ?? null;
-  await assertPortalUserEligible(actor, input.clinicId, userId);
+  let mayEdit: boolean;
+  if (userId) {
+    // Portal identity controls patient-data access. Creating a Doctor profile
+    // does not authorize establishing that identity relationship.
+    await requirePermission(actor, "doctor:edit", input.clinicId);
+    mayEdit = true;
+    await assertPortalUserEligible(actor, input.clinicId, userId);
+  } else {
+    mayEdit = await can(actor, "doctor:edit", input.clinicId);
+  }
 
   let doctor;
   try {
