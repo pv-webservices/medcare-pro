@@ -61,7 +61,9 @@ export const APPOINTMENT_STATUS_ORDER: readonly AppointmentStatus[] = [
 export function formatAppointmentDate(date: string): string {
   // Parsed as UTC to match how the instant is stored, so the label cannot slip
   // a day for a reader west of Greenwich.
-  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
+  // Keep SSR and the browser's first render byte-identical. The UTC calendar
+  // semantics stay unchanged; only the previously implicit locale is fixed.
+  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",

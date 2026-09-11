@@ -98,7 +98,10 @@ function formatDayWithWeekday(date: string): string {
   if (Number.isNaN(parsed.getTime())) {
     return date;
   }
-  return parsed.toLocaleDateString(undefined, {
+  // An explicit locale keeps the server-rendered label identical to the
+  // browser's first render; using the host/browser default can hydrate with a
+  // different weekday/month order even though both represent the same date.
+  return parsed.toLocaleDateString("en-IN", {
     weekday: "long",
     day: "numeric",
     month: "short",

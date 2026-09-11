@@ -106,4 +106,8 @@ describe("formatAppointmentDate", () => {
     expect(formatAppointmentDate("2026-12-21")).toContain("21");
     expect(formatAppointmentDate("2026-01-01")).toContain("2026");
   });
+
+  it("uses a deterministic server/client locale without changing the UTC day", () => {
+    expect(formatAppointmentDate("2026-12-21")).toBe("21 Dec 2026");
+  });
 });
