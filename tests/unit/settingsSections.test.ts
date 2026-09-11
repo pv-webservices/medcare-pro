@@ -178,6 +178,14 @@ describe("branding loses nobody", () => {
     (section) => section.href === "/settings/branding",
   )!;
 
+  it("is titled 'Clinics & branding' and preserves /settings/branding href", () => {
+    expect(branding.title).toBe("Clinics & branding");
+    expect(branding.href).toBe("/settings/branding");
+    expect(branding.description).toContain(
+      "Manage the selected clinic's details and branding, or manage all clinics in your organization.",
+    );
+  });
+
   it("still opens for a role holding only the clinic permissions", () => {
     // The whole reason viewPermissions is a list. Before Stage 10 the branding
     // page had no gate of its own and clinic:edit decided whether the form was

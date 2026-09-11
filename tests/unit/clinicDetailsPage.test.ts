@@ -11,16 +11,44 @@ const formSource = readFileSync(
   "utf8",
 );
 
-describe("Settings → Clinic Details Page Redesign", () => {
-  it("renders breadcrumbs Settings > Clinic details", () => {
+describe("Settings → Clinics & Branding Page", () => {
+  it("renders breadcrumbs Settings > Clinics & branding", () => {
     expect(pageSource).toContain('href="/settings"');
-    expect(pageSource).toContain("Clinic details");
+    expect(pageSource).toContain("Clinics & branding");
   });
 
-  it("renders Clinic details page heading with icon and subtitle", () => {
-    expect(pageSource).toContain("Clinic details");
-    expect(pageSource).toContain("name, address, and branding information");
+  it("renders Clinics & branding page heading with icon and subtitle", () => {
+    expect(pageSource).toContain("Clinics & branding");
+    expect(pageSource).toContain(
+      "Manage this clinic&apos;s details and branding, or open organization-level clinic management.",
+    );
     expect(pageSource).toContain("<BrandingForm");
+  });
+
+  it("renders 'Manage all clinics' CTA pointing to /clinics", () => {
+    expect(pageSource).toContain('href="/clinics"');
+    expect(pageSource).toContain("Manage all clinics");
+    expect(pageSource).toContain("showManageAllClinics");
+  });
+
+  it("checks Clinics module feature lock and user permissions before showing CTA", () => {
+    expect(pageSource).toContain("MODULE_FEATURES.clinics");
+    expect(pageSource).toContain("moduleLock(");
+    expect(pageSource).toContain("accessibleClinicScope(");
+    expect(pageSource).toContain('can(actor, "clinic:create")');
+  });
+
+  it("provides actionable empty account state when user has clinic:create", () => {
+    expect(pageSource).toContain(
+      "No clinic has been added yet. Create your first clinic to configure its doctors, appointments, branding and operations.",
+    );
+    expect(pageSource).toContain("Add clinic");
+  });
+
+  it("provides organization management navigation when multiple clinics exist and none selected", () => {
+    expect(pageSource).toContain(
+      "Pick a clinic in the sidebar to edit its details.",
+    );
   });
 
   it("renders a 2-column responsive layout on desktop", () => {

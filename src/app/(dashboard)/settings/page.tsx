@@ -77,7 +77,8 @@ const SECTION_STYLES: Record<string, SectionStyle> = {
     icon: Building2,
     iconBg: "bg-[#fce7f3] dark:bg-alert-bg",
     iconColor: "text-[#db2777] dark:text-alert-mark",
-    displayDescription: "Update your clinic's name, address, location, and logo.",
+    displayDescription:
+      "Update the selected clinic's details and branding, or manage all clinics in your organization.",
   },
   "/settings/phone-menu": {
     icon: PhoneCall,

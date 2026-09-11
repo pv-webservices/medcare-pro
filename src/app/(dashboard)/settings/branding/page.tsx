@@ -1,15 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2 } from "lucide-react";
+import { ArrowRight, Building2, Plus } from "lucide-react";
 import BrandingForm from "@/components/settings/BrandingForm";
+import { buttonClasses } from "@/components/ui/Button";
 import { getClinicForActor, listClinicsForActor } from "@/lib/clinics";
-import { can, holdsAnywhere, permissionsHeldAnywhere } from "@/lib/rbac";
+import { MODULE_FEATURES, moduleLock } from "@/lib/features";
+import {
+  accessibleClinicScope,
+  can,
+  holdsAnywhere,
+  permissionsHeldAnywhere,
+} from "@/lib/rbac";
 import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import { SETTINGS_SECTIONS } from "@/lib/settingsSections";
 
-// Clinic details — PRD §6.8 (FR-8.3, FR-8.4) plus the clinic's own name,
-// address and city.
+// Clinics & branding — PRD §6.8 (FR-8.3, FR-8.4) plus the clinic's own name,
+// address and city, and organization-level clinic management discoverability.
 
 const BRANDING = SETTINGS_SECTIONS.find(
   (section) => section.href === "/settings/branding",
@@ -40,12 +47,89 @@ export default async function BrandingSettingsPage() {
     );
   }
 
-  const [clinics, selectedClinicId] = await Promise.all([
+  const [
+    clinics,
+    selectedClinicId,
+    clinicsLockReason,
+    readScope,
+    canCreateClinic,
+  ] = await Promise.all([
     listClinicsForActor(actor),
     resolveSelectedClinicId(actor),
+    moduleLock(actor, MODULE_FEATURES.clinics),
+    accessibleClinicScope(actor, "clinic:read"),
+    can(actor, "clinic:create"),
   ]);
 
+  const isClinicsModuleUnlocked = clinicsLockReason === null;
+  const canManageAnywhere =
+    holds("clinic:edit") || holds("settings:manage") || canCreateClinic;
+
+  // Organization-level management CTA logic:
+  // - Organization Owner or Tenant-wide Admin has readScope.scope === "all" and canManageAnywhere
+  // - Clinic-scoped manager with multiple clinics has readScope.scope === "clinics" && readScope.clinicIds.length > 1
+  const showManageAllClinics =
+    isClinicsModuleUnlocked &&
+    readScope.scope === "all" &&
+    canManageAnywhere;
+
+  const showViewScopedClinics =
+    !showManageAllClinics &&
+    isClinicsModuleUnlocked &&
+    readScope.scope === "clinics" &&
+    readScope.clinicIds.length > 1 &&
+    canManageAnywhere;
+
   if (clinics.length === 0) {
+    if (canCreateClinic && isClinicsModuleUnlocked) {
+      return (
+        <div className="space-y-5">
+          {/* Breadcrumbs */}
+          <nav aria-label="Breadcrumb">
+            <ol className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              <li>
+                <Link href="/settings" className="hover:text-slate-800 transition-colors">
+                  Settings
+                </Link>
+              </li>
+              <li className="text-slate-400">&gt;</li>
+              <li className="text-slate-700 font-semibold">Clinics & branding</li>
+            </ol>
+          </nav>
+
+          {/* Page Heading */}
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                Clinics & branding
+              </h1>
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+                Manage this clinic&apos;s details and branding, or open organization-level clinic management.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-600 shadow-sm space-y-4">
+            <p>
+              No clinic has been added yet. Create your first clinic to configure its doctors, appointments, branding and operations.
+            </p>
+            <div>
+              <Link
+                href="/clinics"
+                className={buttonClasses("primary", "md", "gap-2")}
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                Add clinic
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6">
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-600 shadow-sm">
@@ -62,10 +146,74 @@ export default async function BrandingSettingsPage() {
 
   if (!clinicId) {
     return (
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-600 shadow-sm">
-          Pick a clinic in the sidebar to edit its details. Each clinic keeps
-          its own name, address and logo.
+      <div className="space-y-5">
+        {/* Breadcrumbs */}
+        <nav aria-label="Breadcrumb">
+          <ol className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            <li>
+              <Link href="/settings" className="hover:text-slate-800 transition-colors">
+                Settings
+              </Link>
+            </li>
+            <li className="text-slate-400">&gt;</li>
+            <li className="text-slate-700 font-semibold">Clinics & branding</li>
+          </ol>
+        </nav>
+
+        {/* Page Heading with CTA if authorized */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                Clinics & branding
+              </h1>
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+                Manage this clinic&apos;s details and branding, or open organization-level clinic management.
+              </p>
+            </div>
+          </div>
+
+          {showManageAllClinics && (
+            <Link
+              href="/clinics"
+              className={buttonClasses("secondary", "md", "gap-2 shrink-0")}
+            >
+              <Building2 aria-hidden="true" className="h-4 w-4 text-muted" />
+              <span>Manage all clinics</span>
+              <ArrowRight aria-hidden="true" className="h-4 w-4 text-muted" />
+            </Link>
+          )}
+
+          {showViewScopedClinics && (
+            <Link
+              href="/clinics"
+              className={buttonClasses("secondary", "md", "gap-2 shrink-0")}
+            >
+              <span>View clinics</span>
+              <ArrowRight aria-hidden="true" className="h-4 w-4 text-muted" />
+            </Link>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-600 shadow-sm space-y-4">
+          <p>
+            Pick a clinic in the sidebar to edit its details. Each clinic keeps
+            its own name, address and logo.
+          </p>
+          {showManageAllClinics && (
+            <div>
+              <Link
+                href="/clinics"
+                className={buttonClasses("secondary", "md", "gap-2")}
+              >
+                <span>Manage all clinics</span>
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -92,23 +240,51 @@ export default async function BrandingSettingsPage() {
             </Link>
           </li>
           <li className="text-slate-400">&gt;</li>
-          <li className="text-slate-700 font-semibold">Clinic details</li>
+          <li className="text-slate-700 font-semibold">Clinics & branding</li>
         </ol>
       </nav>
 
-      {/* Page Heading */}
-      <div className="flex items-start gap-3.5">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs">
-          <Building2 className="h-5 w-5" />
+      {/* Page Heading & Manage all clinics CTA */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3.5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-2xs">
+            <Building2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              Clinics & branding
+            </h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+              Manage this clinic&apos;s details and branding, or open organization-level clinic management.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            Clinic details
-          </h1>
-          <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-            Manage your clinic&apos;s name, address, and branding information.
-          </p>
-        </div>
+
+        {showManageAllClinics && (
+          <div className="flex flex-col sm:items-end gap-1 shrink-0">
+            <Link
+              href="/clinics"
+              className={buttonClasses("secondary", "md", "gap-2 shrink-0")}
+            >
+              <Building2 aria-hidden="true" className="h-4 w-4 text-muted" />
+              <span>Manage all clinics</span>
+              <ArrowRight aria-hidden="true" className="h-4 w-4 text-muted" />
+            </Link>
+            <span className="text-[11px] text-muted hidden sm:inline">
+              Need another location? Manage organization branches
+            </span>
+          </div>
+        )}
+
+        {showViewScopedClinics && (
+          <Link
+            href="/clinics"
+            className={buttonClasses("secondary", "md", "gap-2 shrink-0")}
+          >
+            <span>View clinics</span>
+            <ArrowRight aria-hidden="true" className="h-4 w-4 text-muted" />
+          </Link>
+        )}
       </div>
 
       {/* Main 2-Column Responsive Form & Branding Tips Layout */}

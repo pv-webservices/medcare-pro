@@ -21,14 +21,20 @@ import PageHeader from "@/components/ui/PageHeader";
 interface AddClinicPanelProps {
   /** The page's meta line, rendered under the title. */
   meta: ReactNode;
+  /** Optional return path / back link */
+  back?: { href: string; label: string };
 }
 
-export default function AddClinicPanel({ meta }: AddClinicPanelProps) {
+export default function AddClinicPanel({
+  meta,
+  back = { href: "/settings/branding", label: "Clinics & branding" },
+}: AddClinicPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <>
       <PageHeader
+        back={back}
         title="Clinics"
         description="Every clinic in this account, with its doctors and patients."
         meta={meta}

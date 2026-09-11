@@ -65,9 +65,10 @@ export default async function ClinicsListPage() {
           the title; the form it opens needs the full width, so the component
           owns both slots rather than being wedged into the header. */}
       {canCreate ? (
-        <AddClinicPanel meta={meta} />
+        <AddClinicPanel meta={meta} back={{ href: "/settings/branding", label: "Clinics & branding" }} />
       ) : (
         <PageHeader
+          back={{ href: "/settings/branding", label: "Clinics & branding" }}
           title="Clinics"
           description="Every clinic in this account, with its doctors and patients."
           meta={meta}
