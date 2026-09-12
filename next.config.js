@@ -59,6 +59,19 @@ const deploymentId = resolveDeploymentId();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    const headers = [
+      { key: "Cache-Control", value: "private, no-store, max-age=0" },
+      { key: "Referrer-Policy", value: "no-referrer" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+    ];
+    return [
+      { source: "/patient/:path*", headers },
+      { source: "/api/patient-portal/:path*", headers },
+      { source: "/api/patients/:id/portal/:path*", headers },
+    ];
+  },
   // Enables cache busting and client recovery during rolling deployments.
   deploymentId,
 

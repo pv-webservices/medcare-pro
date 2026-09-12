@@ -1,4 +1,5 @@
 import Link from "next/link";
+import StaffPortalCard from "@/components/patientPortal/StaffPortalCard";
 import PrescriptionHistory from "@/components/prescriptions/PrescriptionHistory";
 import { getConsultationForRegistration, listPatientPrescriptions } from "@/lib/prescriptions";
 import { notFound, redirect } from "next/navigation";
@@ -75,6 +76,7 @@ export default async function RegistrationDetailPage({
 
   return (
     <section className="space-y-6">
+      {await can(actor, "patient_portal:manage", registration.clinicId) && <StaffPortalCard patientId={registration.patientId} patientName={registration.patientName} />}
       {clinical && <div className="space-y-4 rounded-2xl border border-line bg-canvas p-5">
         <h2 className="text-lg font-semibold">Clinical consultation</h2>
         <p className="text-muted">{clinical.prescription ? `${clinical.prescription.status} · Version ${clinical.prescription.version}` : "No consultation recorded yet."}</p>

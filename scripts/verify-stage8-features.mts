@@ -23,6 +23,7 @@
  * rows, and must never be aimed at a real clinic's data.
  */
 import { BadRequestError } from "@/lib/apiHandler";
+import { TENANT_SCOPED_FEATURES } from "@/lib/moduleFeatures";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultRoles } from "@/lib/defaultRoles";
 import { seedFeatureCatalogue, DEFAULT_PLAN_KEY } from "@/lib/defaultFeatures";
@@ -610,9 +611,9 @@ async function main(): Promise<void> {
   check("names the plan", overview.planName === "Standard", overview.planName);
   check("the owner may manage", overview.canManage === true);
   check(
-    "lists every catalogue feature",
+    "lists every staff catalogue feature",
     overview.features.length ===
-      (await prisma.feature.count()),
+      (await prisma.feature.count({ where: { key: { notIn: Object.values(TENANT_SCOPED_FEATURES) } } })),
     overview.features.length,
   );
   check(
