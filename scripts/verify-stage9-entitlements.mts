@@ -72,9 +72,12 @@ async function expectRefusal(
     await fn();
     check(label, false, "did not throw");
   } catch (error: unknown) {
+    const isBad =
+      error instanceof BadRequestError ||
+      (error instanceof Error && error.name === "BadRequestError");
     check(
       label,
-      error instanceof BadRequestError && error.message.includes(contains),
+      isBad && error instanceof Error && error.message.includes(contains),
       error,
     );
   }
