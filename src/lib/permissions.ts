@@ -183,6 +183,7 @@ export const PRESCRIPTION_PERMISSIONS: readonly string[] = [
 ];
 
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
+  { module: "Patient portal", permissions: [{ key: "patient_portal:manage", label: "Manage patient portal access", description: "Activate, resend and revoke portal access for verified patients." }] },
   {
     module: "Prescriptions",
     permissions: [
@@ -782,6 +783,7 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    permission !== "patient_portal:manage" &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
@@ -836,6 +838,7 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
   (permission) =>
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    permission !== "patient_portal:manage" &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
@@ -882,7 +885,8 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
   ALL_PERMISSIONS.filter(
     (permission) =>
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
-      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+      permission !== "patient_portal:manage" &&
+    !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
       !DASHBOARD_LAYOUT_PERMISSIONS.includes(

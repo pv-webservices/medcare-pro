@@ -156,6 +156,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
     // notifications and messaging. Staff's own array is deliberately NOT
     // narrowed to make room for this — existing tenants already grant it.
     permissions: [
+      "patient_portal:manage",
       "clinic:read",
       "doctor:read",
       "patient:read",
@@ -203,7 +204,7 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.OWNER]: [WILDCARD],
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
-      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+      permission !== "patient_portal:manage" && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(
         permission as (typeof TASK_PERMISSIONS)[number],
       ) &&
@@ -298,7 +299,7 @@ export const PRE_TASK_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.OWNER]: [WILDCARD],
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
-      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+      permission !== "patient_portal:manage" && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       permission !== "dashboard:tasks:view" &&
       !DASHBOARD_LAYOUT_PERMISSIONS.includes(
         permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
@@ -479,11 +480,11 @@ export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
   Partial<Record<RoleKey, readonly string[]>>
 > = {
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
-    (permission) => !PRESCRIPTION_PERMISSIONS.includes(permission) && !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
+    (permission) => permission !== "patient_portal:manage" && !PRESCRIPTION_PERMISSIONS.includes(permission) && !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
   ),
   [ROLE_KEYS.DOCTOR]: DEFAULT_ROLES.find(
     (role) => role.key === ROLE_KEYS.DOCTOR,
-  )!.permissions.filter((permission) => !PRESCRIPTION_PERMISSIONS.includes(permission)).map((permission) =>
+  )!.permissions.filter((permission) => permission !== "patient_portal:manage" && !PRESCRIPTION_PERMISSIONS.includes(permission)).map((permission) =>
     permission === "appointment:self:read" ? "appointment:read" : permission,
   ),
 };

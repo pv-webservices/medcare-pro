@@ -176,6 +176,7 @@ describe("the audit:read permission", () => {
     // the guardrail doing its job rather than a test that needed relaxing.
     // Every future stage joins this array too.
     const combined = [
+      "patient_portal:manage",
       ...STAGE_1_PERMISSIONS,
       ...STAGE_11_PERMISSIONS,
       ...STAGE_AP1_PERMISSIONS,
@@ -209,7 +210,7 @@ describe("the audit:read permission", () => {
     // comparison never matches again and scripts/backfill-stage11.mts silently
     // stops handing out audit:read to the organisations still owed it.
     expect(PRE_STAGE_11_PERMISSIONS.length).toBe(
-      ALL_PERMISSIONS.length -
+      ALL_PERMISSIONS.length - 1 -
         STAGE_11_PERMISSIONS.length -
         STAGE_AP1_PERMISSIONS.length -
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -

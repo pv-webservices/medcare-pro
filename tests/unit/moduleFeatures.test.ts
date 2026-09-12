@@ -9,6 +9,7 @@ import {
   CATALOGUE_FEATURE_KEYS,
   MODULE_FEATURES,
   UNGATED_MODULES,
+  TENANT_SCOPED_FEATURES,
 } from "@/lib/moduleFeatures";
 import { NAV_LINKS } from "@/lib/navigation";
 
@@ -73,7 +74,8 @@ describe("MODULE_FEATURES", () => {
       const isGated = Object.values(MODULE_FEATURES).includes(
         key as (typeof MODULE_FEATURES)[keyof typeof MODULE_FEATURES],
       );
-      expect(isGated || key in UNGATED_MODULES).toBe(true);
+      const tenantScoped = Object.values(TENANT_SCOPED_FEATURES).some(value => value === key);
+      expect(isGated || tenantScoped || key in UNGATED_MODULES).toBe(true);
     }
   });
 });

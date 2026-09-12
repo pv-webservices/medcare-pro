@@ -37,6 +37,7 @@ export interface DefaultFeatureDefinition {
  * governs.
  */
 export const DEFAULT_FEATURES: readonly DefaultFeatureDefinition[] = [
+  { key: "patient_portal", name: "Patient portal", description: "Secure self-service access to personal visits, appointments and issued prescriptions.", tier: "CORE", globalEnabled: true, inDefaultPlan: true },
   {
     key: "prescriptions",
     name: "Electronic prescriptions",

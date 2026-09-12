@@ -63,6 +63,10 @@ export interface AuditDescription {
 export const AUDIT_DESCRIPTIONS: Readonly<
   Record<AuditAction, AuditDescription>
 > = {
+  [AUDIT_ACTIONS.PATIENT_PORTAL_ACTIVATION_CREATED]: { label: "Patient portal activation created", detail: "Authorized staff confirmed identity and created a short-lived patient activation.", side: "tenant", category: "access" },
+  [AUDIT_ACTIONS.PATIENT_PORTAL_ACTIVATION_RESENT]: { label: "Patient portal activation resent", detail: "A new identity-verified activation replaced the previous link.", side: "tenant", category: "access" },
+  [AUDIT_ACTIONS.PATIENT_PORTAL_ACCESS_REVOKED]: { label: "Patient portal access revoked", detail: "Patient access and current portal sessions were revoked immediately.", side: "tenant", category: "access" },
+  [AUDIT_ACTIONS.PATIENT_PORTAL_ACCESS_REENABLED]: { label: "Patient portal reactivation created", detail: "Staff confirmed identity again and created a new patient activation.", side: "tenant", category: "access" },
   [AUDIT_ACTIONS.CONSULTATION_CREATED]: { label: "Consultation started", detail: "A visit consultation was created.", side: "tenant", category: "prescriptions" },
   [AUDIT_ACTIONS.CONSULTATION_UPDATED]: { label: "Consultation draft saved", detail: "An authorized user explicitly saved a clinical draft.", side: "tenant", category: "prescriptions" },
   [AUDIT_ACTIONS.PRESCRIPTION_DRAFT_CREATED]: { label: "Prescription draft created", detail: "A structured visit prescription draft was prepared.", side: "tenant", category: "prescriptions" },

@@ -1,0 +1,231 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality & Database Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci_test_password
+          MARIADB_DATABASE: medcare_ep_portal_ci
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=3s --health-retries=10
+
+    env:
+      CI: "true"
+      DATABASE_URL: "mysql://root:ci_test_password@127.0.0.1:3306/medcare_ep_portal_ci"
+      AUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
+      NEXTAUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
+      PATIENT_PORTAL_OTP_SECRET: "disposable-ci-patient-portal-otp-pepper-2026!"
+      LOGIN_CODE_PEPPER: "disposable-ci-login-code-pepper-32bytes-long!"
+      AUTH_URL: "http://localhost:3000"
+      NEXTAUTH_URL: "http://localhost:3000"
+      PATIENT_PORTAL_TEST_TRANSPORT: "local-file"
+      PATIENT_PORTAL_TEST_OUTBOX: "/tmp/portal-outbox"
+      TZ: "Asia/Kolkata"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Deploy database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed base feature catalogue
+        run: npx tsx prisma/seed.ts
+
+      - name: Apply patient portal backfill
+        run: npm run patient-portal:backfill -- --apply
+
+      - name: Run TypeScript check
+        run: npm run typecheck
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run full Vitest regression suite
+        run: npm test -- --maxWorkers=4
+
+      - name: Run Patient Portal verifier
+        run: npm run verify:patient-portal
+
+      - name: Run Patient Portal database tests
+        run: npm run test:patient-portal
+
+      - name: Run Prescription verifier
+        run: npm run verify:prescriptions
+
+      - name: Run Prescription database tests
+        run: npm run test:prescriptions
+
+      - name: Run Registrations verifier
+        run: npm run verify:registrations
+
+      - name: Run Roles and RBAC verifier
+        run: npm run verify:roles
+
+      - name: Run Stage 8 feature flags verifier
+        run: npm run verify:stage8
+
+      - name: Run Stage 9 entitlements verifier
+        run: npm run verify:stage9
+
+      - name: Run AP-5 appointment conversion verifier
+        run: npm run verify:ap5-appointment-conversion
+
+      - name: Run production build
+        run: npm run build
+
+  patient-portal-e2e:
+    name: Patient Portal Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci_test_password
+          MARIADB_DATABASE: medcare_ep_portal_ci
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=3s --health-retries=10
+
+    env:
+      CI: "true"
+      DATABASE_URL: "mysql://root:ci_test_password@127.0.0.1:3306/medcare_ep_portal_ci"
+      AUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
+      NEXTAUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
+      PATIENT_PORTAL_OTP_SECRET: "disposable-ci-patient-portal-otp-pepper-2026!"
+      LOGIN_CODE_PEPPER: "disposable-ci-login-code-pepper-32bytes-long!"
+      AUTH_URL: "http://127.0.0.1:33322"
+      NEXTAUTH_URL: "http://127.0.0.1:33322"
+      PATIENT_PORTAL_TEST_TRANSPORT: "local-file"
+      PATIENT_PORTAL_TEST_OUTBOX: "/tmp/portal-outbox"
+      TZ: "Asia/Kolkata"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Deploy database migrations
+        run: npx prisma migrate deploy
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Patient Portal Playwright E2E tests
+        run: npm run test:e2e:patient-portal
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patient-portal-playwright-results
+          path: test-results/
+          retention-days: 7
+
+  prescription-e2e:
+    name: Prescription Playwright Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci_test_password
+          MARIADB_DATABASE: medcare_ep_portal_ci
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=3s --health-retries=10
+
+    env:
+      CI: "true"
+      DATABASE_URL: "mysql://root:ci_test_password@127.0.0.1:3306/medcare_ep_portal_ci"
+      AUTH_SECRET: "disposable-prescription-e2e-secret"
+      NEXTAUTH_SECRET: "disposable-prescription-e2e-secret"
+      AUTH_URL: "http://127.0.0.1:33312"
+      NEXTAUTH_URL: "http://127.0.0.1:33312"
+      TZ: "Asia/Kolkata"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Deploy database migrations
+        run: npx prisma migrate deploy
+
+      - name: Build Next.js production bundle
+        run: npx next build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Prescription Playwright E2E tests
+        run: npm run test:e2e:prescriptions
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prescription-playwright-results
+          path: test-results/
+          retention-days: 7
