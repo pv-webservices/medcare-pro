@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireOwnerPage } from "@/lib/platform/ownerPage";
 import { getPlanAdmin } from "@/lib/platform/entitlements";
 import PlanFeatureEditor from "@/components/owner/PlanFeatureEditor";
+import PlanClinicPolicyEditor from "@/components/owner/PlanClinicPolicyEditor";
 
 /**
  * What each plan includes — Stage 9, layer 2a.
@@ -43,6 +44,8 @@ export default async function OwnerPlansPage() {
           instead.
         </p>
       </div>
+
+      <PlanClinicPolicyEditor plans={plans} />
 
       <PlanFeatureEditor plans={plans} />
 

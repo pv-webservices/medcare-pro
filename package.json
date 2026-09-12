@@ -50,6 +50,9 @@
     "verify:ap8-appointment-notifications": "tsx scripts/verify-ap8-appointment-notifications.mts",
     "verify:ap9-appointment-edit": "tsx scripts/verify-ap9-appointment-edit.mts",
     "clinics:backfill": "tsx scripts/backfill-tenant-clinics.mts",
+    "clinic-capacity:report": "tsx scripts/report-clinic-capacity.mts",
+    "verify:clinic-capacity": "tsx scripts/verify-clinic-capacity.mts",
+    "test:e2e:clinic-capacity": "playwright test --config=playwright.clinic-capacity.config.ts",
     "ivr:backfill": "tsx scripts/backfill-ivr.mts",
     "plivo-numbers:backfill": "tsx scripts/backfill-plivo-number-inventory.mts",
     "plivo-quarantine-origin:backfill": "tsx scripts/backfill-plivo-quarantine-origin.mts"
@@ -72,6 +75,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/busboy": "^1.5.4",
     "@types/node": "^20",

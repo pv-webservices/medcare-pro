@@ -61,6 +61,9 @@ export const NOTIFICATION_TYPES = [
   "appointment.cancelled",
   "appointment.no_show",
   "appointment.rescheduled",
+  "clinic.capacity_approved",
+  "clinic.capacity_rejected",
+  "clinic.capacity_payment_attention",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -79,6 +82,9 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   "appointment.cancelled": "Appointment cancelled",
   "appointment.no_show": "Appointment missed",
   "appointment.rescheduled": "Appointment moved",
+  "clinic.capacity_approved": "Clinic capacity approved",
+  "clinic.capacity_rejected": "Clinic capacity request rejected",
+  "clinic.capacity_payment_attention": "Clinic capacity payment",
 };
 
 const DEFAULT_LIMIT = 50;
@@ -215,6 +221,24 @@ export async function notifyClinicUpdated(
     type: "clinic.updated",
     message: `${clinic.clinicName}'s details were updated by ${await actorName(actor)}.`,
     relatedRecordId: clinic.clinicId,
+  });
+}
+
+export async function notifyClinicCapacityDecision(input: {
+  tenantId: string;
+  type:
+    | "clinic.capacity_approved"
+    | "clinic.capacity_rejected"
+    | "clinic.capacity_payment_attention";
+  message: string;
+  requestId: string;
+}): Promise<void> {
+  await recordNotification({
+    tenantId: input.tenantId,
+    clinicId: null,
+    type: input.type,
+    message: input.message,
+    relatedRecordId: input.requestId,
   });
 }
 
@@ -430,6 +454,7 @@ function hrefFor(type: string, relatedRecordId: string | null): string | null {
   if (!relatedRecordId) {
     return null;
   }
+  if (type.startsWith("clinic.capacity_")) return "/clinics";
   if (type.startsWith("clinic.")) return `/clinics/${relatedRecordId}`;
   if (type.startsWith("doctor.")) return `/doctors/${relatedRecordId}`;
   if (type.startsWith("registration.")) return `/registration/${relatedRecordId}`;

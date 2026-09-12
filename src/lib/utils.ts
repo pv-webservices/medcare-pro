@@ -7,6 +7,8 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  /** Stable machine code for recoverable domain failures. */
+  code?: string;
   /**
    * Human-readable note accompanying a *successful* response. Used where the
    * outcome is deliberately ambiguous — e.g. the verification resend endpoint,

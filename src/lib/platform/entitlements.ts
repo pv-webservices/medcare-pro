@@ -379,6 +379,10 @@ export interface PlanAdminRow {
   isActive: boolean;
   /** Customer organisations currently on this plan. */
   tenantCount: number;
+  includedClinics: number;
+  additionalClinicPrice: string | null;
+  additionalClinicCurrency: string;
+  additionalClinicBillingInterval: "MONTHLY" | "YEARLY" | "ONE_TIME" | null;
   features: PlanAdminFeature[];
 }
 
@@ -394,6 +398,10 @@ export async function getPlanAdmin(
         name: true,
         description: true,
         isActive: true,
+        includedClinics: true,
+        additionalClinicPrice: true,
+        additionalClinicCurrency: true,
+        additionalClinicBillingInterval: true,
         features: { select: { featureId: true, enabled: true } },
       },
     }),
@@ -423,6 +431,10 @@ export async function getPlanAdmin(
       description: plan.description,
       isActive: plan.isActive,
       tenantCount: tenantsByPlan.get(plan.id) ?? 0,
+      includedClinics: plan.includedClinics,
+      additionalClinicPrice: plan.additionalClinicPrice?.toFixed(2) ?? null,
+      additionalClinicCurrency: plan.additionalClinicCurrency,
+      additionalClinicBillingInterval: plan.additionalClinicBillingInterval,
       features: features.map((feature) => ({
         key: feature.key,
         name: feature.name,

@@ -12,6 +12,10 @@ import {
   MediaAccessError,
 } from "@/lib/mediaTypes";
 import { InvalidTokenError } from "@/lib/mediaSecurity";
+import {
+  ClinicCapacityConfigurationError,
+  ClinicLimitReachedError,
+} from "@/lib/clinicCapacityErrors";
 
 /**
  * Shared error mapping for API routes.
@@ -87,8 +91,12 @@ export function jsonOk<T>(data: T, status = 200): NextResponse<ApiResponse<T>> {
 export function jsonError(
   error: string,
   status: number,
+  code?: string,
 ): NextResponse<ApiResponse<never>> {
-  return NextResponse.json({ success: false, error }, { status });
+  return NextResponse.json(
+    { success: false, error, ...(code ? { code } : {}) },
+    { status },
+  );
 }
 
 /**
@@ -136,6 +144,13 @@ export function toErrorResponse(
 
   if (error instanceof BadRequestError) {
     return jsonError(error.message, 400);
+  }
+
+  if (
+    error instanceof ClinicLimitReachedError ||
+    error instanceof ClinicCapacityConfigurationError
+  ) {
+    return jsonError(error.message, 409, error.code);
   }
 
   // Stage 4. The message is fixed and subject-free by construction (see

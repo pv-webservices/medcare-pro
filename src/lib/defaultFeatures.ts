@@ -173,6 +173,7 @@ export const DEFAULT_PLAN = {
   description:
     "Everything in MEDCARE PRO today. The baseline every existing organisation was migrated onto.",
   sortOrder: 0,
+  includedClinics: 2,
 } as const;
 
 /**
@@ -218,6 +219,7 @@ export async function seedFeatureCatalogue(
         name: DEFAULT_PLAN.name,
         description: DEFAULT_PLAN.description,
         sortOrder: DEFAULT_PLAN.sortOrder,
+        includedClinics: DEFAULT_PLAN.includedClinics,
       },
       select: { id: true },
     }));

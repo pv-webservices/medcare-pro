@@ -8,6 +8,7 @@ import {
   Building2,
   LayoutGrid,
   Layers,
+  ListPlus,
   LogOut,
   Menu as MenuIcon,
   PhoneIncoming,
@@ -69,6 +70,11 @@ const MANAGEMENT_NAV: NavItem[] = [
     label: "Platform features",
     href: "/owner/features",
     icon: ToggleLeft,
+  },
+  {
+    label: "Clinic requests",
+    href: "/owner/clinic-requests",
+    icon: ListPlus,
   },
   {
     label: "IVR numbers",

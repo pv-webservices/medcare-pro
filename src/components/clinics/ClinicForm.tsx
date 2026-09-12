@@ -37,8 +37,6 @@ const EMPTY: ClinicFormValues = {
   themeColor: "",
 };
 
-const HEX_COLOR = /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-
 type FieldErrors = Partial<Record<keyof ClinicFormValues, string>>;
 
 /** Mirrors the zod rules in src/lib/clinics.ts — the server remains authoritative. */
@@ -79,7 +77,6 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
 
   const errors = validate(values);
   const hasErrors = Object.keys(errors).length > 0;
-  const swatch = values.themeColor.trim();
   const hasUploadedLogo = values.logoUrl.startsWith("data:image/");
 
   function update(field: keyof ClinicFormValues, value: string) {
@@ -148,10 +145,18 @@ export default function ClinicForm({ initial, onCancel }: ClinicFormProps) {
         },
       );
 
-      const body: { success?: boolean; error?: string; data?: { id: string } } =
+      const body: { success?: boolean; error?: string; code?: string; data?: { id: string } } =
         await response.json().catch(() => ({}));
 
       if (!response.ok || !body.success) {
+        if (!isEdit && body.code === "CLINIC_LIMIT_REACHED") {
+          showToast({
+            tone: "alert",
+            title: "Clinic limit reached",
+            detail: "Another clinic may have used the final slot. Capacity has been refreshed.",
+          });
+          router.refresh();
+        }
         setFormError(body.error ?? "Could not save the clinic. Try again.");
         return;
       }

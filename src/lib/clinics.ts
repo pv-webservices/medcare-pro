@@ -9,6 +9,12 @@ import {
   ScopeError,
   type ActorContext,
 } from "@/lib/rbac";
+import {
+  assertClinicCapacityAvailable,
+  clinicCapacityTransactionOptions,
+  lockTenantForClinicCapacity,
+} from "@/lib/clinicCapacity";
+import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
 /**
  * Clinic data access — PRD §6.2 (FR-2.1 … FR-2.3).
@@ -189,28 +195,37 @@ export async function createClinic(
   actor: ActorContext,
   input: CreateClinicInput,
 ): Promise<ClinicSummary> {
+  await requireModule(actor, MODULE_FEATURES.clinics);
   await requirePermission(actor, "clinic:create");
 
-  const clinic = await prisma.clinic.create({
-    data: {
-      // From the session, never from the request body.
-      tenantId: actor.tenantId,
-      name: input.name,
-      address: emptyToNull(input.address) ?? null,
-      city: emptyToNull(input.city) ?? null,
-      logoUrl: emptyToNull(input.logoUrl) ?? null,
-      themeColor: emptyToNull(input.themeColor) ?? null,
-    },
-    select: {
-      id: true,
-      name: true,
-      address: true,
-      city: true,
-      logoUrl: true,
-      themeColor: true,
-      createdAt: true,
-    },
-  });
+  const clinic = await prisma.$transaction(async (tx) => {
+    // Serialise the allocation for this organisation. The capacity read and
+    // clinic insert share the same lock and transaction, so two callers cannot
+    // consume the final slot together.
+    await lockTenantForClinicCapacity(tx, actor.tenantId);
+    await assertClinicCapacityAvailable(actor.tenantId, tx);
+
+    return tx.clinic.create({
+      data: {
+        // From the session, never from the request body.
+        tenantId: actor.tenantId,
+        name: input.name,
+        address: emptyToNull(input.address) ?? null,
+        city: emptyToNull(input.city) ?? null,
+        logoUrl: emptyToNull(input.logoUrl) ?? null,
+        themeColor: emptyToNull(input.themeColor) ?? null,
+      },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        city: true,
+        logoUrl: true,
+        themeColor: true,
+        createdAt: true,
+      },
+    });
+  }, clinicCapacityTransactionOptions);
 
   // FR-7.1. After the write, never inside it: a feed row must not be able to
   // undo a clinic the user already created.

@@ -103,7 +103,7 @@ model Tenant {
   /// NOT NULL column with no default, which MySQL cannot add to a table that
   /// already holds rows — so the expand migration adds it nullable, the backfill
   /// sets it to created_at, and the constrain migration makes it NOT NULL.
-  updatedAt                    DateTime                  @updatedAt @map("updated_at")
+  updatedAt                    DateTime                    @updatedAt @map("updated_at")
   users                        User[]
   roles                        Role[]
   clinics                      Clinic[]
@@ -116,10 +116,10 @@ model Tenant {
   whatsappDevices              WhatsappDevice[]
   whatsappSettings             TenantWhatsappSettings?
   clinicWhatsappSettings       ClinicWhatsappSettings[]
-  plan                         Plan?                     @relation(fields: [planId], references: [id], onDelete: Restrict)
-  approvedBy                   User?                     @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  rejectedBy                   User?                     @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
-  suspendedBy                  User?                     @relation("TenantSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
+  plan                         Plan?                       @relation(fields: [planId], references: [id], onDelete: Restrict)
+  approvedBy                   User?                       @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy                   User?                       @relation("TenantRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  suspendedBy                  User?                       @relation("TenantSuspendedBy", fields: [suspendedById], references: [id], onDelete: SetNull)
   featureOverrides             TenantFeatureOverride[]
   invitations                  Invitation[]
   sessions                     AppSession[]
@@ -127,8 +127,10 @@ model Tenant {
   tasks                        Task[]
   dashboardLayouts             DashboardLayout[]
   telephonyBookingRequests     TelephonyBookingRequest[]
-  platformPlivoNumbers         PlatformPlivoNumber[]     @relation("PlatformPlivoAssignedTenant")
-  quarantineSourcePlivoNumbers PlatformPlivoNumber[]     @relation("PlatformPlivoQuarantineSourceTenant")
+  platformPlivoNumbers         PlatformPlivoNumber[]       @relation("PlatformPlivoAssignedTenant")
+  quarantineSourcePlivoNumbers PlatformPlivoNumber[]       @relation("PlatformPlivoQuarantineSourceTenant")
+  clinicCapacityRequests       ClinicCapacityRequest[]
+  clinicCapacityGrants         TenantClinicCapacityGrant[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   appointments     Appointment[]
@@ -231,11 +233,15 @@ model User {
   invitationsRevoked  Invitation[] @relation("InvitationRevokedBy")
   invitationsAccepted Invitation[] @relation("InvitationAcceptedBy")
 
-  rolesAssigned          UserRole[]                @relation("UserRoleAssignedBy")
-  featureFlagsChanged    Feature[]                 @relation("FeatureGlobalChangedBy")
-  tenantOverridesChanged TenantFeatureOverride[]   @relation("TenantOverrideChangedBy")
-  auditLogs              AuditLog[]
-  telephonyTestCalls     ClinicTelephonyTestCall[] @relation("ClinicTelephonyTestCallRequester")
+  rolesAssigned             UserRole[]                  @relation("UserRoleAssignedBy")
+  featureFlagsChanged       Feature[]                   @relation("FeatureGlobalChangedBy")
+  tenantOverridesChanged    TenantFeatureOverride[]     @relation("TenantOverrideChangedBy")
+  auditLogs                 AuditLog[]
+  telephonyTestCalls        ClinicTelephonyTestCall[]   @relation("ClinicTelephonyTestCallRequester")
+  clinicCapacityRequests    ClinicCapacityRequest[]     @relation("ClinicCapacityRequestedBy")
+  clinicCapacityReviews     ClinicCapacityRequest[]     @relation("ClinicCapacityReviewedBy")
+  clinicCapacityApprovals   TenantClinicCapacityGrant[] @relation("ClinicCapacityApprovedBy")
+  clinicCapacityRevocations TenantClinicCapacityGrant[] @relation("ClinicCapacityRevokedBy")
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   /// Restrict on the owning side, matching Registration.creator: the person who
@@ -787,12 +793,12 @@ model Doctor {
   /// Cascade on the owning side — these rows carry no data, only a lock.
   scheduleLocks DoctorScheduleLock[]
 
-  /// FR-4.1 counts doctors per clinic; the registration form filters by department.
-  @@index([clinicId])
   /// One portal login may represent the same clinician at multiple clinics,
   /// but never two Doctor profiles inside one clinic. MySQL permits multiple
   /// NULL values here, so existing unlinked profiles remain valid.
   @@unique([clinicId, userId])
+  /// FR-4.1 counts doctors per clinic; the registration form filters by department.
+  @@index([clinicId])
   @@index([userId])
   @@index([department])
   @@map("doctors")
@@ -1317,6 +1323,49 @@ enum FeatureTier {
   INTERNAL
 }
 
+enum ClinicCapacityBillingInterval {
+  MONTHLY
+  YEARLY
+  ONE_TIME
+}
+
+enum ClinicCapacityGrantType {
+  PAID_ADDON
+  COMPLIMENTARY
+  ENTERPRISE
+  MIGRATION
+}
+
+enum ClinicCapacityGrantStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum ClinicCapacityRequestType {
+  ADDITIONAL_CLINIC
+  PLAN_UPGRADE
+}
+
+enum ClinicCapacityRequestStatus {
+  PENDING
+  PAYMENT_PENDING
+  PAYMENT_SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ClinicCapacityPaymentStatus {
+  NOT_REQUIRED
+  PENDING
+  SUBMITTED
+  CONFIRMED
+  WAIVED
+  FAILED
+}
+
 // ---------------------------------------------------------------------------
 // Sessions — Stage 2/4.
 //
@@ -1501,23 +1550,100 @@ model Invitation {
 // ---------------------------------------------------------------------------
 
 model Plan {
-  id          String   @id @default(cuid())
+  id                              String                         @id @default(cuid())
   /// Stable machine key, e.g. "standard". Referenced by seeds and code.
-  key         String
-  name        String
-  description String?  @db.Text
+  key                             String
+  name                            String
+  description                     String?                        @db.Text
   /// Retire a plan by clearing this rather than deleting the row — tenants
   /// point at it, and the foreign key is Restrict for exactly that reason.
-  isActive    Boolean  @default(true) @map("is_active")
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  isActive                        Boolean                        @default(true) @map("is_active")
+  sortOrder                       Int                            @default(0) @map("sort_order")
+  /// Commercial clinic entitlement. The application validates a minimum of 1.
+  includedClinics                 Int                            @default(2) @map("included_clinics")
+  additionalClinicPrice           Decimal?                       @map("additional_clinic_price") @db.Decimal(10, 2)
+  additionalClinicCurrency        String                         @default("INR") @map("additional_clinic_currency") @db.VarChar(3)
+  additionalClinicBillingInterval ClinicCapacityBillingInterval? @map("additional_clinic_billing_interval")
+  createdAt                       DateTime                       @default(now()) @map("created_at")
+  updatedAt                       DateTime                       @updatedAt @map("updated_at")
 
-  tenants  Tenant[]
-  features PlanFeature[]
+  tenants                Tenant[]
+  features               PlanFeature[]
+  clinicCapacityRequests ClinicCapacityRequest[] @relation("ClinicCapacityRequestedPlan")
 
   @@unique([key])
   @@map("plans")
+}
+
+/// A tenant's request for more clinic capacity or a higher-capacity plan.
+/// Open-request uniqueness is serialized on the Tenant row in the service
+/// because MySQL does not support a portable partial unique index.
+model ClinicCapacityRequest {
+  id                String                         @id @default(cuid())
+  tenantId          String                         @map("tenant_id")
+  requestedById     String                         @map("requested_by_id")
+  requestType       ClinicCapacityRequestType      @map("request_type")
+  requestedQuantity Int?                           @map("requested_quantity")
+  requestedPlanId   String?                        @map("requested_plan_id")
+  status            ClinicCapacityRequestStatus    @default(PENDING)
+  unitPriceSnapshot Decimal?                       @map("unit_price_snapshot") @db.Decimal(10, 2)
+  currency          String?                        @db.VarChar(3)
+  billingInterval   ClinicCapacityBillingInterval? @map("billing_interval")
+  paymentStatus     ClinicCapacityPaymentStatus    @default(NOT_REQUIRED) @map("payment_status")
+  paymentReference  String?                        @map("payment_reference") @db.VarChar(255)
+  organizationNote  String?                        @map("organization_note") @db.Text
+  reviewNote        String?                        @map("review_note") @db.Text
+  reviewedById      String?                        @map("reviewed_by_id")
+  reviewedAt        DateTime?                      @map("reviewed_at")
+  rejectionReason   String?                        @map("rejection_reason") @db.Text
+  createdAt         DateTime                       @default(now()) @map("created_at")
+  updatedAt         DateTime                       @updatedAt @map("updated_at")
+
+  tenant        Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  requestedBy   User                       @relation("ClinicCapacityRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedPlan Plan?                      @relation("ClinicCapacityRequestedPlan", fields: [requestedPlanId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reviewedBy    User?                      @relation("ClinicCapacityReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  grant         TenantClinicCapacityGrant?
+
+  @@index([tenantId, status, createdAt])
+  @@index([requestType, status, createdAt])
+  @@index([requestedById])
+  @@index([requestedPlanId])
+  @@index([reviewedById])
+  @@map("clinic_capacity_requests")
+}
+
+/// An auditable increment to a tenant's plan-included clinic allowance.
+model TenantClinicCapacityGrant {
+  id                String                         @id @default(cuid())
+  tenantId          String                         @map("tenant_id")
+  quantity          Int
+  type              ClinicCapacityGrantType
+  status            ClinicCapacityGrantStatus      @default(ACTIVE)
+  sourceRequestId   String?                        @unique @map("source_request_id")
+  approvedById      String                         @map("approved_by_id")
+  approvedAt        DateTime                       @map("approved_at")
+  reason            String                         @db.Text
+  unitPriceSnapshot Decimal?                       @map("unit_price_snapshot") @db.Decimal(10, 2)
+  currency          String?                        @db.VarChar(3)
+  billingInterval   ClinicCapacityBillingInterval? @map("billing_interval")
+  startsAt          DateTime                       @default(now()) @map("starts_at")
+  expiresAt         DateTime?                      @map("expires_at")
+  revokedAt         DateTime?                      @map("revoked_at")
+  revokedById       String?                        @map("revoked_by_id")
+  revocationReason  String?                        @map("revocation_reason") @db.Text
+  createdAt         DateTime                       @default(now()) @map("created_at")
+  updatedAt         DateTime                       @updatedAt @map("updated_at")
+
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sourceRequest ClinicCapacityRequest? @relation(fields: [sourceRequestId], references: [id], onDelete: Restrict)
+  approvedBy    User                   @relation("ClinicCapacityApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  revokedBy     User?                  @relation("ClinicCapacityRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, startsAt, expiresAt], map: "clinic_capacity_grants_tenant_status_dates_idx")
+  @@index([approvedById])
+  @@index([revokedById])
+  @@map("tenant_clinic_capacity_grants")
 }
 
 model Feature {
