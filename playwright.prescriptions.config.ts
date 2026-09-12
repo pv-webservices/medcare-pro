@@ -10,7 +10,7 @@ if (!["localhost", "127.0.0.1"].includes(databaseHost))
   throw new Error("Prescription E2E requires disposable localhost database.");
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: "prescriptions.spec.ts",
+  testMatch: /prescriptions.*\.spec\.ts/,
   workers: 1,
   timeout: 90_000,
   use: {

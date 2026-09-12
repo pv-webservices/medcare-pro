@@ -241,7 +241,7 @@ export default function ConsultationWorkspace({
             onClose={() => setConfirmIssue(false)}
             isBusy={busy}
             title="Confirm clinical issuance"
-            description="Issuance permanently freezes this document. Corrections require a new version."
+            description="Once issued, this prescription becomes part of medical history and cannot be directly edited afterward. Corrections will require issuing a new version."
             footer={
               <>
                 <Button

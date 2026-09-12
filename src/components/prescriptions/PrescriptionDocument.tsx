@@ -29,8 +29,8 @@ export default function PrescriptionDocument({
           {status} — retained historical record
         </p>
       )}
-      <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-5">
-        <div>
+      <header className="flex flex-col gap-4 border-b-2 border-black pb-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="min-w-0">
           {/* Existing clinic branding supports uploaded URLs and data images. */}
           {clinic.logoUrl && (
             <Image
@@ -48,7 +48,7 @@ export default function PrescriptionDocument({
           <p>{clinic.city}</p>
           {clinic.phone && <p>Contact: {clinic.phone}</p>}
         </div>
-        <div className="text-right">
+        <div className="min-w-0 sm:text-right">
           <p className="text-lg font-semibold">{doctor.name}</p>
           <p>{doctor.qualification}</p>
           <p>{doctor.department}</p>
@@ -114,50 +114,52 @@ export default function PrescriptionDocument({
       )}
       <section>
         <h2 className="mb-3 text-3xl font-semibold">Rx</h2>
-        <table className="w-full border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b-2 border-black">
-              <th className="p-2"># / Medicine</th>
-              <th className="p-2">Dose / Route</th>
-              <th className="p-2">Frequency / Timing</th>
-              <th className="p-2">Duration / Quantity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {medications.map((item, i) => (
-              <tr key={i} className="border-b border-black align-top">
-                <td className="p-2">
-                  <strong>
-                    {i + 1}. {item.medicineGenericName}
-                  </strong>
-                  {item.brandName && <p>{item.brandName}</p>}
-                  <p>
-                    {item.strength} {item.dosageForm}
-                  </p>
-                  {item.instructions && (
-                    <p className="mt-2 whitespace-pre-wrap break-words">
-                      Instructions: {item.instructions}
-                    </p>
-                  )}
-                </td>
-                <td className="p-2">
-                  <p>{item.dose}</p>
-                  <p>{item.route}</p>
-                </td>
-                <td className="p-2">
-                  <p>{item.frequency}</p>
-                  <p>{item.timing}</p>
-                </td>
-                <td className="p-2">
-                  <p>
-                    {item.durationValue} {item.durationUnit}
-                  </p>
-                  {item.quantity !== null && <p>Quantity: {item.quantity}</p>}
-                </td>
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b-2 border-black">
+                <th className="p-2"># / Medicine</th>
+                <th className="p-2">Dose / Route</th>
+                <th className="p-2">Frequency / Timing</th>
+                <th className="p-2">Duration / Quantity</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {medications.map((item, i) => (
+                <tr key={i} className="border-b border-black align-top">
+                  <td className="p-2">
+                    <strong>
+                      {i + 1}. {item.medicineGenericName}
+                    </strong>
+                    {item.brandName && <p>{item.brandName}</p>}
+                    <p>
+                      {item.strength} {item.dosageForm}
+                    </p>
+                    {item.instructions && (
+                      <p className="mt-2 whitespace-pre-wrap break-words">
+                        Instructions: {item.instructions}
+                      </p>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    <p>{item.dose}</p>
+                    <p>{item.route}</p>
+                  </td>
+                  <td className="p-2">
+                    <p>{item.frequency}</p>
+                    <p>{item.timing}</p>
+                  </td>
+                  <td className="p-2">
+                    <p>
+                      {item.durationValue} {item.durationUnit}
+                    </p>
+                    {item.quantity !== null && <p>Quantity: {item.quantity}</p>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
       {CLINICAL_FIELDS.slice(5).map(
         ([key, label]) =>

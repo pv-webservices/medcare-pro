@@ -116,24 +116,47 @@ export async function createPrescriptionFixture(db: PrismaClient) {
     foreignTenant.id,
     foreignClinic.id,
   );
+  const owner = await user("owner", ["*"], tenant.id, null);
   const doctor = await db.doctor.create({
     data: {
       clinicId: clinic.id,
       userId: doctorUser.id,
       name: "Dr. Synthetic Original",
       department: "General Medicine",
-      qualification: "Synthetic qualification",
-      medicalRegistrationNumber: "SYNTHETIC-REG-1",
-      registrationCouncil: "Synthetic Council",
+      qualification: "MBBS, MD",
+      medicalRegistrationNumber: "TEST-RMP-10001",
+      registrationCouncil: "Test Medical Council",
       phone: "9000000000",
     },
   });
-  await db.doctor.create({
+  const otherDoctor = await db.doctor.create({
     data: {
-      clinicId: clinic.id,
+      clinicId: otherClinic.id,
       userId: otherDoctorUser.id,
       name: "Dr. Synthetic Other",
       department: "General Medicine",
+      qualification: "MBBS, MS",
+      medicalRegistrationNumber: "TEST-RMP-20002",
+      registrationCouncil: "Test Medical Council",
+      phone: "9000000002",
+    },
+  });
+  const foreignDoctorUser = await user(
+    "foreign-doctor",
+    clinical,
+    foreignTenant.id,
+    foreignClinic.id,
+  );
+  const foreignDoctor = await db.doctor.create({
+    data: {
+      clinicId: foreignClinic.id,
+      userId: foreignDoctorUser.id,
+      name: "Dr. Synthetic Doctor C",
+      department: "Pediatrics",
+      qualification: "MBBS, DNB",
+      medicalRegistrationNumber: "TEST-RMP-30003",
+      registrationCouncil: "Test Medical Council",
+      phone: "9000000003",
     },
   });
   const patient = await db.patient.create({
@@ -149,6 +172,32 @@ export async function createPrescriptionFixture(db: PrismaClient) {
       city: "Test city",
     },
   });
+  const patientB = await db.patient.create({
+    data: {
+      tenantId: tenant.id,
+      clinicId: otherClinic.id,
+      patientCode: `PT-SYNTH-B-${stamp}`,
+      name: "Synthetic Patient B",
+      age: 35,
+      gender: "Female",
+      mobileNumber: "9000000004",
+      address: "Clinic B patient address",
+      city: "Test city B",
+    },
+  });
+  const patientC = await db.patient.create({
+    data: {
+      tenantId: foreignTenant.id,
+      clinicId: foreignClinic.id,
+      patientCode: `PT-SYNTH-C-${stamp}`,
+      name: "Synthetic Patient C",
+      age: 28,
+      gender: "Male",
+      mobileNumber: "9000000005",
+      address: "Clinic C patient address",
+      city: "Test city C",
+    },
+  });
   async function visit(doctorId: string | null = doctor.id) {
     return db.registration.create({
       data: {
@@ -162,22 +211,57 @@ export async function createPrescriptionFixture(db: PrismaClient) {
       },
     });
   }
+  async function visitB() {
+    return db.registration.create({
+      data: {
+        clinicId: otherClinic.id,
+        patientId: patientB.id,
+        doctorId: otherDoctor.id,
+        department: otherDoctor.department,
+        amount: 100,
+        visitDate: new Date("2026-09-12T10:30:00Z"),
+        createdBy: admin.id,
+      },
+    });
+  }
+  async function visitC() {
+    return db.registration.create({
+      data: {
+        clinicId: foreignClinic.id,
+        patientId: patientC.id,
+        doctorId: foreignDoctor.id,
+        department: foreignDoctor.department,
+        amount: 150,
+        visitDate: new Date("2026-09-12T11:00:00Z"),
+        createdBy: foreign.id,
+      },
+    });
+  }
   return {
     tenant,
     foreignTenant,
     clinic,
     otherClinic,
+    foreignClinic,
     doctor,
+    otherDoctor,
+    foreignDoctor,
     patient,
+    patientB,
+    patientC,
     doctorUser,
     otherDoctorUser,
+    foreignDoctorUser,
     scopedUser,
     admin,
+    owner,
     preparer,
     reader,
     canceller,
     receptionist,
     foreign,
     visit,
+    visitB,
+    visitC,
   };
 }

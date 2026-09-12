@@ -212,7 +212,7 @@ async function main() {
   );
   await prisma.doctor.update({
     where: { id: f.doctor.id },
-    data: { medicalRegistrationNumber: "SYNTHETIC-REG-1" },
+    data: { medicalRegistrationNumber: "TEST-RMP-10001" },
   });
   const issueAttempts = await Promise.allSettled([
     issuePrescription(f.doctorUser.actor, draft.id, {

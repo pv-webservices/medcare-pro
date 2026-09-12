@@ -100,7 +100,7 @@ test("visit consultation saves, reopens, reviews, issues, prints and corrects im
     .getByRole("link", { name: "Print prescription", exact: true })
     .click();
   await expect(page.locator("nav")).toHaveCount(0);
-  await expect(page.locator(".rx-document")).toContainText("SYNTHETIC-REG-1");
+  await expect(page.locator(".rx-document")).toContainText("TEST-RMP-10001");
   await expect(page.locator(".rx-document")).toContainText(
     "Synthetic E2E medication two",
   );
