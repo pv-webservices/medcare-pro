@@ -102,14 +102,21 @@ async function expectThrows(
   }
 }
 
-const isScopeError = (error: unknown): boolean => error instanceof ScopeError;
+const isScopeError = (error: unknown): boolean =>
+  error instanceof ScopeError ||
+  (error instanceof Error && error.name === "ScopeError");
 const isPermissionError = (error: unknown): boolean =>
-  error instanceof PermissionError;
+  error instanceof PermissionError ||
+  (error instanceof Error && error.name === "PermissionError");
 const isConflictError = (error: unknown): boolean =>
-  error instanceof ConflictError;
+  error instanceof ConflictError ||
+  (error instanceof Error && error.name === "ConflictError");
 const isBadRequestError = (error: unknown): boolean =>
-  error instanceof BadRequestError;
-const isFeatureError = (error: unknown): boolean => error instanceof FeatureError;
+  error instanceof BadRequestError ||
+  (error instanceof Error && error.name === "BadRequestError");
+const isFeatureError = (error: unknown): boolean =>
+  error instanceof FeatureError ||
+  (error instanceof Error && error.name === "FeatureError");
 
 const TEST_TENANT_NAME = "verify-ap5-conversion";
 
@@ -935,8 +942,12 @@ async function checkIneligibleStatuses(
         await convertAppointmentToRegistration(f.actors.reception, convertedId);
         return false;
       } catch (error: unknown) {
+        const isConflict =
+          error instanceof ConflictError ||
+          (error instanceof Error && error.name === "ConflictError");
         return (
-          error instanceof ConflictError &&
+          isConflict &&
+          error instanceof Error &&
           error.message === ALREADY_CONVERTED_MESSAGE
         );
       }
@@ -979,8 +990,12 @@ async function checkMissingDepartment(f: Fixture, types: TypeIds): Promise<void>
         await convertAppointmentToRegistration(f.actors.reception, id);
         return false;
       } catch (error: unknown) {
+        const isBad =
+          error instanceof BadRequestError ||
+          (error instanceof Error && error.name === "BadRequestError");
         return (
-          error instanceof BadRequestError &&
+          isBad &&
+          error instanceof Error &&
           error.message === DEPARTMENT_REQUIRED_MESSAGE
         );
       }
