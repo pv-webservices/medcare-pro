@@ -16,12 +16,26 @@ export interface PatientPortalVerificationSender {
  * No OTP/token is ever returned by an HTTP endpoint or logged.
  */
 export async function patientPortalSender(): Promise<PatientPortalVerificationSender> {
-  if (process.env.PATIENT_PORTAL_TEST_TRANSPORT === "local-file") {
+  const provider =
+    process.env.PATIENT_PORTAL_DELIVERY_PROVIDER?.trim() ||
+    (process.env.PATIENT_PORTAL_TEST_TRANSPORT === "local-file"
+      ? "local-file"
+      : undefined);
+
+  if (provider === "local-file") {
     const { createPatientPortalTestSender } = await import(
       "@/lib/patientPortalTestSender"
     );
     return createPatientPortalTestSender();
   }
+
+  if (provider === "plivo") {
+    const { createPatientPortalPlivoSender } = await import(
+      "@/lib/telephony/patientPortalPlivoSender"
+    );
+    return createPatientPortalPlivoSender();
+  }
+
   throw new PatientPortalError(
     503,
     "Patient Portal verification delivery is unavailable. Please contact your clinic.",
