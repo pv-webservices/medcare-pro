@@ -64,6 +64,12 @@ jobs:
       - name: Deploy database migrations
         run: npx prisma migrate deploy
 
+      - name: Seed base feature catalogue
+        run: npx tsx prisma/seed.ts
+
+      - name: Apply patient portal backfill
+        run: npm run patient-portal:backfill -- --apply
+
       - name: Run TypeScript check
         run: npm run typecheck
 
