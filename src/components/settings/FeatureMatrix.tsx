@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -109,17 +110,40 @@ function featureNote(feature: FeatureOverviewRow): string {
   }
 }
 
-export default function FeatureMatrix({ features, canManage }: FeatureMatrixProps) {
+interface RoleColumn {
+  roleId: string;
+  roleName: string;
+  isAccountOwner: boolean;
+}
+
+export default function FeatureMatrix({
+  features: initialFeatures,
+  canManage,
+}: FeatureMatrixProps) {
   const router = useRouter();
   const showToast = useToast();
+  const [overrideFeatures, setOverrideFeatures] = useState<readonly FeatureOverviewRow[] | null>(null);
+  const [prevInitialFeatures, setPrevInitialFeatures] = useState(initialFeatures);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
-  // Distinct roles across features, preserving order
-  const roles = useMemo(() => {
+  // Synchronize when server components supply fresh props
+  if (prevInitialFeatures !== initialFeatures) {
+    setPrevInitialFeatures(initialFeatures);
+    setOverrideFeatures(null);
+  }
+
+  const features = overrideFeatures ?? initialFeatures;
+
+  // Distinct roles across features for column headers, preserving order
+  const roleColumns = useMemo<RoleColumn[]>(() => {
     if (features.length === 0) return [];
-    return features[0].roles;
+    return features[0].roles.map((r) => ({
+      roleId: r.roleId,
+      roleName: r.roleName,
+      isAccountOwner: r.isAccountOwner,
+    }));
   }, [features]);
 
   // Overall metric counts
@@ -168,7 +192,32 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
     value: AccessValue,
   ) {
     const key = `${feature.key}:${role.roleId}`;
+    if (busyKey === key) return;
     setBusyKey(key);
+
+    const prevFeatures = features;
+    const targetAccess = fromValue(value);
+
+    // Optimistically update the local state for snappy UI feedback
+    setOverrideFeatures(
+      features.map((f) => {
+        if (f.key !== feature.key) return f;
+        return {
+          ...f,
+          roles: f.roles.map((r) => {
+            if (r.roleId !== role.roleId) return r;
+            const isEffective =
+              f.isEntitled &&
+              (targetAccess !== null ? targetAccess : f.inheritsWhenSilent);
+            return {
+              ...r,
+              access: targetAccess,
+              isEffective,
+            };
+          }),
+        };
+      }),
+    );
 
     try {
       const response = await fetch("/api/features", {
@@ -177,15 +226,18 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
         body: JSON.stringify({
           roleId: role.roleId,
           featureKey: feature.key,
-          enabled: fromValue(value),
+          enabled: targetAccess,
         }),
       });
 
-      const body: { success?: boolean; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const body: {
+        success?: boolean;
+        error?: string;
+        data?: { features?: FeatureOverviewRow[] };
+      } = await response.json().catch(() => ({}));
 
       if (!response.ok || !body.success) {
+        setOverrideFeatures(prevFeatures);
         showToast({
           tone: "alert",
           title: body.error ?? "Could not change that. Try again.",
@@ -193,15 +245,20 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
         return;
       }
 
+      if (body.data?.features) {
+        setOverrideFeatures(body.data.features);
+      }
+
       showToast({
         tone: "ok",
         title:
           value === "inherit"
-            ? `${role.roleName} now follows the organisation for ${feature.name}.`
-            : `${feature.name} is ${value === "on" ? "on" : "off"} for ${role.roleName}.`,
+            ? `${role.roleName} now follows the organisation default for ${feature.name}.`
+            : `${feature.name} is ${value === "on" ? "allowed" : "blocked"} for ${role.roleName}.`,
       });
       router.refresh();
     } catch {
+      setOverrideFeatures(prevFeatures);
       showToast({
         tone: "alert",
         title: "Could not reach the server. Check your connection.",
@@ -213,6 +270,21 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
 
   return (
     <div className="space-y-4">
+      {/* Informational Guidance Banner */}
+      <div className="flex items-start gap-3 rounded-2xl border border-line bg-canvas p-3.5 text-xs text-muted shadow-sm">
+        <Info className="h-4 w-4 shrink-0 text-accent mt-0.5" />
+        <div className="leading-relaxed">
+          <span className="font-semibold text-ink">Access vs. Permissions: </span>
+          Feature access controls whether a role can open a module. Roles &amp; Permissions controls what actions that role can perform inside the module.{" "}
+          <Link
+            href="/settings/roles"
+            className="font-medium text-accent hover:underline inline-flex items-center gap-0.5"
+          >
+            Configure role permissions &rarr;
+          </Link>
+        </div>
+      </div>
+
       {/* 1. Compact Summary Toolbar */}
       <div className="flex flex-col gap-3 rounded-2xl border border-line bg-canvas p-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 shadow-sm">
         {/* Metric counts */}
@@ -280,11 +352,20 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
           <>
             {/* Desktop Matrix (lg and above) */}
             <div className="hidden lg:block overflow-x-auto">
-              <div className="min-w-[960px]">
+              <div
+                style={{
+                  minWidth: `${Math.max(960, 280 + roleColumns.length * 95 + 36)}px`,
+                }}
+              >
                 {/* Column Headers */}
-                <div className="grid grid-cols-[minmax(280px,3fr)_repeat(6,minmax(95px,1fr))_36px] items-center border-b border-line bg-canvas px-5 py-3 text-xs font-semibold text-ink">
+                <div
+                  className="grid items-center border-b border-line bg-canvas px-5 py-3 text-xs font-semibold text-ink"
+                  style={{
+                    gridTemplateColumns: `minmax(280px,3fr) repeat(${Math.max(1, roleColumns.length)},minmax(95px,1fr)) 36px`,
+                  }}
+                >
                   <div>FEATURE</div>
-                  {roles.map((role) => (
+                  {roleColumns.map((role) => (
                     <div key={role.roleId} className="text-center">
                       <div className="leading-tight">{role.roleName}</div>
                       {role.isAccountOwner && (
@@ -303,13 +384,19 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                     const isExpanded = expandedKeys.has(feature.key);
                     const Icon = FEATURE_ICONS[feature.key] ?? Layers;
                     const tierBadge = getTierBadge(feature);
+                    const roleMap = new Map(feature.roles.map((r) => [r.roleId, r]));
 
                     return (
                       <div
                         key={feature.key}
                         className="transition-colors hover:bg-canvas-deep/20"
                       >
-                        <div className="grid grid-cols-[minmax(280px,3fr)_repeat(6,minmax(95px,1fr))_36px] items-center px-5 py-3.5 gap-2">
+                        <div
+                          className="grid items-center px-5 py-3.5 gap-2"
+                          style={{
+                            gridTemplateColumns: `minmax(280px,3fr) repeat(${Math.max(1, roleColumns.length)},minmax(95px,1fr)) 36px`,
+                          }}
+                        >
                           {/* Feature metadata */}
                           <div className="flex items-start gap-3 min-w-0 pr-2">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent mt-0.5">
@@ -358,7 +445,18 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
 
                           {/* Role access or special states */}
                           {feature.isEntitled && !feature.isUngated ? (
-                            roles.map((role) => {
+                            roleColumns.map((col) => {
+                              const role = roleMap.get(col.roleId);
+                              if (!role) {
+                                return (
+                                  <div
+                                    key={col.roleId}
+                                    className="flex items-center justify-center px-1 text-xs text-muted"
+                                  >
+                                    —
+                                  </div>
+                                );
+                              }
                               const key = `${feature.key}:${role.roleId}`;
                               const isOwner = role.isAccountOwner;
                               const isEditable = role.isEditable && canManage;
@@ -380,8 +478,12 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                                       label={`${feature.name} access for ${role.roleName}`}
                                       trigger={({ isOpen }) => (
                                         <div
+                                          aria-label={`${feature.name} access for ${role.roleName}`}
+                                          data-feature={feature.key}
+                                          data-role={role.roleId}
+                                          data-effective={role.isEffective ? "true" : "false"}
                                           className={cx(
-                                            "inline-flex h-7 w-[92px] items-center justify-between gap-1 rounded-lg border px-2 text-[11px] font-medium transition-colors",
+                                            "inline-flex h-7 w-[92px] items-center justify-between gap-1 rounded-lg border px-2 text-[11px] font-medium transition-colors cursor-pointer",
                                             role.isEffective
                                               ? "border-emerald-200/80 bg-emerald-50 text-emerald-700 hover:bg-emerald-100/70"
                                               : "border-line bg-canvas-deep text-muted hover:bg-canvas-deep/80 hover:text-ink",
@@ -417,11 +519,11 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                                           )}
                                         >
                                           <span>
-                                            Follow organisation (
-                                            {feature.inheritsWhenSilent ? "on" : "off"})
+                                            Follow organisation default (
+                                            {feature.inheritsWhenSilent ? "On" : "Off"})
                                           </span>
                                           {role.access === null && (
-                                            <Check className="h-3.5 w-3.5 text-accent" />
+                                            <Check className="h-3.5 w-3.5 text-accent shrink-0" />
                                           )}
                                         </button>
                                         <button
@@ -435,9 +537,9 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                                               : "text-ink hover:bg-canvas-deep",
                                           )}
                                         >
-                                          <span>On for this role</span>
+                                          <span>Allow module for this role</span>
                                           {role.access === true && (
-                                            <Check className="h-3.5 w-3.5 text-accent" />
+                                            <Check className="h-3.5 w-3.5 text-accent shrink-0" />
                                           )}
                                         </button>
                                         <button
@@ -451,9 +553,9 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                                               : "text-ink hover:bg-canvas-deep",
                                           )}
                                         >
-                                          <span>Off for this role</span>
+                                          <span>Block module for this role</span>
                                           {role.access === false && (
-                                            <Check className="h-3.5 w-3.5 text-accent" />
+                                            <Check className="h-3.5 w-3.5 text-accent shrink-0" />
                                           )}
                                         </button>
                                       </div>
@@ -474,7 +576,12 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                               );
                             })
                           ) : (
-                            <div className="col-span-6 flex items-center px-3">
+                            <div
+                              className="flex items-center px-3"
+                              style={{
+                                gridColumn: `span ${Math.max(1, roleColumns.length)}`,
+                              }}
+                            >
                               <div className="flex w-full items-center gap-2 rounded-xl border border-line/60 bg-canvas-deep/70 px-3 py-1.5 text-[11px] text-muted">
                                 <Info className="h-3.5 w-3.5 shrink-0 text-muted" />
                                 <span>
@@ -614,7 +721,7 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                           Role Access
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {roles.map((role) => {
+                          {feature.roles.map((role) => {
                             const key = `${feature.key}:${role.roleId}`;
                             const isOwner = role.isAccountOwner;
                             const isEditable = role.isEditable && canManage;
@@ -646,11 +753,16 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                                       label={`${feature.name} for ${role.roleName}`}
                                       trigger={({ isOpen }) => (
                                         <div
+                                          aria-label={`${feature.name} access for ${role.roleName}`}
+                                          data-feature={feature.key}
+                                          data-role={role.roleId}
+                                          data-effective={role.isEffective ? "true" : "false"}
                                           className={cx(
-                                            "inline-flex h-6 w-24 items-center justify-between gap-1 rounded-md border px-2 text-[10px] font-medium",
+                                            "inline-flex h-6 w-24 items-center justify-between gap-1 rounded-md border px-2 text-[10px] font-medium cursor-pointer",
                                             role.isEffective
                                               ? "border-emerald-200/80 bg-emerald-50 text-emerald-700"
                                               : "border-line bg-canvas-deep text-muted",
+                                            busyKey === key && "opacity-60 cursor-wait",
                                             isOpen && "ring-1 ring-accent",
                                           )}
                                         >
@@ -659,31 +771,57 @@ export default function FeatureMatrix({ features, canManage }: FeatureMatrixProp
                                         </div>
                                       )}
                                     >
-                                      <div className="p-1 space-y-0.5 min-w-[200px]">
+                                      <div className="p-1 space-y-0.5 min-w-[210px]">
                                         <button
                                           type="button"
                                           disabled={busyKey === key}
                                           onClick={() => handleChange(feature, role, "inherit")}
-                                          className="w-full text-left px-2 py-1 text-xs text-ink hover:bg-canvas-deep rounded disabled:opacity-50"
+                                          className={cx(
+                                            "w-full flex items-center justify-between px-2 py-1.5 text-xs rounded text-left transition-colors",
+                                            role.access === null
+                                              ? "bg-accent-soft text-accent font-semibold"
+                                              : "text-ink hover:bg-canvas-deep",
+                                          )}
                                         >
-                                          Follow organisation (
-                                          {feature.inheritsWhenSilent ? "on" : "off"})
+                                          <span>
+                                            Follow organisation default (
+                                            {feature.inheritsWhenSilent ? "On" : "Off"})
+                                          </span>
+                                          {role.access === null && (
+                                            <Check className="h-3.5 w-3.5 text-accent shrink-0" />
+                                          )}
                                         </button>
                                         <button
                                           type="button"
                                           disabled={busyKey === key}
                                           onClick={() => handleChange(feature, role, "on")}
-                                          className="w-full text-left px-2 py-1 text-xs text-ink hover:bg-canvas-deep rounded disabled:opacity-50"
+                                          className={cx(
+                                            "w-full flex items-center justify-between px-2 py-1.5 text-xs rounded text-left transition-colors",
+                                            role.access === true
+                                              ? "bg-accent-soft text-accent font-semibold"
+                                              : "text-ink hover:bg-canvas-deep",
+                                          )}
                                         >
-                                          On for this role
+                                          <span>Allow module for this role</span>
+                                          {role.access === true && (
+                                            <Check className="h-3.5 w-3.5 text-accent shrink-0" />
+                                          )}
                                         </button>
                                         <button
                                           type="button"
                                           disabled={busyKey === key}
                                           onClick={() => handleChange(feature, role, "off")}
-                                          className="w-full text-left px-2 py-1 text-xs text-ink hover:bg-canvas-deep rounded disabled:opacity-50"
+                                          className={cx(
+                                            "w-full flex items-center justify-between px-2 py-1.5 text-xs rounded text-left transition-colors",
+                                            role.access === false
+                                              ? "bg-accent-soft text-accent font-semibold"
+                                              : "text-ink hover:bg-canvas-deep",
+                                          )}
                                         >
-                                          Off for this role
+                                          <span>Block module for this role</span>
+                                          {role.access === false && (
+                                            <Check className="h-3.5 w-3.5 text-accent shrink-0" />
+                                          )}
                                         </button>
                                       </div>
                                     </Menu>

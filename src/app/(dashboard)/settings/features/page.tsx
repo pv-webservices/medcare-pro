@@ -58,7 +58,7 @@ export default async function FeatureSettingsPage() {
     <section className="space-y-4">
       <PageHeader
         title="Features"
-        description="Turn modules on/off for this account."
+        description="Control which roles can use modules included in your organisation's plan. Detailed actions are managed separately under Roles & Permissions."
         breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Features" }]}
         meta={
           overview.canManage
