@@ -26,6 +26,7 @@ export class PermissionError extends Error {
   constructor(permission: string) {
     super(`Missing permission: ${permission}`);
     this.name = "PermissionError";
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
@@ -36,6 +37,7 @@ export class ScopeError extends Error {
     // would let a caller probe for clinic ids belonging to other tenants.
     super("Clinic not found");
     this.name = "ScopeError";
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
