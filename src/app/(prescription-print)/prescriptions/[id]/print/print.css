@@ -1,0 +1,76 @@
+@page {
+  size: A4;
+  margin: 14mm;
+}
+.rx-print-shell {
+  max-width: 210mm;
+  margin: 24px auto;
+  color: #000;
+  background: #fff;
+}
+.rx-print-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+}
+.rx-document {
+  font-size: 11pt;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.rx-document table {
+  table-layout: fixed;
+}
+.rx-document thead {
+  display: table-header-group;
+}
+.rx-document tr,
+.rx-signature,
+.rx-document header {
+  break-inside: avoid;
+}
+.rx-document h2 {
+  break-after: avoid;
+}
+.rx-version-note {
+  padding: 8px 24px;
+  font-weight: 600;
+}
+@media print {
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .rx-print-shell {
+    max-width: none;
+    margin: 0;
+  }
+  .rx-print-controls {
+    display: none !important;
+  }
+  .rx-document {
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .rx-document header {
+    display: flex !important;
+  }
+  .rx-document header img {
+    max-width: 45mm;
+    max-height: 20mm;
+  }
+  .rx-document section.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .rx-document .sm\:col-span-2 {
+    grid-column: span 2;
+  }
+  .rx-document a {
+    color: black;
+    text-decoration: none;
+  }
+}

@@ -382,6 +382,8 @@ async function build() {
   const adminUser = await makeUser("admin", tenant.id);
   const receptionUser = await makeUser("reception", tenant.id);
   const doctorUser = await makeUser("doctor", tenant.id);
+  // Current Doctor defaults require an explicit identity link for self-read.
+  await prisma.doctor.update({ where: { id: doctor.id }, data: { userId: doctorUser.id } });
   const staffUser = await makeUser("staff", tenant.id);
   const siblingUser = await makeUser("sibling", tenant.id);
   const noConvertUser = await makeUser("noconvert", tenant.id);
@@ -1027,7 +1029,7 @@ async function checkAuthorisation(f: Fixture, types: TypeIds): Promise<void> {
     () => convertAppointmentToRegistration(f.actors.sibling, id),
   );
 
-  // The Doctor role holds appointment:read, so it CAN see the appointment —
+  // The linked Doctor holds appointment:self:read, so CAN see this appointment —
   // which is why this is a 403 and the two above are 404s.
   await expectThrows(
     "a doctor may look but not convert",

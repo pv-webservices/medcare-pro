@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { FeatureTier } from "@prisma/client";
 import { z } from "zod";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
@@ -86,14 +87,15 @@ interface ActorRole {
  */
 async function loadTenantFeatures(
   tenantId: string,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<Map<string, TenantFeature>> {
-  const tenant = await prisma.tenant.findUnique({
+  const tenant = await client.tenant.findUnique({
     where: { id: tenantId },
     select: { planId: true },
   });
 
   const [features, planFeatures, overrides] = await Promise.all([
-    prisma.feature.findMany({
+    client.feature.findMany({
       select: {
         id: true,
         key: true,
@@ -105,12 +107,12 @@ async function loadTenantFeatures(
       orderBy: { key: "asc" },
     }),
     tenant?.planId
-      ? prisma.planFeature.findMany({
+      ? client.planFeature.findMany({
           where: { planId: tenant.planId },
           select: { featureId: true, enabled: true },
         })
       : Promise.resolve([]),
-    prisma.tenantFeatureOverride.findMany({
+    client.tenantFeatureOverride.findMany({
       where: { tenantId },
       select: { featureId: true, enabled: true },
     }),
@@ -145,8 +147,8 @@ async function loadTenantFeatures(
  * clinic column — an entitlement is something the organisation holds, not
  * something a branch holds — so a role grants its features wherever it applies.
  */
-async function loadActorRoles(actor: ActorContext): Promise<ActorRole[]> {
-  const assignments = await prisma.userRole.findMany({
+async function loadActorRoles(actor: ActorContext, client: Prisma.TransactionClient = prisma): Promise<ActorRole[]> {
+  const assignments = await client.userRole.findMany({
     // Guards against a role assignment left over from a different tenant.
     where: { userId: actor.userId, role: { tenantId: actor.tenantId } },
     select: {
@@ -250,10 +252,11 @@ function missingFeature(featureKey: string): FeatureResolution {
 /** Every feature's verdict for this person, keyed by feature key. */
 export async function resolveModulesForActor(
   actor: ActorContext,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<Map<string, FeatureResolution>> {
   const [features, roles] = await Promise.all([
-    loadTenantFeatures(actor.tenantId),
-    loadActorRoles(actor),
+    loadTenantFeatures(actor.tenantId, client),
+    loadActorRoles(actor, client),
   ]);
 
   return new Map(
@@ -302,12 +305,13 @@ export async function resolveModulesForRole(
 export async function resolveModuleForActor(
   actor: ActorContext,
   featureKey: string,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<FeatureResolution> {
   if (featureKey in UNGATED_MODULES) {
     return { allowed: true, reason: null };
   }
 
-  const verdicts = await resolveModulesForActor(actor);
+  const verdicts = await resolveModulesForActor(actor, client);
   return verdicts.get(featureKey) ?? missingFeature(featureKey);
 }
 
@@ -322,8 +326,9 @@ export async function resolveModuleForActor(
 export async function requireModule(
   actor: ActorContext,
   featureKey: ModuleFeatureKey,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<void> {
-  const verdict = await resolveModuleForActor(actor, featureKey);
+  const verdict = await resolveModuleForActor(actor, featureKey, client);
 
   if (!verdict.allowed) {
     throw new FeatureError(featureKey, verdict.reason as ModuleDenialReason);

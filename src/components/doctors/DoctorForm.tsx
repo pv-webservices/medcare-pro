@@ -24,6 +24,9 @@ export interface DoctorFormValues {
   age: string;
   phone: string;
   userId: string;
+  qualification?: string;
+  medicalRegistrationNumber?: string;
+  registrationCouncil?: string;
 }
 
 export interface ClinicOption {
@@ -138,6 +141,9 @@ export default function DoctorForm({
         gender: values.gender.trim(),
         age: values.age.trim() === "" ? null : Number(values.age),
         phone: values.phone.trim(),
+        qualification: values.qualification?.trim() || null,
+        medicalRegistrationNumber: values.medicalRegistrationNumber?.trim() || null,
+        registrationCouncil: values.registrationCouncil?.trim() || null,
         ...(canManagePortalLink && (!isEdit || values.userId !== initial?.userId)
           ? { userId: values.userId || null }
           : {}),
@@ -310,6 +316,19 @@ export default function DoctorForm({
             </div>
           </div>
 
+
+          <fieldset className="my-6 space-y-4 rounded-2xl border border-line p-4">
+            <legend className="px-2 font-semibold text-ink">Professional credentials</legend>
+            <p className="text-label text-muted">Optional for existing profiles. All three fields are required to issue prescriptions.</p>
+            {([
+              ["qualification", "Qualification"],
+              ["medicalRegistrationNumber", "Medical registration number"],
+              ["registrationCouncil", "Registration council / state"],
+            ] as const).map(([field, label]) => (
+              <Input key={field} id={`doctor-${field}`} name={field} label={label} maxLength={255}
+                value={values[field] ?? ""} onChange={(e) => update(field, e.target.value)} />
+            ))}
+          </fieldset>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button
               type="submit"
@@ -459,6 +478,19 @@ export default function DoctorForm({
             hint="Optional. 10-digit Indian number."
           />
 
+
+          <fieldset className="my-6 space-y-4 rounded-2xl border border-line p-4">
+            <legend className="px-2 font-semibold text-ink">Professional credentials</legend>
+            <p className="text-label text-muted">Optional for existing profiles. All three fields are required to issue prescriptions.</p>
+            {([
+              ["qualification", "Qualification"],
+              ["medicalRegistrationNumber", "Medical registration number"],
+              ["registrationCouncil", "Registration council / state"],
+            ] as const).map(([field, label]) => (
+              <Input key={field} id={`doctor-${field}`} name={field} label={label} maxLength={255}
+                value={values[field] ?? ""} onChange={(e) => update(field, e.target.value)} />
+            ))}
+          </fieldset>
           <div className="mt-8 flex flex-wrap gap-3 pt-2">
             <Button
               type="submit"

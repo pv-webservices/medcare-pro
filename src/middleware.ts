@@ -24,6 +24,7 @@ const PROTECTED_PREFIXES = [
   // refusal arrived as a server error rather than a redirect to /login.
   "/appointments",
   "/registration",
+  "/prescriptions",
   "/doctors",
   "/clinics",
   "/reports",

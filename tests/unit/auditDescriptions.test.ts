@@ -10,6 +10,7 @@ import {
 } from "@/lib/auditDescriptions";
 import {
   ALL_PERMISSIONS,
+  PRESCRIPTION_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
@@ -182,6 +183,7 @@ describe("the audit:read permission", () => {
       ...DASHBOARD_DATA_PERMISSIONS,
       ...DASHBOARD_LAYOUT_PERMISSIONS,
       ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
+      ...PRESCRIPTION_PERMISSIONS,
     ];
     expect(new Set(combined).size).toBe(combined.length);
 
@@ -211,6 +213,7 @@ describe("the audit:read permission", () => {
         STAGE_11_PERMISSIONS.length -
         STAGE_AP1_PERMISSIONS.length -
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
+        PRESCRIPTION_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length -
         DASHBOARD_LAYOUT_PERMISSIONS.length,
@@ -219,6 +222,7 @@ describe("the audit:read permission", () => {
       ...STAGE_11_PERMISSIONS,
       ...STAGE_AP1_PERMISSIONS,
       ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
+      ...PRESCRIPTION_PERMISSIONS,
       ...TASK_PERMISSIONS,
       ...DASHBOARD_DATA_PERMISSIONS,
       ...DASHBOARD_LAYOUT_PERMISSIONS,
