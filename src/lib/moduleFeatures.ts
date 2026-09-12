@@ -22,6 +22,7 @@ import { DEFAULT_FEATURES } from "@/lib/defaultFeatures";
  * being enforced.
  */
 export const MODULE_FEATURES = {
+  prescriptions: "prescriptions",
   registrations: "registrations",
   doctors: "doctors",
   clinics: "clinics",

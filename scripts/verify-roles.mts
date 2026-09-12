@@ -24,6 +24,7 @@ import { NAV_LINKS, visibleNavLinks } from "@/lib/navigation";
 import { canManageSection, visibleSettingsSections } from "@/lib/settingsSections";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultRoles, OWNER_ROLE_NAME } from "@/lib/defaultRoles";
+import { seedFeatureCatalogue, DEFAULT_PLAN_KEY } from "@/lib/defaultFeatures";
 import { ALL_PERMISSIONS, isKnownPermission, WILDCARD } from "@/lib/permissions";
 import { createClinic, getClinicForActor, updateClinic } from "@/lib/clinics";
 import {
@@ -70,6 +71,8 @@ async function expectThrows(
 const TEST_TENANT_NAME = "verify-roles";
 
 async function makeTenant(label: string) {
+  await seedFeatureCatalogue(prisma);
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { key: DEFAULT_PLAN_KEY }, select: { id: true } });
   const tenant = await prisma.tenant.create({
     data: {
       businessName: TEST_TENANT_NAME,
@@ -77,6 +80,7 @@ async function makeTenant(label: string) {
       // Stage 3 made tenants.slug NOT NULL. Mirrors the email's uniqueness.
       slug: `${TEST_TENANT_NAME}-${label}-${Date.now()}`,
       emailVerifiedAt: new Date(),
+      planId: plan.id,
     },
     select: { id: true },
   });
@@ -504,7 +508,7 @@ async function main(): Promise<void> {
     // since branding was built. What changed is that the screen is now findable
     // instead of reachable only by typing its URL. The two checks below pin
     // that it stays READ-ONLY for them.
-    staffTabs.join(",") === "Dashboard,Registrations,Doctors,Clinics,Settings",
+    staffTabs.join(",") === "Dashboard,Tasks,Registrations,Doctors,Settings",
     staffTabs,
   );
   check(
@@ -517,13 +521,13 @@ async function main(): Promise<void> {
   const staffHolds = (permission: string) => holdsAnywhere(staffHeld, permission);
   const staffSections = visibleSettingsSections(staffHolds);
   check(
-    "and inside Settings they reach branding only — not roles, not features",
-    staffSections.map((section) => section.href).join(",") === "/settings/branding",
+    "inside Settings Staff reach personal dashboard and read-only branding",
+    staffSections.map((section) => section.href).join(",") === "/settings/dashboard,/settings/branding",
     staffSections.map((section) => section.href),
   );
   check(
-    "which they cannot change, so the new tab grants them nothing",
-    staffSections.every((section) => !canManageSection(section, staffHolds)),
+    "Staff can customize their dashboard but cannot manage clinic branding",
+    staffSections.every((section) => canManageSection(section, staffHolds) === (section.href === "/settings/dashboard")),
   );
 
   check(

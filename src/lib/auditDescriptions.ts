@@ -41,6 +41,7 @@ export type AuditCategory =
   | "entitlements"
   | "appointments"
   | "tasks"
+  | "prescriptions"
   | "dashboard"
   | "platform";
 
@@ -62,6 +63,13 @@ export interface AuditDescription {
 export const AUDIT_DESCRIPTIONS: Readonly<
   Record<AuditAction, AuditDescription>
 > = {
+  [AUDIT_ACTIONS.CONSULTATION_CREATED]: { label: "Consultation started", detail: "A visit consultation was created.", side: "tenant", category: "prescriptions" },
+  [AUDIT_ACTIONS.CONSULTATION_UPDATED]: { label: "Consultation draft saved", detail: "An authorized user explicitly saved a clinical draft.", side: "tenant", category: "prescriptions" },
+  [AUDIT_ACTIONS.PRESCRIPTION_DRAFT_CREATED]: { label: "Prescription draft created", detail: "A structured visit prescription draft was prepared.", side: "tenant", category: "prescriptions" },
+  [AUDIT_ACTIONS.PRESCRIPTION_CORRECTION_CREATED]: { label: "Prescription correction started", detail: "A new draft version was created without changing the issued original.", side: "tenant", category: "prescriptions" },
+  [AUDIT_ACTIONS.PRESCRIPTION_ISSUED]: { label: "Prescription issued", detail: "The assigned linked Doctor finalized an immutable prescription.", side: "tenant", category: "prescriptions" },
+  [AUDIT_ACTIONS.PRESCRIPTION_SUPERSEDED]: { label: "Prescription superseded", detail: "A corrected prescription was issued; the historical original is retained.", side: "tenant", category: "prescriptions" },
+  [AUDIT_ACTIONS.PRESCRIPTION_CANCELLED]: { label: "Prescription cancelled", detail: "An authorized user voided a prescription and retained its record.", side: "tenant", category: "prescriptions" },
   // --- Platform bookkeeping -----------------------------------------------
   [AUDIT_ACTIONS.OWNER_CREATED]: {
     label: "Platform owner created",
@@ -649,6 +657,7 @@ export const AUDIT_CATEGORIES: readonly {
   { key: "entitlements", label: "Features and plan" },
   { key: "appointments", label: "Appointments" },
   { key: "tasks", label: "Tasks" },
+  { key: "prescriptions", label: "Prescriptions" },
   { key: "dashboard", label: "Dashboard" },
   { key: "platform", label: "Platform" },
 ];

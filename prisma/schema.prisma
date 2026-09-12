@@ -133,8 +133,10 @@ model Tenant {
   clinicCapacityGrants         TenantClinicCapacityGrant[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
-  appointments     Appointment[]
-  appointmentTypes AppointmentType[]
+  appointments          Appointment[]
+  appointmentTypes      AppointmentType[]
+  clinicalConsultations ClinicalConsultation[]
+  prescriptions         Prescription[]
 
   /// Enforced from the constrain migration onward, once the backfill has
   /// generated and validated a slug for every existing row.
@@ -257,9 +259,12 @@ model User {
   /// the login is removed.
   doctorProfiles Doctor[] @relation("DoctorPortalUser")
 
-  tasksCreated   Task[] @relation("TaskCreatedBy")
-  tasksAssigned  Task[] @relation("TaskAssignedTo")
-  tasksCompleted Task[] @relation("TaskCompletedBy")
+  tasksCreated           Task[]                 @relation("TaskCreatedBy")
+  tasksAssigned          Task[]                 @relation("TaskAssignedTo")
+  tasksCompleted         Task[]                 @relation("TaskCompletedBy")
+  consultationsCreated   ClinicalConsultation[] @relation("ConsultationCreatedBy")
+  prescriptionsIssued    Prescription[]         @relation("PrescriptionIssuedBy")
+  prescriptionsCancelled Prescription[]         @relation("PrescriptionCancelledBy")
 
   @@index([tenantId])
   @@index([accountStatus])
@@ -447,6 +452,8 @@ model Clinic {
   platformPlivoNumber          PlatformPlivoNumber?      @relation("PlatformPlivoAssignedClinic")
   quarantineSourcePlivoNumbers PlatformPlivoNumber[]     @relation("PlatformPlivoQuarantineSourceClinic")
   tasks                        Task[]
+  clinicalConsultations        ClinicalConsultation[]
+  prescriptions                Prescription[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -789,9 +796,15 @@ model Doctor {
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   /// Restrict on the owning side: an appointment is history once booked.
-  appointments  Appointment[]
+  appointments          Appointment[]
   /// Cascade on the owning side — these rows carry no data, only a lock.
-  scheduleLocks DoctorScheduleLock[]
+  scheduleLocks         DoctorScheduleLock[]
+  clinicalConsultations ClinicalConsultation[]
+  prescriptions         Prescription[]
+
+  qualification             String? @db.VarChar(255)
+  medicalRegistrationNumber String? @map("medical_registration_number") @db.VarChar(255)
+  registrationCouncil       String? @map("registration_council") @db.VarChar(255)
 
   /// One portal login may represent the same clinician at multiple clinics,
   /// but never two Doctor profiles inside one clinic. MySQL permits multiple
@@ -873,7 +886,9 @@ model Patient {
   /// which cascades. An appointment must survive as a record of what was booked
   /// even if the patient row it was later linked to is deleted — the
   /// denormalised name/mobileNumber on the appointment keep it readable.
-  appointments Appointment[]
+  appointments          Appointment[]
+  clinicalConsultations ClinicalConsultation[]
+  prescriptions         Prescription[]
 
   /// Tenant-scoped, so two tenants can each independently hold PT-2026-0001.
   @@unique([tenantId, patientCode])
@@ -930,7 +945,9 @@ model Registration {
   /// nothing deletes appointments anyway — they retire by status.
   appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
 
-  editLog RegistrationEditLog[]
+  editLog              RegistrationEditLog[]
+  clinicalConsultation ClinicalConsultation?
+  prescriptions        Prescription[]
 
   /// One registration per appointment. This is the database-level guard against
   /// converting the same appointment twice: AP-5's second attempt hits this
@@ -2180,4 +2197,130 @@ model DoctorScheduleLock {
   /// would split the lock in two.
   @@unique([doctorId, date])
   @@map("doctor_schedule_locks")
+}
+
+// EP-1: visit-owned clinical records. Every owning FK restricts deletion.
+enum ConsultationMode {
+  IN_PERSON
+  VIDEO
+  AUDIO
+  TEXT
+}
+
+enum ConsultationStatus {
+  DRAFT
+  FINALIZED
+}
+
+enum PrescriptionStatus {
+  DRAFT
+  ISSUED
+  SUPERSEDED
+  CANCELLED
+}
+
+model ClinicalConsultation {
+  id                      String             @id @default(cuid())
+  tenantId                String             @map("tenant_id")
+  clinicId                String             @map("clinic_id")
+  registrationId          String             @unique @map("registration_id")
+  patientId               String             @map("patient_id")
+  doctorId                String             @map("doctor_id")
+  consultationMode        ConsultationMode   @default(IN_PERSON) @map("consultation_mode")
+  chiefComplaint          String             @default("") @map("chief_complaint") @db.Text
+  historyOfPresentIllness String             @map("history_of_present_illness") @db.Text
+  pastMedicalHistory      String             @map("past_medical_history") @db.Text
+  examinationFindings     String             @map("examination_findings") @db.Text
+  investigationNotes      String             @map("investigation_notes") @db.Text
+  diagnosis               String             @db.Text
+  advice                  String             @db.Text
+  followUpInstructions    String             @map("follow_up_instructions") @db.Text
+  status                  ConsultationStatus @default(DRAFT)
+  createdById             String             @map("created_by_id")
+  createdAt               DateTime           @default(now()) @map("created_at")
+  updatedAt               DateTime           @updatedAt @map("updated_at")
+  tenant                  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic                  Clinic             @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration            Registration       @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  patient                 Patient            @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor                  Doctor             @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  creator                 User               @relation("ConsultationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  prescriptions           Prescription[]
+
+  @@index([tenantId, clinicId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([createdById])
+  @@map("clinical_consultations")
+}
+
+model Prescription {
+  id                       String               @id @default(cuid())
+  tenantId                 String               @map("tenant_id")
+  clinicId                 String               @map("clinic_id")
+  registrationId           String               @map("registration_id")
+  consultationId           String               @map("consultation_id")
+  patientId                String               @map("patient_id")
+  doctorId                 String               @map("doctor_id")
+  prescriptionNumber       String?              @unique @map("prescription_number") @db.VarChar(64)
+  status                   PrescriptionStatus   @default(DRAFT)
+  version                  Int                  @default(1)
+  // NULL after issuance. Uniqueness prevents parallel active drafts per visit.
+  activeDraftKey           String?              @unique @map("active_draft_key")
+  revision                 Int                  @default(0)
+  // Version-owned notes: corrections NEVER edit a finalized consultation.
+  clinicalJson             Json                 @map("clinical_json")
+  snapshotJson             Json?                @map("snapshot_json")
+  issuedAt                 DateTime?            @map("issued_at")
+  issuedByUserId           String?              @map("issued_by_user_id")
+  supersedesPrescriptionId String?              @unique @map("supersedes_prescription_id")
+  cancelledAt              DateTime?            @map("cancelled_at")
+  cancelledById            String?              @map("cancelled_by_id")
+  cancellationReason       String?              @map("cancellation_reason") @db.Text
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
+  tenant                   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic                   Clinic               @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration             Registration         @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  consultation             ClinicalConsultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
+  patient                  Patient              @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor                   Doctor               @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  issuer                   User?                @relation("PrescriptionIssuedBy", fields: [issuedByUserId], references: [id], onDelete: Restrict)
+  canceller                User?                @relation("PrescriptionCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
+  supersedes               Prescription?        @relation("PrescriptionCorrection", fields: [supersedesPrescriptionId], references: [id], onDelete: Restrict)
+  supersededBy             Prescription?        @relation("PrescriptionCorrection")
+  items                    PrescriptionItem[]
+
+  @@unique([consultationId, version])
+  @@index([tenantId, clinicId, status, issuedAt])
+  @@index([tenantId, patientId, issuedAt])
+  @@index([registrationId])
+  @@index([doctorId, issuedAt])
+  @@index([issuedByUserId])
+  @@index([cancelledById])
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id                  String       @id @default(cuid())
+  prescriptionId      String       @map("prescription_id")
+  medicineGenericName String       @map("medicine_generic_name") @db.VarChar(255)
+  brandName           String       @map("brand_name") @db.VarChar(255)
+  dosageForm          String       @map("dosage_form") @db.VarChar(100)
+  strength            String       @db.VarChar(100)
+  dose                String       @db.VarChar(100)
+  route               String       @db.VarChar(100)
+  frequency           String       @db.VarChar(100)
+  timing              String       @db.VarChar(100)
+  durationValue       Int?         @map("duration_value")
+  durationUnit        String       @map("duration_unit") @db.VarChar(50)
+  quantity            Int?
+  instructions        String       @db.Text
+  sortOrder           Int          @map("sort_order")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+  prescription        Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Restrict)
+
+  @@unique([prescriptionId, sortOrder])
+  @@map("prescription_items")
 }

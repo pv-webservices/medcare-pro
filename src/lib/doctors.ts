@@ -55,6 +55,9 @@ export const createDoctorSchema = z.object({
   gender: z.string().trim().max(50).optional().or(z.literal("")),
   age: z.coerce.number().int().min(0).max(120).optional().nullable(),
   phone: phoneSchema.optional().or(z.literal("")),
+  qualification: z.string().trim().max(255).optional().nullable(),
+  medicalRegistrationNumber: z.string().trim().max(255).optional().nullable(),
+  registrationCouncil: z.string().trim().max(255).optional().nullable(),
   /** Explicit only: never inferred from any demographic field. */
   userId: z.union([z.string().trim().min(1), z.literal(""), z.null()]).optional(),
 });
@@ -108,6 +111,9 @@ export interface DoctorSummary {
   gender: string | null;
   age: number | null;
   phone: string | null;
+  qualification?: string | null;
+  medicalRegistrationNumber?: string | null;
+  registrationCouncil?: string | null;
   canManagePortalLink: boolean;
   userId: string | null;
   linkedPortalUser: { name: string | null; email: string } | null;
@@ -270,6 +276,9 @@ export async function listDoctorsForActor(
       gender: true,
       age: true,
       phone: true,
+      qualification: true,
+      medicalRegistrationNumber: true,
+      registrationCouncil: true,
       userId: true,
       user: { select: { name: true, email: true } },
       clinic: { select: { name: true } },
@@ -314,6 +323,9 @@ export async function getDoctorForActor(
       gender: true,
       age: true,
       phone: true,
+      qualification: true,
+      medicalRegistrationNumber: true,
+      registrationCouncil: true,
       userId: true,
       user: { select: { name: true, email: true } },
       clinic: { select: { name: true } },
@@ -340,6 +352,9 @@ export async function getDoctorForActor(
     gender: doctor.gender,
     age: doctor.age,
     phone: doctor.phone,
+    qualification: doctor.qualification,
+    medicalRegistrationNumber: doctor.medicalRegistrationNumber,
+    registrationCouncil: doctor.registrationCouncil,
     canManagePortalLink: mayEdit,
     userId: mayEdit ? doctor.userId : null,
     linkedPortalUser: mayEdit ? doctor.user : null,
@@ -453,6 +468,9 @@ export async function createDoctor(
         gender: emptyToNull(input.gender) ?? null,
         age: input.age ?? null,
         phone: emptyToNull(input.phone) ?? null,
+        qualification: input.qualification?.trim() || null,
+        medicalRegistrationNumber: input.medicalRegistrationNumber?.trim() || null,
+        registrationCouncil: input.registrationCouncil?.trim() || null,
       },
       select: {
         id: true,
@@ -462,6 +480,9 @@ export async function createDoctor(
         gender: true,
         age: true,
         phone: true,
+      qualification: true,
+      medicalRegistrationNumber: true,
+      registrationCouncil: true,
         userId: true,
         user: { select: { name: true, email: true } },
         clinic: { select: { name: true } },
@@ -517,6 +538,9 @@ export async function updateDoctor(
         ...(input.gender === undefined ? {} : { gender: emptyToNull(input.gender) }),
         ...(input.age === undefined ? {} : { age: input.age }),
         ...(input.phone === undefined ? {} : { phone: emptyToNull(input.phone) }),
+        ...(input.qualification === undefined ? {} : { qualification: input.qualification?.trim() || null }),
+        ...(input.medicalRegistrationNumber === undefined ? {} : { medicalRegistrationNumber: input.medicalRegistrationNumber?.trim() || null }),
+        ...(input.registrationCouncil === undefined ? {} : { registrationCouncil: input.registrationCouncil?.trim() || null }),
         ...(userId === undefined ? {} : { userId }),
       },
     });

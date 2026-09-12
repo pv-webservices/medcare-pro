@@ -67,6 +67,9 @@ export default function DoctorProfile({ doctor, canEdit, today, portalUsers }: D
                 gender: doctor.gender ?? "",
                 age: doctor.age === null ? "" : String(doctor.age),
                 phone: doctor.phone ?? "",
+                qualification: doctor.qualification ?? "",
+                medicalRegistrationNumber: doctor.medicalRegistrationNumber ?? "",
+                registrationCouncil: doctor.registrationCouncil ?? "",
                 userId: doctor.userId ?? "",
               }}
               onCancel={() => setIsEditing(false)}
@@ -155,6 +158,11 @@ export default function DoctorProfile({ doctor, canEdit, today, portalUsers }: D
                 </div>
               </div>
             </div>
+            <dl className="mt-5 grid gap-4 border-t border-line pt-5 sm:grid-cols-3">
+              <div><dt className="text-muted">Qualification</dt><dd className="font-semibold">{doctor.qualification || "Not recorded"}</dd></div>
+              <div><dt className="text-muted">Medical registration number</dt><dd className="font-semibold">{doctor.medicalRegistrationNumber || "Not recorded"}</dd></div>
+              <div><dt className="text-muted">Registration council / state</dt><dd className="font-semibold">{doctor.registrationCouncil || "Not recorded"}</dd></div>
+            </dl>
             {canEdit && doctor.linkedPortalUser && (
               <div className="mt-5 flex items-center gap-3 border-t border-line/60 pt-5 text-label">
                 <Link2 className="h-4 w-4 text-accent" aria-hidden="true" />

@@ -96,6 +96,10 @@ async function makeTenant(name: string) {
     data: { clinicId: otherClinic.id, name: "Dr Iyer", department: "Dermatology" },
     select: { id: true },
   });
+  const walkInDoctor = await prisma.doctor.create({
+    data: { clinicId: clinic.id, name: "Dr Iyer", department: "Dermatology" },
+    select: { id: true },
+  });
 
   const roles = await prisma.role.findMany({
     where: { tenantId: tenant.id },
@@ -132,6 +136,7 @@ async function makeTenant(name: string) {
     otherClinicId: otherClinic.id,
     doctorId: doctor.id,
     otherDoctorId: otherDoctor.id,
+    walkInDoctorId: walkInDoctor.id,
     ownerActor: { userId: owner.id, tenantId: tenant.id },
     staffActor: { userId: staff.id, tenantId: tenant.id },
   };
@@ -172,7 +177,7 @@ async function main(): Promise<void> {
     gender: "Female",
     city: "Pune",
     address: "55 Station Road",
-    doctorId: a.otherDoctorId,
+    doctorId: a.walkInDoctorId,
     department: "Dermatology",
     amount: 250.5,
     visitDate: "2026-08-12",

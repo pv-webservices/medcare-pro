@@ -178,7 +178,20 @@ export const DASHBOARD_LAYOUT_PERMISSION_GROUP: PermissionGroup = {
   ],
 };
 
+export const PRESCRIPTION_PERMISSIONS: readonly string[] = [
+  "prescription:read", "prescription:draft", "prescription:issue", "prescription:cancel",
+];
+
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
+  {
+    module: "Prescriptions",
+    permissions: [
+      { key: "prescription:read", label: "View prescriptions", description: "Read clinical records in permitted clinics." },
+      { key: "prescription:draft", label: "Prepare drafts", description: "Create and edit visit consultation drafts." },
+      { key: "prescription:issue", label: "Issue prescriptions", description: "Requires the assigned Doctor's explicit portal identity." },
+      { key: "prescription:cancel", label: "Cancel prescriptions", description: "Void an issued document while retaining its history." },
+    ],
+  },
   {
     module: "Clinics",
     permissions: [
@@ -769,6 +782,7 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
     !DASHBOARD_LAYOUT_PERMISSIONS.includes(
@@ -822,6 +836,7 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
   (permission) =>
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
     !DASHBOARD_LAYOUT_PERMISSIONS.includes(
@@ -867,7 +882,8 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
   ALL_PERMISSIONS.filter(
     (permission) =>
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
-      !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
+      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+    !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
       !DASHBOARD_LAYOUT_PERMISSIONS.includes(
         permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],

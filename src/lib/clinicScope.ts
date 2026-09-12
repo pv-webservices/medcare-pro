@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { accessibleClinicScope, type ActorContext } from "@/lib/rbac";
 
 /**
@@ -26,8 +28,9 @@ export async function clinicWhereForActor(
   actor: ActorContext,
   permission: string,
   requestedClinicId?: string | null,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<ClinicWhere | null> {
-  const access = await accessibleClinicScope(actor, permission);
+  const access = await accessibleClinicScope(actor, permission, client);
 
   if (access.scope === "none") {
     return null;

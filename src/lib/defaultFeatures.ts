@@ -38,6 +38,16 @@ export interface DefaultFeatureDefinition {
  */
 export const DEFAULT_FEATURES: readonly DefaultFeatureDefinition[] = [
   {
+    key: "prescriptions",
+    name: "Electronic prescriptions",
+    description: "Visit consultations, structured medications and permanent prescription history.",
+    // CORE: part of the standard clinical visit workflow. Permissions remain
+    // explicit; inheriting a module never grants clinical authority.
+    tier: "CORE",
+    globalEnabled: true,
+    inDefaultPlan: true,
+  },
+  {
     key: "registrations",
     name: "Patient registrations",
     description: "Register patients, record visits, and keep the edit audit trail.",

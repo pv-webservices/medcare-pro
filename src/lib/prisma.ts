@@ -14,7 +14,9 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma: PrismaClient =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    // Query/error output may embed bound clinical notes and medication values.
+    // Routes provide controlled error reporting; never print database payloads.
+    log: process.env.NODE_ENV === "development" ? ["warn"] : [],
   });
 
 if (!globalForPrisma.prisma) {

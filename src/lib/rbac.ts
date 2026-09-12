@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { permissionGrantKeys, WILDCARD } from "@/lib/permissions";
 
@@ -58,8 +59,9 @@ export function toPermissionList(value: unknown): readonly string[] {
 export async function assertClinicInTenant(
   tenantId: string,
   clinicId: string,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<void> {
-  const clinic = await prisma.clinic.findFirst({
+  const clinic = await client.clinic.findFirst({
     where: { id: clinicId, tenantId },
     select: { id: true },
   });
@@ -80,8 +82,9 @@ export async function can(
   actor: ActorContext,
   permission: string,
   clinicId?: string,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<boolean> {
-  const assignments = await prisma.userRole.findMany({
+  const assignments = await client.userRole.findMany({
     where: {
       userId: actor.userId,
       // A tenant-wide assignment (null clinic) always applies. A clinic-scoped
@@ -109,12 +112,13 @@ export async function requirePermission(
   actor: ActorContext,
   permission: string,
   clinicId?: string,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<void> {
   if (clinicId) {
-    await assertClinicInTenant(actor.tenantId, clinicId);
+    await assertClinicInTenant(actor.tenantId, clinicId, client);
   }
 
-  const allowed = await can(actor, permission, clinicId);
+  const allowed = await can(actor, permission, clinicId, client);
   if (!allowed) {
     throw new PermissionError(permission);
   }
@@ -151,9 +155,10 @@ export type ClinicScope =
 export async function accessibleClinicScopes(
   actor: ActorContext,
   permissions: readonly string[],
+  client: Prisma.TransactionClient = prisma,
 ): Promise<ReadonlyMap<string, ClinicScope>> {
   const requested = [...new Set(permissions)];
-  const assignments = await prisma.userRole.findMany({
+  const assignments = await client.userRole.findMany({
     where: { userId: actor.userId, role: { tenantId: actor.tenantId } },
     select: { clinicId: true, role: { select: { permissions: true } } },
   });
@@ -192,8 +197,9 @@ export async function accessibleClinicScopes(
 export async function accessibleClinicScope(
   actor: ActorContext,
   permission: string,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<ClinicScope> {
-  const scopes = await accessibleClinicScopes(actor, [permission]);
+  const scopes = await accessibleClinicScopes(actor, [permission], client);
   return scopes.get(permission) ?? { scope: "none" };
 }
 

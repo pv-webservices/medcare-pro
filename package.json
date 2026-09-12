@@ -55,7 +55,11 @@
     "test:e2e:clinic-capacity": "playwright test --config=playwright.clinic-capacity.config.ts",
     "ivr:backfill": "tsx scripts/backfill-ivr.mts",
     "plivo-numbers:backfill": "tsx scripts/backfill-plivo-number-inventory.mts",
-    "plivo-quarantine-origin:backfill": "tsx scripts/backfill-plivo-quarantine-origin.mts"
+    "plivo-quarantine-origin:backfill": "tsx scripts/backfill-plivo-quarantine-origin.mts",
+    "prescriptions:backfill": "tsx scripts/backfill-prescriptions.mts",
+    "verify:prescriptions": "tsx scripts/verify-prescriptions.mts",
+    "test:prescriptions": "tsx scripts/test-prescriptions.mts",
+    "test:e2e:prescriptions": "playwright test --config=playwright.prescriptions.config.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

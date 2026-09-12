@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALL_PERMISSIONS,
+  PRESCRIPTION_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
@@ -201,6 +202,7 @@ describe("the stage sets stay disjoint", () => {
       (permission) =>
         !STAGE_11_PERMISSIONS.includes(permission) &&
         !STAGE_AP1_PERMISSIONS.includes(permission) &&
+        !PRESCRIPTION_PERMISSIONS.includes(permission) &&
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
         !TASK_PERMISSIONS.includes(
           permission as (typeof TASK_PERMISSIONS)[number],
@@ -222,6 +224,7 @@ describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
       ALL_PERMISSIONS.length -
         STAGE_AP1_PERMISSIONS.length -
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
+        PRESCRIPTION_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_LAYOUT_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length,
@@ -470,7 +473,8 @@ describe("what the backfill would append", () => {
       const expected = role.permissions.filter(
         (permission) =>
           !permission.startsWith("dashboard:") &&
-          !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
+          !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+        !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
           !TASK_PERMISSIONS.includes(
             permission as (typeof TASK_PERMISSIONS)[number],
           ),
