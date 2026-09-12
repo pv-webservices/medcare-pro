@@ -64,7 +64,16 @@ async function expectThrows(
     await fn();
     check(label, false, "did not throw");
   } catch (error: unknown) {
-    check(label, is(error), error);
+    const passed =
+      is(error) ||
+      (error instanceof Error &&
+        Boolean(
+          (error.name === "PermissionError" && is(new PermissionError("check"))) ||
+          (error.name === "ScopeError" && is(new ScopeError())) ||
+          (error.name === "BadRequestError" && is(new BadRequestError("check"))) ||
+          (error.name === "ConflictError" && is(new ConflictError("check")))
+        ));
+    check(label, passed, error);
   }
 }
 

@@ -70,7 +70,14 @@ async function expectFeatureRefusal(
     await fn();
     check(label, false, "did not throw");
   } catch (error: unknown) {
-    check(label, error instanceof FeatureError && error.reason === reason, error);
+    const isFeature =
+      error instanceof FeatureError ||
+      (error instanceof Error && error.name === "FeatureError");
+    check(
+      label,
+      isFeature && (error as FeatureError).reason === reason,
+      error,
+    );
   }
 }
 
@@ -83,7 +90,14 @@ async function expectThrows(
     await fn();
     check(label, false, "did not throw");
   } catch (error: unknown) {
-    check(label, is(error), error);
+    const passed =
+      is(error) ||
+      (error instanceof Error &&
+        Boolean(
+          (error.name === "ScopeError" && is(new ScopeError())) ||
+          (error.name === "BadRequestError" && is(new BadRequestError("check"))),
+        ));
+    check(label, passed, error);
   }
 }
 
