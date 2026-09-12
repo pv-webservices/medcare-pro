@@ -20,6 +20,8 @@ export class PatientPortalError extends Error {
     message = "Patient Portal is unavailable. Please contact your clinic.",
   ) {
     super(message);
+    this.name = "PatientPortalError";
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 export function normalizePatientMobile(input: string): string {

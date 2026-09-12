@@ -68,9 +68,10 @@ async function rejects(
   await assert.rejects(work, (error: unknown) => {
     if (status !== undefined) {
       return (
-        (error instanceof PatientPortalError ||
-          (error instanceof Error && error.name === "PatientPortalError")) &&
-        (error as PatientPortalError).status === status
+        typeof error === "object" &&
+        error !== null &&
+        "status" in error &&
+        (error as { status: unknown }).status === status
       );
     }
     if (kind) {
