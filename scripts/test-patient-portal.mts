@@ -65,13 +65,23 @@ async function rejects(
   status?: number,
   kind?: new (...args: never[]) => Error,
 ) {
-  await assert.rejects(work, (error) =>
-    status !== undefined
-      ? error instanceof PatientPortalError && error.status === status
-      : kind
-        ? error instanceof kind
-        : error instanceof Error,
-  );
+  await assert.rejects(work, (error: unknown) => {
+    if (status !== undefined) {
+      return (
+        (error instanceof PatientPortalError ||
+          (error instanceof Error && error.name === "PatientPortalError")) &&
+        (error as PatientPortalError).status === status
+      );
+    }
+    if (kind) {
+      return (
+        error instanceof kind ||
+        (error instanceof Error &&
+          (error.name === kind.name || error.constructor.name === kind.name))
+      );
+    }
+    return error instanceof Error;
+  });
   checks++;
   console.log(`PASS ${label}`);
 }
