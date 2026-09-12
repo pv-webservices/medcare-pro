@@ -70,6 +70,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@prisma/client": "^6.19.1",
+    "@tailwindcss/postcss": "^4",
     "bcryptjs": "^3.0.3",
     "busboy": "^1.6.0",
     "dotenv": "^17.4.2",
@@ -82,18 +83,17 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.20.0",
+    "tailwindcss": "^4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@tailwindcss/postcss": "^4",
     "@types/busboy": "^1.5.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
-    "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^3.2.7"
