@@ -40,10 +40,11 @@ describe("Gemini transport (mock only)", () => {
       outputTokens: 5,
     });
     expect(transport.mock.calls[0][0]).not.toContain("synthetic-key");
-    expect(
-      JSON.parse(transport.mock.calls[0][1].body).generationConfig
-        .responseFormat.text.mimeType,
-    ).toBe("application/json");
+    const sentBody = JSON.parse(transport.mock.calls[0][1].body);
+    expect(sentBody.generationConfig.responseMimeType).toBe("application/json");
+    expect(sentBody.generationConfig.responseSchema).toBeDefined();
+    expect(sentBody.generationConfig.responseSchema).not.toHaveProperty("$schema");
+    expect(sentBody.generationConfig.responseSchema).not.toHaveProperty("additionalProperties");
   });
   it.each([
     [401, "AUTH"],

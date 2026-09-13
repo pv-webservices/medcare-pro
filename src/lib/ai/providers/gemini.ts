@@ -27,6 +27,16 @@ const envelope = z.object({
     })
     .optional(),
 });
+function sanitizeGeminiSchema(schema: unknown): unknown {
+  if (typeof schema !== "object" || schema === null) return schema;
+  if (Array.isArray(schema)) return schema.map(sanitizeGeminiSchema);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === "$schema" || key === "additionalProperties") continue;
+    out[key] = sanitizeGeminiSchema(value);
+  }
+  return out;
+}
 export class GeminiProvider implements AiProvider {
   constructor(
     private readonly config: AiConfig,
@@ -66,9 +76,8 @@ export class GeminiProvider implements AiProvider {
             generationConfig: {
               temperature: 0,
               maxOutputTokens: 4096,
-              responseFormat: {
-                text: { mimeType: "application/json", schema: request.schema },
-              },
+              responseMimeType: "application/json",
+              responseSchema: sanitizeGeminiSchema(request.schema),
             },
           }),
         },
