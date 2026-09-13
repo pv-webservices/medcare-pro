@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
+  CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
@@ -202,7 +203,9 @@ describe("the stage sets stay disjoint", () => {
       (permission) =>
         !STAGE_11_PERMISSIONS.includes(permission) &&
         !STAGE_AP1_PERMISSIONS.includes(permission) &&
-        permission !== "patient_portal:manage" && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+        !CLINICAL_AI_PERMISSIONS.includes(permission) &&
+        permission !== "patient_portal:manage" &&
+        !PRESCRIPTION_PERMISSIONS.includes(permission) &&
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
         !TASK_PERMISSIONS.includes(
           permission as (typeof TASK_PERMISSIONS)[number],
@@ -225,6 +228,7 @@ describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
         STAGE_AP1_PERMISSIONS.length -
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
         PRESCRIPTION_PERMISSIONS.length -
+        CLINICAL_AI_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_LAYOUT_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length,
@@ -473,7 +477,9 @@ describe("what the backfill would append", () => {
       const expected = role.permissions.filter(
         (permission) =>
           !permission.startsWith("dashboard:") &&
-          permission !== "patient_portal:manage" && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+          !CLINICAL_AI_PERMISSIONS.includes(permission) &&
+          permission !== "patient_portal:manage" &&
+          !PRESCRIPTION_PERMISSIONS.includes(permission) &&
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
           !TASK_PERMISSIONS.includes(
             permission as (typeof TASK_PERMISSIONS)[number],

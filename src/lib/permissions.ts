@@ -182,7 +182,9 @@ export const PRESCRIPTION_PERMISSIONS: readonly string[] = [
   "prescription:read", "prescription:draft", "prescription:issue", "prescription:cancel",
 ];
 
+export const CLINICAL_AI_PERMISSIONS: readonly string[] = ["clinical-ai:writing"];
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
+  { module: "Clinical AI", permissions: [{ key: "clinical-ai:writing", label: "Clinical writing assistance", description: "Request language suggestions for an authorized consultation." }] },
   { module: "Patient portal", permissions: [{ key: "patient_portal:manage", label: "Manage patient portal access", description: "Activate, resend and revoke portal access for verified patients." }] },
   {
     module: "Prescriptions",
@@ -783,6 +785,7 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !CLINICAL_AI_PERMISSIONS.includes(permission) &&
     permission !== "patient_portal:manage" &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
@@ -838,6 +841,7 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
   (permission) =>
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
+    !CLINICAL_AI_PERMISSIONS.includes(permission) &&
     permission !== "patient_portal:manage" &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
@@ -885,8 +889,9 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
   ALL_PERMISSIONS.filter(
     (permission) =>
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
+      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
-    !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
       !DASHBOARD_LAYOUT_PERMISSIONS.includes(

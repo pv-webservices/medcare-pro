@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const schema = readFileSync(resolve("prisma/schema.prisma"), "utf8");
+const schema = readFileSync(resolve("prisma/schema.prisma"), "utf8").replace(/\r\n/g, "\n");
 const migration = readFileSync(
   resolve(
     "prisma/migrations/20260902160000_plivo_phase5_test_calls/migration.sql",

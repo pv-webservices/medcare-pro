@@ -45,7 +45,7 @@ describe("the catalogue", () => {
 
   it("uses the resource:action naming convention throughout", () => {
     for (const key of ALL_PERMISSIONS) {
-      expect(key).toMatch(/^[a-z]+(?:_[a-z]+)*(?::[a-z]+)+$/);
+      expect(key).toMatch(/^[a-z]+(?:[-_][a-z]+)*(?::[a-z]+)+$/);
     }
   });
 
