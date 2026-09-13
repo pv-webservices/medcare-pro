@@ -11,8 +11,6 @@ import {
 const labels: Record<(typeof WRITING_MODES)[number], string> = {
   SPELLING: "Fix spelling",
   GRAMMAR: "Improve grammar",
-  CONCISE: "Make concise",
-  CLINICAL_WORDING: "Improve clinical wording",
 };
 export default function ClinicalWritingControl({
   registrationId,
@@ -62,7 +60,7 @@ export default function ClinicalWritingControl({
         setMessage(
           body.data.status === "SAFETY_REJECTED"
             ? "The suggestion could not be verified as preserving clinical meaning. Your note has not been changed."
-            : "No safe language changes suggested.",
+            : "No safe spelling or grammar changes suggested.",
         );
     } catch {
       setMessage(

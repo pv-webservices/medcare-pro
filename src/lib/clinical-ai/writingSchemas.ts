@@ -1,10 +1,6 @@
 import { z } from "zod";
-export const WRITING_MODES = [
-  "SPELLING",
-  "GRAMMAR",
-  "CONCISE",
-  "CLINICAL_WORDING",
-] as const;
+// Released capabilities only; broader rewriting is deliberately deferred.
+export const WRITING_MODES = ["SPELLING", "GRAMMAR"] as const;
 const restricted = {
   modes: ["SPELLING", "GRAMMAR"] as readonly (typeof WRITING_MODES)[number][],
   semanticRisk: "VERY_HIGH" as const,
@@ -64,12 +60,7 @@ export const writingResponseSchema = z.strictObject({
   suggestions: z
     .array(
       z.strictObject({
-        category: z.enum([
-          "SPELLING",
-          "GRAMMAR",
-          "CLARITY",
-          "CLINICAL_WORDING",
-        ]),
+        category: z.enum(WRITING_MODES),
         originalFragment: z.string().min(1).max(5000),
         suggestedFragment: z.string().min(1).max(10000),
         reason: z.string().max(300),

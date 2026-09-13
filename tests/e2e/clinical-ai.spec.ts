@@ -255,3 +255,89 @@ test("provider failure leaves the clinician text untouched", async ({
     control.getByRole("button", { name: "Accept", exact: true }),
   ).toHaveCount(0);
 });
+
+test("every field exposes only released modes and direct deferred-mode API calls fail", async ({
+  page,
+}) => {
+  const visit = await f.visit();
+  await signIn(page);
+  await page.goto(`/registration/${visit.id}/consultation`);
+  const fields = [
+    "chiefComplaint",
+    "historyOfPresentIllness",
+    "pastMedicalHistory",
+    "examinationFindings",
+    "investigationNotes",
+    "diagnosis",
+    "advice",
+    "followUpInstructions",
+  ];
+  const before = await db.aiRun.count({ where: { registrationId: visit.id } });
+  for (const field of fields) {
+    await page.locator(`#consultation-${field}`).fill("Patient have headache.");
+    const control = page.getByLabel(`Writing assistance for ${field}`, {
+      exact: true,
+    });
+    await control
+      .getByRole("button", { name: /^Improve writing for / })
+      .click();
+    await expect(
+      control.getByRole("button", { name: "Fix spelling", exact: true }),
+    ).toBeVisible();
+    await expect(
+      control.getByRole("button", { name: "Improve grammar", exact: true }),
+    ).toBeVisible();
+    await expect(control.getByRole("button")).toHaveCount(3);
+    await expect(
+      control.getByRole("button", {
+        name: /Make concise|Improve clinical wording/,
+      }),
+    ).toHaveCount(0);
+    for (const mode of ["CONCISE", "CLINICAL_WORDING"]) {
+      const response = await page.request.post(
+        "/api/clinical-ai/writing-assist",
+        {
+          data: {
+            registrationId: visit.id,
+            field,
+            mode,
+            text: "Patient have headache.",
+          },
+        },
+      );
+      expect(response.status()).toBe(400);
+      expect((await response.json()).success).toBe(false);
+    }
+    await control
+      .getByRole("button", { name: /^Improve writing for / })
+      .click();
+  }
+  expect(await db.aiRun.count({ where: { registrationId: visit.id } })).toBe(
+    before,
+  );
+});
+
+test("no-change response accurately describes spelling and grammar capability", async ({
+  page,
+}) => {
+  const visit = await f.visit();
+  await signIn(page);
+  await page.goto(`/registration/${visit.id}/consultation`);
+  const note = page.getByLabel("History of present illness", { exact: true });
+  const control = page.getByLabel(
+    "Writing assistance for historyOfPresentIllness",
+    { exact: true },
+  );
+  await note.fill("Patient has headache for 3 days.");
+  await control.getByRole("button", { name: /^Improve writing for / }).click();
+  await control
+    .getByRole("button", { name: "Improve grammar", exact: true })
+    .click();
+  await expect(control.getByRole("status")).toHaveText(
+    "No safe spelling or grammar changes suggested.",
+  );
+  await expect(note).toHaveValue("Patient has headache for 3 days.");
+  await expect(
+    control.getByRole("button", { name: "Accept", exact: true }),
+  ).toHaveCount(0);
+});

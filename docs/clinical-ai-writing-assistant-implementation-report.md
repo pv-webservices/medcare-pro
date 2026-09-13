@@ -1,5 +1,7 @@
 # Phase AI-1 implementation report
 
+**Current AI-1.1 release: SPELLING/GRAMMAR only on all eight supported fields.** CONCISE/CLINICAL_WORDING are intentionally deferred because the conservative validator cannot establish broader rewrites as safe enough for release. Historical AI-1 verification below is retained; the AI-1.1 correction and current validation are recorded separately at the end.
+
 Branch: `codex/clinical-ai-writing-assistant`. Fetched baseline: `origin/codex/electronic-prescriptions`, commit `ede921d940c180e0a5ff39718ee2e7dd2652bc9f`. Phase AI-1 implementation and safety hardening are finalized for independent review. No production deployment, remote database migration, real-patient provider request, paid call or AI-2 work was performed.
 
 ## A. Architecture implemented
@@ -125,7 +127,7 @@ The required initial Git checks confirmed branch `codex/clinical-ai-writing-assi
 
 Issues found and corrected:
 
-- Past medical history allowed all modes: restricted it to SPELLING/GRAMMAR. CONCISE and CLINICAL_WORDING remain available only on chief complaint and HPI.
+- Past medical history allowed all modes: restricted it to SPELLING/GRAMMAR. At that historical AI-1 stage, CONCISE/CLINICAL_WORDING remained on chief complaint and HPI; AI-1.1 subsequently removed them from every public field.
 - Normal fields equated `from`/`for`, potentially changing cause/timing: removed that equivalence and added a causality regression.
 - The requested anchor matrix had coverage gaps: added all specified dose, decimal, volume, tablet, frequency, interval, temperature, blood-pressure, oxygen, HbA1c, laterality, negation and diagnostic-certainty examples. `.5` → `0.5` is explicitly rejected. The reviewed `fevr` → `fever` spelling correction is supported; diagnostic substitutions and loss of uncertainty remain rejected.
 - Strict-schema tests omitted several proxy overrides: added provider, model, prompt, system instruction and target URL cases plus a real-context generic-request rejection.
@@ -141,3 +143,43 @@ No browser provider calls, client secrets, direct AI consultation writes, medica
 AiRun retains ownership identifiers and is therefore sensitive, linkable operational metadata, not anonymous data. Rate-denied requests have no AiRun reservation; HTTP status-only metrics can count them. RESTRICT relationships intentionally prevent hard-deleting referenced owners/visits; any eventual retention/purge policy needs a separately reviewed operational procedure. Provider-side logging, retention and compliance approval remain deployment responsibilities.
 
 One interim prescription browser run timed out at the existing five-second post-issuance navigation assertion (25 passed, one failed). A read-only local DB check confirmed issuance succeeded; the complete unmodified-threshold rerun passed all 26 tests in 51.0 seconds. Final AI E2E passed six tests in 26.8 seconds, including the corrected page-level overflow checks. Final unit rerun passed 154 files/2,381 tests. No application or test-threshold change was made for the transient navigation failure.
+
+## N. Phase AI-1.1 — Functional calibration
+
+Reviewed starting HEAD: `481d9cb0794b4cfae82396e82e47dddacce8a773`; initial worktree was clean on the existing `codex/clinical-ai-writing-assistant` branch. No new branch or PR was created.
+
+Released UI/API modes and response categories are now **SPELLING and GRAMMAR only**. The same two modes apply to chiefComplaint, historyOfPresentIllness, pastMedicalHistory, examinationFindings, investigationNotes, diagnosis, advice and followUpInstructions. CONCISE/CLINICAL_WORDING are deliberately deferred because ordered lexical invariants cannot establish broader semantic rewriting as safe enough for release. The prompt forbids style/conciseness/tone/professional rephrasing; no-change copy accurately describes spelling/grammar.
+
+Exact files modified:
+
+- `src/lib/clinical-ai/writingSchemas.ts`: authoritative released modes and response categories.
+- `src/lib/clinical-ai/writingAssistant.ts`: spelling/grammar-only instruction and category policy; authorization remains unchanged.
+- `src/components/prescriptions/ClinicalWritingControl.tsx`: only two active options and corrected no-change copy.
+- `src/components/prescriptions/ConsultationWorkspace.tsx`: accurate helper copy.
+- `tests/unit/clinicalWritingSafety.test.ts`: every field's accepted/rejected modes, deferred categories, safe correction examples and ambiguous clinical spelling/preposition rejection.
+- `tests/unit/clinicalWritingService.test.ts`: deferred modes rejected before provider/reservation, prompt and generated schema alignment.
+- `tests/e2e/clinical-ai.spec.ts`: all eight menus expose only spelling/grammar; all sixteen field/deferred-mode API combinations return 400 without reservations; no-change text and original-note retention.
+- `docs/clinical-ai-writing-assistant.md`: current field matrix, intentional deferral, manual synthetic QA matrix, A/B/C classification with C=0 release gate and future semantic-invariant note.
+- `docs/clinical-ai-writing-assistant-implementation-report.md`: current calibration/report, preserving explicitly historical AI-1 results.
+
+The safety validator and reviewed typo map are unchanged. No a/an expansion, preposition equivalence, fuzzy matching, synonyms, arbitrary token changes or second-LLM equivalence judge were introduced. Existing numeric/decimal/unit/medication, negation, uncertainty, laterality and temporal regressions remain passing. Medication controls remain absent. Source equality, Accept/Dismiss and explicit optimistic Save are unchanged. No authority, entitlement, provider transport/configuration, logging or database model/migration changes occurred; AiRun remains metadata-only.
+
+### AI-1.1 final validation
+
+| Command/check                                     | Result                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------- |
+| npm run typecheck                                 | Passed                                                                     |
+| npm run lint                                      | Passed; zero errors, five existing unrelated warnings                      |
+| npm test -- --maxWorkers=4                        | 154 files, 2,405 tests passed                                              |
+| Focused clinicalWriting/geminiProvider unit suite | Four files, 151 passed                                                     |
+| npm run test:clinical-ai                          | 32 local DB checks passed                                                  |
+| npm run verify:prescriptions                      | Nine checks passed                                                         |
+| npm run test:prescriptions                        | 58 local DB checks passed                                                  |
+| npm run build                                     | Passed; verified disposable localhost DB, AI disabled and Gemini key unset |
+| npm run test:e2e:clinical-ai                      | Eight passed, including direct API mode rejection                          |
+| npm run test:e2e:prescriptions                    | 26 passed                                                                  |
+| git diff --check                                  | Passed                                                                     |
+
+Provider calls remain mocked in all automated checks. Local build deployed no new migration. Validation evidence uses `ai11-*` logs in the existing external artifact directory. No screenshots, logs, secrets, DB files or generated artifacts entered the correction commit.
+
+**Live Gemini QA: NOT RUN — no local provider credentials supplied.** The documented synthetic matrix is a manual approval gate; no live outcomes are claimed. Future structured facts/protected entities/fact reconciliation/source evidence remain deferred. No merge, deployment or AI-2 work was performed.

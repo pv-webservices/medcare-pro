@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FIELD_POLICIES,
+  WRITING_MODES,
   writingRequestSchema,
   writingResponseSchema,
 } from "@/lib/clinical-ai/writingSchemas";
@@ -42,25 +43,30 @@ describe("Clinical writing input and field policy", () => {
   );
   it("rejects malformed input", () =>
     expect(writingRequestSchema.safeParse(null).success).toBe(false));
-  it("allows every normal note mode", () => {
-    for (const mode of FIELD_POLICIES.historyOfPresentIllness.modes)
-      expect(writingRequestSchema.safeParse({ ...input, mode }).success).toBe(
-        true,
-      );
+  it("releases only spelling and grammar", () => {
+    expect(WRITING_MODES).toEqual(["SPELLING", "GRAMMAR"]);
   });
-  it.each([
-    "diagnosis",
-    "followUpInstructions",
-    "advice",
-    "investigationNotes",
-    "examinationFindings",
-    "pastMedicalHistory",
-  ])("restricts %s", (field) => {
-    for (const mode of ["CONCISE", "CLINICAL_WORDING"])
+  it.each(Object.keys(FIELD_POLICIES))(
+    "allows only released modes for %s",
+    (field) => {
       expect(
-        writingRequestSchema.safeParse({ ...input, field, mode }).success,
-      ).toBe(false);
-  });
+        FIELD_POLICIES[field as keyof typeof FIELD_POLICIES].modes,
+      ).toEqual(WRITING_MODES);
+      for (const mode of WRITING_MODES)
+        expect(
+          writingRequestSchema.safeParse({ ...input, field, mode }).success,
+        ).toBe(true);
+    },
+  );
+  it.each(Object.keys(FIELD_POLICIES))(
+    "rejects deferred modes for %s",
+    (field) => {
+      for (const mode of ["CONCISE", "CLINICAL_WORDING"])
+        expect(
+          writingRequestSchema.safeParse({ ...input, field, mode }).success,
+        ).toBe(false);
+    },
+  );
   it("respects shorter diagnosis limit", () =>
     expect(
       writingRequestSchema.safeParse({
@@ -123,6 +129,19 @@ describe("Clinical meaning anchors", () => {
     ["Patient was febrile", "Patient is febrile", false],
     ["viral fever?", "viral fever", false],
     ["Patient have fever", "Patient has fever", true],
+    [
+      "Patient is suffring from headach.",
+      "Patient is suffering from headache.",
+      true,
+    ],
+    ["patient have headache", "Patient has headache.", true],
+    ["patient has headache", "The patient has headache.", true],
+    ["Vitamin A", "Vitamin an", false],
+    ["metformin", "metoprolol", false],
+    ["viral", "varicella", false],
+    ["ileum", "ilium", false],
+    ["fever from 3 days", "fever for 3 days", false],
+    ["pain from exercise", "pain for exercise", false],
   ])("%s -> %s = %s", (source, target, accepted) =>
     expect(safe(source, target, FIELD_POLICIES.diagnosis)).toBe(accepted),
   );
@@ -137,6 +156,26 @@ describe("Clinical meaning anchors", () => {
   });
 });
 describe("Structured result and config", () => {
+  it.each(["CLARITY", "CLINICAL_WORDING"])(
+    "rejects deferred response category %s",
+    (category) => {
+      expect(
+        writingResponseSchema.safeParse({
+          changed: true,
+          suggestedText: "Patient has headache.",
+          suggestions: [
+            {
+              category,
+              originalFragment: "patient has headache",
+              suggestedFragment: "Patient has headache.",
+              reason: "style",
+              confidence: "HIGH",
+            },
+          ],
+        }).success,
+      ).toBe(false);
+    },
+  );
   it.each([
     {},
     { changed: true },

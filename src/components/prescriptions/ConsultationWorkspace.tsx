@@ -284,8 +284,8 @@ export default function ConsultationWorkspace({
               <h2 className="text-lg font-semibold">Consultation notes</h2>
               {mayUseAi && (
                 <p className="text-sm text-muted">
-                  Clinical Writing Assistant · Improve spelling, grammar and
-                  clinical wording without changing intended clinical meaning.
+                  Clinical Writing Assistant · Correct spelling and grammar
+                  while preserving clinical meaning.
                   Review every suggestion before accepting.
                 </p>
               )}
