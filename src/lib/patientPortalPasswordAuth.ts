@@ -321,10 +321,63 @@ export async function activatePatientPortal(
       : "Portal activated, but we couldn't send the recovery-email verification. You can resend it from Profile.",
   };
 }
+export async function resolveSecurityTokenTenant(
+  raw: string,
+  purpose: PatientPortalTokenPurpose,
+  db: Prisma.TransactionClient = prisma,
+): Promise<{ slug: string; businessName: string } | null> {
+  if (!/^[\w-]{43}$/.test(raw)) return null;
+  const token = await db.patientPortalSecurityToken.findUnique({
+    where: { tokenHash: hashPortalToken(raw) },
+    include: {
+      portalAccount: {
+        include: {
+          links: {
+            where: { accessType: "SELF" },
+            orderBy: { createdAt: "desc" },
+            include: {
+              patient: {
+                include: {
+                  tenant: { select: { slug: true, businessName: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (
+    !token ||
+    token.purpose !== purpose ||
+    !portalRecordLive(token, new Date())
+  )
+    return null;
+  const link =
+    token.portalAccount.links.find(
+      (l) => !l.revokedAt && l.activePatientId === l.patientId,
+    ) ?? token.portalAccount.links[0];
+  if (!link?.patient?.tenant?.slug) return null;
+  return {
+    slug: link.patient.tenant.slug,
+    businessName: link.patient.tenant.businessName,
+  };
+}
 async function activeSecurityAccount(db: Prisma.TransactionClient, id: string) {
   const account = await db.patientPortalAccount.findUnique({
     where: { id },
-    include: { links: { where: { revokedAt: null, accessType: "SELF" } } },
+    include: {
+      links: {
+        where: { revokedAt: null, accessType: "SELF" },
+        include: {
+          patient: {
+            include: {
+              tenant: { select: { id: true, slug: true, businessName: true } },
+            },
+          },
+        },
+      },
+    },
   });
   const link = account?.links.length === 1 ? account.links[0] : null;
   if (
@@ -340,7 +393,7 @@ async function activeSecurityAccount(db: Prisma.TransactionClient, id: string) {
       "This security link is invalid or expired.",
     );
   await requirePatientPortalEntitlement(link.tenantId, db);
-  return account;
+  return { account, link };
 }
 async function loadSecurityToken(
   db: Prisma.TransactionClient,
@@ -369,14 +422,17 @@ async function loadSecurityToken(
       400,
       "This security link is invalid or expired.",
     );
-  const account = await activeSecurityAccount(db, token.portalAccountId);
-  return { token, account };
+  const { account, link } = await activeSecurityAccount(
+    db,
+    token.portalAccountId,
+  );
+  return { token, account, link };
 }
 export async function verifyPatientRecoveryEmail(raw: string) {
   try {
-    await prisma.$transaction(
+    return await prisma.$transaction(
       async (db) => {
-        const { token, account } = await loadSecurityToken(
+        const { token, account, link } = await loadSecurityToken(
           db,
           raw,
           "VERIFY_RECOVERY_EMAIL",
@@ -410,11 +466,13 @@ export async function verifyPatientRecoveryEmail(raw: string) {
         await db.patientPortalAuditEvent.create({
           data: {
             portalAccountId: account.id,
+            tenantId: link.tenantId,
             event: account.recoveryEmail
               ? "PORTAL_RECOVERY_EMAIL_CHANGED"
               : "PORTAL_RECOVERY_EMAIL_VERIFIED",
           },
         });
+        return { tenantSlug: link.patient.tenant.slug };
       },
       { isolationLevel: "ReadCommitted" },
     );
@@ -474,9 +532,9 @@ export async function resetPatientPassword(input: {
 }) {
   const hash = await hashPatientPassword(input.password);
   try {
-    await prisma.$transaction(
+    return await prisma.$transaction(
       async (db) => {
-        const { token, account } = await loadSecurityToken(
+        const { token, account, link } = await loadSecurityToken(
           db,
           input.token,
           "PASSWORD_RESET",
@@ -518,9 +576,11 @@ export async function resetPatientPassword(input: {
         await db.patientPortalAuditEvent.create({
           data: {
             portalAccountId: account.id,
+            tenantId: link.tenantId,
             event: "PORTAL_PASSWORD_RESET_COMPLETED",
           },
         });
+        return { tenantSlug: link.patient.tenant.slug };
       },
       { isolationLevel: "ReadCommitted" },
     );
@@ -561,7 +621,7 @@ export async function changePatientRecoveryEmail(
   const mail = await prisma.$transaction(
     async (db) => {
       await lockPortalAccount(db, account.id);
-      const fresh = await activeSecurityAccount(db, account.id);
+      const { account: fresh } = await activeSecurityAccount(db, account.id);
       await loadPatientActorFromSession(actor, db);
       if (fresh.passwordHash !== account.passwordHash)
         throw new PatientPortalError(401, "Please sign in again.");
@@ -622,7 +682,7 @@ export async function resendPatientRecoveryEmail(
     async (db) => {
       await lockPortalAccount(db, actor.portalAccountId);
       await loadPatientActorFromSession(actor, db);
-      const account = await activeSecurityAccount(db, actor.portalAccountId);
+      const { account } = await activeSecurityAccount(db, actor.portalAccountId);
       if (!account.pendingRecoveryEmail)
         throw new PatientPortalError(400, "No recovery email is pending.");
       const mail = await issueSecurityToken(

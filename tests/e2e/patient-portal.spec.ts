@@ -78,9 +78,13 @@ async function noOverflow(page: Page) {
 async function patientLogin(page: Page, passwordValue: string) {
   await page.goto(`/patient/login?org=${f.tenant.slug}`);
   await noOverflow(page);
-  await expect(page.getByLabel("Organization", { exact: true })).toHaveValue(
-    f.tenant.slug,
-  );
+  await expect(page.getByLabel("Organization", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByLabel("Clinic Access Code", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: f.tenant.businessName }),
+  ).toBeVisible();
   await page
     .getByLabel("Patient ID", { exact: true })
     .fill(f.patient.patientCode);
@@ -171,6 +175,20 @@ test("QR, password, verified email recovery, clinical IDOR, print and immediate 
   await expect(
     patient.getByText("Recovery email verified.", { exact: true }),
   ).toBeVisible();
+  // Follow "Back to sign in" to verify organization preservation
+  await patient.getByRole("link", { name: "Back to sign in" }).click();
+  await expect(patient).toHaveURL(
+    new RegExp(`/patient/login\\?org=${f.tenant.slug}`),
+  );
+  await expect(patient.getByLabel("Organization", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    patient.getByLabel("Clinic Access Code", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    patient.getByRole("heading", { name: f.tenant.businessName }),
+  ).toBeVisible();
   await patient.goto("/patient/profile");
   await expect(patient.getByText(/· Verified/)).toBeVisible();
   await patient
@@ -212,6 +230,12 @@ test("QR, password, verified email recovery, clinical IDOR, print and immediate 
   });
   const resetPage = await resetContext.newPage();
   await resetPage.goto(`/patient/forgot-password?org=${f.tenant.slug}`);
+  await expect(
+    resetPage.getByLabel("Organization", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    resetPage.getByLabel("Clinic Access Code", { exact: true }),
+  ).toHaveCount(0);
   await resetPage
     .getByLabel("Patient ID", { exact: true })
     .fill(f.patient.patientCode);
@@ -232,10 +256,57 @@ test("QR, password, verified email recovery, clinical IDOR, print and immediate 
     .fill(replacement);
   await noOverflow(resetPage);
   await resetPage.getByRole("button", { name: "Update password" }).click();
-  await expect(resetPage).toHaveURL(/\/patient\/login\?reset=complete/);
+  await expect(resetPage).toHaveURL(
+    new RegExp(`/patient/login\\?org=${f.tenant.slug}&reset=complete`),
+  );
+  await expect(
+    resetPage.getByLabel("Organization", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    resetPage.getByLabel("Clinic Access Code", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    resetPage.getByText(
+      "Password updated. Sign in with your new password.",
+    ),
+  ).toBeVisible();
   expect((await patient.request.get("/api/patient-portal/me")).status()).toBe(
     401,
   );
+
+  // Generic /patient/login without ?org
+  await resetPage.goto("/patient/login");
+  await expect(
+    resetPage.getByLabel("Clinic Access Code", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    resetPage.getByText(
+      /Find this code on your clinic's Patient Portal link, receipt or prescription/,
+    ),
+  ).toBeVisible();
+  // Format guidance when entering name with spaces instead of slug
+  await resetPage
+    .getByLabel("Clinic Access Code", { exact: true })
+    .fill("Sharma Clinic");
+  await resetPage
+    .getByLabel("Patient ID", { exact: true })
+    .fill(f.patient.patientCode);
+  await resetPage.getByLabel("Password", { exact: true }).fill(replacement);
+  await resetPage.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    resetPage.getByText(
+      "Enter your Clinic Access Code, for example sharma-clinic.",
+    ),
+  ).toBeVisible();
+  // Valid unknown slug returns generic failure
+  await resetPage
+    .getByLabel("Clinic Access Code", { exact: true })
+    .fill("valid-unknown-slug");
+  await resetPage.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    resetPage.getByText("Invalid sign-in details.", { exact: true }),
+  ).toBeVisible();
+
   await patientLogin(resetPage, password);
   await expect(
     resetPage.getByText("Invalid sign-in details.", { exact: true }),
