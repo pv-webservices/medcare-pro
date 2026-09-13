@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { prisma } from "../../src/lib/prisma";
+import { hashPortalToken } from "../../src/lib/patientPortalSecurity";
 import type { createPatientPortalFixture } from "../../scripts/patient-portal-test-fixture";
 import { PRESCRIPTION_TEST_PASSWORD } from "../../scripts/prescription-test-fixture";
 const origin = "http://127.0.0.1:33322";
@@ -159,9 +160,7 @@ test("QR, password, verified email recovery, clinical IDOR, print and immediate 
     (
       await prisma.patientPortalSecurityToken.findUniqueOrThrow({
         where: {
-          tokenHash: (
-            await import("../../src/lib/patientPortalSecurity")
-          ).hashPortalToken(raw),
+          tokenHash: hashPortalToken(raw),
         },
       })
     ).consumedAt,
