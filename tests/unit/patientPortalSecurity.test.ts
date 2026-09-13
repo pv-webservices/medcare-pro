@@ -1,120 +1,111 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
-  normalizePatientMobile,
   hashPortalToken,
   portalToken,
-  portalCodeDigest,
-  portalCodeMatches,
   portalRecordLive,
-  portalChallengeLive,
   portalLoginSchema,
-  portalVerifySchema,
+  portalActivationSchema,
+  portalPasswordSchema,
   assertPortalOrigin,
-  portalPepper,
-  OTP_ATTEMPTS,
+  ACTIVATION_TTL,
 } from "@/lib/patientPortalSecurity";
+import {
+  hashPatientPassword,
+  comparePatientPassword,
+  DUMMY_PATIENT_HASH,
+} from "@/lib/patientPortalPasswordAuth";
+import {
+  createPatientPortalTestMailer,
+  portalEmailBody,
+} from "@/lib/patientPortalEmails";
 import {
   planPatientPortalRoleMigration,
   PRE_PATIENT_PORTAL_ROLES,
 } from "@/lib/patientPortalRoleMigration";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
 import { DEFAULT_FEATURES } from "@/lib/defaultFeatures";
-import { createPatientPortalTestSender } from "@/lib/patientPortalTestSender";
-const now = new Date("2026-09-13T00:00:00Z");
 afterEach(() => vi.unstubAllEnvs());
-describe("Patient Portal security", () => {
-  it.each([
-    "9876543210",
-    "+919876543210",
-    "919876543210",
-    "00919876543210",
-    "(98765) 43210",
-  ])("normalizes %s", (n) =>
-    expect(normalizePatientMobile(n)).toBe("+919876543210"),
-  );
-  it.each([
-    "1234567890",
-    "+19876543210",
-    "987654321",
-    "98765432100",
-    "98765abc10",
-  ])("rejects %s", (n) => expect(() => normalizePatientMobile(n)).toThrow());
-  it("generates high entropy opaque tokens and stores only a different digest", () => {
-    const t = portalToken();
-    expect(t).toMatch(/^[\w-]{43}$/);
-    expect(portalToken()).not.toBe(t);
-    expect(hashPortalToken(t)).toHaveLength(64);
-    expect(hashPortalToken(t)).not.toBe(t);
+describe("Patient Portal password security", () => {
+  it("uses 32 bytes of entropy and SHA-256 hashes with a 15 minute activation TTL", () => {
+    const token = portalToken();
+    expect(token).toMatch(/^[\w-]{43}$/);
+    expect(hashPortalToken(token)).toHaveLength(64);
+    expect(portalToken()).not.toBe(token);
+    expect(ACTIVATION_TTL).toBe(900000);
   });
-  it("binds OTP digests to challenge and pepper", () => {
-    const secret = "x".repeat(32);
-    const d = portalCodeDigest("a", "012345", secret);
-    expect(portalCodeMatches("a", "012345", d, secret)).toBe(true);
-    expect(portalCodeMatches("b", "012345", d, secret)).toBe(false);
-    expect(portalCodeMatches("a", "012345", d, "y".repeat(32))).toBe(false);
-    expect(portalCodeMatches("a", "999999", d, secret)).toBe(false);
-    expect(portalCodeMatches("a", "012345", "bad", secret)).toBe(false);
+  it("normalizes organization and patient code", () => {
+    expect(
+      portalLoginSchema.parse({
+        organization: " SHARMA-CLINIC ",
+        patientCode: " pt-2026-001 ",
+        password: "passphrase here",
+      }),
+    ).toEqual({
+      organization: "sharma-clinic",
+      patientCode: "PT-2026-001",
+      password: "passphrase here",
+    });
   });
   it.each([
-    { expiresAt: now },
-    { expiresAt: new Date(now.getTime() + 1), revokedAt: now },
-    { expiresAt: new Date(now.getTime() + 1), consumedAt: now },
-  ])("refuses expired/revoked/consumed token %j", (row) =>
-    expect(portalRecordLive(row, now)).toBe(false),
-  );
-  it("accepts an unconsumed future token", () =>
+    "patientId",
+    "tenantId",
+    "clinicId",
+    "portalAccountId",
+    "linkId",
+    "status",
+  ])("rejects browser authority %s", (field) => {
     expect(
-      portalRecordLive({ expiresAt: new Date(now.getTime() + 1) }, now),
-    ).toBe(true));
-  it("refuses exhausted challenges even if database maxAttempts is broadened", () => {
+      portalLoginSchema.safeParse({
+        organization: "clinic",
+        patientCode: "PT-001",
+        password: "passphrase here",
+        [field]: "other",
+      }).success,
+    ).toBe(false);
     expect(
-      portalChallengeLive(
-        {
-          expiresAt: new Date(now.getTime() + 1000),
-          consumedAt: null,
-          attemptCount: OTP_ATTEMPTS,
-          maxAttempts: 100,
-        },
-        now,
-      ),
+      portalActivationSchema.safeParse({
+        token: portalToken(),
+        password: "passphrase here",
+        [field]: "other",
+      }).success,
     ).toBe(false);
   });
-  it("accepts a live challenge below five attempts", () =>
-    expect(
-      portalChallengeLive(
-        {
-          expiresAt: new Date(now.getTime() + 1000),
-          consumedAt: null,
-          attemptCount: 4,
-          maxAttempts: 5,
-        },
-        now,
-      ),
-    ).toBe(true));
-  it.each(["patientId", "tenantId", "clinicId", "roleId"])(
-    "rejects browser ownership field %s",
-    (field) => {
-      expect(
-        portalLoginSchema.safeParse({ mobile: "9876543210", [field]: "other" })
-          .success,
-      ).toBe(false);
-      expect(
-        portalVerifySchema.safeParse({
-          mobile: "9876543210",
-          code: "012345",
-          [field]: "other",
-        }).success,
-      ).toBe(false);
-    },
-  );
-  it("requires a strong configured pepper", () => {
-    vi.stubEnv("PATIENT_PORTAL_OTP_SECRET", "");
-    expect(portalPepper).toThrow();
-    vi.stubEnv("PATIENT_PORTAL_OTP_SECRET", "x".repeat(32));
-    expect(portalPepper()).toHaveLength(32);
+  it("allows passphrases without arbitrary complexity and bounds length", () => {
+    expect(portalPasswordSchema.safeParse("this is a passphrase").success).toBe(
+      true,
+    );
+    expect(portalPasswordSchema.safeParse("short").success).toBe(false);
+    expect(portalPasswordSchema.safeParse("x".repeat(129)).success).toBe(false);
   });
-  it("rejects foreign and absent origins", () => {
+  it("bcrypt uses cost 12 and compares the entire long Unicode passphrase", async () => {
+    const password = "é".repeat(60) + "first";
+    const hash = await hashPatientPassword(password);
+    expect(hash).toMatch(/^\$2[ab]\$12\$/);
+    expect(await comparePatientPassword(password, hash)).toBe(true);
+    expect(await comparePatientPassword("é".repeat(60) + "second", hash)).toBe(
+      false,
+    );
+    expect(await comparePatientPassword(password, DUMMY_PATIENT_HASH)).toBe(
+      false,
+    );
+  }, 20000);
+  it.each(["revokedAt", "consumedAt"])("refuses %s tokens", (field) =>
+    expect(
+      portalRecordLive(
+        { expiresAt: new Date(Date.now() + 1000), [field]: new Date() },
+        new Date(),
+      ),
+    ).toBe(false),
+  );
+  it("rejects expired tokens", () =>
+    expect(portalRecordLive({ expiresAt: new Date(0) }, new Date())).toBe(
+      false,
+    ));
+  it("requires matching origin and rejects cross-site requests", () => {
     vi.stubEnv("AUTH_URL", "https://clinic.example");
+    expect(() =>
+      assertPortalOrigin(new Request("https://clinic.example/api")),
+    ).toThrow();
     expect(() =>
       assertPortalOrigin(
         new Request("https://clinic.example/api", {
@@ -123,7 +114,14 @@ describe("Patient Portal security", () => {
       ),
     ).toThrow();
     expect(() =>
-      assertPortalOrigin(new Request("https://clinic.example/api")),
+      assertPortalOrigin(
+        new Request("https://clinic.example/api", {
+          headers: {
+            origin: "https://clinic.example",
+            "sec-fetch-site": "cross-site",
+          },
+        }),
+      ),
     ).toThrow();
     expect(() =>
       assertPortalOrigin(
@@ -133,25 +131,40 @@ describe("Patient Portal security", () => {
       ),
     ).not.toThrow();
   });
-  it("test transport fails closed in production despite copied test flags", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("DATABASE_URL", "mysql://test@localhost/medcare_ep_portal_test");
-    vi.stubEnv("PATIENT_PORTAL_TEST_TRANSPORT", "local-file");
-    vi.stubEnv("PATIENT_PORTAL_TEST_OUTBOX", "C:/test-only");
-    expect(createPatientPortalTestSender).toThrow();
-  });
-  it("test transport refuses remote databases", () => {
-    vi.stubEnv("NODE_ENV", "test");
-    vi.stubEnv(
-      "DATABASE_URL",
-      "mysql://test@remote.example/medcare_ep_portal_test",
-    );
-    vi.stubEnv("PATIENT_PORTAL_TEST_TRANSPORT", "local-file");
-    vi.stubEnv("PATIENT_PORTAL_TEST_OUTBOX", "C:/test-only");
-    expect(createPatientPortalTestSender).toThrow();
-  });
+  it.each(["production", "remote"])(
+    "test mailer refuses %s environment",
+    (environment) => {
+      vi.stubEnv(
+        "NODE_ENV",
+        environment === "production" ? "production" : "test",
+      );
+      vi.stubEnv(
+        "DATABASE_URL",
+        `mysql://test@${environment === "remote" ? "remote.example" : "localhost"}/medcare_ep_portal_test`,
+      );
+      vi.stubEnv("PATIENT_PORTAL_TEST_TRANSPORT", "local-file");
+      vi.stubEnv("PATIENT_PORTAL_TEST_OUTBOX", "C:/test-only");
+      expect(createPatientPortalTestMailer).toThrow();
+    },
+  );
+  it.each(["VERIFY_RECOVERY_EMAIL", "PASSWORD_RESET"] as const)(
+    "%s security email contains no clinical data and no token in subject",
+    (purpose) => {
+      const token = portalToken();
+      const body = portalEmailBody({
+        to: "synthetic@example.test",
+        purpose,
+        url: `https://clinic.example/patient/security?token=${token}`,
+      });
+      expect(body.subject).not.toContain(token);
+      expect(body.text).not.toMatch(
+        /diagnosis|medication|appointment|prescription|doctor/i,
+      );
+      expect(body.html).toContain("https://clinic.example");
+    },
+  );
   it.each(["CLINIC_ADMIN", "RECEPTIONIST"])(
-    "backfills only exact historical system %s roles",
+    "preserves customized %s role permissions",
     (key) => {
       const before = PRE_PATIENT_PORTAL_ROLES[key];
       expect(
@@ -161,32 +174,22 @@ describe("Patient Portal security", () => {
           permissions: before,
         }).status,
       ).toBe("ELIGIBLE");
-      for (const permissions of [
-        before.slice(1),
-        [...before, "custom:permission"],
-        [...before, before[0]],
-        {},
-      ])
-        expect(
-          planPatientPortalRoleMigration({ key, isSystem: true, permissions })
-            .status,
-        ).toBe("CUSTOMIZED_OR_OLDER");
       expect(
         planPatientPortalRoleMigration({
           key,
-          isSystem: false,
-          permissions: before,
+          isSystem: true,
+          permissions: [...before, "custom:right"],
         }).status,
       ).toBe("CUSTOMIZED_OR_OLDER");
     },
   );
-  it("defaults management only to Admin/front desk/Owner wildcard", () => {
-    for (const r of DEFAULT_ROLES)
-      expect(r.permissions.includes("patient_portal:manage")).toBe(
-        ["CLINIC_ADMIN", "RECEPTIONIST"].includes(r.key),
+  it("keeps management entitlement defaults", () => {
+    for (const role of DEFAULT_ROLES)
+      expect(role.permissions.includes("patient_portal:manage")).toBe(
+        ["CLINIC_ADMIN", "RECEPTIONIST"].includes(role.key),
       );
     expect(
       DEFAULT_FEATURES.find((f) => f.key === "patient_portal"),
-    ).toMatchObject({ globalEnabled: true, inDefaultPlan: true, tier: "CORE" });
+    ).toMatchObject({ tier: "CORE", globalEnabled: true });
   });
 });

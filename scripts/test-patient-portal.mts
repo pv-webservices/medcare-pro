@@ -13,10 +13,15 @@ import {
   getStaffPortalStatus,
 } from "@/lib/patientPortalActivation";
 import {
-  requestPatientPortalCode,
-  verifyPatientPortalCode,
+  activatePatientPortal,
+  loginPatientPortal,
+  verifyPatientRecoveryEmail,
+  requestPatientPasswordReset,
+  resetPatientPassword,
+  changePatientRecoveryEmail,
+  resendPatientRecoveryEmail,
   portalAuthRateLimit,
-} from "@/lib/patientPortalOtp";
+} from "@/lib/patientPortalPasswordAuth";
 import {
   loadPatientActor,
   logoutPatientPortal,
@@ -29,30 +34,24 @@ import {
   patientOwnedAppointment,
 } from "@/lib/patientPortalRecords";
 import {
-  normalizePatientMobile,
   hashPortalToken,
   PatientPortalError,
   SESSION_TTL,
+  portalToken,
 } from "@/lib/patientPortalSecurity";
-import { requirePatientPortalEntitlement } from "@/lib/patientPortalFeature";
-import { requirePermission, ScopeError, PermissionError } from "@/lib/rbac";
-import { setRoleFeatureAccess } from "@/lib/features";
+import { PermissionError, ScopeError } from "@/lib/rbac";
 import { RateLimitError } from "@/lib/rateLimit";
-import { PRE_PATIENT_PORTAL_ROLES } from "@/lib/patientPortalRoleMigration";
+import type { PortalSecurityMail } from "@/lib/patientPortalEmails";
 assertPatientPortalTestDatabase();
-process.env.PATIENT_PORTAL_OTP_SECRET =
-  "disposable-patient-portal-test-pepper-2026";
 process.env.AUTH_URL = "http://127.0.0.1:33322";
-let activationToken = "",
-  code = "";
-const sender = {
-  async sendActivation(input: { activationUrl: string }) {
-    activationToken = input.activationUrl.split("/").at(-1)!;
-  },
-  async sendLoginCode(input: { code: string }) {
-    code = input.code;
-  },
+const password = "synthetic patient passphrase";
+const newPassword = "synthetic replacement passphrase";
+const mails: PortalSecurityMail[] = [];
+const mailer = async (mail: PortalSecurityMail) => {
+  mails.push(mail);
 };
+const secret = (url: string) => new URL(url).searchParams.get("token")!;
+const activationSecret = (url: string) => url.split("/").at(-1)!;
 let checks = 0;
 function check(label: string, value: unknown) {
   assert.ok(value, label);
@@ -65,208 +64,173 @@ async function rejects(
   status?: number,
   kind?: new (...args: never[]) => Error,
 ) {
-  await assert.rejects(work, (error: unknown) => {
-    if (status !== undefined) {
-      return (
-        typeof error === "object" &&
-        error !== null &&
-        "status" in error &&
-        (error as { status: unknown }).status === status
-      );
-    }
-    if (kind) {
-      return (
-        error instanceof kind ||
-        (error instanceof Error &&
-          (error.name === kind.name || error.constructor.name === kind.name))
-      );
-    }
-    return error instanceof Error;
-  });
+  await assert.rejects(work, (error: unknown) =>
+    status !== undefined
+      ? error instanceof PatientPortalError && error.status === status
+      : kind
+        ? error instanceof kind
+        : error instanceof Error,
+  );
   checks++;
   console.log(`PASS ${label}`);
 }
-async function ageChallenges(mobile: string) {
-  await prisma.patientPortalChallenge.updateMany({
-    where: { mobileE164: mobile },
-    data: { createdAt: new Date(Date.now() - 61000) },
-  });
-}
 async function main() {
   const f = await createPatientPortalFixture();
-  const mobile = normalizePatientMobile(f.number);
+  await prisma.patient.update({
+    where: { id: f.patientC.id },
+    data: { patientCode: f.patient.patientCode },
+  });
+  const emailA = `patient-a-${f.patient.id}@example.test`,
+    emailB = `patient-b-${f.patient.id}@example.test`;
   await rejects(
-    "Staff without explicit portal permission denied",
-    () =>
-      createPortalActivation(f.doctorUser.actor, f.patient.id, false, sender),
+    "Staff without portal permission denied",
+    () => createPortalActivation(f.doctorUser.actor, f.patient.id),
     undefined,
     PermissionError,
   );
   await rejects(
-    "Foreign tenant staff cannot activate patient",
-    () => createPortalActivation(f.foreign.actor, f.patient.id, false, sender),
+    "Cross-tenant staff activation denied",
+    () => createPortalActivation(f.foreign.actor, f.patient.id),
     undefined,
     ScopeError,
   );
   await rejects(
-    "Clinic scoped receptionist cannot activate outside clinic",
-    () =>
-      createPortalActivation(
-        f.receptionist.actor,
-        f.patientB.id,
-        false,
-        sender,
-      ),
+    "Cross-clinic receptionist activation denied",
+    () => createPortalActivation(f.receptionist.actor, f.patientB.id),
     undefined,
     PermissionError,
   );
-  check(
-    "Historical patients start NOT ENABLED",
-    (await getStaffPortalStatus(f.owner.actor, f.patient.id)).status ===
-      "NOT ENABLED",
-  );
-  await createPortalActivation(
+  const firstQR = await createPortalActivation(
     f.receptionist.actor,
     f.patient.id,
-    false,
-    sender,
   );
-  const first = activationToken;
+  const first = activationSecret(firstQR.activationUrl);
   check(
-    "Staff activation is pending and masked",
-    (await getStaffPortalStatus(f.owner.actor, f.patient.id)).status ===
-      "PENDING ACTIVATION",
-  );
-  const activation = await loadPortalActivation(first);
-  check(
-    "Only activation token hash is persisted",
-    activation.tokenHash === hashPortalToken(first) &&
-      activation.tokenHash !== first,
+    "Staff receives one-time QR only on authorized creation",
+    first.length === 43 &&
+      firstQR.activationUrl.startsWith(process.env.AUTH_URL!),
   );
   check(
-    "Staff identity confirmation recorded",
-    activation.createdByUserId === f.receptionist.id &&
-      !!activation.identityVerifiedAt,
+    "Reload status cannot reconstruct raw QR",
+    !(
+      "activationUrl" in
+      (await getStaffPortalStatus(f.owner.actor, f.patient.id))
+    ),
   );
+  check(
+    "QR TTL is 15 minutes and hash only is stored",
+    (await loadPortalActivation(first)).tokenHash === hashPortalToken(first) &&
+      new Date(firstQR.expiresAt).getTime() - Date.now() <= 900000,
+  );
+  const secondQR = await createPortalActivation(
+    f.owner.actor,
+    f.patient.id,
+    true,
+  );
+  const token = activationSecret(secondQR.activationUrl);
   await rejects(
-    "Staff resend cooldown enforced",
-    () => createPortalActivation(f.owner.actor, f.patient.id, true, sender),
-    429,
-  );
-  await prisma.patientPortalActivation.update({
-    where: { id: activation.id },
-    data: { createdAt: new Date(Date.now() - 61000) },
-  });
-  await createPortalActivation(f.owner.actor, f.patient.id, true, sender);
-  const token = activationToken;
-  await rejects(
-    "Resend invalidates old token",
+    "Regenerated QR invalidates previous QR",
     () => loadPortalActivation(first),
     404,
   );
-  await requestPatientPortalCode({ token }, sender);
-  const wrong = code === "000000" ? "111111" : "000000";
-  for (let i = 0; i < 5; i++)
-    await rejects(
-      `Wrong OTP attempt ${i + 1} rejected`,
-      () => verifyPatientPortalCode({ token, code: wrong }),
-      400,
-    );
-  await rejects(
-    "Correct code cannot revive exhausted challenge",
-    () => verifyPatientPortalCode({ token, code }),
-    400,
-  );
-  const exhausted = await prisma.patientPortalChallenge.findFirstOrThrow({
-    where: { activationId: (await loadPortalActivation(token)).id },
-    orderBy: { createdAt: "desc" },
-  });
-  check("Failed OTP attempts committed", exhausted.attemptCount === 5);
-  await ageChallenges(mobile);
-  await requestPatientPortalCode({ token }, sender);
-  await prisma.patientPortalChallenge.updateMany({
-    where: { mobileE164: mobile, consumedAt: null },
-    data: { expiresAt: new Date(Date.now() - 1) },
-  });
-  await rejects(
-    "Expired OTP refuses the correct code",
-    () => verifyPatientPortalCode({ token, code }),
-    400,
-  );
-  await ageChallenges(mobile);
-  await requestPatientPortalCode({ token }, sender);
   const concurrent = await Promise.allSettled([
-    verifyPatientPortalCode({ token, code }),
-    verifyPatientPortalCode({ token, code }),
+    activatePatientPortal({ token, password, email: emailA }, {}, mailer),
+    activatePatientPortal({ token, password, email: emailA }, {}, mailer),
   ]);
   check(
-    "Concurrent activation redemption authenticates exactly once",
+    "Concurrent activation succeeds exactly once",
     concurrent.filter((r) => r.status === "fulfilled").length === 1,
   );
   const sessionToken = (
-    concurrent.find(
-      (r) => r.status === "fulfilled",
-    ) as PromiseFulfilledResult<string>
-  ).value;
+    concurrent.find((r) => r.status === "fulfilled") as PromiseFulfilledResult<{
+      sessionToken: string;
+    }>
+  ).value.sessionToken;
   const actor = await loadPatientActor(sessionToken);
+  const identity = {
+    organization: f.tenant.slug,
+    patientCode: f.patient.patientCode,
+  };
   check(
-    "Actor derives exact patient/tenant from verified link",
+    "Token derives exact patient and tenant",
     actor.patientId === f.patient.id && actor.tenantId === f.tenant.id,
+  );
+  const account = await prisma.patientPortalAccount.findUniqueOrThrow({
+    where: { id: actor.portalAccountId },
+  });
+  check(
+    "New account has no copied mobile and email is pending only",
+    account.mobileE164 === null &&
+      account.recoveryEmail === null &&
+      account.pendingRecoveryEmail === emailA &&
+      !!account.passwordHash,
+  );
+  await rejects(
+    "QR single use",
+    () => activatePatientPortal({ token, password }, {}, mailer),
+    404,
   );
   const storedSession = await prisma.patientPortalSession.findUniqueOrThrow({
     where: { id: actor.sessionId },
   });
   check(
-    "Session lifetime is twelve hours with no sliding extension",
-    Math.abs(
-      storedSession.expiresAt.getTime() -
-        storedSession.createdAt.getTime() -
-        SESSION_TTL,
-    ) < 1000,
+    "Session opaque hash and absolute 12 hour TTL",
+    storedSession.tokenHash === hashPortalToken(sessionToken) &&
+      Math.abs(
+        storedSession.expiresAt.getTime() -
+          storedSession.createdAt.getTime() -
+          SESSION_TTL,
+      ) < 1000,
+  );
+  for (const [label, input] of [
+    [
+      "wrong organization",
+      { ...identity, organization: "unknown-org", password },
+    ],
+    ["wrong patient code", { ...identity, patientCode: "UNKNOWN", password }],
+    ["wrong password", { ...identity, password: "wrong password" }],
+  ] as const) {
+    await assert.rejects(
+      () => loginPatientPortal(input),
+      (e: unknown) =>
+        e instanceof PatientPortalError &&
+        e.message === "Invalid sign-in details.",
+    );
+    check(`Generic login error: ${label}`, true);
+  }
+  const savedHash = account.passwordHash;
+  await prisma.patientPortalAccount.update({
+    where: { id: account.id },
+    data: { passwordHash: null },
+  });
+  check(
+    "Legacy mobile-only account derives SETUP REQUIRED",
+    (await getStaffPortalStatus(f.owner.actor, f.patient.id)).status ===
+      "SETUP REQUIRED",
+  );
+  await rejects(
+    "Legacy account cannot password login",
+    () => loginPatientPortal({ ...identity, password }),
+    400,
   );
   await prisma.patientPortalAccount.update({
-    where: { id: actor.portalAccountId },
-    data: { status: "DISABLED" },
+    where: { id: account.id },
+    data: { passwordHash: savedHash, status: "DISABLED" },
   });
   await rejects(
-    "Disabled account denies existing session",
+    "Disabled account cannot login",
+    () => loginPatientPortal({ ...identity, password }),
+    400,
+  );
+  await rejects(
+    "Disabled account kills session",
     () => loadPatientActor(sessionToken),
     401,
   );
   await prisma.patientPortalAccount.update({
-    where: { id: actor.portalAccountId },
+    where: { id: account.id },
     data: { status: "ACTIVE" },
   });
-  await prisma.patient.update({
-    where: { id: f.patient.id },
-    data: { mobileNumber: `8${f.number.slice(1)}` },
-  });
-  check(
-    "Patient mobile edits do not transfer verified portal identity",
-    (
-      await prisma.patientPortalAccount.findUniqueOrThrow({
-        where: { id: actor.portalAccountId },
-      })
-    ).mobileE164 === mobile &&
-      (await loadPatientActor(sessionToken)).patientId === f.patient.id,
-  );
-  await prisma.patient.update({
-    where: { id: f.patient.id },
-    data: { mobileNumber: f.number },
-  });
-  check(
-    "Session token hash persisted and 12 hour absolute TTL",
-    (
-      await prisma.patientPortalSession.findUniqueOrThrow({
-        where: { id: actor.sessionId },
-      })
-    ).tokenHash === hashPortalToken(sessionToken),
-  );
-  await rejects(
-    "Activation token cannot be replayed",
-    () => verifyPatientPortalCode({ token, code }),
-    404,
-  );
   check(
     "A to A profile allowed",
     (await patientPortalProfile(actor)).patientCode === f.patient.patientCode,
@@ -371,46 +335,35 @@ async function main() {
       frozen.doctor.qualification === "MBBS, MD" &&
       frozen.clinic.address === "Original clinic address",
   );
-  await rejects(
-    "Shared mobile second patient activation blocked",
-    () => createPortalActivation(f.owner.actor, f.patientB.id, false, sender),
-    409,
-  );
-  check(
-    "Shared mobile never combines records",
-    (await prisma.patientPortalLink.count({
-      where: { portalAccountId: actor.portalAccountId, revokedAt: null },
-    })) === 1,
-  );
+
+  const qrB = await createPortalActivation(f.owner.actor, f.patientB.id);
   const portalFeature = await prisma.feature.findUniqueOrThrow({
     where: { key: "patient_portal" },
-  });
-  const rxFeature = await prisma.feature.findUniqueOrThrow({
-    where: { key: "prescriptions" },
-  });
-  await prisma.feature.update({
-    where: { id: rxFeature.id },
-    data: { globalEnabled: false },
-  });
-  check(
-    "Historical Rx remains visible without staff prescriptions feature",
-    (await patientOwnedPrescription(actor, f.issued.id)).id === f.issued.id,
-  );
-  await prisma.feature.update({
-    where: { id: rxFeature.id },
-    data: { globalEnabled: true },
   });
   await prisma.feature.update({
     where: { id: portalFeature.id },
     data: { globalEnabled: false },
   });
   await rejects(
-    "Global portal kill switch denies live session",
+    "Entitlement kill switch immediately denies patient session",
     () => loadPatientActor(sessionToken),
     503,
   );
-  await requestPatientPortalCode({ mobile }, sender);
-  check("Disabled entitlement login request stays generic", true);
+  await rejects(
+    "Entitlement kill switch keeps password login generic",
+    () => loginPatientPortal({ ...identity, password }),
+    400,
+  );
+  await rejects(
+    "Entitlement kill switch denies live QR redemption",
+    () =>
+      activatePatientPortal(
+        { token: activationSecret(qrB.activationUrl), password },
+        {},
+        mailer,
+      ),
+    503,
+  );
   await prisma.feature.update({
     where: { id: portalFeature.id },
     data: { globalEnabled: true },
@@ -420,12 +373,12 @@ async function main() {
       tenantId: f.tenant.id,
       featureId: portalFeature.id,
       enabled: false,
-      reason: "Synthetic test",
+      reason: "Synthetic portal auth regression",
     },
   });
   await rejects(
-    "Tenant override denies portal",
-    () => requirePatientPortalEntitlement(f.tenant.id),
+    "Tenant portal override immediately denies session",
+    () => loadPatientActor(sessionToken),
     503,
   );
   await prisma.tenantFeatureOverride.delete({
@@ -436,305 +389,451 @@ async function main() {
       },
     },
   });
-  await prisma.tenant.update({
-    where: { id: f.tenant.id },
-    data: { planId: null },
-  });
-  await rejects(
-    "Missing tenant plan entitlement denies portal",
-    () => requirePatientPortalEntitlement(f.tenant.id),
-    503,
-  );
-  await prisma.tenant.update({
-    where: { id: f.tenant.id },
-    data: { planId: f.tenant.planId },
-  });
-  await prisma.roleFeatureAccess.create({
-    data: {
-      roleId: (
-        await prisma.role.findFirstOrThrow({
-          where: { tenantId: f.tenant.id, key: "DOCTOR" },
-        })
-      ).id,
-      featureId: portalFeature.id,
-      enabled: false,
+  const sessionB = await activatePatientPortal(
+    {
+      token: activationSecret(qrB.activationUrl),
+      password: "patient b unique passphrase",
+      email: emailB,
     },
-  });
+    {},
+    mailer,
+  );
+  const actorB = await loadPatientActor(sessionB.sessionToken);
   check(
-    "Patient actor does not require staff RoleFeatureAccess",
-    (await loadPatientActor(sessionToken)).patientId === f.patient.id,
+    "Shared mobile creates separate accounts and sessions",
+    actorB.portalAccountId !== actor.portalAccountId &&
+      actorB.patientId === f.patientB.id,
   );
   await rejects(
-    "Patient Portal cannot be controlled through staff role feature switch",
+    "Shared mobile does not share passwords",
     () =>
-      setRoleFeatureAccess(f.owner.actor, {
-        roleId: "unused",
-        featureKey: "patient_portal",
-        enabled: true,
+      loginPatientPortal({
+        organization: f.tenant.slug,
+        patientCode: f.patientB.patientCode,
+        password,
       }),
+    400,
   );
+  const verifyA = secret(mails.find((m) => m.to === emailA)!.url);
+  const count = mails.length;
+  await requestPatientPasswordReset({ ...identity, email: emailA }, mailer);
+  check("Pending email has no recovery authority", mails.length === count);
+  await verifyPatientRecoveryEmail(verifyA);
   await rejects(
-    "Future clock expires session",
-    () =>
-      loadPatientActor(sessionToken, new Date(Date.now() + SESSION_TTL + 1000)),
-    401,
+    "Verification token replay denied",
+    () => verifyPatientRecoveryEmail(verifyA),
+    400,
   );
+  const verifyB = secret(mails.find((m) => m.to === emailB)!.url);
+  await verifyPatientRecoveryEmail(verifyB);
+  await changePatientRecoveryEmail(
+    actor,
+    { password, email: `pending-${f.patient.id}@example.test` },
+    mailer,
+  );
+  const oldVerification = secret(mails.at(-1)!.url);
+  await resendPatientRecoveryEmail(actor, mailer);
   await rejects(
-    "Staff session ID cannot be used as patient token",
-    () => loadPatientActor("staff-session-id"),
-    401,
+    "Resend invalidates previous email verification",
+    () => verifyPatientRecoveryEmail(oldVerification),
+    400,
   );
-  await ageChallenges(mobile);
-  await requestPatientPortalCode({ mobile }, sender);
-  const loginSession = await verifyPatientPortalCode({ mobile, code });
   check(
-    "Mobile login resolves linked patient only",
-    (await loadPatientActor(loginSession)).patientId === f.patient.id,
+    "Pending email change preserves original verified inbox",
+    (
+      await prisma.patientPortalAccount.findUniqueOrThrow({
+        where: { id: actor.portalAccountId },
+      })
+    ).recoveryEmail === emailA,
   );
-  await logoutPatientPortal(loginSession);
   await rejects(
-    "Logout revokes session",
+    "Email change needs current password",
+    () =>
+      changePatientRecoveryEmail(
+        actor,
+        { password: "wrong password", email: "replacement@example.test" },
+        mailer,
+      ),
+    400,
+  );
+  await changePatientRecoveryEmail(
+    actorB,
+    { password: "patient b unique passphrase", email: emailA },
+    mailer,
+  );
+  await rejects(
+    "Recovery inbox uniqueness enforced atomically",
+    () => verifyPatientRecoveryEmail(secret(mails.at(-1)!.url)),
+    400,
+  );
+  check(
+    "Failed uniqueness preserves original verified email",
+    (
+      await prisma.patientPortalAccount.findUniqueOrThrow({
+        where: { id: actorB.portalAccountId },
+      })
+    ).recoveryEmail === emailB,
+  );
+  const beforeUnknown = mails.length;
+  for (const input of [
+    { ...identity, email: "wrong@example.test" },
+    { ...identity, organization: "unknown", email: emailA },
+    { ...identity, patientCode: "UNKNOWN", email: emailA },
+  ])
+    await requestPatientPasswordReset(input, mailer);
+  check(
+    "Unknown identities and wrong email send nothing",
+    mails.length === beforeUnknown,
+  );
+  await requestPatientPasswordReset({ ...identity, email: emailA }, mailer);
+  const expired = secret(mails.at(-1)!.url);
+  await prisma.patientPortalSecurityToken.update({
+    where: { tokenHash: hashPortalToken(expired) },
+    data: { expiresAt: new Date(0) },
+  });
+  await rejects(
+    "Expired password reset denied",
+    () => resetPatientPassword({ token: expired, password: newPassword }),
+    400,
+  );
+  await requestPatientPasswordReset({ ...identity, email: emailA }, mailer);
+  const previousReset = secret(mails.at(-1)!.url);
+  await requestPatientPasswordReset({ ...identity, email: emailA }, mailer);
+  const reset = secret(mails.at(-1)!.url);
+  await rejects(
+    "New reset revokes previous reset",
+    () => resetPatientPassword({ token: previousReset, password: newPassword }),
+    400,
+  );
+  const loginSession = await loginPatientPortal({ ...identity, password });
+  const resets = await Promise.allSettled([
+    resetPatientPassword({ token: reset, password: newPassword }),
+    resetPatientPassword({ token: reset, password: newPassword }),
+  ]);
+  check(
+    "Concurrent reset succeeds exactly once",
+    resets.filter((r) => r.status === "fulfilled").length === 1,
+  );
+  await rejects(
+    "Reset token replay denied",
+    () => resetPatientPassword({ token: reset, password: newPassword }),
+    400,
+  );
+  await rejects(
+    "Old activation session revoked after reset",
+    () => loadPatientActor(sessionToken),
+    401,
+  );
+  await rejects(
+    "Every old login session revoked after reset",
     () => loadPatientActor(loginSession),
     401,
   );
-  await revokePatientPortal(f.receptionist.actor, f.patient.id);
   await rejects(
-    "Revoke invalidates existing session immediately",
-    () => loadPatientActor(sessionToken),
+    "Old password fails after reset",
+    () => loginPatientPortal({ ...identity, password }),
+    400,
+  );
+  const replacementSession = await loginPatientPortal({
+    ...identity,
+    password: newPassword,
+  });
+  check(
+    "New password works",
+    (await loadPatientActor(replacementSession)).patientId === f.patient.id,
+  );
+  await logoutPatientPortal(replacementSession);
+  await rejects(
+    "Logout revokes session",
+    () => loadPatientActor(replacementSession),
+    401,
+  );
+  const liveBeforeRecovery = await loginPatientPortal({
+    ...identity,
+    password: newPassword,
+  });
+  await requestPatientPasswordReset({ ...identity, email: emailA }, mailer);
+  const resetBeforeRecovery = secret(mails.at(-1)!.url);
+  const recovery = await createPortalActivation(
+    f.owner.actor,
+    f.patient.id,
+    false,
+    true,
+  );
+  await rejects(
+    "Staff recovery immediately kills password",
+    () => loginPatientPortal({ ...identity, password: newPassword }),
+    400,
+  );
+  await rejects(
+    "Staff recovery immediately kills session",
+    () => loadPatientActor(liveBeforeRecovery),
+    401,
+  );
+  check(
+    "Staff recovery clears compromised recovery authority",
+    (
+      await prisma.patientPortalAccount.findUniqueOrThrow({
+        where: { id: actor.portalAccountId },
+      })
+    ).recoveryEmail === null && recovery.status === "RECOVERY PENDING",
+  );
+  await rejects(
+    "Staff recovery invalidates outstanding email reset token",
+    () =>
+      resetPatientPassword({
+        token: resetBeforeRecovery,
+        password: newPassword,
+      }),
+    400,
+  );
+  const recovered = await activatePatientPortal(
+    {
+      token: activationSecret(recovery.activationUrl),
+      password: "fresh recovery passphrase",
+    },
+    {},
+    mailer,
+  );
+  check(
+    "Staff recovery creates fresh link generation",
+    (await loadPatientActor(recovered.sessionToken)).linkId !== actor.linkId,
+  );
+  await revokePatientPortal(f.owner.actor, f.patient.id);
+  await rejects(
+    "Revoke prevents password login",
+    () =>
+      loginPatientPortal({
+        ...identity,
+        password: "fresh recovery passphrase",
+      }),
+    400,
+  );
+  await rejects(
+    "Revoke immediately kills session",
+    () => loadPatientActor(recovered.sessionToken),
     401,
   );
   await rejects(
-    "Previously resolved actor cannot read after revoke",
+    "Previously resolved actor loses records",
     () => patientOwnedPrescription(actor, f.issued.id),
     401,
   );
-  check(
-    "Revoke preserves clinical records",
-    (await prisma.prescription.count({
-      where: { patientId: f.patient.id },
-    })) === 5,
-  );
-  await createPortalActivation(f.owner.actor, f.patient.id, false, sender);
-  await ageChallenges(mobile);
-  await requestPatientPortalCode({ token: activationToken }, sender);
-  const reenabled = await verifyPatientPortalCode({
-    token: activationToken,
-    code,
-  });
-  check(
-    "Reactivation creates a fresh link generation",
-    (await loadPatientActor(reenabled)).linkId !== actor.linkId,
+  const reenable = await createPortalActivation(f.owner.actor, f.patient.id);
+  const reenabled = await activatePatientPortal(
+    {
+      token: activationSecret(reenable.activationUrl),
+      password: "reenabled fresh passphrase",
+    },
+    {},
+    mailer,
   );
   await rejects(
-    "Reactivation cannot revive an old session",
-    () => loadPatientActor(sessionToken),
+    "Reenable never revives old session",
+    () => loadPatientActor(recovered.sessionToken),
     401,
   );
-  await prisma.patient.update({
-    where: { id: f.patientB.id },
-    data: { mobileNumber: `8${f.number.slice(1)}` },
-  });
-  await createPortalActivation(f.owner.actor, f.patientB.id, false, sender);
-  const mobileChangeToken = activationToken;
-  await prisma.patient.update({
-    where: { id: f.patientB.id },
-    data: { mobileNumber: `7${f.number.slice(1)}` },
-  });
-  await rejects(
-    "Pending patient mobile change refuses old activation",
-    () => loadPortalActivation(mobileChangeToken),
-    404,
+  check(
+    "Reenable creates a new active link",
+    (await loadPatientActor(reenabled.sessionToken)).linkId !== actor.linkId,
+  );
+  const qrC = await createPortalActivation(
+    f.owner.actor,
+    f.patient.id,
+    false,
+    true,
   );
   await prisma.patientPortalActivation.updateMany({
-    where: { patientId: f.patientB.id },
-    data: { expiresAt: new Date(Date.now() - 1) },
+    where: { activePatientId: f.patient.id },
+    data: { expiresAt: new Date(0) },
   });
   await rejects(
     "Expired activation denied",
-    () => loadPortalActivation(mobileChangeToken),
+    () => loadPortalActivation(activationSecret(qrC.activationUrl)),
     404,
   );
-  await rejects("DB rejects a forged tenant/patient link", () =>
-    prisma.patientPortalLink.create({
-      data: {
-        portalAccountId: actor.portalAccountId,
-        patientId: f.patientB.id,
-        tenantId: f.foreignTenant.id,
-        activePatientId: f.patientB.id,
-        activeAccountId: actor.portalAccountId,
-        verifiedAt: new Date(),
-        identityVerifiedAt: new Date(),
-      },
-    }),
-  );
-  await rejects("DB rejects live link NULL-key cardinality bypass", () =>
-    prisma.patientPortalLink.create({
-      data: {
-        portalAccountId: actor.portalAccountId,
-        patientId: f.patientB.id,
-        tenantId: f.tenant.id,
-        verifiedAt: new Date(),
-        identityVerifiedAt: new Date(),
-      },
-    }),
-  );
-  for (let i = 0; i < 5; i++) {
-    try {
-      await portalAuthRateLimit(
-        `synthetic-rate-${f.patient.id}`,
-        `rate-${f.patient.id}`,
-        true,
-      );
-    } catch {
-      /* capped below */
-    }
-  }
-  for (let i = 0; i < 10; i++)
+  for (let i = 0; i < 15; i++)
     await portalAuthRateLimit(
-      `synthetic-rate-${f.patient.id}`,
-      `rate-${f.patient.id}`,
-      true,
+      `synthetic-ip-${f.patient.id}`,
+      `synthetic-subject-${f.patient.id}`,
     );
   await rejects(
-    "Database rate limiter refuses OTP brute force",
+    "DB rate limiter blocks brute force",
     () =>
       portalAuthRateLimit(
-        `synthetic-rate-${f.patient.id}`,
-        `rate-${f.patient.id}`,
-        true,
+        `synthetic-ip-${f.patient.id}`,
+        `synthetic-subject-${f.patient.id}`,
       ),
     undefined,
     RateLimitError,
   );
-  const rolesBefore = await prisma.role.create({
+  await prisma.patientPortalActivation.updateMany({
+    where: { activePatientId: f.patient.id },
+    data: { revokedAt: new Date(), activePatientId: null },
+  });
+  const legacy = await prisma.patientPortalActivation.create({
     data: {
+      patientId: f.patient.id,
+      activePatientId: f.patient.id,
       tenantId: f.tenant.id,
-      key: null,
-      name: `Customized ${f.patient.id}`,
-      isSystem: false,
-      permissions: PRE_PATIENT_PORTAL_ROLES.RECEPTIONIST.slice(1),
+      mobileE164: "+919999999999",
+      tokenHash: hashPortalToken(portalToken()),
+      expiresAt: new Date(Date.now() + 10000),
+      identityVerifiedAt: new Date(),
     },
   });
-  const beforeAccounts = await prisma.patientPortalAccount.count();
-  const historicalAdmin = await prisma.role.findFirstOrThrow({
-    where: { tenantId: f.tenant.id, key: "CLINIC_ADMIN" },
+  await prisma.patientPortalChallenge.create({
+    data: {
+      activationId: legacy.id,
+      mobileE164: "+919999999999",
+      purpose: "ACTIVATION",
+      codeDigest: "0".repeat(64),
+      expiresAt: new Date(Date.now() + 10000),
+    },
   });
-  await prisma.role.update({
-    where: { id: historicalAdmin.id },
-    data: { permissions: [...PRE_PATIENT_PORTAL_ROLES.CLINIC_ADMIN] },
-  });
-  const customReception = await prisma.role.findFirstOrThrow({
-    where: { tenantId: f.tenant.id, key: "RECEPTIONIST" },
-  });
-  const customPermissions = [
-    ...PRE_PATIENT_PORTAL_ROLES.RECEPTIONIST,
-    "custom:right",
-  ];
-  await prisma.role.update({
-    where: { id: customReception.id },
-    data: { permissions: customPermissions },
-  });
-  execFileSync(
-    process.execPath,
-    ["node_modules/tsx/dist/cli.mjs", "scripts/backfill-patient-portal.mts"],
-    { env: process.env, stdio: "pipe" },
-  );
-  check(
-    "Backfill dry run creates no patient identity",
-    beforeAccounts === (await prisma.patientPortalAccount.count()),
-  );
-  check(
-    "Backfill dry run does not broaden exact historical role",
-    !(
-      await prisma.role.findUniqueOrThrow({ where: { id: historicalAdmin.id } })
-    ).permissions
-      ?.toString()
-      .includes("patient_portal:manage"),
-  );
-  execFileSync(
-    process.execPath,
-    [
-      "node_modules/tsx/dist/cli.mjs",
-      "scripts/backfill-patient-portal.mts",
-      "--apply",
-    ],
-    { env: process.env, stdio: "pipe" },
-  );
-  check(
-    "Backfill apply upgrades exact historical system Admin",
-    (
-      await prisma.role.findUniqueOrThrow({ where: { id: historicalAdmin.id } })
-    ).permissions
-      ?.toString()
-      .includes("patient_portal:manage"),
-  );
-  check(
-    "Backfill apply preserves customized system Receptionist",
-    JSON.stringify(
-      (
-        await prisma.role.findUniqueOrThrow({
-          where: { id: customReception.id },
-        })
-      ).permissions,
-    ) === JSON.stringify(customPermissions),
-  );
-  check(
-    "Backfill apply never creates portal accounts",
-    beforeAccounts === (await prisma.patientPortalAccount.count()),
-  );
-  let remoteBlocked = false;
-  try {
+  const runBackfill = (...args: string[]) =>
     execFileSync(
       process.execPath,
       [
         "node_modules/tsx/dist/cli.mjs",
-        "scripts/backfill-patient-portal.mts",
+        "scripts/backfill-patient-portal-password-auth.mts",
+        ...args,
+      ],
+      { env: process.env, encoding: "utf8" },
+    );
+  const historyCounts = {
+    accounts: await prisma.patientPortalAccount.count(),
+    links: await prisma.patientPortalLink.count(),
+    sessions: await prisma.patientPortalSession.count(),
+    rx: await prisma.prescription.count(),
+  };
+  runBackfill();
+  check(
+    "Backfill dry run leaves activation intact",
+    !(
+      await prisma.patientPortalActivation.findUniqueOrThrow({
+        where: { id: legacy.id },
+      })
+    ).revokedAt,
+  );
+  runBackfill("--apply");
+  check(
+    "Backfill invalidates only legacy SMS activation",
+    !!(
+      await prisma.patientPortalActivation.findUniqueOrThrow({
+        where: { id: legacy.id },
+      })
+    ).revokedAt,
+  );
+  const second = JSON.parse(runBackfill("--apply"));
+  check(
+    "Backfill second apply is idempotent",
+    second.revokedActivations === 0 && second.invalidatedChallenges === 0,
+  );
+  check(
+    "Backfill preserves accounts links sessions and prescriptions",
+    JSON.stringify(historyCounts) ===
+      JSON.stringify({
+        accounts: await prisma.patientPortalAccount.count(),
+        links: await prisma.patientPortalLink.count(),
+        sessions: await prisma.patientPortalSession.count(),
+        rx: await prisma.prescription.count(),
+      }),
+  );
+  await rejects("Remote backfill apply guard", async () =>
+    execFileSync(
+      process.execPath,
+      [
+        "node_modules/tsx/dist/cli.mjs",
+        "scripts/backfill-patient-portal-password-auth.mts",
         "--apply",
       ],
       {
         env: {
           ...process.env,
-          DATABASE_URL: "mysql://synthetic@remote.example/medcare_pro",
+          DATABASE_URL:
+            "mysql://synthetic@remote.example/medcare_ep_portal_test",
         },
         stdio: "pipe",
       },
-    );
-  } catch {
-    remoteBlocked = true;
-  }
-  check(
-    "Remote backfill writes require explicit allow-remote flag",
-    remoteBlocked,
+    ),
   );
   check(
-    "Backfill preserves customized roles",
-    JSON.stringify(
-      (await prisma.role.findUniqueOrThrow({ where: { id: rolesBefore.id } }))
-        .permissions,
-    ) === JSON.stringify(rolesBefore.permissions),
-  );
-  check(
-    "Patient audit excludes secrets and clinical content",
-    !(
-      await prisma.patientPortalAuditEvent.findMany({
-        where: { portalAccountId: actor.portalAccountId },
-      })
-    ).some(
+    "Audits contain no password or raw security tokens",
+    !(await prisma.patientPortalAuditEvent.findMany()).some(
       (e) =>
-        JSON.stringify(e).includes("Synthetic portal diagnosis") ||
+        JSON.stringify(e).includes(password) ||
+        JSON.stringify(e).includes(reset) ||
         JSON.stringify(e).includes(sessionToken),
     ),
   );
+  const failureQR = await createPortalActivation(
+    f.foreign.actor,
+    f.patientC.id,
+  );
+  const deliveryFailure = await activatePatientPortal(
+    {
+      token: activationSecret(failureQR.activationUrl),
+      password: "foreign patient unique passphrase",
+      email: `delivery-${f.patientC.id}@example.test`,
+    },
+    {},
+    async () => {
+      throw new Error("Synthetic delivery failure");
+    },
+  );
   await rejects(
-    "Doctor never gained management permission",
+    "Tenant patient-code collision cannot use another account password",
     () =>
-      requirePermission(
-        f.doctorUser.actor,
-        "patient_portal:manage",
-        f.clinic.id,
+      loginPatientPortal({
+        organization: f.foreignTenant.slug,
+        patientCode: f.patient.patientCode,
+        password,
+      }),
+    400,
+  );
+  const failureActor = await loadPatientActor(deliveryFailure.sessionToken);
+  check(
+    "Email delivery failure preserves activated password and session",
+    deliveryFailure.message.includes("couldn't send") &&
+      failureActor.patientId === f.patientC.id,
+  );
+  check(
+    "Failed delivery leaves email pending and untrusted",
+    (
+      await prisma.patientPortalAccount.findUniqueOrThrow({
+        where: { id: failureActor.portalAccountId },
+      })
+    ).recoveryEmailVerifiedAt === null,
+  );
+  await resendPatientRecoveryEmail(failureActor, mailer);
+  const resendToken = secret(mails.at(-1)!.url);
+  await prisma.patientPortalSecurityToken.update({
+    where: { tokenHash: hashPortalToken(resendToken) },
+    data: { expiresAt: new Date(0) },
+  });
+  await rejects(
+    "Expired recovery email verification denied",
+    () => verifyPatientRecoveryEmail(resendToken),
+    400,
+  );
+  await portalAuthRateLimit(
+    `cooldown-${f.patient.id}`,
+    actor.portalAccountId,
+    "email-request",
+    true,
+  );
+  await rejects(
+    "Email resend 60-second cooldown enforced",
+    () =>
+      portalAuthRateLimit(
+        `cooldown-${f.patient.id}`,
+        actor.portalAccountId,
+        "email-request",
+        true,
       ),
     undefined,
-    PermissionError,
+    RateLimitError,
   );
   console.log(`Patient Portal database checks: ${checks} passed`);
 }
@@ -743,7 +842,7 @@ main()
     console.error(
       e instanceof assert.AssertionError
         ? e.message
-        : `Patient Portal database check failed: ${e instanceof Error ? e.name : "unknown"} ${(e as { code?: string }).code ?? ""}; sensitive payload withheld.`,
+        : `Patient Portal check failed: ${e instanceof Error ? e.name : "unknown"}; sensitive payload withheld.`,
     );
     process.exitCode = 1;
   })

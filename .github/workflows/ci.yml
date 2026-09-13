@@ -37,7 +37,6 @@ jobs:
       DATABASE_URL: "mysql://root:ci_test_password@127.0.0.1:3306/medcare_ep_portal_ci"
       AUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
       NEXTAUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
-      PATIENT_PORTAL_OTP_SECRET: "disposable-ci-patient-portal-otp-pepper-2026!"
       LOGIN_CODE_PEPPER: "disposable-ci-login-code-pepper-32bytes-long!"
       AUTH_URL: "http://localhost:3000"
       NEXTAUTH_URL: "http://localhost:3000"
@@ -48,6 +47,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Phase 1 upgrade replay reads the recorded base schema.
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -78,6 +79,12 @@ jobs:
 
       - name: Run full Vitest regression suite
         run: npm test -- --maxWorkers=4
+
+      - name: Replay Patient Portal fresh and Phase 1 upgrade migrations
+        run: npx tsx scripts/test-patient-portal-migration.mts
+
+      - name: Run staff password recovery regression
+        run: npm run verify:password-reset
 
       - name: Run Patient Portal verifier
         run: npm run verify:patient-portal
@@ -129,7 +136,6 @@ jobs:
       DATABASE_URL: "mysql://root:ci_test_password@127.0.0.1:3306/medcare_ep_portal_ci"
       AUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
       NEXTAUTH_SECRET: "disposable-ci-auth-secret-32bytes-long-key!"
-      PATIENT_PORTAL_OTP_SECRET: "disposable-ci-patient-portal-otp-pepper-2026!"
       LOGIN_CODE_PEPPER: "disposable-ci-login-code-pepper-32bytes-long!"
       AUTH_URL: "http://127.0.0.1:33322"
       NEXTAUTH_URL: "http://127.0.0.1:33322"

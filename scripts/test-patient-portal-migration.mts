@@ -1,4 +1,4 @@
-/** Complete empty + pre-main upgrade replay in NEW disposable local databases.
+/** Complete empty + Phase 1 upgrade replay in NEW disposable local databases.
  * Uses existing reachable local MariaDB. Requires a dedicated local test URL.
  */
 import "dotenv/config";
@@ -13,11 +13,11 @@ assertPatientPortalTestDatabase();
 const source = new URL(process.env.DATABASE_URL!);
 const folder = resolve(tmpdir(), `medcare-portal-migration-${Date.now()}`);
 mkdirSync(folder);
-const migration = "20260913010000_patient_portal_phase1";
+const migration = "20260913020000_patient_portal_password_email_auth";
 const root = process.cwd();
 const schema = execFileSync(
   "git",
-  ["show", "3bfde194cddbb42874c61c671af34ba614574d67:prisma/schema.prisma"],
+  ["show", "a2b4e607cd79f7037525be48d51a37eb32e7f905:prisma/schema.prisma"],
   { encoding: "utf8" },
 );
 writeFileSync(resolve(folder, "baseline.prisma"), schema);
@@ -25,7 +25,7 @@ mkdirSync(resolve(folder, "migrations"));
 for (const entry of readdirSync(resolve(root, "prisma/migrations"), {
   withFileTypes: true,
 }))
-  if (entry.isDirectory() && entry.name !== migration)
+  if (entry.isDirectory() && entry.name < migration)
     cpSync(
       resolve(root, "prisma/migrations", entry.name),
       resolve(folder, "migrations", entry.name),
@@ -70,7 +70,7 @@ async function main() {
   stage = "empty replay";
   emptyUrl.pathname = `/${emptyName}`;
   deploy(emptyUrl.toString(), false);
-  console.log("PASS Complete 33-migration chain from empty database");
+  console.log("PASS Complete 34-migration chain from empty database");
   const upgradeUrl = new URL(source);
   stage = "baseline replay";
   upgradeUrl.pathname = `/${upgradeName}`;
@@ -97,9 +97,11 @@ async function main() {
   stage = "preservation checks";
   phase("--after");
   console.log(
-    "PASS Pre-main upgrade preserves Patient, Registration and issued snapshot byte-equivalent",
+    "PASS Phase 1 upgrade preserves clinical data and legacy portal history byte-equivalent",
   );
-  console.log("PASS Migration creates zero accounts and zero patient links");
+  console.log(
+    "PASS Migration invents no passwords or emails and leaves legacy activation for explicit backfill",
+  );
   console.log("Patient Portal migration checks: 3 passed");
 }
 main()

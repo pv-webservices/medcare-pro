@@ -1,19 +1,12 @@
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  randomInt,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-
 export const PORTAL_COOKIE = "medcare_patient_session";
 export const SESSION_TTL = 12 * 60 * 60 * 1000;
-export const ACTIVATION_TTL = 24 * 60 * 60 * 1000;
-export const OTP_TTL = 10 * 60 * 1000;
-export const OTP_ATTEMPTS = 5;
-export const PORTAL_LOGIN_MESSAGE =
-  "If an active Patient Portal account exists for this number, a verification code has been sent.";
+export const ACTIVATION_TTL = 15 * 60 * 1000;
+export const RESET_TTL = ACTIVATION_TTL;
+export const EMAIL_VERIFICATION_TTL = 24 * 60 * 60 * 1000;
+export const PORTAL_RESET_MESSAGE =
+  "If the details match an active Patient Portal account with a verified recovery email, we've sent a password-reset link.";
 export class PatientPortalError extends Error {
   constructor(
     public readonly status: number,
@@ -24,47 +17,9 @@ export class PatientPortalError extends Error {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
-export function normalizePatientMobile(input: string): string {
-  const compact = input.trim().replace(/[ ()-]/g, "");
-  const digits = compact.replace(/^(\+91|0091|91)(?=[6-9]\d{9}$)/, "");
-  if (!/^[6-9]\d{9}$/.test(digits))
-    throw new PatientPortalError(400, "Enter a valid Indian mobile number.");
-  return `+91${digits}`;
-}
-export const maskPatientMobile = (mobile: string) =>
-  `******${mobile.slice(-4)}`;
 export const portalToken = () => randomBytes(32).toString("base64url");
 export const hashPortalToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
-export const portalCode = () =>
-  randomInt(0, 1_000_000).toString().padStart(6, "0");
-export function portalPepper(): string {
-  const secret =
-    (process.env.PATIENT_PORTAL_OTP_SECRET ?? "").trim() ||
-    (process.env.NEXTAUTH_SECRET ?? "").trim() ||
-    (process.env.AUTH_SECRET ?? "").trim();
-  if (secret.length < 32) throw new PatientPortalError(503);
-  return secret;
-}
-export function portalCodeDigest(
-  id: string,
-  code: string,
-  secret: string,
-): string {
-  return createHmac("sha256", secret)
-    .update(`patient-portal:${id}:${code}`)
-    .digest("hex");
-}
-export function portalCodeMatches(
-  id: string,
-  code: string,
-  digest: string,
-  secret: string,
-): boolean {
-  const expected = Buffer.from(portalCodeDigest(id, code, secret), "hex");
-  const actual = Buffer.from(digest, "hex");
-  return actual.length === expected.length && timingSafeEqual(expected, actual);
-}
 export function portalRecordLive(
   record: {
     expiresAt: Date;
@@ -75,37 +30,55 @@ export function portalRecordLive(
 ): boolean {
   return !record.revokedAt && !record.consumedAt && record.expiresAt > now;
 }
-export function portalChallengeLive(
-  record: {
-    expiresAt: Date;
-    consumedAt: Date | null;
-    attemptCount: number;
-    maxAttempts: number;
-  },
-  now: Date,
-): boolean {
-  return (
-    portalRecordLive(record, now) &&
-    record.attemptCount < Math.min(record.maxAttempts, OTP_ATTEMPTS)
-  );
-}
-export const portalLoginSchema = z.strictObject({
-  mobile: z.string().max(30).transform(normalizePatientMobile),
+export const portalOrgSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(100)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+export const portalPatientCodeSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .min(1)
+  .max(100);
+export const portalEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(254)
+  .email();
+export const portalPasswordSchema = z
+  .string()
+  .min(10, "Use at least 10 characters.")
+  .max(128, "Use at most 128 characters.");
+export const portalIdentitySchema = z.strictObject({
+  organization: portalOrgSchema,
+  patientCode: portalPatientCodeSchema,
 });
-export const portalVerifySchema = z.strictObject({
-  mobile: z.string().max(30).transform(normalizePatientMobile),
-  code: z.string().regex(/^\d{6}$/, "Enter the six-digit code."),
+export const portalLoginSchema = portalIdentitySchema.extend({
+  password: z.string().min(1).max(128),
 });
-export const portalActivationRequestSchema = z.strictObject({
-  token: z.string().regex(/^[\w-]{43}$/),
+export const portalTokenSchema = z.string().regex(/^[\w-]{43}$/);
+export const portalActivationSchema = z.strictObject({
+  token: portalTokenSchema,
+  password: portalPasswordSchema,
+  email: portalEmailSchema.optional(),
 });
-export const portalActivationVerifySchema =
-  portalActivationRequestSchema.extend({
-    code: z.string().regex(/^\d{6}$/, "Enter the six-digit code."),
-  });
+export const portalResetRequestSchema = portalIdentitySchema.extend({
+  email: portalEmailSchema,
+});
+export const portalResetSchema = z.strictObject({
+  token: portalTokenSchema,
+  password: portalPasswordSchema,
+});
+export const portalEmailChangeSchema = z.strictObject({
+  password: z.string().min(1).max(128),
+  email: portalEmailSchema,
+});
 export const portalStaffActivationSchema = z.strictObject({
   identityVerified: z.literal(true, {
-    error: "Confirm patient identity and mobile number.",
+    error: "Confirm patient identity in person.",
   }),
 });
 export const portalEmptySchema = z.strictObject({});

@@ -1,6 +1,12 @@
+import PortalSecurityForm from "@/components/patientPortal/PortalSecurityForm";
 import { patientPortalPage } from "@/lib/patientPortalPages";
 import { patientPortalProfile } from "@/lib/patientPortalRecords";
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ activation?: string }>;
+}) {
+  const activation = (await searchParams).activation;
   const p = await patientPortalPage(patientPortalProfile);
   return (
     <>
@@ -25,6 +31,15 @@ export default async function Page() {
           </div>
         ))}
       </dl>
+      <PortalSecurityForm
+        activationMessage={
+          activation === "email-failed"
+            ? "Portal activated, but we couldn't send the recovery-email verification. You can resend it from Profile."
+            : activation === "complete"
+              ? "Portal activated."
+              : undefined
+        }
+      />
     </>
   );
 }

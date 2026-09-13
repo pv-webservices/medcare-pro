@@ -115,3 +115,8 @@ scaffolding has been removed.
   patient ids — never a message body, never a raw phone number. Numbers are read
   from the patient record server-side, so the account's WhatsApp device cannot
   be used to message an arbitrary phone.
+
+Patient Portal authentication uses staff-verified one-time QR activation,
+Organization + Patient ID + password login, and optional verified-email recovery.
+See [Patient Portal architecture](docs/patient-portal-phase1.md). Plivo IVR and
+ordinary RkvRobo messaging remain independent; neither delivers portal secrets.
