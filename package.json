@@ -59,6 +59,9 @@
     "prescriptions:backfill": "tsx scripts/backfill-prescriptions.mts",
     "verify:prescriptions": "tsx scripts/verify-prescriptions.mts",
     "test:prescriptions": "tsx scripts/test-prescriptions.mts",
+    "clinical-ai:backfill": "tsx scripts/backfill-clinical-ai.mts",
+    "test:clinical-ai": "tsx scripts/test-clinical-ai.mts",
+    "test:e2e:clinical-ai": "playwright test --config=playwright.clinical-ai.config.ts",
     "test:e2e:prescriptions": "playwright test --config=playwright.prescriptions.config.ts"
   },
   "dependencies": {

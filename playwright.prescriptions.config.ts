@@ -30,6 +30,7 @@ export default defineConfig({
       AUTH_URL: "http://127.0.0.1:33312",
       NEXTAUTH_URL: "http://127.0.0.1:33312",
       TZ: "Asia/Kolkata",
+      AI_ENABLED: "false",
     },
   },
 });
