@@ -20,7 +20,9 @@ export async function patientPortalSender(): Promise<PatientPortalVerificationSe
     process.env.PATIENT_PORTAL_DELIVERY_PROVIDER?.trim() ||
     (process.env.PATIENT_PORTAL_TEST_TRANSPORT === "local-file"
       ? "local-file"
-      : undefined);
+      : process.env.PLIVO_AUTH_ID?.trim() && process.env.PLIVO_AUTH_TOKEN?.trim()
+        ? "plivo"
+        : undefined);
 
   if (provider === "local-file") {
     const { createPatientPortalTestSender } = await import(

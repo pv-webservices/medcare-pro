@@ -39,7 +39,10 @@ export const hashPortalToken = (token: string) =>
 export const portalCode = () =>
   randomInt(0, 1_000_000).toString().padStart(6, "0");
 export function portalPepper(): string {
-  const secret = process.env.PATIENT_PORTAL_OTP_SECRET ?? "";
+  const secret =
+    (process.env.PATIENT_PORTAL_OTP_SECRET ?? "").trim() ||
+    (process.env.NEXTAUTH_SECRET ?? "").trim() ||
+    (process.env.AUTH_SECRET ?? "").trim();
   if (secret.length < 32) throw new PatientPortalError(503);
   return secret;
 }
