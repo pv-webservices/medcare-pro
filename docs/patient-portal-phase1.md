@@ -1,163 +1,67 @@
-# Phase 1 Secure Patient Portal — implementation and review report
+# Patient Portal authentication (Phase 1.1)
 
-Status: **READY FOR INDEPENDENT REVIEW**. Production verification delivery is intentionally unavailable pending a reviewed adapter. This is not a deployment or production acceptance statement.
+Patient authentication is separate from staff User/Auth.js, LoginCode, and staff password recovery. Clinical pages and SELF-only resource authorization continue to use PatientPortalLink and the opaque PatientPortalSession cookie.
 
-Branch: `codex/patient-portal-phase1`. Baseline main: `3bfde194cddbb42874c61c671af34ba614574d67`. Obtain the finished commit with `git rev-parse HEAD` on this branch. Work and validation used disposable localhost databases only; no merge, deployment, production mutation, paid call, or provider provisioning was performed.
+## Clinic activation
 
-## Architecture and database
+Authorized staff with `patient_portal:manage`, exact clinic/tenant scope, and the `patient_portal` entitlement confirm the patient's identity in person from Registration Detail. The server locks the Patient, invalidates earlier activations, and returns a one-time activation URL only in the authorized no-store response. The URL contains a random 32-byte token; only its SHA-256 hash is persisted. Its lifetime is 15 minutes.
 
-Patient identities are separate from staff `User`, NextAuth, RBAC and staff sessions. The six new tables are accounts, SELF links, activation challenges, OTP challenges, sessions and patient audit events. Account mobile is normalized Indian E.164 and unique. Nullable unique live-link keys enforce one active account per Patient and one active Patient per account. Composite foreign keys enforce Patient/tenant ownership and session/account/link-generation agreement. Four CHECK constraints prevent null-key cardinality bypasses, invalid challenge subjects and excessive attempts. Identity foreign keys restrict deletion; optional staff verifier/revoker references use SET NULL. Clinical records are never cascade-deleted through portal identity.
+The staff browser renders a local SVG QR with react-qr-code. It can print the activation card or generate a new QR. Closing the card clears the raw URL from component state. Reloading shows pending activation and Generate New QR; the server cannot reconstruct a raw QR. No localStorage or automatic delivery is used.
 
-The additive migration is `20260913010000_patient_portal_phase1`. It adds identity structures and the Patient composite ownership index, with no automatic accounts, links, mobile matching, or clinical-data rewrite. The database test replays all 33 migrations from empty and upgrades from the exact 32-migration main baseline. It compares Patient, Registration and issued snapshot data before and after the upgrade and asserts zero portal accounts/links.
+The patient scans using their own device, creates and confirms a password, and optionally enters a recovery email. Token context determines Patient and Tenant; browser IDs cannot choose an identity. Activation locks the Patient and existing account, consumes the token, creates a fresh ACTIVE SELF link generation and a 12-hour session, and records the activation audit. Reenable requires fresh password setup and cannot revive old sessions.
 
-## Authentication and authorization
+## Password login
 
-Staff must hold `patient_portal:manage` at the Patient's clinic and confirm identity verification. Enable/resend creates a random 32-byte activation token, persists its SHA-256 hash, and sends the raw URL through the delivery interface. The token expires after 24 hours; resending invalidates the prior token. Activation also requires OTP verification and rechecks the current Patient mobile snapshot before creating an ACTIVE SELF link. There is no mobile-based automatic linking.
+Normal login is Organization (Tenant.slug) + Patient ID (tenant-scoped Patient.patientCode) + password. `/patient/login?org=<slug>` syntactically normalizes and prefills the organization without looking up or revealing its existence. Patient codes are trimmed and uppercased. The public clinic login URL contains no patient code or authentication secret and is available from the staff card.
 
-OTP codes are cryptographically generated six-digit values, stored as secret-peppered HMAC digests scoped to challenge identity. They expire after ten minutes and allow five attempts. Wrong attempts commit even when verification fails. Patient row locks serialize redemption, resend and revocation; concurrent activation redeems exactly once. Database-backed hourly limits are 20 requests/50 verifications per IP and 5 requests/15 verifications per subject, with a 60-second request/resend cooldown. Staff activation is separately bounded. Login request responses are generic for known/unknown mobiles, including entitlement denial; missing delivery configuration gives the same availability failure.
+Passwords accept 10–128 characters, including spaces and Unicode, without arbitrary complexity rules. A domain-separated SHA-256 prehash of the entire UTF-8 password is passed to bcryptjs with cost 12, avoiding bcrypt's silent 72-byte truncation. The prehash and plaintext are never persisted or logged. All patient password creation and comparison use this versioned input encoding. The account stores only the resulting bcrypt hash.
 
-The independent `medcare_patient_session` cookie is HttpOnly, SameSite=Lax, path `/`, Secure in production and has an absolute twelve-hour lifetime without sliding extension. Only a token hash is persisted. Every protected read resolves a live session → ACTIVE account → ACTIVE SELF link → exactly one Patient and tenant. Even a previously resolved actor is revalidated before record reads. Patient actors cannot become staff actors, and staff cookies do not authenticate patient routes.
+Unknown organization/code, wrong password, disabled/revoked account, and missing password credential return `Invalid sign-in details.` Nonexistent identities use a constant cost-12 dummy bcrypt hash. DB-backed limits cover IP and a SHA-256 hash of organization + patient code. Clinical mobile numbers and email addresses are never login authority.
 
-All visit, appointment and prescription queries include server-derived Patient and tenant ownership, including clinic/Patient tenant consistency. Request bodies and query strings cannot supply authority. Strict schemas reject extra `patientId`, `tenantId` and `clinicId`. Missing, foreign and draft records return 404. Lists are bounded to twenty records per page. State changes require the configured same origin and reject missing/foreign Origin and cross-site requests. Sensitive responses/pages use no-store and no-referrer policies.
+## Verified recovery email
 
-Staff revocation disables the account, revokes links, pending challenges and every session without touching clinical history. An already logged-in browser immediately receives 401 and redirects to login on reload. Re-enabling creates a fresh link generation; old cookies remain unusable.
+Recovery email belongs to PatientPortalAccount, not Patient or staff User. Typed addresses are normalized and pending until possession is explicitly confirmed. The dedicated PatientPortalSecurityToken table stores only SHA-256 token hashes, purpose, account, email snapshot, expiry, and lifecycle timestamps.
 
-## Entitlements and role migration
+Verification email expires in 24 hours. `/patient/verify-email?token=...` only renders a confirmation; GET never consumes it. POST locks the account, checks the token, active SELF access and entitlement, atomically enforces unique recoveryEmail, consumes the token and records an audit. A conflicting inbox reveals no other identity. Replacing an address also invalidates outstanding reset tokens for the previous address.
 
-`patient_portal` is a CORE feature included in the default Standard plan. Authority follows global availability plus tenant plan/override and active tenant status. It never depends on staff `RoleFeatureAccess`; tenant-only features are excluded from staff role switches. Patient historical prescriptions remain accessible without the staff prescriptions feature.
+Profile → Security & Recovery shows masked verified and pending addresses. Adding or changing recovery email requires current-password reauthentication, and the old verified address remains authoritative until replacement verification succeeds. Resend requires a 60-second cooldown and a small hourly account/IP limit; it invalidates the old verification token. Removing recovery email is intentionally not offered in this phase.
 
-New default Admin and Receptionist roles receive management permission; Doctor and Staff do not. Owner retains existing wildcard behavior. Historical role snapshots for older migrations explicitly exclude the new permission so those backfills retain their original matching semantics.
+Security emails use the existing Resend `sendTransactionalEmail` transport and contain no clinical information. An injected mailer captures all automated test mail. Optional local-file capture requires a nonproduction process, an explicit flag, and a dedicated localhost `medcare_ep_portal_` database; copied flags cannot enable it in production. No debug token endpoint exists.
 
-`npm run patient-portal:backfill` defaults to dry-run. Apply adds catalogue/plan mapping while preserving explicit switches and upgrades only exact frozen historical system Admin/Receptionist permission sets. Customized roles are reported and preserved. Writes against a remote database require both `--apply --allow-remote`; local apply was tested. No backfill creates patient identities or sends messages. Remote apply is a separate reviewed operation.
+Recovery email delivery failure does not roll back password activation. The patient's Profile shows the delivery warning and permits resend. Provider errors and credentials are not returned or logged.
 
-## Patient-visible records and UI
+## Forgot password
 
-Completed: scoped staff Portal card with enable/resend/revoke/re-enable confirmations; patient login and activation; separate patient navigation and dashboard; visits, linked appointments, prescriptions, prescription detail and print/Save PDF; profile; logout; desktop and mobile layouts.
+`/patient/forgot-password` requires Organization + Patient ID + Recovery email. Every valid-shaped request returns the same neutral response, including unknown identity, wrong email, revoked account, and unverified/missing email. Only an exact active identity and verified inbox receive mail.
 
-Patient prescription DTOs explicitly select visible fields from immutable issuance snapshots. ISSUED, SUPERSEDED and CANCELLED history remains readable with status warnings and ownership-checked correction links. DRAFT is invisible. Raw snapshots, internal IDs, staff account data, internal consultation workspace fields, generic audit content and cancellation reasons are omitted. Printing performs independent patient authorization and excludes staff chrome. An existing visit-history locale mismatch discovered during browser validation was corrected to deterministic `en-IN` formatting.
+Reset tokens expire in 15 minutes, have 32 bytes of entropy, and are single-use. New reset requests revoke earlier tokens. GET opens the form without consuming anything. POST hashes the new password outside the transaction, locks the account, checks the purpose/email snapshot/live token/active access, changes the credential, consumes the token, revokes all account sessions and outstanding security tokens, and audits completion. Pending email changes authorized with the old password are cleared. Reset never auto-signs in; return to login with confirmation.
 
-## Verification
+## Staff recovery and revocation
 
-| Check | Result |
-| --- | --- |
-| Full Vitest suite | PASS: 152 files, 2,293 tests |
-| Portal focused unit suite | PASS: 2 files, 39 tests |
-| Portal disposable DB suite | PASS: 75 checks |
-| Portal read-only verifier | PASS: 14/14 checks |
-| Portal Playwright | PASS: 4/4 desktop/mobile tests |
-| Migration verification | PASS: 3 checks, empty-chain and baseline upgrade |
-| Prescription DB regression | PASS: 58 checks |
-| Prescription schema/catalogue verifier | PASS: 9 checks |
-| Registration regression | PASS: all checks |
-| Appointment conversion regression | PASS: all checks |
-| RBAC/default-role regression | PASS: all checks |
-| Stage 8 feature and Stage 9 entitlement regressions | PASS: all checks |
-| Prisma generation | PASS |
-| Typecheck | PASS: `npm run typecheck`, exit 0 |
-| Lint | PASS: 0 errors, 5 existing warnings |
-| Production build | PASS: `npx next build`, 102 generated pages |
-| Staff prescription Playwright regression | PASS: 26/26 tests |
+Reset Portal Access requires fresh in-person identity confirmation and the same staff authorization as activation. Under Patient/account locks it disables the account, clears password and recovery authority, revokes all sessions, revokes active links while preserving history, invalidates security and activation tokens, and issues a STAFF_RECOVERY QR. Old credentials immediately fail. Redemption creates a fresh password/link/session; email may be added and verified again.
 
-Browser checks exercised actual staff activation, private test delivery, OTP redemption, patient navigation, immutable historical prescriptions, print invocation, missing/foreign records, malformed ownership inputs, staff/patient session separation, logout/login, generic login responses, origin rejection, cooldown and immediate staff revocation. Mobile home/print screenshots were preserved outside the repository and visually inspected.
+Revoke Access disables the account, revokes sessions and active links, and invalidates activation and email/reset tokens. Clinical rows and portal history are retained. Enable Again issues fresh QR/password setup.
 
-## IDOR and identity matrix
+## Legacy compatibility and migration
 
-| Attack / access | Result |
-| --- | --- |
-| A → A visit | PASS: allowed |
-| A → B visit | PASS: 404 |
-| A → A Rx | PASS: allowed for issued history |
-| A → B Rx | PASS: 404 |
-| A → foreign-tenant Rx | PASS: 404 |
-| A → A DRAFT Rx | PASS: 404 |
-| A → B print | PASS: 404 |
-| A → foreign appointment | PASS: 404 |
-| Tampered patientId | PASS: 400; cannot widen authority |
-| Tampered tenantId | PASS: 400; cannot widen authority |
-| Tampered clinicId | PASS: 400; cannot widen authority |
+Migration `20260913020000_patient_portal_password_email_auth` follows the unchanged Phase 1 migration. It adds nullable password/recovery columns, nullable legacy mobile columns, activation purpose (existing rows default to LEGACY_SMS), and the dedicated security-token table. It does not rewrite clinical rows, invent credentials, or auto-link patients. PatientPortalChallenge remains temporarily as deprecated data; patient authentication has no runtime reads/writes to it.
 
-Two synthetic Patients shared one mobile. Activation of the second Patient was blocked; the first account saw only its verified Patient's records. Unlinked appointments with the same mobile remained hidden. Editing Patient demographics did not transfer an established account's identity; editing a pending activation's mobile invalidated redemption. Concurrent activation, exhausted/expired OTP, revoked/expired session, disabled account, feature kills, plan denial and fresh-generation reactivation were independently tested.
+Legacy mobile-only accounts remain readable, derive SETUP REQUIRED in staff UI, and cannot password-login. Generate Setup QR reuses only their patient-scoped account history; shared mobile numbers cannot combine accounts. Existing sessions remain governed by their original DB expiry/revocation checks; setup/recovery/revoke explicitly invalidate them.
 
-## Security findings and deployment prerequisites
+`npx tsx scripts/backfill-patient-portal-password-auth.mts` is dry-run by default and reports aggregate legacy/account/activation/challenge counts. `--apply` revokes only outstanding LEGACY_SMS activations and invalidates unconsumed OTP challenges. It never deletes accounts, links, sessions or clinical rows; never creates passwords/email/activations; never sends messages. Remote apply requires explicit `--apply --allow-remote`. During this implementation the named production database is explicitly forbidden by the guard. Review the script and data before any later production execution.
 
-- P0: no unresolved portal finding identified by the implemented automated checks and review.
-- P1: no unresolved portal finding identified. Independent security review remains necessary.
-- P2: production delivery is absent by design. Configure a reviewed security-message adapter, delivery failure policy and operational abuse monitoring before activation is offered to patients. Generic response bodies do not constitute proof of constant-time delivery behavior; review timing and provider failure behavior when integrating that adapter.
-- P3: five pre-existing lint warnings and existing Next middleware/package-type build warnings remain. Dependency audit reports eight existing advisories (one critical, five high, two moderate); no dependency upgrades were included. Advisory severity requires a separate applicability assessment and is not reclassified as a low-severity portal issue.
+## Messaging and environment
 
-The only verification transport exercised was the explicit local-file test sender. It requires non-production mode, a localhost database with the dedicated disposable prefix and a private configured outbox outside HTTP paths. Production and remote-database use are rejected. No OTP/token enters HTTP responses, application logs, generic audit rows or clinical message history. No SMS/WhatsApp provider was used or charged.
+Patient Portal SMS/OTP runtime and its dedicated sender files are retired. Plivo SDK, IVR, Voice, number inventory and webhook signature validation remain supported. RkvRobo ordinary clinic messaging remains intact. RkvRobo is not authentication transport: never send QR activation secrets, reset tokens, passwords, OTPs or sessions through WhatsApp. Only public organization login URLs may be distributed through ordinary clinic messaging.
 
-Validation setup issues were corrected before final runs: the initial migration CHECK rejected Prisma's default ON UPDATE CASCADE, so identity ownership keys now explicitly use ON UPDATE RESTRICT; OTP browser fixtures were isolated per test to avoid shared cooldown state; the upgrade verifier launches separate processes because Prisma's singleton retains its construction-time database URL. One overlapping Prisma generation attempt hit a Windows DLL lock; generation was rerun successfully after database processes exited. Initial typecheck failures in nullable test assertions were fixed; final typecheck and build passed. These failed attempts are not counted as passing checks.
+Patient Portal no longer uses PATIENT_PORTAL_DELIVERY_PROVIDER, PATIENT_PORTAL_SMS_SENDER or PATIENT_PORTAL_OTP_SECRET. Existing production values may remain unused until a separate approved cleanup.
 
-Runtime configuration used disposable MariaDB 11.4 on localhost, never the repository's production database. Synthetic fixtures and private browser screenshots are retained locally for review. No real patient data or credentials were used as test fixtures. Existing dependency advisories include direct Next (critical), Prisma (high) and Vitest (moderate), plus transitive advisories; no claim is made about exploit applicability from audit severity alone.
+Email recovery needs EMAIL_API_KEY, a verified Resend EMAIL_FROM_ADDRESS, and HTTPS AUTH_URL/NEXTAUTH_URL matching the public origin. No production environment is changed by this task.
 
-Review entry points: `patientPortalSession.ts` and `patientPortalRecords.ts` hold patient authority and ownership predicates; activation/OTP/security modules hold authentication lifecycle; `patientPortalFeature.ts` holds tenant-only entitlement; `patientPortalRoleMigration.ts` and the frozen `prePatientPortalRoles.json` hold conservative backfill matching. API routes delegate to those services, while patient/staff UI components only render their authorized results. Existing staff session, appointment scheduling, prescription issuance and telephony services remain the established domain implementations.
+## Validation and deployment boundary
 
-Before deployment: independently review the feature and dependency advisories; configure a strong server-only `PATIENT_PORTAL_OTP_SECRET` of at least 32 characters, HTTPS `AUTH_URL`/`NEXTAUTH_URL` matching the public origin, and a reviewed production delivery adapter; approve the additive migration and exact dry-run role candidates; preserve explicit tenant feature decisions; perform controlled live acceptance and revocation checks. Do not enable the test sender in production. Local green checks do not prove production acceptance.
+All development/testing/migration replay/builds must explicitly use disposable local databases. `npm run build` runs `prisma migrate deploy`; never run it against production. Tests include password/QR/token/recovery races, shared mobile isolation, entitlement revocation, IDOR, clinical snapshots, backfill dry-run/apply/idempotence/remote guard, and desktop/mobile Playwright. Staff password-reset verification is separate.
 
-## Changed files
+CI uses disposable MariaDB and captured/injected email without Plivo SMS, RkvRobo or real Resend credentials. The review report records exact local results and existing dependency/build warnings.
 
-- `docs/patient-portal-phase1.md`
-- `next.config.js`
-- `package.json`
-- `playwright.patient-portal.config.ts`
-- `prisma/migrations/20260913010000_patient_portal_phase1/migration.sql`
-- `prisma/schema.prisma`
-- `scripts/backfill-patient-portal.mts`
-- `scripts/create-patient-portal-e2e.mts`
-- `scripts/patient-portal-migration-fixture.mts`
-- `scripts/patient-portal-test-fixture.ts`
-- `scripts/test-patient-portal-migration.mts`
-- `scripts/test-patient-portal.mts`
-- `scripts/verify-patient-portal.mts`
-- `scripts/verify-stage8-features.mts`
-- `src/app/(dashboard)/registration/[id]/page.tsx`
-- `src/app/api/patient-portal/[...path]/route.ts`
-- `src/app/api/patients/[id]/portal/[action]/route.ts`
-- `src/app/api/patients/[id]/portal/route.ts`
-- `src/app/patient/(secure)/appointments/page.tsx`
-- `src/app/patient/(secure)/layout.tsx`
-- `src/app/patient/(secure)/page.tsx`
-- `src/app/patient/(secure)/prescriptions/[id]/page.tsx`
-- `src/app/patient/(secure)/prescriptions/[id]/print/page.tsx`
-- `src/app/patient/(secure)/prescriptions/page.tsx`
-- `src/app/patient/(secure)/profile/page.tsx`
-- `src/app/patient/(secure)/visits/page.tsx`
-- `src/app/patient/activate/[token]/page.tsx`
-- `src/app/patient/layout.tsx`
-- `src/app/patient/login/page.tsx`
-- `src/app/patient/portal.css`
-- `src/app/patient/unavailable/page.tsx`
-- `src/components/patientPortal/PortalAuthForm.tsx`
-- `src/components/patientPortal/PortalButtons.tsx`
-- `src/components/patientPortal/PortalHistoryPage.tsx`
-- `src/components/patientPortal/PortalPrescription.tsx`
-- `src/components/patientPortal/StaffPortalCard.tsx`
-- `src/components/registration/PatientVisits.tsx`
-- `src/lib/audit.ts`
-- `src/lib/auditDescriptions.ts`
-- `src/lib/defaultFeatures.ts`
-- `src/lib/defaultRoles.ts`
-- `src/lib/features.ts`
-- `src/lib/moduleFeatures.ts`
-- `src/lib/patientPortalActivation.ts`
-- `src/lib/patientPortalApi.ts`
-- `src/lib/patientPortalFeature.ts`
-- `src/lib/patientPortalOtp.ts`
-- `src/lib/patientPortalPages.ts`
-- `src/lib/patientPortalRecords.ts`
-- `src/lib/patientPortalRoleMigration.ts`
-- `src/lib/patientPortalSecurity.ts`
-- `src/lib/patientPortalSender.ts`
-- `src/lib/patientPortalSession.ts`
-- `src/lib/patientPortalStaffApi.ts`
-- `src/lib/patientPortalTestSender.ts`
-- `src/lib/permissions.ts`
-- `src/lib/prePatientPortalRoles.json`
-- `tests/e2e/patient-portal.spec.ts`
-- `tests/unit/appointmentPermissionDefaults.test.ts`
-- `tests/unit/auditDescriptions.test.ts`
-- `tests/unit/moduleFeatures.test.ts`
-- `tests/unit/patientPortalRecords.test.ts`
-- `tests/unit/patientPortalSecurity.test.ts`
-- `tests/unit/permissions.test.ts`
+This branch must be independently reviewed before any merge, production migration/backfill, deployment, environment change, real patient activation or real recovery mail. The SMS-fix branch is not a base and must not be merged.

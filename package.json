@@ -61,6 +61,7 @@
     "test:prescriptions": "tsx scripts/test-prescriptions.mts",
     "test:e2e:prescriptions": "playwright test --config=playwright.prescriptions.config.ts",
     "patient-portal:backfill": "tsx scripts/backfill-patient-portal.mts",
+    "patient-portal:password-auth-backfill": "tsx scripts/backfill-patient-portal-password-auth.mts",
     "test:patient-portal": "vitest run patientPortal && tsx scripts/test-patient-portal.mts",
     "verify:patient-portal": "tsx scripts/verify-patient-portal.mts",
     "test:e2e:patient-portal": "playwright test --config=playwright.patient-portal.config.ts"
@@ -82,6 +83,7 @@
     "prisma": "^6.19.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-qr-code": "2.0.21",
     "resend": "^6.20.0",
     "tailwindcss": "^4",
     "zod": "^4.4.3"

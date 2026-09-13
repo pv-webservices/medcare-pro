@@ -370,7 +370,11 @@ async function main(): Promise<void> {
     try {
       await requestPasswordReset(deps(mailbox.mailer), { email: limited.email, ...META });
     } catch (error: unknown) {
-      if (error instanceof RateLimitError) {
+      if (
+        error instanceof RateLimitError ||
+        (error instanceof Error && error.name === "RateLimitError") ||
+        (typeof error === "object" && error !== null && "retryAfterMs" in error)
+      ) {
         refusedAt = attempt;
         break;
       }

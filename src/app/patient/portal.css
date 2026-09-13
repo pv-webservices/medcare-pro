@@ -166,10 +166,6 @@
   background: #fff;
   color: var(--portal-ink);
 }
-.portal-auth input[autocomplete="one-time-code"] {
-  letter-spacing: 0.35em;
-  font-size: 1.35rem;
-}
 .portal-primary {
   background: #184b43;
   color: white;
@@ -387,4 +383,17 @@
     size: A4;
     margin: 15mm;
   }
+}
+.portal-security {
+  margin-top: 2rem;
+  width: 100%;
+  max-width: 40rem;
+}
+.portal-security form {
+  display: grid;
+  gap: 1rem;
+}
+.portal-auth input {
+  min-width: 0;
+  max-width: 100%;
 }

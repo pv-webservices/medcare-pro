@@ -20,10 +20,15 @@ export function patientPortalStaffApi(
     if (request.method === "GET" && !action)
       return portalJson(await getStaffPortalStatus(actor, id));
     const body = await readJsonBody(request);
-    if (action === "activate" || action === "resend") {
+    if (action === "activate" || action === "resend" || action === "recovery") {
       portalStaffActivationSchema.parse(body);
       return portalJson(
-        await createPortalActivation(actor, id, action === "resend"),
+        await createPortalActivation(
+          actor,
+          id,
+          action === "resend",
+          action === "recovery",
+        ),
       );
     }
     if (action === "revoke") {

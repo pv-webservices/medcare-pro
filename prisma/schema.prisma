@@ -2346,19 +2346,54 @@ enum PatientPortalChallengePurpose {
   LOGIN
 }
 
+enum PatientPortalActivationPurpose {
+  LEGACY_SMS
+  INITIAL
+  REENABLE
+  STAFF_RECOVERY
+}
+
+enum PatientPortalTokenPurpose {
+  VERIFY_RECOVERY_EMAIL
+  PASSWORD_RESET
+}
+
+model PatientPortalSecurityToken {
+  id              String                    @id @default(cuid())
+  portalAccountId String                    @map("portal_account_id")
+  purpose         PatientPortalTokenPurpose
+  emailSnapshot   String                    @map("email_snapshot") @db.VarChar(254)
+  tokenHash       String                    @unique @map("token_hash") @db.Char(64)
+  expiresAt       DateTime                  @map("expires_at")
+  consumedAt      DateTime?                 @map("consumed_at")
+  revokedAt       DateTime?                 @map("revoked_at")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  portalAccount   PatientPortalAccount      @relation(fields: [portalAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([portalAccountId, purpose])
+  @@index([expiresAt])
+  @@map("patient_portal_security_tokens")
+}
+
 /// Separate identity domain. Restrict relations never delete medical records.
 model PatientPortalAccount {
-  id          String                     @id @default(cuid())
-  mobileE164  String                     @unique @map("mobile_e164") @db.VarChar(16)
-  status      PatientPortalAccountStatus @default(ACTIVE)
-  verifiedAt  DateTime                   @map("verified_at")
-  lastLoginAt DateTime?                  @map("last_login_at")
-  createdAt   DateTime                   @default(now()) @map("created_at")
-  updatedAt   DateTime                   @updatedAt @map("updated_at")
-  links       PatientPortalLink[]
-  sessions    PatientPortalSession[]
-  challenges  PatientPortalChallenge[]
-  auditEvents PatientPortalAuditEvent[]
+  id                      String                       @id @default(cuid())
+  mobileE164              String?                      @unique @map("mobile_e164") @db.VarChar(16)
+  passwordHash            String?                      @map("password_hash") @db.VarChar(60)
+  passwordSetAt           DateTime?                    @map("password_set_at")
+  recoveryEmail           String?                      @unique @map("recovery_email") @db.VarChar(254)
+  recoveryEmailVerifiedAt DateTime?                    @map("recovery_email_verified_at")
+  pendingRecoveryEmail    String?                      @map("pending_recovery_email") @db.VarChar(254)
+  securityTokens          PatientPortalSecurityToken[]
+  status                  PatientPortalAccountStatus   @default(ACTIVE)
+  verifiedAt              DateTime                     @map("verified_at")
+  lastLoginAt             DateTime?                    @map("last_login_at")
+  createdAt               DateTime                     @default(now()) @map("created_at")
+  updatedAt               DateTime                     @updatedAt @map("updated_at")
+  links                   PatientPortalLink[]
+  sessions                PatientPortalSession[]
+  challenges              PatientPortalChallenge[]
+  auditEvents             PatientPortalAuditEvent[]
 
   @@map("patient_portal_accounts")
 }
@@ -2412,20 +2447,21 @@ model PatientPortalSession {
 }
 
 model PatientPortalActivation {
-  id                 String                   @id @default(cuid())
-  patientId          String                   @map("patient_id")
-  tenantId           String                   @map("tenant_id")
-  activePatientId    String?                  @unique @map("active_patient_id")
-  mobileE164         String                   @map("mobile_e164") @db.VarChar(16)
-  tokenHash          String                   @unique @map("token_hash") @db.Char(64)
-  expiresAt          DateTime                 @map("expires_at")
-  consumedAt         DateTime?                @map("consumed_at")
-  revokedAt          DateTime?                @map("revoked_at")
-  createdByUserId    String?                  @map("created_by_user_id")
-  identityVerifiedAt DateTime                 @map("identity_verified_at")
-  createdAt          DateTime                 @default(now()) @map("created_at")
-  patient            Patient                  @relation(fields: [patientId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
-  creator            User?                    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  id                 String                         @id @default(cuid())
+  patientId          String                         @map("patient_id")
+  tenantId           String                         @map("tenant_id")
+  activePatientId    String?                        @unique @map("active_patient_id")
+  mobileE164         String?                        @map("mobile_e164") @db.VarChar(16)
+  purpose            PatientPortalActivationPurpose @default(LEGACY_SMS)
+  tokenHash          String                         @unique @map("token_hash") @db.Char(64)
+  expiresAt          DateTime                       @map("expires_at")
+  consumedAt         DateTime?                      @map("consumed_at")
+  revokedAt          DateTime?                      @map("revoked_at")
+  createdByUserId    String?                        @map("created_by_user_id")
+  identityVerifiedAt DateTime                       @map("identity_verified_at")
+  createdAt          DateTime                       @default(now()) @map("created_at")
+  patient            Patient                        @relation(fields: [patientId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  creator            User?                          @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   challenges         PatientPortalChallenge[]
 
   @@index([patientId, tenantId])

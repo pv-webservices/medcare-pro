@@ -3,11 +3,13 @@ import { portalApi, portalJson, readJsonBody } from "@/lib/patientPortalApi";
 import {
   PatientPortalError,
   PORTAL_COOKIE,
-  PORTAL_LOGIN_MESSAGE,
+  PORTAL_RESET_MESSAGE,
   portalLoginSchema,
-  portalVerifySchema,
-  portalActivationRequestSchema,
-  portalActivationVerifySchema,
+  portalActivationSchema,
+  portalResetRequestSchema,
+  portalResetSchema,
+  portalEmailChangeSchema,
+  portalTokenSchema,
   portalEmptySchema,
   portalPageSchema,
   hashPortalToken,
@@ -19,9 +21,15 @@ import {
 } from "@/lib/patientPortalSession";
 import {
   portalAuthRateLimit,
-  requestPatientPortalCode,
-  verifyPatientPortalCode,
-} from "@/lib/patientPortalOtp";
+  loginPatientPortal,
+  activatePatientPortal,
+  requestPatientPasswordReset,
+  resetPatientPassword,
+  verifyPatientRecoveryEmail,
+  changePatientRecoveryEmail,
+  resendPatientRecoveryEmail,
+  patientPortalSecurityProfile,
+} from "@/lib/patientPortalPasswordAuth";
 import {
   patientPortalProfile,
   patientPortalHistory,
@@ -30,13 +38,14 @@ import {
   patientOwnedAppointment,
 } from "@/lib/patientPortalRecords";
 import { readClientIp, readUserAgent } from "@/lib/requestMeta";
-
+import { z } from "zod";
 type Context = { params: Promise<{ path: string[] }> };
 export async function POST(request: Request, context: Context) {
   return portalApi(request, async () => {
     const path = (await context.params).path.join("/");
     const body = await readJsonBody(request);
     const ip = readClientIp(request);
+    const meta = { ip, userAgent: readUserAgent(request) };
     if (path === "auth/logout") {
       portalEmptySchema.parse(body);
       await logoutPatientPortal((await cookies()).get(PORTAL_COOKIE)?.value);
@@ -47,37 +56,84 @@ export async function POST(request: Request, context: Context) {
       });
       return response;
     }
-    if (path === "auth/login/request") {
-      const input = portalLoginSchema.parse(body);
-      await portalAuthRateLimit(ip, input.mobile);
-      await requestPatientPortalCode(input);
-      return portalJson({ message: PORTAL_LOGIN_MESSAGE });
-    }
-    if (path === "auth/activation/request") {
-      const input = portalActivationRequestSchema.parse(body);
-      await portalAuthRateLimit(ip, hashPortalToken(input.token));
-      await requestPatientPortalCode(input);
-      return portalJson({
-        message: "A verification code has been sent to your verified contact.",
-      });
-    }
-    if (path === "auth/login/verify" || path === "auth/activation/verify") {
-      const input =
-        path === "auth/login/verify"
-          ? portalVerifySchema.parse(body)
-          : portalActivationVerifySchema.parse(body);
+    if (path === "auth/login") {
+      // Malformed identities use the same public sign-in error.
+
+      const parsed = portalLoginSchema.safeParse(body);
+      if (!parsed.success) {
+        await portalAuthRateLimit(ip, ip ?? "unknown");
+        throw new PatientPortalError(400, "Invalid sign-in details.");
+      }
+      const input = parsed.data;
       await portalAuthRateLimit(
         ip,
-        "mobile" in input ? input.mobile : hashPortalToken(input.token),
-        true,
+        `${input.organization}:${input.patientCode}`,
       );
-      const token = await verifyPatientPortalCode(input, {
-        ip,
-        userAgent: readUserAgent(request),
-      });
+      const token = await loginPatientPortal(input, meta);
       const response = portalJson({ message: "Signed in." });
       response.cookies.set(PORTAL_COOKIE, token, patientCookieOptions());
       return response;
+    }
+    if (path === "auth/activate") {
+      const input = portalActivationSchema.parse(body);
+      await portalAuthRateLimit(ip, hashPortalToken(input.token), "activation");
+      const result = await activatePatientPortal(input, meta);
+      const response = portalJson({ message: result.message });
+      response.cookies.set(
+        PORTAL_COOKIE,
+        result.sessionToken,
+        patientCookieOptions(),
+      );
+      return response;
+    }
+    if (path === "auth/forgot-password") {
+      const parsed = portalResetRequestSchema.safeParse(body);
+      await portalAuthRateLimit(
+        ip,
+        parsed.success
+          ? `${parsed.data.organization}:${parsed.data.patientCode}`
+          : "invalid",
+        "reset-request",
+        true,
+      );
+      if (parsed.success) await requestPatientPasswordReset(parsed.data);
+      return portalJson({ message: PORTAL_RESET_MESSAGE });
+    }
+    if (path === "auth/reset-password") {
+      const input = portalResetSchema.parse(body);
+      await portalAuthRateLimit(ip, hashPortalToken(input.token), "reset");
+      await resetPatientPassword(input);
+      return portalJson({
+        message: "Password updated. Sign in with your new password.",
+      });
+    }
+    if (path === "auth/verify-email") {
+      const input = z.strictObject({ token: portalTokenSchema }).parse(body);
+      await portalAuthRateLimit(
+        ip,
+        hashPortalToken(input.token),
+        "email-verify",
+      );
+      await verifyPatientRecoveryEmail(input.token);
+      return portalJson({ message: "Recovery email verified." });
+    }
+    if (path === "me/security/email" || path === "me/security/resend") {
+      const actor = await requirePatientActor();
+      await portalAuthRateLimit(
+        ip,
+        actor.portalAccountId,
+        "email-request",
+        true,
+      );
+      if (path.endsWith("resend")) {
+        portalEmptySchema.parse(body);
+        await resendPatientRecoveryEmail(actor);
+      } else
+        await changePatientRecoveryEmail(
+          actor,
+          portalEmailChangeSchema.parse(body),
+        );
+      return portalJson({ message: "Verification email sent." });
     }
     throw new PatientPortalError(404, "Not found.");
   });
@@ -89,6 +145,8 @@ export async function GET(request: Request, context: Context) {
       Object.fromEntries(new URL(request.url).searchParams),
     );
     const actor = await requirePatientActor();
+    if (parts.join("/") === "me/security")
+      return portalJson(await patientPortalSecurityProfile(actor));
     if (parts.join("/") === "me")
       return portalJson(await patientPortalProfile(actor));
     const kind = parts[1];

@@ -40,12 +40,14 @@ async function main() {
   const tables = await prisma.$queryRaw<
     { TABLE_NAME: string }[]
   >`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE 'patient_portal_%'`;
-  check("Six patient identity tables deployed", tables.length === 6);
+  check("Seven patient identity tables deployed", tables.length === 7);
   const indexes = await prisma.$queryRaw<
     { TABLE_NAME: string; INDEX_NAME: string; NON_UNIQUE: number }[]
   >`SELECT DISTINCT TABLE_NAME, INDEX_NAME, NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE 'patient_portal_%'`;
   for (const [table, fragment] of [
     ["patient_portal_accounts", "mobile_e164"],
+    ["patient_portal_accounts", "recovery_email"],
+    ["patient_portal_security_tokens", "token_hash"],
     ["patient_portal_links", "active_patient_id"],
     ["patient_portal_links", "active_account_id"],
     ["patient_portal_activations", "active_patient_id"],
@@ -66,7 +68,7 @@ async function main() {
   >`SELECT CONSTRAINT_NAME, DELETE_RULE, UPDATE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME LIKE 'patient_portal_%'`;
   check(
     "No identity foreign key cascades deletion",
-    foreignKeys.length === 12 &&
+    foreignKeys.length === 13 &&
       foreignKeys.every(
         (k) => k.DELETE_RULE === "RESTRICT" || k.DELETE_RULE === "SET NULL",
       ),

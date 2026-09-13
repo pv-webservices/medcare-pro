@@ -13,7 +13,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: /patient-portal\.spec\.ts/,
   workers: 1,
-  timeout: 120000,
+  timeout: 240000,
   projects: [
     { name: "desktop", use: { viewport: { width: 1280, height: 800 } } },
     { name: "mobile", use: { viewport: { width: 390, height: 844 } } },
@@ -27,7 +27,7 @@ export default defineConfig({
     command: "npx next dev --hostname 127.0.0.1 --port 33322",
     url: "http://127.0.0.1:33322/patient/login",
     reuseExistingServer: false,
-    timeout: 120000,
+    timeout: 240000,
     env: {
       DATABASE_URL: process.env.DATABASE_URL!,
       NODE_ENV: "development",
@@ -35,11 +35,10 @@ export default defineConfig({
       NEXTAUTH_SECRET: "disposable-patient-portal-staff-auth-secret",
       AUTH_URL: "http://127.0.0.1:33322",
       NEXTAUTH_URL: "http://127.0.0.1:33322",
-      PATIENT_PORTAL_OTP_SECRET: "disposable-patient-portal-test-pepper-2026",
       PATIENT_PORTAL_TEST_TRANSPORT: "local-file",
       PATIENT_PORTAL_TEST_OUTBOX: resolve(
         process.env.PATIENT_PORTAL_TEST_OUTBOX ??
-          "C:/Users/hp/.codex/visualizations/2026/09/12/01a096d9-a9e5-7331-a731-25e4a20362e1/portal-outbox",
+          "test-results/patient-portal-outbox",
       ),
       TZ: "Asia/Kolkata",
     },

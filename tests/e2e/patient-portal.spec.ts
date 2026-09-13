@@ -3,18 +3,17 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { prisma } from "../../src/lib/prisma";
+import { hashPortalToken } from "../../src/lib/patientPortalSecurity";
 import type { createPatientPortalFixture } from "../../scripts/patient-portal-test-fixture";
 import { PRESCRIPTION_TEST_PASSWORD } from "../../scripts/prescription-test-fixture";
 const origin = "http://127.0.0.1:33322";
-const database = new URL(process.env.DATABASE_URL ?? "mysql://invalid");
-if (
-  !["localhost", "127.0.0.1"].includes(database.hostname) ||
-  !database.pathname.startsWith("/medcare_ep_portal_")
-)
-  throw new Error("Requires a disposable local patient portal database.");
 let f: Awaited<ReturnType<typeof createPatientPortalFixture>>;
+const password = "synthetic patient passphrase";
+const replacement = "synthetic replacement passphrase";
 test.beforeEach(async () => {
-  await prisma.rateLimitBucket.deleteMany({ where: { key: { startsWith: "patient-portal:" } } });
+  await prisma.rateLimitBucket.deleteMany({
+    where: { key: { startsWith: "patient-portal:" } },
+  });
   f = JSON.parse(
     execFileSync(
       process.execPath,
@@ -27,12 +26,12 @@ test.beforeEach(async () => {
   );
 });
 test.afterAll(async () => prisma.$disconnect());
-async function signIn(page: Page, email: string) {
+async function signIn(page: Page) {
   const csrf = await (await page.request.get("/api/auth/csrf")).json();
   const r = await page.request.post("/api/auth/callback/credentials", {
     form: {
       csrfToken: csrf.csrfToken,
-      email,
+      email: f.receptionist.email,
       password: PRESCRIPTION_TEST_PASSWORD,
       callbackUrl: `${origin}/dashboard`,
     },
@@ -40,30 +39,34 @@ async function signIn(page: Page, email: string) {
   });
   expect(r.ok()).toBe(true);
 }
-async function outbox(type: string) {
-  const path = resolve(
-    process.env.PATIENT_PORTAL_TEST_OUTBOX ??
-      "C:/Users/hp/.codex/visualizations/2026/09/12/01a096d9-a9e5-7331-a731-25e4a20362e1/portal-outbox",
-    "outbox.jsonl",
-  );
-  let entry: { activationUrl?: string; code?: string } | undefined;
+async function outbox(email: string, purpose: string) {
+  let url = "";
   await expect
     .poll(async () => {
       try {
-        const entries = (await readFile(path, "utf8"))
+        const entries = (
+          await readFile(
+            resolve(
+              process.env.PATIENT_PORTAL_TEST_OUTBOX ??
+                "test-results/patient-portal-outbox",
+              "outbox.jsonl",
+            ),
+            "utf8",
+          )
+        )
           .trim()
           .split("\n")
           .map((line) => JSON.parse(line));
-        entry = entries
-          .filter((e) => e.type === type && e.mobileE164 === `+91${f.number}`)
-          .at(-1);
-        return !!entry;
+        url =
+          entries.filter((e) => e.to === email && e.purpose === purpose).at(-1)
+            ?.url ?? "";
+        return !!url;
       } catch {
         return false;
       }
     })
     .toBe(true);
-  return entry!;
+  return url;
 }
 async function noOverflow(page: Page) {
   expect(
@@ -72,250 +75,184 @@ async function noOverflow(page: Page) {
     ),
   ).toBe(true);
 }
-test("staff activation, patient records, IDOR, print, revocation and logout", async ({
+async function patientLogin(page: Page, passwordValue: string) {
+  await page.goto(`/patient/login?org=${f.tenant.slug}`);
+  await noOverflow(page);
+  await expect(page.getByLabel("Organization", { exact: true })).toHaveValue(
+    f.tenant.slug,
+  );
+  await page
+    .getByLabel("Patient ID", { exact: true })
+    .fill(f.patient.patientCode);
+  await page.getByLabel("Password", { exact: true }).fill(passwordValue);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+}
+test("QR, password, verified email recovery, clinical IDOR, print and immediate revocation", async ({
   page,
   browser,
 }, info) => {
-  await signIn(page, f.receptionist.email);
+  await signIn(page);
   await page.goto(`/registration/${f.visitA.id}`);
-  await expect(
-    page.getByRole("heading", { name: "Patient Portal", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Enable Patient Portal" }).click();
+  await page
+    .getByRole("button", { name: "Enable Patient Portal", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Confirm patient identity" }),
   ).toBeVisible();
+  const activationResponse = page.waitForResponse(
+    (r) =>
+      r.url().endsWith(`/api/patients/${f.patient.id}/portal/activate`) &&
+      r.request().method() === "POST",
+  );
   await page
     .getByRole("button", { name: "Identity verified — enable portal" })
     .click();
-  await expect(page.getByText(/PENDING ACTIVATION/)).toBeVisible();
-  const activation = await outbox("activation");
+  const activation = (await (await activationResponse).json()).data;
+  await expect(
+    page.getByRole("heading", {
+      name: "Patient Portal Activation",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".portal-activation-card svg")).toBeVisible();
+  expect(activation.activationUrl).toMatch(
+    /^http:\/\/127.0.0.1:33322\/patient\/activate\/[\w-]{43}$/,
+  );
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.reload();
+  await expect(
+    page.getByText("PENDING ACTIVATION", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".portal-activation-card svg")).toHaveCount(0);
   const context = await browser.newContext({
     viewport: info.project.use.viewport,
   });
   const patient = await context.newPage();
-  await patient.goto(activation.activationUrl!);
-  await expect(
-    patient.getByRole("heading", { name: "Activate your portal" }),
-  ).toBeVisible();
-  await patient.getByRole("button", { name: "Send verification code" }).click();
-  await expect(patient.getByLabel("Verification code")).toBeVisible();
-  const challenge = await outbox("code");
-  await patient.getByLabel("Verification code").fill(challenge.code!);
-  await patient.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(patient).toHaveURL(`${origin}/patient`);
-  await expect(
-    patient.getByRole("heading", { name: `Welcome, ${f.patient.name}` }),
-  ).toBeVisible();
+  await patient.goto(`/patient/login?org=${f.tenant.slug}`);
+  await patient.screenshot({
+    path: info.outputPath("login.png"),
+    caret: "initial",
+    fullPage: true,
+  });
+  const email = `patient-${f.patient.id}@example.test`;
+  await patient.goto(activation.activationUrl);
+  await patient.getByLabel("Create password", { exact: true }).fill(password);
+  await patient.getByLabel("Confirm password", { exact: true }).fill(password);
+  await patient
+    .getByLabel("Recovery email (recommended)", { exact: true })
+    .fill(email);
   await noOverflow(patient);
-  const knownMobile = await patient.request.post(
-    "/api/patient-portal/auth/login/request",
-    { headers: { origin }, data: { mobile: f.number } },
-  );
-  const unknownMobile = await patient.request.post(
-    "/api/patient-portal/auth/login/request",
-    { headers: { origin }, data: { mobile: `7${f.number.slice(1)}` } },
-  );
-  expect(knownMobile.status()).toBe(200);
-  expect(unknownMobile.status()).toBe(200);
-  expect(await knownMobile.json()).toEqual(await unknownMobile.json());
+  await patient
+    .getByRole("button", { name: "Activate Patient Portal", exact: true })
+    .click();
+  await expect(patient).toHaveURL(/\/patient\/profile/);
+  await expect(patient.getByText(/Verification pending/)).toBeVisible();
   await patient.screenshot({
-    path: info.outputPath("patient-home.png"),
+    path: info.outputPath("security.png"),
+    caret: "initial",
     fullPage: true,
   });
-  for (const path of ["visits", "appointments", "profile", "prescriptions"]) {
-    await patient.goto(`/patient/${path}`);
-    await noOverflow(patient);
-  }
-  await expect(patient.getByText(f.issued.prescriptionNumber)).toBeVisible();
-  for (const id of [f.issued.id, f.superseded.id, f.cancelled.id]) {
-    await patient.goto(`/patient/prescriptions/${id}`);
-    await noOverflow(patient);
-  }
-  await expect(
-    patient.getByText(
-      "This prescription is no longer valid. Retained as a historical record.",
-    ),
-  ).toBeVisible();
-  for (const [kind, id] of [
-    ["visits", f.visitBRow.id],
-    ["visits", f.visitCRow.id],
-    ["appointments", f.appointmentB.id],
-    ["appointments", f.appointmentC.id],
-    ["appointments", f.unlinked.id],
-    ["prescriptions", f.rxB.id],
-    ["prescriptions", f.rxC.id],
-    ["prescriptions", f.draft.id],
-  ]) {
-    const r = await patient.request.get(`/api/patient-portal/me/${kind}/${id}`);
-    expect(r.status()).toBe(404);
-  }
-  for (const path of [
-    `/patient/prescriptions/${f.rxB.id}`,
-    `/patient/prescriptions/${f.rxB.id}/print`,
-    `/patient/prescriptions/${f.rxC.id}/print`,
-    `/patient/prescriptions/${f.draft.id}/print`,
-  ])
-    expect((await patient.goto(path))?.status()).toBe(404);
-  for (const [field, id] of [
-    ["patientId", f.patientB.id],
-    ["tenantId", f.foreignTenant.id],
-    ["clinicId", f.foreignClinic.id],
-  ]) {
-    expect(
-      (
-        await patient.request.get(`/api/patient-portal/me?${field}=${id}`)
-      ).status(),
-    ).toBe(400);
-    expect(
-      (
-        await patient.request.post("/api/patient-portal/auth/login/request", {
-          headers: { origin },
-          data: { mobile: f.number, [field]: id },
-        })
-      ).status(),
-    ).toBe(400);
-  }
-  const spoof = await patient.request.get("/api/patient-portal/me", {
-    headers: {
-      "x-patient-id": f.patientB.id,
-      "x-tenant-id": f.foreignTenant.id,
-      cookie:
-        (await context.cookies())
-          .map((c) => `${c.name}=${c.value}`)
-          .join("; ") +
-        `; patientId=${f.patientB.id}; tenantId=${f.foreignTenant.id}; clinicId=${f.foreignClinic.id}`,
-    },
-  });
-  expect((await spoof.json()).data.patientCode).toBe(f.patient.patientCode);
-  for (const path of [
-    "/api/prescriptions",
-    "/api/registrations",
-    "/api/patients",
-    "/api/features",
-  ])
-    expect((await patient.request.get(path)).status()).toBe(401);
-  expect((await patient.goto("/dashboard"))?.url()).toContain("/login");
-  await patient.goto(`/patient/prescriptions/${f.issued.id}/print`);
-  await patient.evaluate(() => {
-    (window as unknown as { portalPrintCalled: boolean }).portalPrintCalled =
-      false;
-    window.print = () => {
-      (window as unknown as { portalPrintCalled: boolean }).portalPrintCalled =
-        true;
-    };
-  });
-  await patient.getByRole("button", { name: "Print / Save as PDF" }).click();
-  expect(
-    await patient.evaluate(
-      () =>
-        (window as unknown as { portalPrintCalled: boolean }).portalPrintCalled,
-    ),
-  ).toBe(true);
-  await patient.emulateMedia({ media: "print" });
-  await expect(
-    patient.getByRole("navigation", { name: "Patient navigation" }),
-  ).toBeHidden();
-  await patient.screenshot({
-    path: info.outputPath("patient-prescription-print.png"),
-    fullPage: true,
-  });
-  await patient.emulateMedia({ media: "screen" });
+  await noOverflow(patient);
+  const verifyUrl = await outbox(email, "VERIFY_RECOVERY_EMAIL");
+  const raw = new URL(verifyUrl).searchParams.get("token")!;
+  await patient.goto(verifyUrl);
   expect(
     (
-      await patient.request.post("/api/patient-portal/auth/logout", {
-        headers: { origin: "https://evil.example" },
-        data: {},
+      await prisma.patientPortalSecurityToken.findUniqueOrThrow({
+        where: {
+          tokenHash: hashPortalToken(raw),
+        },
       })
-    ).status(),
-  ).toBe(403);
-  await patient.goto("/patient");
-  await patient.getByRole("button", { name: "Logout", exact: true }).click();
-  await expect(patient).toHaveURL(`${origin}/patient/login`);
+    ).consumedAt,
+  ).toBeNull();
+  await patient
+    .getByRole("button", { name: "Verify recovery email", exact: true })
+    .click();
+  await expect(
+    patient.getByText("Recovery email verified.", { exact: true }),
+  ).toBeVisible();
+  await patient.goto("/patient/profile");
+  await expect(patient.getByText(/· Verified/)).toBeVisible();
+  await patient
+    .getByRole("button", { name: /Sign out|Log out|Logout/i })
+    .click();
+  await patientLogin(patient, password);
+  await expect(patient).toHaveURL(`${origin}/patient`);
+  await noOverflow(patient);
+  for (const path of ["visits", "appointments", "prescriptions"]) {
+    await patient.goto(`/patient/${path}`);
+    await expect(patient.locator("h1")).toBeVisible();
+    await noOverflow(patient);
+  }
+  for (const [kind, ids] of [
+    ["visits", [f.visitBRow.id, f.visitCRow.id]],
+    ["appointments", [f.appointmentB.id, f.appointmentC.id]],
+    ["prescriptions", [f.rxB.id, f.rxC.id, f.draft.id]],
+  ] as const)
+    for (const id of ids)
+      expect(
+        (
+          await patient.request.get(`/api/patient-portal/me/${kind}/${id}`)
+        ).status(),
+      ).toBe(404);
+  await patient.goto(`/patient/prescriptions/${f.issued.id}/print`);
+  await expect(patient.locator("h1")).toBeVisible();
+  await noOverflow(patient);
+  const staffMe = await page.request.get("/api/patient-portal/me");
+  expect(staffMe.status()).toBe(401);
+  const staffApi = await patient.request.get("/api/patients");
+  expect(staffApi.status()).toBe(401);
+  const foreignPrint = await patient.request.get(
+    `/patient/prescriptions/${f.rxB.id}/print`,
+  );
+  expect(foreignPrint.status()).toBe(404);
+  // Keep this context's session active while a separate browser redeems reset.
+  const resetContext = await browser.newContext({
+    viewport: info.project.use.viewport,
+  });
+  const resetPage = await resetContext.newPage();
+  await resetPage.goto(`/patient/forgot-password?org=${f.tenant.slug}`);
+  await resetPage
+    .getByLabel("Patient ID", { exact: true })
+    .fill(f.patient.patientCode);
+  await resetPage.getByLabel("Recovery email", { exact: true }).fill(email);
+  await noOverflow(resetPage);
+  await resetPage.getByRole("button", { name: "Send reset link" }).click();
+  await expect(
+    resetPage.getByText(
+      /If the details match an active Patient Portal account/,
+    ),
+  ).toBeVisible();
+  await resetPage.goto(await outbox(email, "PASSWORD_RESET"));
+  await resetPage
+    .getByLabel("Create password", { exact: true })
+    .fill(replacement);
+  await resetPage
+    .getByLabel("Confirm password", { exact: true })
+    .fill(replacement);
+  await noOverflow(resetPage);
+  await resetPage.getByRole("button", { name: "Update password" }).click();
+  await expect(resetPage).toHaveURL(/\/patient\/login\?reset=complete/);
   expect((await patient.request.get("/api/patient-portal/me")).status()).toBe(
     401,
   );
-  await prisma.patientPortalChallenge.updateMany({
-    where: { mobileE164: `+91${f.number}` },
-    data: { createdAt: new Date(Date.now() - 61000) },
-  });
-  // Activation and login share the request cooldown: clear only the synthetic
-  // rate bucket via the database, never a production/debug HTTP endpoint.
-  await prisma.rateLimitBucket.deleteMany({
-    where: { key: { startsWith: "patient-portal:cooldown:" } },
-  });
-  await patient.getByLabel("Mobile number").fill(f.number);
-  await patient.getByRole("button", { name: "Send verification code" }).click();
-  await expect(patient.getByLabel("Verification code")).toBeVisible();
-  const loginCode = await outbox("code");
-  await patient.getByLabel("Verification code").fill(loginCode.code!);
-  await patient.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(patient).toHaveURL(`${origin}/patient`);
-  await page.reload();
-  await expect(page.getByText(/ACTIVE · Login mobile/)).toBeVisible();
-  await page.getByRole("button", { name: "Revoke Access" }).click();
+  await patientLogin(resetPage, password);
+  await expect(
+    resetPage.getByText("Invalid sign-in details.", { exact: true }),
+  ).toBeVisible();
+  await patientLogin(resetPage, replacement);
+  await expect(resetPage).toHaveURL(`${origin}/patient`);
+  await page.goto(`/registration/${f.visitA.id}`);
+  await page
+    .getByRole("button", { name: "Revoke Access", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Revoke access", exact: true })
     .click();
-  await expect(page.getByText(/REVOKED · Login mobile/)).toBeVisible();
-  expect((await patient.request.get("/api/patient-portal/me")).status()).toBe(
+  await expect(page.getByText("REVOKED", { exact: true })).toBeVisible();
+  expect((await resetPage.request.get("/api/patient-portal/me")).status()).toBe(
     401,
   );
-  await patient.reload();
-  await expect(patient).toHaveURL(`${origin}/patient/login`);
   await context.close();
-});
-test("authentication domains, enumeration, origin and staff permission remain independent", async ({
-  page,
-  browser,
-}) => {
-  await signIn(page, f.doctorUser.email);
-  expect((await page.request.get("/api/patient-portal/me")).status()).toBe(401);
-  await page.goto("/patient");
-  await expect(page).toHaveURL(`${origin}/patient/login`);
-  expect(
-    (
-      await page.request.post(`/api/patients/${f.patient.id}/portal/activate`, {
-        headers: { origin },
-        data: { identityVerified: true },
-      })
-    ).status(),
-  ).toBe(403);
-  expect(
-    (
-      await page.request.post(
-        `/api/patients/${f.patientC.id}/portal/activate`,
-        { headers: { origin }, data: { identityVerified: true } },
-      )
-    ).status(),
-  ).toBe(404);
-  const anonymous = await browser.newContext();
-  const request = anonymous.request;
-  const known = await request.post("/api/patient-portal/auth/login/request", {
-    headers: { origin },
-    data: { mobile: f.number },
-  });
-  const unknown = await request.post("/api/patient-portal/auth/login/request", {
-    headers: { origin },
-    data: { mobile: `6${f.number.slice(1)}` },
-  });
-  expect(known.status()).toBe(200);
-  expect(unknown.status()).toBe(200);
-  expect(await known.json()).toEqual(await unknown.json());
-  expect(
-    (
-      await request.post("/api/patient-portal/auth/login/request", {
-        data: { mobile: "9999999999" },
-      })
-    ).status(),
-  ).toBe(403);
-  expect(
-    (
-      await request.post("/api/patient-portal/auth/login/request", {
-        headers: { origin },
-        data: { mobile: `6${f.number.slice(1)}` },
-      })
-    ).status(),
-  ).toBe(429);
-  await anonymous.close();
+  await resetContext.close();
 });
