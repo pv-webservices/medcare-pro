@@ -41,6 +41,7 @@ export class RateLimitError extends Error {
     super(message);
     this.name = "RateLimitError";
     this.retryAfterMs = retryAfterMs;
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 

@@ -38,7 +38,13 @@ async function rejects(
   work: () => Promise<unknown>,
   kind: new (...args: never[]) => Error,
 ) {
-  await assert.rejects(work, kind);
+  await assert.rejects(work, (error: unknown) => {
+    return (
+      error instanceof kind ||
+      (error instanceof Error &&
+        (error.name === kind.name || error.constructor.name === kind.name))
+    );
+  });
   checks++;
   console.log(`PASS ${label}`);
 }

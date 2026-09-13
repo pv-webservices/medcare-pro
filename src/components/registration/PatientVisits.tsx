@@ -19,7 +19,7 @@ interface PatientVisitsProps {
 
 function formatVisitDate(date: string): string {
   // Parsed as UTC to match how the date is stored, so the label cannot slip a day.
-  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
+  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",

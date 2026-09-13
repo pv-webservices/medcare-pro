@@ -41,6 +41,9 @@ export const MODULE_FEATURES = {
 
 export type ModuleFeatureKey = (typeof MODULE_FEATURES)[keyof typeof MODULE_FEATURES];
 
+/** Tenant entitlement features outside staff-role modules. */
+export const TENANT_SCOPED_FEATURES = { patientPortal: "patient_portal" } as const;
+
 /**
  * Features that exist in the catalogue but gate nothing, and why.
  *

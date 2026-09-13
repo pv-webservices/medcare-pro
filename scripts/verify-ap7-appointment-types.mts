@@ -86,12 +86,18 @@ async function expectThrows(
   }
 }
 
-const isScopeError = (error: unknown): boolean => error instanceof ScopeError;
+const isScopeError = (error: unknown): boolean =>
+  error instanceof ScopeError ||
+  (error instanceof Error && error.name === "ScopeError");
 const isPermissionError = (error: unknown): boolean =>
-  error instanceof PermissionError;
+  error instanceof PermissionError ||
+  (error instanceof Error && error.name === "PermissionError");
 const isConflictError = (error: unknown): boolean =>
-  error instanceof ConflictError;
-const isFeatureError = (error: unknown): boolean => error instanceof FeatureError;
+  error instanceof ConflictError ||
+  (error instanceof Error && error.name === "ConflictError");
+const isFeatureError = (error: unknown): boolean =>
+  error instanceof FeatureError ||
+  (error instanceof Error && error.name === "FeatureError");
 
 const TEST_TENANT_NAME = "verify-ap7-types";
 

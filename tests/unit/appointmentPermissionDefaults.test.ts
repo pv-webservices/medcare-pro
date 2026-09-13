@@ -203,7 +203,9 @@ describe("the stage sets stay disjoint", () => {
       (permission) =>
         !STAGE_11_PERMISSIONS.includes(permission) &&
         !STAGE_AP1_PERMISSIONS.includes(permission) &&
-        !CLINICAL_AI_PERMISSIONS.includes(permission) && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+        !CLINICAL_AI_PERMISSIONS.includes(permission) &&
+        permission !== "patient_portal:manage" &&
+        !PRESCRIPTION_PERMISSIONS.includes(permission) &&
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
         !TASK_PERMISSIONS.includes(
           permission as (typeof TASK_PERMISSIONS)[number],
@@ -222,7 +224,7 @@ describe("the stage sets stay disjoint", () => {
 describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
   it("is the historical catalogue before AP-1 and later dashboard rights", () => {
     expect(PRE_APPOINTMENTS_PERMISSIONS.length).toBe(
-      ALL_PERMISSIONS.length -
+      ALL_PERMISSIONS.length - 1 -
         STAGE_AP1_PERMISSIONS.length -
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
         PRESCRIPTION_PERMISSIONS.length -
@@ -475,7 +477,9 @@ describe("what the backfill would append", () => {
       const expected = role.permissions.filter(
         (permission) =>
           !permission.startsWith("dashboard:") &&
-          !CLINICAL_AI_PERMISSIONS.includes(permission) && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+          !CLINICAL_AI_PERMISSIONS.includes(permission) &&
+          permission !== "patient_portal:manage" &&
+          !PRESCRIPTION_PERMISSIONS.includes(permission) &&
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
           !TASK_PERMISSIONS.includes(
             permission as (typeof TASK_PERMISSIONS)[number],

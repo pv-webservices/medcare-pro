@@ -36,17 +36,18 @@ datasource db {
 /// The top-level tenant. One signup = one Tenant, which can own many Clinics.
 /// Holds no credentials of its own — see the note on User.passwordHash.
 model Tenant {
-  aiRuns          AiRun[]
-  id              String    @id @default(cuid())
-  businessName    String    @map("business_name")
+  aiRuns            AiRun[]
+  portalAuditEvents PatientPortalAuditEvent[]
+  id                String                    @id @default(cuid())
+  businessName      String                    @map("business_name")
   /// Contact address collected at signup, and the address the FR-1.2
   /// verification link is sent to.
-  email           String    @unique
+  email             String                    @unique
   /// FR-1.2 / PRD §9 — login is blocked for every User under this Tenant until
   /// this is set. Verification is a property of the business, not of each
   /// individual login, so it lives here and not on User.
-  emailVerifiedAt DateTime? @map("email_verified_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  emailVerifiedAt   DateTime?                 @map("email_verified_at")
+  createdAt         DateTime                  @default(now()) @map("created_at")
 
   // --- Stage 1: platform lifecycle (Owner-controlled) ---------------------
   /// URL-safe identifier for this organisation. Used for the cosmetic half of
@@ -154,16 +155,19 @@ model Tenant {
 /// A login within a Tenant. Signup creates exactly one of these (the owner);
 /// further users are invited by an Owner/Admin.
 model User {
-  aiRuns       AiRun[]
-  id           String   @id @default(cuid())
-  tenantId     String   @map("tenant_id")
-  name         String?
-  email        String   @unique
+  aiRuns                      AiRun[]
+  portalIdentityVerifications PatientPortalLink[]       @relation("PortalIdentityVerifier")
+  portalRevocations           PatientPortalLink[]       @relation("PortalRevoker")
+  portalActivationsCreated    PatientPortalActivation[]
+  id                          String                    @id @default(cuid())
+  tenantId                    String                    @map("tenant_id")
+  name                        String?
+  email                       String                    @unique
   /// The only password hash in the schema. PRD §7 also lists one on `accounts`,
   /// but a Tenant is an organisation, not something that logs in — credentials
   /// live solely on User and login always resolves via User.email.
-  passwordHash String   @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
+  passwordHash                String                    @map("password_hash")
+  createdAt                   DateTime                  @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -859,24 +863,26 @@ model DoctorLeave {
 // ---------------------------------------------------------------------------
 
 model Patient {
-  id           String   @id @default(cuid())
+  portalLinks       PatientPortalLink[]
+  portalActivations PatientPortalActivation[]
+  id                String                    @id @default(cuid())
   /// Denormalised from `clinic.tenant_id` purely so the tenant-wide uniqueness
   /// of `patient_code` can be enforced by the database (see @@unique below)
   /// rather than only by application convention. Keep it in step with the
   /// owning clinic's tenant on every write.
-  tenantId     String   @map("tenant_id")
-  clinicId     String   @map("clinic_id")
+  tenantId          String                    @map("tenant_id")
+  clinicId          String                    @map("clinic_id")
   /// FR-3.1 format `PT-YYYY-####`, generated server-side, sequential, and
   /// unique tenant-wide (not per clinic) per PRD §10. Generated in exactly one
   /// place: lib/generatePatientCode.ts.
-  patientCode  String   @map("patient_code")
-  name         String
-  age          Int?
-  gender       String?
-  mobileNumber String   @map("mobile_number")
-  address      String?  @db.Text
-  city         String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  patientCode       String                    @map("patient_code")
+  name              String
+  age               Int?
+  gender            String?
+  mobileNumber      String                    @map("mobile_number")
+  address           String?                   @db.Text
+  city              String?
+  createdAt         DateTime                  @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
@@ -895,6 +901,7 @@ model Patient {
 
   /// Tenant-scoped, so two tenants can each independently hold PT-2026-0001.
   @@unique([tenantId, patientCode])
+  @@unique([id, tenantId])
   @@index([clinicId])
   /// FR-3.2 — search by patient name or mobile number.
   @@index([name])
@@ -2357,4 +2364,178 @@ model AiRun {
   @@index([tenantId, userId, createdAt])
   @@index([tenantId, registrationId, createdAt])
   @@map("ai_runs")
+}
+
+enum PatientPortalAccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum PatientPortalAccessType {
+  SELF
+}
+
+enum PatientPortalChallengePurpose {
+  ACTIVATION
+  LOGIN
+}
+
+enum PatientPortalActivationPurpose {
+  LEGACY_SMS
+  INITIAL
+  REENABLE
+  STAFF_RECOVERY
+}
+
+enum PatientPortalTokenPurpose {
+  VERIFY_RECOVERY_EMAIL
+  PASSWORD_RESET
+}
+
+model PatientPortalSecurityToken {
+  id              String                    @id @default(cuid())
+  portalAccountId String                    @map("portal_account_id")
+  purpose         PatientPortalTokenPurpose
+  emailSnapshot   String                    @map("email_snapshot") @db.VarChar(254)
+  tokenHash       String                    @unique @map("token_hash") @db.Char(64)
+  expiresAt       DateTime                  @map("expires_at")
+  consumedAt      DateTime?                 @map("consumed_at")
+  revokedAt       DateTime?                 @map("revoked_at")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  portalAccount   PatientPortalAccount      @relation(fields: [portalAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([portalAccountId, purpose])
+  @@index([expiresAt])
+  @@map("patient_portal_security_tokens")
+}
+
+/// Separate identity domain. Restrict relations never delete medical records.
+model PatientPortalAccount {
+  id                      String                       @id @default(cuid())
+  mobileE164              String?                      @unique @map("mobile_e164") @db.VarChar(16)
+  passwordHash            String?                      @map("password_hash") @db.VarChar(60)
+  passwordSetAt           DateTime?                    @map("password_set_at")
+  recoveryEmail           String?                      @unique @map("recovery_email") @db.VarChar(254)
+  recoveryEmailVerifiedAt DateTime?                    @map("recovery_email_verified_at")
+  pendingRecoveryEmail    String?                      @map("pending_recovery_email") @db.VarChar(254)
+  securityTokens          PatientPortalSecurityToken[]
+  status                  PatientPortalAccountStatus   @default(ACTIVE)
+  verifiedAt              DateTime                     @map("verified_at")
+  lastLoginAt             DateTime?                    @map("last_login_at")
+  createdAt               DateTime                     @default(now()) @map("created_at")
+  updatedAt               DateTime                     @updatedAt @map("updated_at")
+  links                   PatientPortalLink[]
+  sessions                PatientPortalSession[]
+  challenges              PatientPortalChallenge[]
+  auditEvents             PatientPortalAuditEvent[]
+
+  @@map("patient_portal_accounts")
+}
+
+/// Live unique keys retain revoked history. SQL CHECKs bind keys to IDs.
+model PatientPortalLink {
+  id                       String                  @id @default(cuid())
+  portalAccountId          String                  @map("portal_account_id")
+  patientId                String                  @map("patient_id")
+  tenantId                 String                  @map("tenant_id")
+  activePatientId          String?                 @unique @map("active_patient_id")
+  activeAccountId          String?                 @unique @map("active_account_id")
+  accessType               PatientPortalAccessType @default(SELF) @map("access_type")
+  verifiedAt               DateTime                @map("verified_at")
+  identityVerifiedByUserId String?                 @map("identity_verified_by_user_id")
+  identityVerifiedAt       DateTime                @map("identity_verified_at")
+  revokedAt                DateTime?               @map("revoked_at")
+  revokedByUserId          String?                 @map("revoked_by_user_id")
+  createdAt                DateTime                @default(now()) @map("created_at")
+  updatedAt                DateTime                @updatedAt @map("updated_at")
+  portalAccount            PatientPortalAccount    @relation(fields: [portalAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  patient                  Patient                 @relation(fields: [patientId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  identityVerifier         User?                   @relation("PortalIdentityVerifier", fields: [identityVerifiedByUserId], references: [id], onDelete: SetNull)
+  revoker                  User?                   @relation("PortalRevoker", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+  sessions                 PatientPortalSession[]
+
+  @@unique([id, portalAccountId])
+  @@index([patientId, tenantId])
+  @@index([portalAccountId])
+  @@map("patient_portal_links")
+}
+
+/// Bound to link generation: re-enable cannot revive old sessions.
+model PatientPortalSession {
+  id              String               @id @default(cuid())
+  portalAccountId String               @map("portal_account_id")
+  linkId          String               @map("link_id")
+  tokenHash       String               @unique @map("token_hash") @db.Char(64)
+  expiresAt       DateTime             @map("expires_at")
+  revokedAt       DateTime?            @map("revoked_at")
+  ip              String?              @db.VarChar(45)
+  userAgent       String?              @map("user_agent") @db.VarChar(512)
+  createdAt       DateTime             @default(now()) @map("created_at")
+  lastSeenAt      DateTime?            @map("last_seen_at")
+  portalAccount   PatientPortalAccount @relation(fields: [portalAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  link            PatientPortalLink    @relation(fields: [linkId, portalAccountId], references: [id, portalAccountId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([portalAccountId, revokedAt])
+  @@index([expiresAt])
+  @@map("patient_portal_sessions")
+}
+
+model PatientPortalActivation {
+  id                 String                         @id @default(cuid())
+  patientId          String                         @map("patient_id")
+  tenantId           String                         @map("tenant_id")
+  activePatientId    String?                        @unique @map("active_patient_id")
+  mobileE164         String?                        @map("mobile_e164") @db.VarChar(16)
+  purpose            PatientPortalActivationPurpose @default(LEGACY_SMS)
+  tokenHash          String                         @unique @map("token_hash") @db.Char(64)
+  expiresAt          DateTime                       @map("expires_at")
+  consumedAt         DateTime?                      @map("consumed_at")
+  revokedAt          DateTime?                      @map("revoked_at")
+  createdByUserId    String?                        @map("created_by_user_id")
+  identityVerifiedAt DateTime                       @map("identity_verified_at")
+  createdAt          DateTime                       @default(now()) @map("created_at")
+  patient            Patient                        @relation(fields: [patientId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  creator            User?                          @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  challenges         PatientPortalChallenge[]
+
+  @@index([patientId, tenantId])
+  @@index([expiresAt])
+  @@map("patient_portal_activations")
+}
+
+model PatientPortalChallenge {
+  id              String                        @id @default(cuid())
+  portalAccountId String?                       @map("portal_account_id")
+  activationId    String?                       @map("activation_id")
+  mobileE164      String                        @map("mobile_e164") @db.VarChar(16)
+  purpose         PatientPortalChallengePurpose
+  codeDigest      String                        @map("code_digest") @db.Char(64)
+  expiresAt       DateTime                      @map("expires_at")
+  attemptCount    Int                           @default(0) @map("attempt_count")
+  maxAttempts     Int                           @default(5) @map("max_attempts")
+  consumedAt      DateTime?                     @map("consumed_at")
+  createdAt       DateTime                      @default(now()) @map("created_at")
+  portalAccount   PatientPortalAccount?         @relation(fields: [portalAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  activation      PatientPortalActivation?      @relation(fields: [activationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([mobileE164, purpose, createdAt])
+  @@index([activationId])
+  @@map("patient_portal_challenges")
+}
+
+/// IDs/outcomes only; no arbitrary clinical/secret metadata.
+model PatientPortalAuditEvent {
+  id              String                @id @default(cuid())
+  portalAccountId String?               @map("portal_account_id")
+  tenantId        String?               @map("tenant_id")
+  event           String                @db.VarChar(64)
+  resourceId      String?               @map("resource_id")
+  status          String?               @db.VarChar(32)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  portalAccount   PatientPortalAccount? @relation(fields: [portalAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tenant          Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([portalAccountId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("patient_portal_audit_events")
 }

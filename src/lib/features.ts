@@ -13,6 +13,7 @@ import {
 } from "@/lib/featureResolution";
 import {
   UNGATED_MODULES,
+  TENANT_SCOPED_FEATURES,
   type ModuleFeatureKey,
 } from "@/lib/moduleFeatures";
 import { prisma } from "@/lib/prisma";
@@ -489,7 +490,7 @@ export async function getFeatureOverview(
     holdsFeatureManage(actor),
   ]);
 
-  const rows = [...features.values()].map((feature): FeatureOverviewRow => {
+  const rows = [...features.values()].filter(feature => !Object.values(TENANT_SCOPED_FEATURES).some(key => key === feature.key)).map((feature): FeatureOverviewRow => {
     const isEntitled =
       feature.globalEnabled &&
       isTenantEntitled({
@@ -591,6 +592,8 @@ export async function setRoleFeatureAccess(
   input: SetRoleFeatureInput,
 ): Promise<void> {
   await requirePermission(actor, "feature:manage");
+  if (Object.values(TENANT_SCOPED_FEATURES).some(key => key === input.featureKey))
+    throw new BadRequestError("Patient Portal access is managed through verified patient links, not staff role feature switches.");
 
   const role = await prisma.role.findFirst({
     where: { id: input.roleId, tenantId: actor.tenantId },

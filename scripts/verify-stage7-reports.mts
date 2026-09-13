@@ -76,9 +76,13 @@ async function expectRefusal(
     await fn();
     check(label, false, "did not throw");
   } catch (error: unknown) {
+    const isPerm =
+      error instanceof PermissionError ||
+      (error instanceof Error && error.name === "PermissionError");
     check(
       label,
-      error instanceof PermissionError &&
+      isPerm &&
+        error instanceof Error &&
         error.message === `Missing permission: ${permission}`,
       error,
     );

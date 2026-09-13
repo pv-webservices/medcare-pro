@@ -72,9 +72,12 @@ async function expectRefusal(
     await fn();
     check(label, false, "did not throw");
   } catch (error: unknown) {
+    const isBad =
+      error instanceof BadRequestError ||
+      (error instanceof Error && error.name === "BadRequestError");
     check(
       label,
-      error instanceof BadRequestError && error.message.includes(contains),
+      isBad && error instanceof Error && error.message.includes(contains),
       error,
     );
   }
@@ -89,7 +92,14 @@ async function expectThrows(
     await fn();
     check(label, false, "did not throw");
   } catch (error: unknown) {
-    check(label, is(error), error);
+    const passed =
+      is(error) ||
+      (error instanceof Error &&
+        Boolean(
+          (error.name === "ScopeError" && is(new ScopeError())) ||
+          (error.name === "BadRequestError" && is(new BadRequestError("check"))),
+        ));
+    check(label, passed, error);
   }
 }
 
