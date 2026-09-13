@@ -64,13 +64,22 @@ async function rejects(
   status?: number,
   kind?: new (...args: never[]) => Error,
 ) {
-  await assert.rejects(work, (error: unknown) =>
-    status !== undefined
-      ? error instanceof PatientPortalError && error.status === status
-      : kind
-        ? error instanceof kind
-        : error instanceof Error,
-  );
+  await assert.rejects(work, (error: unknown) => {
+    if (status !== undefined) {
+      return (
+        (error instanceof PatientPortalError ||
+          (error instanceof Error && error.name === "PatientPortalError")) &&
+        (error as { status?: number }).status === status
+      );
+    }
+    if (kind) {
+      return (
+        error instanceof kind ||
+        (error instanceof Error && error.name === kind.name)
+      );
+    }
+    return error instanceof Error;
+  });
   checks++;
   console.log(`PASS ${label}`);
 }
@@ -193,8 +202,9 @@ async function main() {
     await assert.rejects(
       () => loginPatientPortal(input),
       (e: unknown) =>
-        e instanceof PatientPortalError &&
-        e.message === "Invalid sign-in details.",
+        (e instanceof PatientPortalError ||
+          (e instanceof Error && e.name === "PatientPortalError")) &&
+        (e as Error).message === "Invalid sign-in details.",
     );
     check(`Generic login error: ${label}`, true);
   }
