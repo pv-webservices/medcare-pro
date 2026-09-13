@@ -61,6 +61,7 @@
     "test:prescriptions": "tsx scripts/test-prescriptions.mts",
     "test:e2e:prescriptions": "playwright test --config=playwright.prescriptions.config.ts",
     "patient-portal:backfill": "tsx scripts/backfill-patient-portal.mts",
+    "patient-portal:password-auth-backfill": "tsx scripts/backfill-patient-portal-password-auth.mts",
     "test:patient-portal": "vitest run patientPortal && tsx scripts/test-patient-portal.mts",
     "verify:patient-portal": "tsx scripts/verify-patient-portal.mts",
     "test:e2e:patient-portal": "playwright test --config=playwright.patient-portal.config.ts"

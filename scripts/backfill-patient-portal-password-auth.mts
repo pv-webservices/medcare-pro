@@ -1,23 +1,13 @@
 /** Legacy authentication retirement. Dry-run by default. No clinical writes. */
 import "dotenv/config";
 import { prisma } from "@/lib/prisma";
-export function assertPortalBackfillTarget(
-  url: string,
-  apply: boolean,
-  allowRemote: boolean,
-) {
-  const db = new URL(url);
-  if (db.pathname === "/u292106402_medcare")
-    throw new Error(
-      "Production database is forbidden during this implementation.",
-    );
-  if (
-    apply &&
-    !["localhost", "127.0.0.1", "[::1]"].includes(db.hostname) &&
-    !allowRemote
-  )
-    throw new Error("Remote writes require explicit --apply --allow-remote.");
-}
+export {
+  PRODUCTION_DB_NAME,
+  type PortalBackfillGuardOptions,
+  parseDatabaseName,
+  assertPortalBackfillTarget,
+} from "@/lib/patientPortalBackfillGuard";
+import { assertPortalBackfillTarget } from "@/lib/patientPortalBackfillGuard";
 export async function backfillPortalPasswordAuth(apply = false) {
   const now = new Date();
   return prisma.$transaction(async (db) => {
@@ -59,12 +49,25 @@ export async function backfillPortalPasswordAuth(apply = false) {
     return report;
   });
 }
+const args = process.argv.slice(2);
+const apply = args.includes("--apply");
+const allowRemote = args.includes("--allow-remote");
+const allowProduction = args.includes("--allow-production");
+const confirmArg = args.find((a) => a.startsWith("--confirm-production-db="));
+const confirmProductionDb = confirmArg
+  ? confirmArg.slice("--confirm-production-db=".length)
+  : undefined;
+
 assertPortalBackfillTarget(
   process.env.DATABASE_URL ?? "mysql://invalid",
-  process.argv.includes("--apply"),
-  process.argv.includes("--allow-remote"),
+  {
+    apply,
+    allowRemote,
+    allowProduction,
+    confirmProductionDb,
+  },
 );
-backfillPortalPasswordAuth(process.argv.includes("--apply"))
+backfillPortalPasswordAuth(apply)
   .then((report) =>
     console.log(
       JSON.stringify({
