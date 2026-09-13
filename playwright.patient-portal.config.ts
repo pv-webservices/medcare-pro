@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { defineConfig } from "@playwright/test";
 import { resolve } from "node:path";
 const db = new URL(process.env.DATABASE_URL ?? "mysql://invalid");
@@ -41,6 +42,7 @@ export default defineConfig({
           "test-results/patient-portal-outbox",
       ),
       TZ: "Asia/Kolkata",
+      NODE_OPTIONS: "--max-old-space-size=4096",
     },
   },
 });

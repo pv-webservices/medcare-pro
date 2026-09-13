@@ -2,13 +2,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+
+const isSlug = (val: string) => {
+  const s = val.trim().toLowerCase();
+  return (
+    s.length > 0 && s.length <= 100 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s)
+  );
+};
+
 export default function PortalAuthForm({
   token,
   organization = "",
+  clinicName = null,
   mode = token ? "activate" : "login",
 }: {
   token?: string;
   organization?: string;
+  clinicName?: string | null;
   mode?:
     | "login"
     | "activate"
@@ -28,9 +38,15 @@ export default function PortalAuthForm({
   const [error, setError] = useState("");
   const identity = mode === "login" || mode === "forgot-password";
   const newPassword = mode === "activate" || mode === "reset-password";
+  const hasClinicContext = Boolean(organization && isSlug(organization));
+
   async function submit() {
     setError("");
     setMessage("");
+    if (identity && !isSlug(org)) {
+      setError("Enter your Clinic Access Code, for example sharma-clinic.");
+      return;
+    }
     if (newPassword && password !== confirmPassword) {
       setError("Passwords must match.");
       return;
@@ -39,15 +55,25 @@ export default function PortalAuthForm({
     try {
       const body =
         mode === "login"
-          ? { organization: org, patientCode, password }
+          ? {
+              organization: org.trim(),
+              patientCode: patientCode.trim(),
+              password,
+            }
           : mode === "forgot-password"
-            ? { organization: org, patientCode, email }
+            ? {
+                organization: org.trim(),
+                patientCode: patientCode.trim(),
+                email: email.trim(),
+              }
             : mode === "verify-email"
               ? { token }
               : {
                   token,
                   password,
-                  ...(mode === "activate" && email ? { email } : {}),
+                  ...(mode === "activate" && email
+                    ? { email: email.trim() }
+                    : {}),
                 };
       const response = await fetch(`/api/patient-portal/auth/${mode}`, {
         method: "POST",
@@ -67,9 +93,18 @@ export default function PortalAuthForm({
         );
         router.refresh();
       } else if (mode === "reset-password") {
-        router.replace("/patient/login?reset=complete");
+        const targetOrg = result.data?.tenantSlug || org || organization;
+        const query = targetOrg
+          ? `?org=${encodeURIComponent(targetOrg)}&reset=complete`
+          : "?reset=complete";
+        router.replace(`/patient/login${query}`);
         router.refresh();
-      } else setMessage(result.data.message);
+      } else {
+        setMessage(result.data.message);
+        if (result.data?.tenantSlug) {
+          setOrg(result.data.tenantSlug);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Please try again later.");
     } finally {
@@ -85,29 +120,54 @@ export default function PortalAuthForm({
       }}
     >
       <p className="portal-eyebrow">PRIVATE ACCESS · MEDCARE PRO</p>
-      <h1>
-        {mode === "login"
-          ? "Your care, in one place."
-          : mode === "activate"
-            ? "Create your Patient Portal account"
-            : mode === "forgot-password"
-              ? "Forgot password?"
-              : mode === "verify-email"
-                ? "Verify recovery email"
-                : "Choose a new password"}
-      </h1>
+      {hasClinicContext && mode === "login" ? (
+        <div className="portal-clinic-context">
+          <h1 className="portal-clinic-name">
+            {clinicName || "Clinic Portal"}
+          </h1>
+          <p className="portal-clinic-subhead">Patient Portal</p>
+        </div>
+      ) : hasClinicContext && mode === "forgot-password" ? (
+        <div className="portal-clinic-context">
+          <h1 className="portal-clinic-name">
+            {clinicName || "Clinic Portal"}
+          </h1>
+          <p className="portal-clinic-subhead">Patient Portal</p>
+          <h2 className="portal-mode-heading">Forgot password?</h2>
+        </div>
+      ) : (
+        <h1>
+          {mode === "login"
+            ? "Your care, in one place."
+            : mode === "activate"
+              ? "Create your Patient Portal account"
+              : mode === "forgot-password"
+                ? "Forgot password?"
+                : mode === "verify-email"
+                  ? "Verify recovery email"
+                  : "Choose a new password"}
+        </h1>
+      )}
       {identity && (
         <>
-          <label>
-            Organization
-            <input
-              required
-              autoComplete="organization"
-              maxLength={100}
-              value={org}
-              onChange={(e) => setOrg(e.target.value)}
-            />
-          </label>
+          {!hasClinicContext && (
+            <div>
+              <label htmlFor="clinic-access-code">Clinic Access Code</label>
+              <input
+                id="clinic-access-code"
+                required
+                autoComplete="organization"
+                aria-describedby="clinic-access-code-hint"
+                maxLength={100}
+                value={org}
+                onChange={(e) => setOrg(e.target.value)}
+              />
+              <span id="clinic-access-code-hint" className="portal-field-hint">
+                Find this code on your clinic&apos;s Patient Portal link, receipt
+                or prescription. Example: sharma-clinic
+              </span>
+            </div>
+          )}
           <label>
             Patient ID
             <input
@@ -214,7 +274,17 @@ export default function PortalAuthForm({
           </p>
         </>
       )}
-      {mode !== "login" && <Link href="/patient/login">Back to sign in</Link>}
+      {mode !== "login" && (
+        <Link
+          href={
+            org || organization
+              ? `/patient/login?org=${encodeURIComponent(org || organization)}`
+              : "/patient/login"
+          }
+        >
+          Back to sign in
+        </Link>
+      )}
     </form>
   );
 }

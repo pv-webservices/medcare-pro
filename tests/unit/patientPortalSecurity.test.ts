@@ -3,6 +3,7 @@ import {
   hashPortalToken,
   portalToken,
   portalRecordLive,
+  portalOrgSchema,
   portalLoginSchema,
   portalActivationSchema,
   portalPasswordSchema,
@@ -45,6 +46,12 @@ describe("Patient Portal password security", () => {
       patientCode: "PT-2026-001",
       password: "passphrase here",
     });
+  });
+  it("rejects invalid organization format such as display names with spaces", () => {
+    expect(portalOrgSchema.safeParse("Sharma Clinic").success).toBe(false);
+    expect(portalOrgSchema.safeParse("sharma clinic").success).toBe(false);
+    expect(portalOrgSchema.safeParse("sharma_clinic").success).toBe(false);
+    expect(portalOrgSchema.safeParse("sharma-clinic").success).toBe(true);
   });
   it.each([
     "patientId",

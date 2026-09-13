@@ -1,5 +1,7 @@
 import PortalAuthForm from "@/components/patientPortal/PortalAuthForm";
 import { portalOrgSchema } from "@/lib/patientPortalSecurity";
+import { prisma } from "@/lib/prisma";
+
 export default async function Page({
   searchParams,
 }: {
@@ -7,13 +9,24 @@ export default async function Page({
 }) {
   const query = await searchParams;
   const org = portalOrgSchema.safeParse(query.org);
+  let clinicName: string | null = null;
+  if (org.success) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: org.data },
+      select: { businessName: true },
+    });
+    clinicName = tenant?.businessName ?? null;
+  }
   return (
     <main className="portal-login">
       <div>
         {query.reset === "complete" && (
           <p role="status">Password updated. Sign in with your new password.</p>
         )}
-        <PortalAuthForm organization={org.success ? org.data : ""} />
+        <PortalAuthForm
+          organization={org.success ? org.data : ""}
+          clinicName={clinicName}
+        />
       </div>
     </main>
   );

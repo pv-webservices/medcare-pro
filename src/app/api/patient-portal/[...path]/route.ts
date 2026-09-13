@@ -4,6 +4,7 @@ import {
   PatientPortalError,
   PORTAL_COOKIE,
   PORTAL_RESET_MESSAGE,
+  portalOrgSchema,
   portalLoginSchema,
   portalActivationSchema,
   portalResetRequestSchema,
@@ -57,8 +58,21 @@ export async function POST(request: Request, context: Context) {
       return response;
     }
     if (path === "auth/login") {
-      // Malformed identities use the same public sign-in error.
-
+      if (
+        typeof body === "object" &&
+        body !== null &&
+        "organization" in body &&
+        typeof (body as { organization: unknown }).organization === "string" &&
+        !portalOrgSchema.safeParse(
+          (body as { organization: string }).organization,
+        ).success
+      ) {
+        await portalAuthRateLimit(ip, ip ?? "unknown");
+        throw new PatientPortalError(
+          400,
+          "Enter your Clinic Access Code, for example sharma-clinic.",
+        );
+      }
       const parsed = portalLoginSchema.safeParse(body);
       if (!parsed.success) {
         await portalAuthRateLimit(ip, ip ?? "unknown");
@@ -102,9 +116,10 @@ export async function POST(request: Request, context: Context) {
     if (path === "auth/reset-password") {
       const input = portalResetSchema.parse(body);
       await portalAuthRateLimit(ip, hashPortalToken(input.token), "reset");
-      await resetPatientPassword(input);
+      const result = await resetPatientPassword(input);
       return portalJson({
         message: "Password updated. Sign in with your new password.",
+        tenantSlug: result.tenantSlug,
       });
     }
     if (path === "auth/verify-email") {
@@ -114,8 +129,11 @@ export async function POST(request: Request, context: Context) {
         hashPortalToken(input.token),
         "email-verify",
       );
-      await verifyPatientRecoveryEmail(input.token);
-      return portalJson({ message: "Recovery email verified." });
+      const result = await verifyPatientRecoveryEmail(input.token);
+      return portalJson({
+        message: "Recovery email verified.",
+        tenantSlug: result.tenantSlug,
+      });
     }
     if (path === "me/security/email" || path === "me/security/resend") {
       const actor = await requirePatientActor();

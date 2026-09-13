@@ -24,6 +24,7 @@ export default function StaffPortalCard({
   const [now, setNow] = useState(() => Date.now());
   const dialog = useRef<HTMLDialogElement>(null);
   const qrDialog = useRef<HTMLDialogElement>(null);
+  const publicQrDialog = useRef<HTMLDialogElement>(null);
   const endpoint = `/api/patients/${patientId}/portal`;
   useEffect(() => {
     let alive = true;
@@ -155,6 +156,12 @@ export default function StaffPortalCard({
             >
               Copy Patient Login Link
             </button>
+            <button
+              className="min-h-11 rounded-lg border border-line px-4"
+              onClick={() => publicQrDialog.current?.showModal()}
+            >
+              Show Public Login QR
+            </button>
           </div>
           <p className="text-sm">
             PATIENT LOGIN LINK — PUBLIC. Contains no patient identity or
@@ -219,7 +226,9 @@ export default function StaffPortalCard({
           </h3>
           <p>{patientName}</p>
           <p>Patient ID: {state?.patientCode}</p>
-          <p className="text-sm">ONE-TIME ACTIVATION QR — SECRET</p>
+          <p className="text-sm font-semibold text-amber-800">
+            ACTIVATION QR — SECRET
+          </p>
           {live ? (
             <div className="mx-auto my-4 w-fit bg-white p-4">
               <QRCode
@@ -263,6 +272,43 @@ export default function StaffPortalCard({
           >
             Close
           </button>
+        </div>
+      </dialog>
+      <dialog
+        ref={publicQrDialog}
+        aria-labelledby="portal-public-qr-heading"
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-6 text-black backdrop:bg-black/40"
+      >
+        <div className="text-center">
+          <h3 id="portal-public-qr-heading" className="text-lg font-semibold">
+            Patient Login QR — Public
+          </h3>
+          <p className="mt-1 text-sm text-gray-600">
+            Scan to open your clinic&apos;s Patient Portal login page.
+          </p>
+          <div className="mx-auto my-4 w-fit bg-white p-4">
+            <QRCode
+              value={state?.loginUrl ?? ""}
+              size={200}
+              style={{ maxWidth: "100%", height: "auto" }}
+              title="Patient Login QR — Public"
+            />
+          </div>
+          <p className="text-xs font-mono text-gray-500 break-all">
+            {state?.loginUrl}
+          </p>
+          <p className="mt-3 text-xs text-gray-500">
+            PATIENT LOGIN QR — PUBLIC. Contains no patient identity or
+            authentication secret.
+          </p>
+          <div className="mt-5 flex justify-center gap-3">
+            <button
+              className="min-h-11 rounded-lg border px-4"
+              onClick={() => publicQrDialog.current?.close()}
+            >
+              Close
+            </button>
+          </div>
         </div>
       </dialog>
       <style>{`@media print { body:has(.portal-qr-dialog[open]) * { visibility: hidden; } body:has(.portal-qr-dialog[open]) .portal-activation-card, body:has(.portal-qr-dialog[open]) .portal-activation-card * { visibility: visible; } .portal-qr-dialog[open] { position: absolute; inset: 0; margin: 0 auto; border: 0; } .portal-qr-actions { display: none; } }`}</style>

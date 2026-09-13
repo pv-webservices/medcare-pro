@@ -18,6 +18,7 @@ import {
   verifyPatientRecoveryEmail,
   requestPatientPasswordReset,
   resetPatientPassword,
+  resolveSecurityTokenTenant,
   changePatientRecoveryEmail,
   resendPatientRecoveryEmail,
   portalAuthRateLimit,
@@ -428,7 +429,20 @@ async function main() {
   const count = mails.length;
   await requestPatientPasswordReset({ ...identity, email: emailA }, mailer);
   check("Pending email has no recovery authority", mails.length === count);
-  await verifyPatientRecoveryEmail(verifyA);
+  const resolvedA = await resolveSecurityTokenTenant(
+    verifyA,
+    "VERIFY_RECOVERY_EMAIL",
+  );
+  check(
+    "Unconsumed security token resolves tenant slug and businessName",
+    resolvedA?.slug === f.tenant.slug &&
+      resolvedA?.businessName === f.tenant.businessName,
+  );
+  const verifyResult = await verifyPatientRecoveryEmail(verifyA);
+  check(
+    "Recovery email verification returns tenantSlug",
+    verifyResult.tenantSlug === f.tenant.slug,
+  );
   await rejects(
     "Verification token replay denied",
     () => verifyPatientRecoveryEmail(verifyA),
@@ -515,6 +529,15 @@ async function main() {
     () => resetPatientPassword({ token: previousReset, password: newPassword }),
     400,
   );
+  const resolvedReset = await resolveSecurityTokenTenant(
+    reset,
+    "PASSWORD_RESET",
+  );
+  check(
+    "Unconsumed password reset token resolves tenant slug and businessName",
+    resolvedReset?.slug === f.tenant.slug &&
+      resolvedReset?.businessName === f.tenant.businessName,
+  );
   const loginSession = await loginPatientPortal({ ...identity, password });
   const resets = await Promise.allSettled([
     resetPatientPassword({ token: reset, password: newPassword }),
@@ -523,6 +546,14 @@ async function main() {
   check(
     "Concurrent reset succeeds exactly once",
     resets.filter((r) => r.status === "fulfilled").length === 1,
+  );
+  const fulfilledReset = resets.find(
+    (r): r is PromiseFulfilledResult<{ tenantSlug: string }> =>
+      r.status === "fulfilled",
+  );
+  check(
+    "Password reset returns tenantSlug",
+    fulfilledReset?.value.tenantSlug === f.tenant.slug,
   );
   await rejects(
     "Reset token replay denied",
