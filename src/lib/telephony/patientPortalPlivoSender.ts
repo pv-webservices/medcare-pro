@@ -38,9 +38,11 @@ export function createPatientPortalPlivoSender(
   const authId = options.authId ?? process.env.PLIVO_AUTH_ID?.trim();
   const authToken = options.authToken ?? process.env.PLIVO_AUTH_TOKEN?.trim();
   const senderId =
-    options.senderId ??
-    process.env.PATIENT_PORTAL_SMS_SENDER?.trim() ??
-    process.env.PLIVO_SMS_SENDER?.trim();
+    options.senderId !== undefined
+      ? options.senderId.trim()
+      : (process.env.PATIENT_PORTAL_SMS_SENDER?.trim() ||
+         process.env.PLIVO_SMS_SENDER?.trim() ||
+         "MEDCARE");
 
   if (!authId || !authToken) {
     throw new PatientPortalError(
