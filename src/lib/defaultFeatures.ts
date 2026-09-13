@@ -37,6 +37,7 @@ export interface DefaultFeatureDefinition {
  * governs.
  */
 export const DEFAULT_FEATURES: readonly DefaultFeatureDefinition[] = [
+  { key: "clinical_ai", name: "Clinical AI", description: "Clinician-controlled documentation language assistance.", tier: "PREMIUM", globalEnabled: false, inDefaultPlan: false },
   {
     key: "prescriptions",
     name: "Electronic prescriptions",

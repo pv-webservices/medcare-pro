@@ -17,11 +17,14 @@ import {
   type PrescriptionSnapshot,
 } from "@/lib/prescriptionValidation";
 import type { ConsultationWorkspaceData } from "@/lib/prescriptions";
+import ClinicalWritingControl from "./ClinicalWritingControl";
 
 export default function ConsultationWorkspace({
   data,
+  mayUseAi = false,
 }: {
   data: ConsultationWorkspaceData;
+  mayUseAi?: boolean;
 }) {
   const router = useRouter();
   const [consultation, setConsultation] = useState(
@@ -274,11 +277,18 @@ export default function ConsultationWorkspace({
       ) : (
         <fieldset
           disabled={busy || !data.mayDraft || !context.doctor}
-          className="space-y-5"
+          className="min-w-0 space-y-5"
         >
-          <div className="grid items-start gap-6 xl:grid-cols-2">
-            <div className="space-y-4 rounded-2xl border border-line bg-canvas p-5">
+          <div className="grid min-w-0 grid-cols-1 items-start gap-6 xl:grid-cols-2">
+            <div className="min-w-0 space-y-4 rounded-2xl border border-line bg-canvas p-5">
               <h2 className="text-lg font-semibold">Consultation notes</h2>
+              {mayUseAi && (
+                <p className="text-sm text-muted">
+                  Clinical Writing Assistant · Improve spelling, grammar and
+                  clinical wording without changing intended clinical meaning.
+                  Review every suggestion before accepting.
+                </p>
+              )}
               <Select
                 id="consultation-mode"
                 label="Consultation mode"
@@ -299,19 +309,40 @@ export default function ConsultationWorkspace({
                 ))}
               </Select>
               {CLINICAL_FIELDS.map(([key, label, maxLength]) => (
-                <Textarea
-                  key={key}
-                  id={`consultation-${key}`}
-                  label={label}
-                  rows={key === "diagnosis" || key === "chiefComplaint" ? 3 : 2}
-                  maxLength={maxLength}
-                  value={consultation[key]}
-                  error={errors[`consultation.${key}`]}
-                  onChange={(e) => {
-                    setConsultation({ ...consultation, [key]: e.target.value });
-                    setDirty(true);
-                  }}
-                />
+                <div key={key}>
+                  <Textarea
+                    id={`consultation-${key}`}
+                    label={label}
+                    rows={
+                      key === "diagnosis" || key === "chiefComplaint" ? 3 : 2
+                    }
+                    maxLength={maxLength}
+                    value={consultation[key]}
+                    error={errors[`consultation.${key}`]}
+                    onChange={(e) => {
+                      setConsultation({
+                        ...consultation,
+                        [key]: e.target.value,
+                      });
+                      setDirty(true);
+                    }}
+                  />
+                  {mayUseAi && (
+                    <ClinicalWritingControl
+                      registrationId={context.visit.registrationId}
+                      field={key}
+                      label={label}
+                      text={consultation[key]}
+                      onAccept={(text) => {
+                        setConsultation((current) => ({
+                          ...current,
+                          [key]: text,
+                        }));
+                        setDirty(true);
+                      }}
+                    />
+                  )}
+                </div>
               ))}
             </div>
             <div className="space-y-4">

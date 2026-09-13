@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   ALL_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
+  CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
@@ -135,6 +136,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "prescription:read",
       "prescription:draft",
       "prescription:issue",
+      "clinical-ai:writing",
       "dashboard:view",
       "dashboard:customize",
       "dashboard:appointments:view",
@@ -203,7 +205,7 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.OWNER]: [WILDCARD],
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
-      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+      !CLINICAL_AI_PERMISSIONS.includes(permission) && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(
         permission as (typeof TASK_PERMISSIONS)[number],
       ) &&
@@ -298,7 +300,7 @@ export const PRE_TASK_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.OWNER]: [WILDCARD],
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
-      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+      !CLINICAL_AI_PERMISSIONS.includes(permission) && !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       permission !== "dashboard:tasks:view" &&
       !DASHBOARD_LAYOUT_PERMISSIONS.includes(
         permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
@@ -479,11 +481,11 @@ export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
   Partial<Record<RoleKey, readonly string[]>>
 > = {
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
-    (permission) => !PRESCRIPTION_PERMISSIONS.includes(permission) && !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
+    (permission) => !CLINICAL_AI_PERMISSIONS.includes(permission) && !PRESCRIPTION_PERMISSIONS.includes(permission) && !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
   ),
   [ROLE_KEYS.DOCTOR]: DEFAULT_ROLES.find(
     (role) => role.key === ROLE_KEYS.DOCTOR,
-  )!.permissions.filter((permission) => !PRESCRIPTION_PERMISSIONS.includes(permission)).map((permission) =>
+  )!.permissions.filter((permission) => !CLINICAL_AI_PERMISSIONS.includes(permission) && !PRESCRIPTION_PERMISSIONS.includes(permission)).map((permission) =>
     permission === "appointment:self:read" ? "appointment:read" : permission,
   ),
 };

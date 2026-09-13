@@ -36,6 +36,7 @@ datasource db {
 /// The top-level tenant. One signup = one Tenant, which can own many Clinics.
 /// Holds no credentials of its own — see the note on User.passwordHash.
 model Tenant {
+  aiRuns          AiRun[]
   id              String    @id @default(cuid())
   businessName    String    @map("business_name")
   /// Contact address collected at signup, and the address the FR-1.2
@@ -153,6 +154,7 @@ model Tenant {
 /// A login within a Tenant. Signup creates exactly one of these (the owner);
 /// further users are invited by an Owner/Admin.
 model User {
+  aiRuns       AiRun[]
   id           String   @id @default(cuid())
   tenantId     String   @map("tenant_id")
   name         String?
@@ -416,6 +418,7 @@ model DashboardLayout {
 // ---------------------------------------------------------------------------
 
 model Clinic {
+  aiRuns     AiRun[]
   id         String   @id @default(cuid())
   tenantId   String   @map("tenant_id")
   name       String
@@ -900,6 +903,7 @@ model Patient {
 }
 
 model Registration {
+  aiRuns     AiRun[]
   id         String   @id @default(cuid())
   clinicId   String   @map("clinic_id")
   patientId  String   @map("patient_id")
@@ -2323,4 +2327,34 @@ model PrescriptionItem {
 
   @@unique([prescriptionId, sortOrder])
   @@map("prescription_items")
+}
+
+/// Metadata only: never store clinical text, prompts, errors or provider bodies.
+model AiRun {
+  id                   String       @id @default(cuid())
+  tenantId             String       @map("tenant_id")
+  clinicId             String       @map("clinic_id")
+  userId               String       @map("user_id")
+  registrationId       String       @map("registration_id")
+  feature              String       @db.VarChar(64)
+  field                String       @db.VarChar(64)
+  mode                 String       @db.VarChar(32)
+  provider             String       @db.VarChar(32)
+  model                String       @db.VarChar(101)
+  status               String       @db.VarChar(32)
+  inputCharacterCount  Int          @map("input_character_count")
+  outputCharacterCount Int          @default(0) @map("output_character_count")
+  inputTokens          Int?         @map("input_tokens")
+  outputTokens         Int?         @map("output_tokens")
+  latencyMs            Int?         @map("latency_ms")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  tenant               Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic               Clinic       @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  registration         Registration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, registrationId, createdAt])
+  @@map("ai_runs")
 }

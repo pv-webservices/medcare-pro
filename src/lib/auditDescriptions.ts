@@ -65,6 +65,7 @@ export const AUDIT_DESCRIPTIONS: Readonly<
 > = {
   [AUDIT_ACTIONS.CONSULTATION_CREATED]: { label: "Consultation started", detail: "A visit consultation was created.", side: "tenant", category: "prescriptions" },
   [AUDIT_ACTIONS.CONSULTATION_UPDATED]: { label: "Consultation draft saved", detail: "An authorized user explicitly saved a clinical draft.", side: "tenant", category: "prescriptions" },
+  [AUDIT_ACTIONS.CLINICAL_AI_RUN_COMPLETED]: { label: "Clinical writing assistance completed", detail: "A documentation suggestion request completed; no clinical record was saved.", side: "tenant", category: "prescriptions" },
   [AUDIT_ACTIONS.PRESCRIPTION_DRAFT_CREATED]: { label: "Prescription draft created", detail: "A structured visit prescription draft was prepared.", side: "tenant", category: "prescriptions" },
   [AUDIT_ACTIONS.PRESCRIPTION_CORRECTION_CREATED]: { label: "Prescription correction started", detail: "A new draft version was created without changing the issued original.", side: "tenant", category: "prescriptions" },
   [AUDIT_ACTIONS.PRESCRIPTION_ISSUED]: { label: "Prescription issued", detail: "The assigned linked Doctor finalized an immutable prescription.", side: "tenant", category: "prescriptions" },
