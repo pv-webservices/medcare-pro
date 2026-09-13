@@ -1,0 +1,115 @@
+# Phase AI-1 — Clinical Writing Assistant
+
+**This feature is a documentation assistant, not a clinical decision-support or treatment recommendation engine.** The doctor owns the clinical content and must review every suggestion. Phase AI-2 and all audio, transcription, diagnostic, prescribing, reconciliation, compliance, RAG and autonomous capabilities are out of scope.
+
+## Baseline and architecture
+
+Built on `origin/codex/electronic-prescriptions` at `ede921d`, on `codex/clinical-ai-writing-assistant`. Electronic prescription data ownership, immutable history, correction versions, revision checking and explicit save/issuance remain authoritative.
+
+The dynamic consultation page resolves assistant eligibility server-side. `ConsultationWorkspace` adds a compact `ClinicalWritingControl` below each supported note textarea. Explicit Improve → mode sends POST `/api/clinical-ai/writing-assist`. The service validates the strict request, derives clinic/patient/doctor ownership from the existing scoped consultation service, checks draft authority, linked assigned Doctor identity, feature access and AI permission, then reserves numerical usage before calling an injected `AiProvider`.
+
+`AiProvider.generateStructured<T>` accepts a task, system instruction, input and JSON schema. `getAiProvider()` selects the configured provider. `GeminiProvider` owns server HTTP transport, structured JSON generation, bounded output, timeout and error sanitization. A future OpenAI implementation can implement the same interface and extend the configuration factory without changing the writing service or UI. No OpenAI implementation is included now.
+
+Gemini uses the generateContent REST API, an API-key header and `generationConfig.responseFormat.text` JSON schema, following [Google's structured-output reference](https://ai.google.dev/gemini-api/docs/generate-content/structured-output?hl=en). A successful finish reason and valid envelope are required. The clinical service independently parses the result with strict Zod and applies the application safety validator. The client also validates the public writing-result shape.
+
+## Entitlement, identity and permissions
+
+`clinical_ai` is PREMIUM, globally disabled by default and **excluded from the default Standard plan**. Existing platform feature controls can enable the global switch and add a plan link or a reasoned tenant override. Existing role feature controls must explicitly enable this PREMIUM feature. The environment switch is an additional global fail-closed gate.
+
+`clinical-ai:writing` is a separate explicit action permission in the central Roles & Permissions catalogue. New Doctor seeds receive it alongside existing prescription preparation/issuance rights. New Admin seeds receive the catalogue; wildcard semantics are unchanged. Receptionist and Staff defaults receive no AI right. Existing/custom roles are never automatically modified. Older backfill snapshots exclude this new permission, and the electronic-prescription backfill remains unchanged.
+
+Requests additionally require `prescription:read` scope, clinic-specific `prescription:draft`, and the actor to be the explicitly linked assigned Doctor of the visit. A wildcard alone cannot impersonate a clinician. Suspended tenants, foreign tenant/clinic registrations, changed clinical ownership and immutable prescriptions are denied. Scope, authority and entitlement are rechecked after waiting for the provider. Routes use the live registry session resolver, which checks tenant, account and membership activity.
+
+The browser can supply only registration ID, field, mode and current text. It cannot supply tenant, clinic, patient, doctor, scope or provider settings. The task and prompt are fixed server-side; there is no general question/chat/provider endpoint.
+
+## Fields and modes
+
+Central `FIELD_POLICIES` is used by both the authoritative request validator and UI.
+
+| Field                   | Modes                                        | Input/output limit |
+| ----------------------- | -------------------------------------------- | ------------------ |
+| chiefComplaint          | SPELLING, GRAMMAR, CONCISE, CLINICAL_WORDING | 4,000 characters   |
+| historyOfPresentIllness | All four                                     | 5,000 characters   |
+| pastMedicalHistory      | SPELLING, GRAMMAR                            | 5,000 characters   |
+| examinationFindings     | SPELLING, GRAMMAR                            | 5,000 characters   |
+| investigationNotes      | SPELLING, GRAMMAR                            | 5,000 characters   |
+| diagnosis               | SPELLING, GRAMMAR                            | 4,000 characters   |
+| advice                  | SPELLING, GRAMMAR                            | 5,000 characters   |
+| followUpInstructions    | SPELLING, GRAMMAR                            | 4,000 characters   |
+
+Investigations, advice and examination findings are restricted because the existing fields may contain clinical decisions. All medication builder fields, including free-text medication instructions, are excluded. Existing consultation textarea/save limits are unchanged; longer notes can still be edited/saved normally but cannot be sent to the assistant.
+
+## Safety and clinician-controlled save
+
+The fixed system instruction forbids clinical additions, omissions, inference, recommendations and changes to facts, numbers, units, medicines, doses, strength, routes, schedules, dates, investigation values, diagnosis, negation and uncertainty. Note text is explicitly untrusted input, not instructions.
+
+`validateClinicalMeaningPreserved()` compares ordered clinical anchors. It preserves number/unit and medication/dose binding rather than comparing only bags of numbers. It covers decimal values including `.5`, percentages, inequalities, dates, time intervals, routes, frequency terms, negation, uncertainty and clinical words. A small reviewed equivalence map permits common non-diagnostic spelling corrections and zero–ten number words. No fuzzy matching or diagnosis/medicine synonym inference is allowed. Subject–verb agreement can change within the same tense; past/current auxiliaries and question-mark uncertainty are preserved; single-letter `A` remains an anchor to protect Vitamin A. Causality/timing prepositions remain exact. Decimal spelling normalization `.5` to `0.5` is deliberately rejected.
+
+The same checks apply to each returned fragment, and fragments must occur in source and suggested text. Categories must match the requested mode. Provider reasons are replaced with fixed language-only copy to avoid displaying unvalidated medical recommendations. Full suggested text must fit the field limit. Unsafe output returns `changed=false`, empty suggested text/fragments and `SAFETY_REJECTED`; it is never returned or retried automatically.
+
+No AI function writes ClinicalConsultation, Prescription or PrescriptionItem. Accept replaces only the target React field and marks the existing draft dirty. Dismiss leaves it unchanged. Accept compares the current text with the exact source copy; stale suggestions display “The note changed after this suggestion was generated. Please run the assistant again.” The doctor must explicitly Save draft; existing revision/concurrency validation is preserved. Errors preserve all input.
+
+## Limits, usage and privacy
+
+Meaningful input must contain a letter and at least three trimmed characters. The endpoint reads at most 40,000 bytes, including streaming bodies; provider response bodies are capped at 100,000 bytes. Output is bounded to 4,096 tokens and strict response sizes. There are no retry loops, autocomplete, keystroke requests or background rewriting. The 5,000-character ceiling reduces unnecessary exposure and cost while covering individual note fields.
+
+An `AiRun` reservation is committed before provider contact. A short transaction locks the tenant row and counts indexed rolling usage, enforcing six requests/user/minute, twelve requests/registration/five minutes and one hundred requests/tenant/hour across app instances. Failures and safety rejections consume allowance. Provider network waiting occurs outside the transaction. Reservations left STARTED after process failure still count until their window expires; operational review can identify these records.
+
+Forward-only migration `20260913120000_clinical_ai_runs` creates only `ai_runs`. Tenant, Clinic, User and Registration foreign keys use RESTRICT; indexes cover tenant/time, tenant/user/time and tenant/registration/time. No clinical history alteration, deletion or content backfill occurs. Records hold ownership IDs, fixed feature/field/mode/provider/model, status, character counts, optional numerical tokens, latency and creation time. No patient names, medication details, source/suggested text, prompts, raw errors or provider response bodies are stored. Provider request IDs are intentionally omitted because no useful stable ID is needed in AI-1.
+
+`CLINICAL_AI_RUN_COMPLETED` records metadata only in the existing audit system, with a description under the clinical Prescriptions category. It records the request outcome, not acceptance or a clinical save. Local Accept/Dismiss have no persistent side effect and are not falsely represented as server-confirmed audit actions. The existing consultation save audit records the actual explicit record change. No keystroke audit, browser analytics or prompt logging is introduced. Existing PHI-safe Prisma behavior is retained.
+
+Both success and error responses are `Cache-Control: private, no-store, max-age=0`. Provider HTTP bodies/errors/stack traces never reach browser responses or ordinary logs. Authentication, scope, input, rate and provider failures return fixed messages. Quota, bad key, model errors, network failures, timeout, truncation, malformed JSON and invalid schemas fail closed. If usage/audit completion fails, the route withholds the suggestion rather than exposing database payloads.
+
+Clinical text is sent to the chosen external provider only on an authorized explicit request. Before any pilot with real patient data, review the provider account's data-use/retention terms, contractual privacy requirements and organizational authorization. Automated validation uses synthetic text and mocked transport only.
+
+## Configuration and local QA
+
+**Do not use unpaid/free Gemini API projects with real patient clinical data.** Production requires an approved provider and data-processing configuration appropriate to the deployment jurisdiction and customer obligations. A working integration or feature flag does not establish HIPAA, DPDP or medical compliance. Review the applicable contracts, region, retention, abuse monitoring, access controls and consent/authorization before any clinical pilot.
+
+Each generateContent request is independent and stateless. This implementation enables no chat/session persistence, files, cached content, grounding, request-log sharing or datasets. The selected generateContent request has no general `store=false` switch; do not invent one. Provider-side retention and optional logging/sharing remain deployment configuration responsibilities. Paid service does not by itself mean zero retention: review [Google's current data terms](https://ai.google.dev/gemini-api/terms), [logging policy](https://ai.google.dev/gemini-api/docs/logs-policy) and [retention guidance](https://ai.google.dev/gemini-api/docs/zdr). Do not capture full clinical content in observability tools.
+
+A future Google Cloud/Vertex or enterprise provider can implement `AiProvider.generateStructured` and extend the server configuration/factory. `requestWritingAssistance` contains no Gemini HTTP contract, so neither its safety/authority logic nor the UI needs rewriting. Vertex is intentionally not implemented in AI-1.
+
+### Selected-role rollout administration
+
+As an account owner (or authorized administrator with sufficient grantable authority), open **Settings → Roles & Permissions** (`/settings/roles`), select the intended clinician role, open its permission editor, expand **Clinical AI**, enable **Clinical writing assistance**, and click **Save permissions**. Preserve every existing permission. Use the existing user-role assignment controls to assign that role only to the selected users and clinic scope; create a dedicated clinician pilot role when the shared Doctor role would reach too many users. The server checks grantable permissions and scope; the UI cannot grant beyond the administrator's authority.
+
+Separately open **Settings → Features** (`/settings/features`) and explicitly set Clinical AI access to **On** for the selected role. PREMIUM access does not inherit an automatic grant. The platform owner must also enable the global feature and an approved plan link or reasoned tenant entitlement override. Environment/provider configuration, prescription read/draft rights, assigned linked Doctor identity and editable clinical context are all still required. No automatic historical Doctor-role migration is included or needed.
+
+### Operational outcomes
+
+AiRun statuses are `STARTED`, `SUCCEEDED`, `UNCHANGED`, `SAFETY_REJECTED`, `TIMEOUT`, `INVALID_OUTPUT`, `AUTH`, `QUOTA`, `MODEL`, `NETWORK` and `FAILED`. These distinguish successful/no-change requests, application safety rejection, invalid provider responses, timeout and provider failure classes without storing output. An HTTP 429 reservation rejection creates no AiRun and never calls the provider; accepted attempts, including failures, consume the rolling limits. Rate rejections can be counted from status-only HTTP metrics without request bodies. Interrupted processes may leave STARTED records; these remain counted until the window expires.
+
+Server-only environment variables:
+
+```env
+AI_ENABLED=false
+AI_PROVIDER=gemini
+GEMINI_API_KEY=
+GEMINI_MODEL=
+GEMINI_TIMEOUT_MS=15000
+```
+
+Enable only with `AI_ENABLED=true`, supported provider, nonblank key, explicit safe model identifier and integer timeout between 1,000 and 30,000 ms. Missing timeout defaults to 15 seconds; invalid/missing configuration hides the controls and rejects requests without affecting prescription functionality. Keys and configuration objects are never passed as client props. No model is hardcoded.
+
+Use a disposable localhost database whose name starts with `medcare_ep` for integration/browser scripts; set a process-local DATABASE_URL without changing production environment files. Run the forward migrations there. `npm run build` includes `prisma migrate deploy`, so it must run only with this verified local override.
+
+1. Run `npm run clinical-ai:backfill` for read-only feature installation review. `--apply` creates only a missing, disabled feature. It preserves all existing feature settings, plans, role rights and overrides. Remote apply additionally requires `--allow-remote` and separate reviewed authorization; no remote operation was performed for this implementation.
+2. For deterministic local validation run `npm run test:clinical-ai`; it creates synthetic accounts/visits, enables the add-on only for those fixtures and injects mock providers.
+3. Run `npm run test:e2e:clinical-ai` after building. Its guarded test-runner preload mocks all Gemini transport and requires a local disposable DB plus a synthetic key. It is never imported by production code. This exercises the actual endpoint/service/safety validator, rather than mocking away server rejection.
+4. Browser scenarios cover review before application, no writes before Save, persistence after Save/reload, unsafe 500→850 mg provider output withheld, mobile stale acceptance, Dismiss, restricted diagnosis modes, spoofed ownership and unauthorized scope.
+5. For approved manual provider QA with synthetic notes, configure a supported Gemini model, enable the global catalogue switch, tenant override/plan link, role feature access and scoped writing/draft rights for a linked assigned Doctor. Start the app and open `/registration/<synthetic-visit>/consultation`.
+6. Enter misspelled HPI, click Improve → Improve grammar, review Original/Suggested, Accept, then Save draft and reload. Repeat with Dismiss and with manual edits after generation. Confirm medication fields have no assistant controls and diagnosis has only spelling/grammar. Disable AI_ENABLED and restart; ordinary consultation editing and saves must continue.
+
+## Testing, rollout and rollback
+
+Unit tests cover strict/spoofed input, field modes/limits, clinical anchors, provider parsing/error/timeout/body limits, service authority/revalidation, disabled config, rate reservation and PHI-safe route errors. Real local DB integration checks cover ownership, entitlement, clinician identity, metadata privacy, no writeback, explicit normal Save and concurrent durable rate enforcement. Existing prescription unit/database/browser regressions are retained. Exact final results and file manifest are in the companion implementation report.
+
+No production deployment or production database migration is part of this phase. Rollout is staged: internal developer/test accounts → selected demo clinic → small controlled clinician pilot → reviewed general AI add-on release. Each stage requires approved schema/feature installation, explicit plan/tenant and role grants, provider/privacy review, synthetic live-provider QA and signed-in clinician acceptance. Existing Doctor roles need a deliberate manual grant; no broad historical-role upgrade is bundled.
+
+Immediate rollback: set AI_ENABLED=false/restart or disable the `clinical_ai` global/tenant switch. Electronic prescriptions remain independent. Retain `ai_runs` metadata and its forward migration; do not delete tables or rewind clinical history. Code can roll back to the EP baseline while the additive table remains.
+
+## Known limitations
+
+This is a conservative lexical validator, not a proof of medical equivalence. Unknown spelling corrections, synonyms, translations, substantial restructuring and many legitimate concise/clinical-phrasing rewrites will be rejected. A short reviewed typo dictionary is intentional; similar drug/diagnosis spelling is unsafe evidence. Clinicians must review allowed language corrections. Restricted fields deliberately have fewer modes. No inline diff dependency, provider retry, live-provider automated test, acceptance/dismissal endpoint, billing invoice logic or historical role backfill is included. Provider availability, model-specific schema support and actual clinical pilot suitability require manual synthetic acceptance before rollout.
