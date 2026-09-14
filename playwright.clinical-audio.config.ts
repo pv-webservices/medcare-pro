@@ -12,7 +12,7 @@ if (
   );
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: /clinical-audio\.spec\.ts/,
+  testMatch: /clinical-(audio|transcription)\.spec\.ts/,
   workers: 1,
   timeout: 90000,
   expect: { timeout: 20000 },
@@ -30,7 +30,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npx next dev --hostname 127.0.0.1 --port 33342",
+    command: "npx next dev --webpack --hostname 127.0.0.1 --port 33342",
     url: "http://127.0.0.1:33342/login",
     reuseExistingServer: false,
     timeout: 240000,
@@ -49,6 +49,12 @@ export default defineConfig({
       CLINICAL_AUDIO_ENABLED:
         process.env.CLINICAL_AUDIO_E2E_DISABLED === "true" ? "false" : "true",
       RECORDING_STORAGE_PROVIDER: "local",
+      TRANSCRIPTION_PRIMARY_PROVIDER: "sarvam",
+      TRANSCRIPTION_AUTO_FALLBACK: "false",
+      SARVAM_API_SUBSCRIPTION_KEY: "synthetic-never-sent",
+      SARVAM_TRANSCRIPTION_MODEL: "saaras:v4",
+      CLINICAL_TRANSCRIPTION_PUBLIC_BASE_URL: "",
+      SARVAM_WEBHOOK_SECRET: "",
       RECORDING_LOCAL_ROOT: resolve(tmpdir(), "medcare-ai2a1-e2e-private"),
       RECORDING_LOCAL_SIGNING_SECRET: "disposable-local-audio-signing-secret",
       NODE_OPTIONS:

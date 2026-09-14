@@ -1,5 +1,7 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { prisma } from "@/lib/prisma";
 import {
   createClinicalAudioFixture,
@@ -24,8 +26,8 @@ try {
   const actor = f.doctorUser.actor;
   const visit = await f.visit();
   const migrations = await prisma.$queryRaw<
-    Array<{ migration_name: string }>
-  >`SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
+    Array<{ migration_name: string; checksum: string }>
+  >`SELECT migration_name,checksum FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
   check(
     "AI-2A migration applied",
     migrations.some(
@@ -33,6 +35,15 @@ try {
         m.migration_name === "20260914010000_clinical_recording_transcription",
     ),
   );
+  for (const name of ["20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards"]) check("AI-2A.2 migration applied: " + name, migrations.some((migration) => migration.migration_name === name));
+  for (const name of ["20260914010000_clinical_recording_transcription", "20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards"]) {
+    const checksum = createHash("sha256").update(await readFile(`prisma/migrations/${name}/migration.sql`)).digest("hex");
+    check("Migration checksum matches: " + name, migrations.some((migration) => migration.migration_name === name && migration.checksum === checksum));
+  }
+  const transcriptionIndexes = await prisma.$queryRaw<{ INDEX_NAME: string; NON_UNIQUE: bigint }[]>`SELECT INDEX_NAME,NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='transcription_runs'`;
+  for (const name of ["transcription_runs_active_key_key", "transcription_runs_provider_provider_job_id_key"]) check("Transcription unique index: " + name, transcriptionIndexes.some((index) => index.INDEX_NAME === name && Number(index.NON_UNIQUE) === 0));
+  const evidenceTriggers = await prisma.$queryRaw<{ TRIGGER_NAME: string }[]>`SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()`;
+  for (const name of ["transcription_active_key_insert", "transcription_active_key_update", "clinical_transcript_source_immutable", "clinical_transcript_segment_immutable", "clinical_transcript_segment_no_delete", "transcript_correction_append_only", "transcript_correction_no_delete", "transcript_speaker_identity_immutable"]) check("Evidence trigger: " + name, evidenceTriggers.some((trigger) => trigger.TRIGGER_NAME === name));
   const indexes = await prisma.$queryRaw<
     Array<{ INDEX_NAME: string }>
   >`SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='consultation_recordings'`;

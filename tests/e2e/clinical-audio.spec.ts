@@ -4,8 +4,11 @@ import { createClinicalAudioFixture } from "../../scripts/clinical-audio-test-fi
 import { PRESCRIPTION_TEST_PASSWORD } from "../../scripts/prescription-test-fixture";
 let f: Awaited<ReturnType<typeof createClinicalAudioFixture>>;
 const disabled = process.env.CLINICAL_AUDIO_E2E_DISABLED === "true";
-test.beforeAll(async () => {
+test.beforeAll(async ({ request }) => {
   f = await createClinicalAudioFixture();
+  // Compile cold dev routes before native capture; all warmups are unauthenticated.
+  for (const path of ["/api/clinical-ai/recordings", "/api/clinical-ai/recordings/synthetic/start", "/api/clinical-ai/recordings/synthetic/upload/init", "/api/clinical-ai/recordings/synthetic/transcriptions"]) expect((await request.post(path, { data: {} })).status()).toBe(401);
+  for (const path of ["/api/clinical-ai/local-storage", "/api/clinical-ai/recordings/synthetic/audio-url", "/api/clinical-ai/recordings/synthetic/transcriptions/latest"]) expect((await request.get(path)).status()).toBe(401);
 });
 test.afterAll(async () => {
   await prisma.$disconnect();

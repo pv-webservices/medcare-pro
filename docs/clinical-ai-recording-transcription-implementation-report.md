@@ -1,4 +1,89 @@
-# AI-2A.1 implementation report
+# AI-2A.2 implementation report
+
+## Scope and Git
+
+Branch: `codex/clinical-ai-recording-transcription`. Starting SHA: `fda6dd608277816c0d1711b42f3a9f65bc4f5049`. Implementation commit: `8ddb851c33df444d6fbe8ff850b2d0dd662a53df` (`feat(transcription): add Sarvam Batch worker and immutable clinician review`). Existing [PR #6](https://github.com/pv-webservices/medcare-pro/pull/6) remains the review destination. No merge, deployment or production configuration/migration is authorized. The final test/documentation commit SHA is recorded in the handoff and PR.
+
+The existing recording/consent/storage/domain models were extended, not replaced. No new dependencies, transcription auto-enqueue, Gemini fallback, transliteration, retention cleanup, telephony changes or AI-3 features were introduced. The old mock/future-provider abstractions are not used by the live Batch worker; test injection is explicit and server/test-owned.
+
+## Database
+
+Two additive migrations: `20260914120000_sarvam_batch_transcription` and `20260914120100_transcription_evidence_guards`. Existing AI-2A.1 migration is unchanged. Changes affect TranscriptionRun (active key, fenced lease, submission/upload/poll checkpoints, callback hint), ClinicalTranscript (version), TranscriptSpeakerMapping (confirmation metadata) and TranscriptCorrection (unique supersession chain). No duplicate clinical models. Unique active recording/provider job keys, active-key CHECK/binding triggers and source/segment/correction/provider-speaker immutability guards are enforced by the database. All 30 existing restrictive foreign keys are preserved.
+
+Fresh disposable MariaDB 11.4.9 database `medcare_ep_ai2a1_ai2a2_final` replayed all 38 migrations successfully. Verifier: 38 checks PASS, including migration SHA-256 matches, indexes, triggers, constraints and ownership. An earlier throwaway migration trial hit MariaDB's restriction on CHECK expressions referencing a foreign-key column; corrected to CHECK presence plus binding triggers and verified by fresh replay. No production DB was touched.
+
+## Sarvam, worker and webhook
+
+Direct fixed-origin REST Batch transport uses `saaras:v4`, verbatim mode, diarization, timestamps, requested two speakers and `language_code: unknown` autodetection. Server-owned keyterms: maximum 50 unique trimmed terms, 64 characters each. Only `SARVAM_API_SUBSCRIPTION_KEY` is accepted. HTTP timeout defaults 30 seconds (configurable 1–120 seconds), persisted polling defaults 30 seconds, job deadline 180 minutes. API JSON is bounded to 256 KiB, downloaded result JSON to 8 MiB before decoding/parsing; unsafe storage origins and redirects fail closed.
+
+Private internal local/S3 streams upload to provider-issued HTTPS Azure Blob SAS destinations. No whole-recording buffer, public source URL or API key on storage requests. Output filename is taken from authoritative successful status, never guessed. Unsupported future storage backends require separate implementation.
+
+Claims use row locks with SKIP LOCKED, 120-second token-fenced leases and renewal every 40 seconds. Provider ID is persisted before upload/start; recovery queries existing jobs and reuses checkpoints. Known transient errors receive persisted bounded backoff/jitter (three attempts). Definitively rejected create 429s may retry; ambiguous create/ID-write interruption fails closed because Sarvam does not document initiation idempotency. An informed manual retry can leave an orphan provider job and is not an exactly-once provider guarantee.
+
+`POST /api/clinical-ai/transcription/webhooks/sarvam` validates the timing-safe callback header before reading a bounded body, returns 403 for invalid tokens, acknowledges unknown/duplicate/terminal jobs and only persists a polling hint for existing active Sarvam jobs. It never accepts transcript text, creates runs, finalizes results or makes provider calls.
+
+## Transcript and clinician review
+
+Atomic immutable source/ordered millisecond segments/provider speaker labels/UNKNOWN mappings and terminal run completion. Versioned canonical SHA-256 is an integrity checksum, not a signature. Strict finite nonnegative ordered timing validation allows overlapping speech and a two-second recording tolerance. At most 20,000 segments, 16 speakers, two million text characters and 16,000 characters per segment.
+
+Live assigned-Doctor, tenant/clinic, RBAC, entitlement and kill-switch checks are server-owned. Clinician-confirmed roles cannot contain multiple Doctors. Explicit review requires one Doctor, a Patient and no UNKNOWN/unconfirmed speakers. Corrections append original evidence and supersession history; optimistic version checks reject stale edits. Mapping/correction changes invalidate previous review with metadata-only audits. Source/timestamps are never rewritten.
+
+UI preserves the application's clinical styling, separates original evidence from corrections, paginates 50 segment controls, polls only application status, offers explicit Sarvam-only generation/retry, and reuses private player URLs for timestamp seek. Review is documentation attestation, not proof of medical accuracy.
+
+## Added APIs
+
+- POST `/api/clinical-ai/recordings/:recordingId/transcriptions`
+- GET `/api/clinical-ai/recordings/:recordingId/transcriptions/latest`
+- GET `/api/clinical-ai/transcripts/:transcriptId`
+- POST `/api/clinical-ai/transcripts/:transcriptId/speakers/:speakerId/confirm`
+- POST `/api/clinical-ai/transcript-segments/:segmentId/corrections`
+- POST `/api/clinical-ai/transcripts/:transcriptId/review`
+- POST `/api/clinical-ai/transcription/webhooks/sarvam`
+
+Strict schemas reject browser provider/model/audio URL overrides; authenticated data is private/no-store. Legacy singular transcription endpoint stays disabled. Transcript-read does not grant mutation rights.
+
+## Privacy
+
+No audio in MySQL. No transcript text in generic logs. No raw Sarvam response stored in generic logs. No provider credentials in browser. No public audio URL. Sanitized provider failure categories only; signed bearer URL revocation limitations from AI-2A.1 remain. Tests use synthetic credentials, explicitly injected fake transports and disposable localhost databases, not real Sarvam traffic.
+
+## Current verification
+
+- Full Vitest: 163 files / 2,536 tests PASS.
+- Focused audio/Sarvam/webhook: 70 tests PASS.
+- Audio DB integration: 40 checks PASS; transcription DB integration: 48 checks PASS; schema verifier: 38 checks PASS.
+- Recovery evidence reproduces expired persisted lease boundaries after claim, create before ID write, ID write, upload before/after checkpoint and start; no OS-level process-kill test is claimed. A real 41-second delayed submission verifies renewal and competing-claim rejection. Definite create 429, bounded retry, deadline, invalid diarization, stale fencing, duplicate callbacks, review invalidation and DB immutability are covered.
+- Final production build PASS against disposable DB, no pending migrations, 106 static pages. Final typecheck PASS. Full lint: zero errors/five pre-existing warnings; subsequent test additions also pass focused lint.
+- Audio browser: 15 enabled cases PASS / one audio-off case intentionally skipped; independent audio-off server: one case PASS. Standalone transcript rerun: one case PASS, preserving screenshots at `playwright-report/transcription-screenshots/transcript-{1366,768,390}.png` (not committed). Native fake mic, failure/Sarvam-only retry, source/mapping/review/correction/reload and exact 17-second seek/private URL reuse verified. No Next error dialog at completion; no horizontal overflow at tested widths.
+- AI-1: 32 mock-backed DB checks / eight browser cases PASS.
+- Electronic Prescription: nine verifier checks / 58 DB checks / 26 browser cases PASS.
+- Patient Portal: 16 verifier checks / 61 focused unit tests / 88 DB checks / two desktop/mobile browser cases PASS on schema with all 38 migrations.
+- Roles/RBAC: 65 checks PASS. Registrations: 62 checks PASS.
+- There are 52 distinct passing browser cases across these final runs; the standalone transcript rerun is additional repeat evidence, not another distinct case.
+- Secret scans and Git diff/staged whitespace checks PASS. Only placeholders/synthetic fixtures are committed; no real environment files, private audio, patient data or provider secrets.
+
+Five existing lint warnings are unchanged (verify-stage11-audit, ClinicDetail, RegistrationsTable and two appointmentStatusVocabulary variables). Existing middleware deprecation, Tailwind module-type and color-option warnings remain. The full dependency audit remains six advisories (four high/two moderate); production-only audit has three high advisories through the existing Prisma/deepmerge-ts chain. No unrelated dependency changes were made.
+
+The initial full development browser run emitted screenshot-caret hydration attribute warnings and a transient DashboardLayout mismatch. Its assertions still passed. The final standalone transcript rerun prewarms protected routes before native capture and preserves the screenshot caret; no hydration error appeared in that rerun. No production hydration fix is claimed. Screenshots were visually inspected at all three widths; sticky dashboard furniture is positioned at the scrolled viewport in full-page captures.
+
+## AI-2A.2 milestone verdict
+
+PASS — AI-2A.2 Sarvam transcription and clinician-review layer is ready for AI-2A.3.
+
+## Live Sarvam QA
+
+NOT RUN — credentials/webhook environment unavailable.
+
+No real clinical audio or paid provider request was used. Synthetic mocked anchors include Metformin 500 mg / once daily / no chest pain / three days / left knee. This is transport/workflow evidence, not live language/model-quality acceptance.
+
+## Production
+
+NOT DEPLOYED
+
+Worker process supervision, live synthetic-language QA, real private S3 acceptance and operational production sign-off remain deferred. Stop after the AI-2A.2 review-ready commit/push/PR update; AI-2A.3 and AI-3 are out of scope.
+
+---
+
+# Historical AI-2A.1 implementation report
 
 ## Git and scope
 
