@@ -114,6 +114,11 @@ export class S3RecordingStorageProvider implements RecordingStorageProvider {
       { expiresIn: i.ttlSeconds },
     );
   }
+  async getObjectStream(i: { key: string }) {
+    const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: i.key }));
+    if (!result.Body) throw new Error("OBJECT_NOT_FOUND");
+    return result.Body.transformToWebStream() as ReadableStream<Uint8Array>;
+  }
   async deleteObject(i: { key: string }) {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: i.key }),

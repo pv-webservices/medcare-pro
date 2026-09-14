@@ -2540,6 +2540,12 @@ model TranscriptionRun {
   status                TranscriptionRunStatus @default(QUEUED)
   mode                  TranscriptionMode      @default(VERBATIM)
   providerJobId         String?                @map("provider_job_id") @db.VarChar(255)
+  activeKey             String?                @unique @map("active_key") @db.VarChar(191)
+  leaseToken            String?                @map("lease_token") @db.Char(36)
+  submissionIntentAt    DateTime?              @map("submission_intent_at")
+  uploadCompletedAt     DateTime?              @map("upload_completed_at")
+  lastPollAt            DateTime?              @map("last_poll_at")
+  callbackState         String?                @map("callback_state") @db.VarChar(32)
   providerRequestId     String?                @map("provider_request_id") @db.VarChar(255)
   languageCode          String?                @map("language_code") @db.VarChar(32)
   requestedSpeakerCount Int?                   @map("requested_speaker_count")
@@ -2569,6 +2575,7 @@ model TranscriptionRun {
   fallbackRuns          TranscriptionRun[]     @relation("TranscriptionFallback")
 
   @@index([provider, status, nextAttemptAt])
+  @@unique([provider, providerJobId])
   @@index([leaseExpiresAt])
   @@index([tenantId, createdAt])
   @@map("transcription_runs")
@@ -2583,6 +2590,7 @@ model ClinicalTranscript {
   transcriptionRunId String                      @unique @map("transcription_run_id")
   sourceText         String                      @map("source_text") @db.LongText
   sourceHash         String                      @map("source_hash") @db.Char(64)
+  version            Int                         @default(1)
   reviewedAt         DateTime?                   @map("reviewed_at")
   reviewedByUserId   String?                     @map("reviewed_by_user_id")
   createdAt          DateTime                    @default(now()) @map("created_at")
@@ -2620,6 +2628,8 @@ model TranscriptSpeakerMapping {
   transcriptId String             @map("transcript_id")
   speakerLabel String             @map("speaker_label") @db.VarChar(64)
   speakerType  String             @map("speaker_type") @db.VarChar(32)
+  confirmedAt  DateTime?          @map("confirmed_at")
+  confirmedByUserId String?       @map("confirmed_by_user_id")
   createdAt    DateTime           @default(now()) @map("created_at")
   transcript   ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
 
@@ -2632,6 +2642,7 @@ model TranscriptCorrection {
   transcriptId  String             @map("transcript_id")
   createdById   String             @map("created_by_id")
   segmentId     String?            @map("segment_id")
+  supersedesCorrectionId String?   @unique @map("supersedes_correction_id")
   originalText  String             @map("original_text") @db.Text
   correctedText String             @map("corrected_text") @db.Text
   createdAt     DateTime           @default(now()) @map("created_at")

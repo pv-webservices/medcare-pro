@@ -26,6 +26,8 @@ export interface RecordingStorageProvider {
   }): Promise<void>;
   abortMultipartUpload(input: { key: string; uploadId: string }): Promise<void>;
   headObject(input: { key: string }): Promise<StorageHead>;
+  /** Internal worker-only access. Never return this stream from metadata APIs. */
+  getObjectStream(input: { key: string }): Promise<ReadableStream<Uint8Array>>;
   getSignedReadUrl(input: { key: string; ttlSeconds: number }): Promise<string>;
   deleteObject(input: { key: string }): Promise<void>;
 }
@@ -93,6 +95,17 @@ export class InMemoryRecordingStorage implements RecordingStorageProvider {
   }
   async getSignedReadUrl(i: { key: string; ttlSeconds: number }) {
     return "memory://" + i.key;
+  }
+  async getObjectStream(i: { key: string }) {
+    const object = this.objects.get(i.key);
+    if (!object) throw new Error("OBJECT_NOT_FOUND");
+    let offset = 0;
+    return new ReadableStream<Uint8Array>({ pull(controller) {
+      if (offset >= object.data.length) { controller.close(); return; }
+      const end = Math.min(offset + 64 * 1024, object.data.length);
+      controller.enqueue(object.data.slice(offset, end));
+      offset = end;
+    } });
   }
   async deleteObject(i: { key: string }) {
     this.objects.delete(i.key);

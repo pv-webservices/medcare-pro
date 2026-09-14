@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import TranscriptPanel from "./TranscriptPanel";
 import { useClinicalRecorder, audioRequest } from "./useClinicalRecorder";
 function duration(ms: number) {
   const seconds = Math.floor(ms / 1000);
@@ -15,15 +16,26 @@ export default function ClinicalAudioPanel({
   inPerson?: boolean;
 }) {
   const r = useClinicalRecorder(registrationId, maxMinutes);
+  const player = useRef<HTMLAudioElement | null>(null);
+  const pendingSeek = useRef<number | null>(null);
   const [attested, setAttested] = useState(false),
     [method, setMethod] = useState("VERBAL"),
     [consenter, setConsenter] = useState("PATIENT"),
-    [playback, setPlayback] = useState<{ id: string; url: string } | null>(
+    [playback, setPlayback] = useState<{ id: string; url: string; expiresAt: number } | null>(
       null,
     ),
     [playError, setPlayError] = useState("");
   const button =
     "min-h-11 rounded-lg border border-line px-4 py-2 text-sm font-medium disabled:opacity-40";
+  async function seekRecording(id: string, milliseconds: number) {
+    if (playback?.id === id && playback.expiresAt > Date.now() && player.current?.readyState) {
+      player.current.currentTime = milliseconds / 1000;
+      return;
+    }
+    pendingSeek.current = milliseconds / 1000;
+    const result = await audioRequest<{ url: string; expiresIn: number }>(`/api/clinical-ai/recordings/${id}/audio-url`);
+    setPlayback({ id, url: result.url, expiresAt: Date.now() + Math.max(1, result.expiresIn - 5) * 1000 });
+  }
   return (
     <section
       aria-label="Recording & Transcript"
@@ -257,13 +269,13 @@ export default function ClinicalAudioPanel({
                     className={button}
                     onClick={() => {
                       setPlayError("");
-                      void audioRequest<{ url: string }>(
+                      void audioRequest<{ url: string; expiresIn: number }>(
                         "/api/clinical-ai/recordings/" +
                           recording.id +
                           "/audio-url",
                       )
                         .then((v) =>
-                          setPlayback({ id: recording.id, url: v.url }),
+                          setPlayback({ id: recording.id, url: v.url, expiresAt: Date.now() + Math.max(1, v.expiresIn - 5) * 1000 }),
                         )
                         .catch((e) => setPlayError(e.message));
                     }}
@@ -274,6 +286,8 @@ export default function ClinicalAudioPanel({
               )}
               {playback?.id === recording.id && (
                 <audio
+                  ref={player}
+                  onLoadedMetadata={() => { if (player.current && pendingSeek.current !== null) { player.current.currentTime = pendingSeek.current; pendingSeek.current = null; } }}
                   aria-label="Consultation recording playback"
                   controls
                   src={playback.url}
@@ -285,6 +299,7 @@ export default function ClinicalAudioPanel({
                   }
                 />
               )}
+              {recording.status === "READY" && <TranscriptPanel recordingId={recording.id} onSeek={(milliseconds) => seekRecording(recording.id, milliseconds)} />}
             </div>
           ))}
         </div>

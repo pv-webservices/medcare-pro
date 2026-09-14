@@ -5,6 +5,7 @@ import { UnauthenticatedError } from "@/lib/session";
 import { ScopeError, PermissionError } from "@/lib/rbac";
 import { FeatureError } from "@/lib/featureResolution";
 import { ClinicalAudioDisabledError, RecordingStateError } from "./errors";
+import { TranscriptionFailure } from "@/lib/transcription/errors";
 export function audioJson(data: unknown, status = 200) {
   return NextResponse.json(
     { success: true, data },
@@ -22,6 +23,7 @@ export function audioError(error: unknown) {
             error instanceof ClinicalAudioDisabledError
           ? 403
           : error instanceof RecordingStateError ||
+              (error instanceof TranscriptionFailure && ["SOURCE_MISSING", "CONSENT_INVALID"].includes(error.code)) ||
               error instanceof ConflictError
             ? 409
             : error instanceof ZodError ||
@@ -29,7 +31,9 @@ export function audioError(error: unknown) {
                 error instanceof SyntaxError
               ? 400
               : 503;
-  const message =
+  const message = error instanceof TranscriptionFailure
+    ? "Transcription is unavailable. Check retained audio, consent and server configuration."
+    :
     status === 401
       ? "You are not signed in."
       : status === 404

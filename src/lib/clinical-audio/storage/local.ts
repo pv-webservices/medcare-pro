@@ -208,6 +208,11 @@ export class LocalRecordingStorageProvider implements RecordingStorageProvider {
       createReadStream(this.path(key), { start, end }),
     ) as ReadableStream<Uint8Array>;
   }
+  async getObjectStream(i: { key: string }) {
+    const head = await this.headObject(i);
+    if (head.size <= 0) throw new Error("OBJECT_NOT_FOUND");
+    return this.streamRange(i.key, 0, head.size - 1);
+  }
   async deleteObject(i: { key: string }) {
     await unlink(this.path(i.key)).catch(() => {});
     await unlink(this.path(i.key) + ".metadata").catch(() => {});
