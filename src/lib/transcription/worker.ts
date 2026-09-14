@@ -67,7 +67,7 @@ async function processRun(claim: TranscriptionRun, { config, provider, storage }
           if (BigInt(head.size) !== recording.byteSize) throw new Error("SOURCE_MISSING");
           stream = await storage.getObjectStream({ key: recording.storageKey! });
         } catch { throw new TranscriptionFailure("SOURCE_MISSING"); }
-        await provider.upload(jobId, filename, stream, Number(recording.byteSize), recording.mimeType!, controller.signal);
+        await provider.upload(jobId, filename, stream, Number(recording.byteSize), mime!, controller.signal);
         await fencedRunUpdate(run, { uploadCompletedAt: new Date() });
       }
       await retainedRecording(actor, run.recordingId);
