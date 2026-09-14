@@ -182,9 +182,19 @@ export const PRESCRIPTION_PERMISSIONS: readonly string[] = [
   "prescription:read", "prescription:draft", "prescription:issue", "prescription:cancel",
 ];
 
-export const CLINICAL_AI_PERMISSIONS: readonly string[] = ["clinical-ai:writing"];
+export const CLINICAL_AI_PERMISSIONS: readonly string[] = [
+  "clinical-ai:writing",
+  "clinical-ai:recording",
+  "clinical-ai:transcription",
+  "clinical-ai:transcript-read",
+];
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
-  { module: "Clinical AI", permissions: [{ key: "clinical-ai:writing", label: "Clinical writing assistance", description: "Request language suggestions for an authorized consultation." }] },
+  { module: "Clinical AI", permissions: [
+    { key: "clinical-ai:writing", label: "Clinical writing assistance", description: "Request language suggestions for an authorized consultation." },
+    { key: "clinical-ai:recording", label: "Consultation recording", description: "Record consented face-to-face consultations." },
+    { key: "clinical-ai:transcription", label: "Clinical transcription", description: "Request and review transcription processing." },
+    { key: "clinical-ai:transcript-read", label: "Transcript access", description: "View consented consultation transcripts and playback." },
+  ] },
   { module: "Patient portal", permissions: [{ key: "patient_portal:manage", label: "Manage patient portal access", description: "Activate, resend and revoke portal access for verified patients." }] },
   {
     module: "Prescriptions",

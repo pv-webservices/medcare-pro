@@ -135,10 +135,14 @@ model Tenant {
   clinicCapacityGrants         TenantClinicCapacityGrant[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
-  appointments          Appointment[]
-  appointmentTypes      AppointmentType[]
-  clinicalConsultations ClinicalConsultation[]
-  prescriptions         Prescription[]
+  appointments           Appointment[]
+  appointmentTypes       AppointmentType[]
+  clinicalConsultations  ClinicalConsultation[]
+  prescriptions          Prescription[]
+  recordingConsents      ConsultationRecordingConsent[]
+  consultationRecordings ConsultationRecording[]
+  transcriptionRuns      TranscriptionRun[]
+  clinicalTranscripts    ClinicalTranscript[]
 
   /// Enforced from the constrain migration onward, once the backfill has
   /// generated and validated a slug for every existing row.
@@ -265,12 +269,17 @@ model User {
   /// the login is removed.
   doctorProfiles Doctor[] @relation("DoctorPortalUser")
 
-  tasksCreated           Task[]                 @relation("TaskCreatedBy")
-  tasksAssigned          Task[]                 @relation("TaskAssignedTo")
-  tasksCompleted         Task[]                 @relation("TaskCompletedBy")
-  consultationsCreated   ClinicalConsultation[] @relation("ConsultationCreatedBy")
-  prescriptionsIssued    Prescription[]         @relation("PrescriptionIssuedBy")
-  prescriptionsCancelled Prescription[]         @relation("PrescriptionCancelledBy")
+  tasksCreated               Task[]                         @relation("TaskCreatedBy")
+  tasksAssigned              Task[]                         @relation("TaskAssignedTo")
+  tasksCompleted             Task[]                         @relation("TaskCompletedBy")
+  consultationsCreated       ClinicalConsultation[]         @relation("ConsultationCreatedBy")
+  prescriptionsIssued        Prescription[]                 @relation("PrescriptionIssuedBy")
+  prescriptionsCancelled     Prescription[]                 @relation("PrescriptionCancelledBy")
+  recordingConsentsCaptured  ConsultationRecordingConsent[] @relation("RecordingConsentCapturedBy")
+  recordingConsentsWithdrawn ConsultationRecordingConsent[] @relation("RecordingConsentWithdrawnBy")
+  recordingsCreated          ConsultationRecording[]        @relation("RecordingCreatedBy")
+  transcriptionRunsRequested TranscriptionRun[]             @relation("TranscriptionRunRequestedBy")
+  transcriptCorrections      TranscriptCorrection[]         @relation("TranscriptCorrectionCreatedBy")
 
   @@index([tenantId])
   @@index([accountStatus])
@@ -456,11 +465,15 @@ model Clinic {
   telephonyBookingRequests     TelephonyBookingRequest[]
   telephonyCalls               ClinicTelephonyCall[]
   telephonyTestCalls           ClinicTelephonyTestCall[]
-  platformPlivoNumber          PlatformPlivoNumber?      @relation("PlatformPlivoAssignedClinic")
-  quarantineSourcePlivoNumbers PlatformPlivoNumber[]     @relation("PlatformPlivoQuarantineSourceClinic")
+  platformPlivoNumber          PlatformPlivoNumber?           @relation("PlatformPlivoAssignedClinic")
+  quarantineSourcePlivoNumbers PlatformPlivoNumber[]          @relation("PlatformPlivoQuarantineSourceClinic")
   tasks                        Task[]
   clinicalConsultations        ClinicalConsultation[]
   prescriptions                Prescription[]
+  recordingConsents            ConsultationRecordingConsent[]
+  consultationRecordings       ConsultationRecording[]
+  transcriptionRuns            TranscriptionRun[]
+  clinicalTranscripts          ClinicalTranscript[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -803,11 +816,13 @@ model Doctor {
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   /// Restrict on the owning side: an appointment is history once booked.
-  appointments          Appointment[]
+  appointments           Appointment[]
   /// Cascade on the owning side — these rows carry no data, only a lock.
-  scheduleLocks         DoctorScheduleLock[]
-  clinicalConsultations ClinicalConsultation[]
-  prescriptions         Prescription[]
+  scheduleLocks          DoctorScheduleLock[]
+  clinicalConsultations  ClinicalConsultation[]
+  prescriptions          Prescription[]
+  recordingConsents      ConsultationRecordingConsent[]
+  consultationRecordings ConsultationRecording[]
 
   qualification             String? @db.VarChar(255)
   medicalRegistrationNumber String? @map("medical_registration_number") @db.VarChar(255)
@@ -895,9 +910,11 @@ model Patient {
   /// which cascades. An appointment must survive as a record of what was booked
   /// even if the patient row it was later linked to is deleted — the
   /// denormalised name/mobileNumber on the appointment keep it readable.
-  appointments          Appointment[]
-  clinicalConsultations ClinicalConsultation[]
-  prescriptions         Prescription[]
+  appointments                  Appointment[]
+  clinicalConsultations         ClinicalConsultation[]
+  prescriptions                 Prescription[]
+  consultationRecordingConsents ConsultationRecordingConsent[]
+  consultationRecordings        ConsultationRecording[]
 
   /// Tenant-scoped, so two tenants can each independently hold PT-2026-0001.
   @@unique([tenantId, patientCode])
@@ -956,9 +973,13 @@ model Registration {
   /// nothing deletes appointments anyway — they retire by status.
   appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
 
-  editLog              RegistrationEditLog[]
-  clinicalConsultation ClinicalConsultation?
-  prescriptions        Prescription[]
+  editLog                RegistrationEditLog[]
+  clinicalConsultation   ClinicalConsultation?
+  prescriptions          Prescription[]
+  recordingConsents      ConsultationRecordingConsent[]
+  consultationRecordings ConsultationRecording[]
+  transcriptionRuns      TranscriptionRun[]
+  clinicalTranscripts    ClinicalTranscript[]
 
   /// One registration per appointment. This is the database-level guard against
   /// converting the same appointment twice: AP-5's second attempt hits this
@@ -2364,6 +2385,256 @@ model AiRun {
   @@index([tenantId, userId, createdAt])
   @@index([tenantId, registrationId, createdAt])
   @@map("ai_runs")
+}
+
+enum RecordingConsentMethod {
+  VERBAL
+  WRITTEN
+  DIGITAL
+}
+
+enum RecordingConsenterType {
+  PATIENT
+  GUARDIAN
+  AUTHORIZED_REPRESENTATIVE
+}
+
+enum ConsultationRecordingStatus {
+  CREATED
+  RECORDING
+  PAUSED
+  STOPPED
+  UPLOADING
+  READY
+  ABORTED
+  FAILED
+}
+
+enum ConsultationRecordingEventType {
+  START
+  PAUSE
+  RESUME
+  STOP
+  CONSENT_WITHDRAWN
+}
+
+enum TranscriptionProvider {
+  SARVAM
+  GEMINI
+}
+
+enum TranscriptionRunStatus {
+  QUEUED
+  PREPARING
+  SUBMITTED
+  PROCESSING
+  COMPLETED
+  FAILED
+  TIMED_OUT
+  CANCELLED
+}
+
+enum TranscriptionMode {
+  VERBATIM
+}
+
+model ConsultationRecordingConsent {
+  id                String                 @id @default(cuid())
+  tenantId          String                 @map("tenant_id")
+  clinicId          String                 @map("clinic_id")
+  registrationId    String                 @map("registration_id")
+  patientId         String                 @map("patient_id")
+  doctorId          String                 @map("doctor_id")
+  capturedByUserId  String                 @map("captured_by_user_id")
+  method            RecordingConsentMethod
+  consenterType     RecordingConsenterType @map("consenter_type")
+  consentedAt       DateTime               @map("consented_at")
+  withdrawnAt       DateTime?              @map("withdrawn_at")
+  withdrawnByUserId String?                @map("withdrawn_by_user_id")
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic       Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration Registration           @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  patient      Patient                @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor       Doctor                 @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  capturedBy   User                   @relation("RecordingConsentCapturedBy", fields: [capturedByUserId], references: [id], onDelete: Restrict)
+  withdrawnBy  User?                  @relation("RecordingConsentWithdrawnBy", fields: [withdrawnByUserId], references: [id], onDelete: Restrict)
+  recording    ConsultationRecording?
+
+  @@index([tenantId, clinicId, createdAt], map: "recording_consent_tenant_clinic_created_idx")
+  @@index([registrationId, createdAt])
+  @@map("consultation_recording_consents")
+}
+
+model ConsultationRecording {
+  id               String                      @id @default(cuid())
+  tenantId         String                      @map("tenant_id")
+  clinicId         String                      @map("clinic_id")
+  registrationId   String                      @map("registration_id")
+  patientId        String                      @map("patient_id")
+  doctorId         String                      @map("doctor_id")
+  createdByUserId  String                      @map("created_by_user_id")
+  consentId        String                      @unique @map("consent_id")
+  status           ConsultationRecordingStatus @default(CREATED)
+  activeKey        String?                     @unique @map("active_key") @db.VarChar(191)
+  mimeType         String?                     @map("mime_type") @db.VarChar(128)
+  durationMs       Int?                        @map("duration_ms")
+  byteSize         BigInt?                     @map("byte_size")
+  storageProvider  String?                     @map("storage_provider") @db.VarChar(32)
+  storageKey       String?                     @map("storage_key") @db.VarChar(512)
+  sha256           String?                     @db.Char(64)
+  startedAt        DateTime?                   @map("started_at")
+  stoppedAt        DateTime?                   @map("stopped_at")
+  uploadedAt       DateTime?                   @map("uploaded_at")
+  audioDeleteAfter DateTime?                   @map("audio_delete_after")
+  audioDeletedAt   DateTime?                   @map("audio_deleted_at")
+  version          Int                         @default(1)
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+
+  tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic              Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration        Registration                 @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  patient             Patient                      @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor              Doctor                       @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  createdBy           User                         @relation("RecordingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  consent             ConsultationRecordingConsent @relation(fields: [consentId], references: [id], onDelete: Restrict)
+  events              ConsultationRecordingEvent[]
+  transcriptionRuns   TranscriptionRun[]
+  clinicalTranscripts ClinicalTranscript[]
+
+  @@index([tenantId, clinicId, createdAt])
+  @@index([registrationId, createdAt])
+  @@index([status])
+  @@index([audioDeleteAfter])
+  @@map("consultation_recordings")
+}
+
+model ConsultationRecordingEvent {
+  id              String                         @id @default(cuid())
+  recordingId     String                         @map("recording_id")
+  type            ConsultationRecordingEventType
+  clientElapsedMs Int                            @map("client_elapsed_ms")
+  createdAt       DateTime                       @default(now()) @map("created_at")
+  recording       ConsultationRecording          @relation(fields: [recordingId], references: [id], onDelete: Restrict)
+
+  @@index([recordingId, createdAt])
+  @@map("consultation_recording_events")
+}
+
+model TranscriptionRun {
+  id                    String                 @id @default(cuid())
+  tenantId              String                 @map("tenant_id")
+  clinicId              String                 @map("clinic_id")
+  registrationId        String                 @map("registration_id")
+  recordingId           String                 @map("recording_id")
+  requestedByUserId     String                 @map("requested_by_user_id")
+  provider              TranscriptionProvider
+  model                 String                 @db.VarChar(101)
+  status                TranscriptionRunStatus @default(QUEUED)
+  mode                  TranscriptionMode      @default(VERBATIM)
+  providerJobId         String?                @map("provider_job_id") @db.VarChar(255)
+  providerRequestId     String?                @map("provider_request_id") @db.VarChar(255)
+  languageCode          String?                @map("language_code") @db.VarChar(32)
+  requestedSpeakerCount Int?                   @map("requested_speaker_count")
+  attemptNumber         Int                    @default(1) @map("attempt_number")
+  failureCode           String?                @map("failure_code") @db.VarChar(64)
+  queuedAt              DateTime               @default(now()) @map("queued_at")
+  startedAt             DateTime?              @map("started_at")
+  submittedAt           DateTime?              @map("submitted_at")
+  completedAt           DateTime?              @map("completed_at")
+  nextAttemptAt         DateTime?              @map("next_attempt_at")
+  lockedAt              DateTime?              @map("locked_at")
+  leaseExpiresAt        DateTime?              @map("lease_expires_at")
+  lockedBy              String?                @map("locked_by") @db.VarChar(128)
+  audioDurationMs       Int?                   @map("audio_duration_ms")
+  audioBytes            BigInt?                @map("audio_bytes")
+  latencyMs             Int?                   @map("latency_ms")
+  fallbackFromRunId     String?                @map("fallback_from_run_id")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic                Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration          Registration           @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  recording             ConsultationRecording  @relation(fields: [recordingId], references: [id], onDelete: Restrict)
+  requestedBy           User                   @relation("TranscriptionRunRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  transcript            ClinicalTranscript?
+  fallbackFrom          TranscriptionRun?      @relation("TranscriptionFallback", fields: [fallbackFromRunId], references: [id], onDelete: Restrict)
+  fallbackRuns          TranscriptionRun[]     @relation("TranscriptionFallback")
+
+  @@index([provider, status, nextAttemptAt])
+  @@index([leaseExpiresAt])
+  @@index([tenantId, createdAt])
+  @@map("transcription_runs")
+}
+
+model ClinicalTranscript {
+  id                 String                      @id @default(cuid())
+  tenantId           String                      @map("tenant_id")
+  clinicId           String                      @map("clinic_id")
+  registrationId     String                      @map("registration_id")
+  recordingId        String                      @map("recording_id")
+  transcriptionRunId String                      @unique @map("transcription_run_id")
+  sourceText         String                      @map("source_text") @db.LongText
+  sourceHash         String                      @map("source_hash") @db.Char(64)
+  reviewedAt         DateTime?                   @map("reviewed_at")
+  reviewedByUserId   String?                     @map("reviewed_by_user_id")
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  updatedAt          DateTime                    @updatedAt @map("updated_at")
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic             Clinic                      @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration       Registration                @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  recording          ConsultationRecording       @relation(fields: [recordingId], references: [id], onDelete: Restrict)
+  transcriptionRun   TranscriptionRun            @relation(fields: [transcriptionRunId], references: [id], onDelete: Restrict)
+  segments           ClinicalTranscriptSegment[]
+  speakerMappings    TranscriptSpeakerMapping[]
+  corrections        TranscriptCorrection[]
+
+  @@index([tenantId, clinicId, createdAt])
+  @@map("clinical_transcripts")
+}
+
+model ClinicalTranscriptSegment {
+  id           String             @id @default(cuid())
+  transcriptId String             @map("transcript_id")
+  ordinal      Int
+  speakerLabel String             @map("speaker_label") @db.VarChar(64)
+  startMs      Int                @map("start_ms")
+  endMs        Int                @map("end_ms")
+  text         String             @db.Text
+  transcript   ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
+
+  @@unique([transcriptId, ordinal])
+  @@index([transcriptId, ordinal])
+  @@map("clinical_transcript_segments")
+}
+
+model TranscriptSpeakerMapping {
+  id           String             @id @default(cuid())
+  transcriptId String             @map("transcript_id")
+  speakerLabel String             @map("speaker_label") @db.VarChar(64)
+  speakerType  String             @map("speaker_type") @db.VarChar(32)
+  createdAt    DateTime           @default(now()) @map("created_at")
+  transcript   ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
+
+  @@unique([transcriptId, speakerLabel])
+  @@map("transcript_speaker_mappings")
+}
+
+model TranscriptCorrection {
+  id            String             @id @default(cuid())
+  transcriptId  String             @map("transcript_id")
+  createdById   String             @map("created_by_id")
+  segmentId     String?            @map("segment_id")
+  originalText  String             @map("original_text") @db.Text
+  correctedText String             @map("corrected_text") @db.Text
+  createdAt     DateTime           @default(now()) @map("created_at")
+  transcript    ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
+  createdBy     User               @relation("TranscriptCorrectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([transcriptId, createdAt])
+  @@map("transcript_corrections")
 }
 
 enum PatientPortalAccountStatus {
