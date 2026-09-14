@@ -31,6 +31,11 @@ CREATE TABLE `consultation_recordings` (
     `consent_id` VARCHAR(191) NOT NULL,
     `status` ENUM('CREATED', 'RECORDING', 'PAUSED', 'STOPPED', 'UPLOADING', 'READY', 'ABORTED', 'FAILED') NOT NULL DEFAULT 'CREATED',
     `active_key` VARCHAR(191) NULL,
+    `upload_id` VARCHAR(255) NULL,
+    `upload_part_size` INTEGER NULL,
+    `upload_part_count` INTEGER NULL,
+    `upload_expected_bytes` BIGINT NULL,
+    `upload_completed_parts_hash` CHAR(64) NULL,
     `mime_type` VARCHAR(128) NULL,
     `duration_ms` INTEGER NULL,
     `byte_size` BIGINT NULL,
@@ -256,3 +261,9 @@ ALTER TABLE `transcript_corrections` ADD CONSTRAINT `transcript_corrections_tran
 
 -- AddForeignKey
 ALTER TABLE `transcript_corrections` ADD CONSTRAINT `transcript_corrections_created_by_id_fkey` FOREIGN KEY (`created_by_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Prevent nullable unique-key bypass for any unfinished recording.
+ALTER TABLE `consultation_recordings` ADD CONSTRAINT `recording_active_key_state_check` CHECK (
+  (`status` IN ('CREATED', 'RECORDING', 'PAUSED', 'STOPPED', 'UPLOADING') AND `active_key` IS NOT NULL)
+  OR (`status` IN ('READY', 'ABORTED', 'FAILED') AND `active_key` IS NULL)
+);

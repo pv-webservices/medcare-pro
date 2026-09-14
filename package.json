@@ -63,6 +63,8 @@
     "test:clinical-ai": "tsx scripts/test-clinical-ai.mts",
     "test:e2e:clinical-ai": "playwright test --config=playwright.clinical-ai.config.ts",
     "verify:clinical-audio": "tsx scripts/verify-clinical-audio.mts",
+    "test:clinical-audio": "vitest run clinicalAudio && tsx scripts/test-clinical-audio.mts",
+    "test:e2e:clinical-audio": "playwright test --config=playwright.clinical-audio.config.ts",
     "test:e2e:prescriptions": "playwright test --config=playwright.prescriptions.config.ts",
     "patient-portal:backfill": "tsx scripts/backfill-patient-portal.mts",
     "patient-portal:password-auth-backfill": "tsx scripts/backfill-patient-portal-password-auth.mts",

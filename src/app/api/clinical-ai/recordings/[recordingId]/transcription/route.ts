@@ -1,8 +1,6 @@
-import { requireActor } from "@/lib/session";
-import { jsonOk, toErrorResponse } from "@/lib/apiHandler";
-import { requestTranscription } from "@/lib/transcription/service";
-type Context = { params: Promise<{ recordingId: string }> };
-export async function POST(_request: Request, context: Context) {
-  try { const actor = await requireActor(); const { recordingId } = await context.params; return jsonOk(await requestTranscription(actor, recordingId)); }
-  catch (error) { return toErrorResponse(error, "POST transcription request"); }
+import { audioError } from "@/lib/clinical-audio/api";
+import { ClinicalAudioDisabledError } from "@/lib/clinical-audio/errors";
+// AI-2A.1 ends at READY; transcription requests are reserved for AI-2A.2.
+export async function POST() {
+  return audioError(new ClinicalAudioDisabledError());
 }

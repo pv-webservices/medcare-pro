@@ -45,7 +45,7 @@ describe("the catalogue", () => {
 
   it("uses the resource:action naming convention throughout", () => {
     for (const key of ALL_PERMISSIONS) {
-      expect(key).toMatch(/^[a-z]+(?:[-_][a-z]+)*(?::[a-z]+)+$/);
+      expect(key).toMatch(/^[a-z]+(?:[-_][a-z]+)*(?::[a-z]+(?:[-_][a-z]+)*)+$/);
     }
   });
 
@@ -85,7 +85,9 @@ describe("HISTORICAL_ALL_PERMISSIONS", () => {
     for (const key of HISTORICAL_ALL_PERMISSIONS) {
       expect(ALL_PERMISSIONS).toContain(key);
     }
-    expect(ALL_PERMISSIONS.length).toBeGreaterThan(HISTORICAL_ALL_PERMISSIONS.length);
+    expect(ALL_PERMISSIONS.length).toBeGreaterThan(
+      HISTORICAL_ALL_PERMISSIONS.length,
+    );
   });
 
   it("has no duplicates", () => {
@@ -158,7 +160,9 @@ describe("STAGE_1_PERMISSIONS", () => {
 
 describe("isUntouchedHistoricalAdminSet", () => {
   it("matches a seeded Admin role nobody has edited", () => {
-    expect(isUntouchedHistoricalAdminSet([...HISTORICAL_ALL_PERMISSIONS])).toBe(true);
+    expect(isUntouchedHistoricalAdminSet([...HISTORICAL_ALL_PERMISSIONS])).toBe(
+      true,
+    );
   });
 
   it("ignores ordering, because the roles editor does not preserve it", () => {
@@ -175,7 +179,10 @@ describe("isUntouchedHistoricalAdminSet", () => {
 
   it("does not match a role with a permission added", () => {
     expect(
-      isUntouchedHistoricalAdminSet([...HISTORICAL_ALL_PERMISSIONS, "team:view"]),
+      isUntouchedHistoricalAdminSet([
+        ...HISTORICAL_ALL_PERMISSIONS,
+        "team:view",
+      ]),
     ).toBe(false);
   });
 

@@ -18,13 +18,16 @@ import {
 } from "@/lib/prescriptionValidation";
 import type { ConsultationWorkspaceData } from "@/lib/prescriptions";
 import ClinicalWritingControl from "./ClinicalWritingControl";
+import ClinicalAudioPanel from "@/components/clinicalAudio/ClinicalAudioPanel";
 
 export default function ConsultationWorkspace({
   data,
   mayUseAi = false,
+  clinicalAudio,
 }: {
   data: ConsultationWorkspaceData;
   mayUseAi?: boolean;
+  clinicalAudio?: { maxMinutes: number } | null;
 }) {
   const router = useRouter();
   const [consultation, setConsultation] = useState(
@@ -216,6 +219,13 @@ export default function ConsultationWorkspace({
           {message}
         </p>
       )}
+      {clinicalAudio && (
+        <ClinicalAudioPanel
+          registrationId={context.visit.registrationId}
+          maxMinutes={clinicalAudio.maxMinutes}
+          inPerson={consultation.consultationMode === "IN_PERSON"}
+        />
+      )}
       {review && preview ? (
         <>
           <PrescriptionDocument
@@ -285,8 +295,8 @@ export default function ConsultationWorkspace({
               {mayUseAi && (
                 <p className="text-sm text-muted">
                   Clinical Writing Assistant · Correct spelling and grammar
-                  while preserving clinical meaning.
-                  Review every suggestion before accepting.
+                  while preserving clinical meaning. Review every suggestion
+                  before accepting.
                 </p>
               )}
               <Select

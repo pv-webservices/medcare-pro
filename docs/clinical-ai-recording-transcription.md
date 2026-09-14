@@ -1,34 +1,57 @@
-# Clinical AI-2A: recording and transcription
+# Clinical AI recording — AI-2A.1
 
-AI-2A is limited to consented, face-to-face consultation audio captured from a single browser microphone. It does not record Plivo, WhatsApp, WebRTC, Zoom/Meet, or other remote calls, and it does not diagnose, recommend treatment, create prescriptions, extract facts, or populate consultation notes.
+## Scope and data flow
 
-## Safety boundary
+Consented IN_PERSON browser microphone → MediaRecorder → IndexedDB → reconstructed Blob → signed multipart upload → private storage → HEAD verification → Recording READY → authorized playback.
 
-Recording requires an active tenant, the `clinical_ai` entitlement, `prescription:draft`, `clinical-ai:recording`, an assigned Doctor linked to the authenticated user, and an editable registration. Tenant Owner/Admin authority alone does not substitute for that Doctor identity. Transcript requests additionally require `clinical-ai:transcription`; reading requires `clinical-ai:transcript-read`.
+This milestone does not capture Plivo/WhatsApp/remote calls, modify notes/prescriptions, generate transcripts or enqueue transcription. Provider mocks/interfaces and leasing primitives remain foundation only. The transcription endpoint is explicitly disabled.
 
-The separate `CLINICAL_AUDIO_ENABLED` switch must be `true`. It is independent from AI-1's `AI_ENABLED` switch, so disabling audio does not disable writing assistance.
+## Identity and consent
 
-## Data flow
+Live server-side authorization derives active user/tenant, clinic, Registration, patient and assigned linked Doctor. Owner/Admin wildcard rights never impersonate a Doctor. Recording writes require prescription:draft, clinical-ai:recording, clinical_ai/prescriptions entitlements, editable IN_PERSON consultation and valid consent. Read/cleanup paths use prescription:read and live visit ownership. Playback separately requires clinical-ai:transcript-read. Foreign resources return privacy-safe 404.
 
-```text
-Microphone -> browser temporary chunks -> private object storage
-          -> server-created TranscriptionRun -> Sarvam Saaras v4 Batch
-          -> normalized immutable ClinicalTranscript + segments
-          -> clinician speaker mapping / append-only corrections
-```
+Doctor explicitly attests verbal/written/digital consent from patient/guardian/authorized representative. Neither consent nor microphone permission is automatic. AI_ENABLED and the independent CLINICAL_AUDIO_ENABLED gate audio; audio off preserves AI-1. Customized historical roles are not migrated by name.
 
-MySQL stores metadata, consent, state events, transcript text and normalized segments. It never stores audio bytes. Object keys are opaque IDs and must not contain patient identifiers. Production storage is fail-closed unless an S3-compatible provider is configured; local/memory providers are test/development only.
+## Browser and IndexedDB
 
-## State and privacy
+The additive Recording & Transcript panel preserves consultation notes and prescriptions. Check microphone explicitly calls getUserMedia with optional echoCancellation/noiseSuppression/autoGainControl and shows selected input label and transient Web Audio RMS meter. No device identifiers or meter telemetry are stored.
 
-Recording state is `CREATED -> RECORDING <-> PAUSED -> STOPPED -> UPLOADING -> READY`, with explicit `ABORTED` and `FAILED` paths. A unique `active_key` plus a registration row lock prevents two active sessions for one visit. Consent withdrawal aborts the recording and prevents transcription. Source transcript text is never overwritten; corrections are append-only.
+MIME preference: audio/webm;codecs=opus, audio/ogg;codecs=opus, audio/mp4, audio/webm, selected by isTypeSupported. Controlled error messages cover unsupported/denied/missing/busy microphone. Server start/pause/resume succeeds before MediaRecorder transitions. Timeslice is 10000ms, not a duration estimate. performance.now excludes paused periods; configured maximum auto-stops. Device ended stops safely; mute shows feedback.
 
-Sarvam is configured for `saaras:v4`, `verbatim`, diarization, two expected speakers, and optional keyterms. Sarvam Batch is required for long audio and speaker diarization. Gemini is represented as a separate provider boundary for an approved future fallback; no live provider calls are made by tests or this local implementation.
+Each dataavailable Blob is queued immediately into IndexedDB rather than an accumulating React array. Stop waits for final dataavailable and all writes, validates contiguous chunks, reconstructs nonempty Blob, then stops server state.
 
-## Required configuration
+medcare-clinical-audio v1 has sessions keyed by recordingId and chunks keyed by [recordingId,sequence], indexed by recordingId. Session fields: registrationId, MIME, timestamps, state, nextSequence, elapsedMs. Chunk fields: Blob, size, createdAt. Chunk insertion and sequence advancement are atomic.
 
-See `.env.example` for the server-only configuration. Before production, configure a private TLS S3-compatible bucket, server-side encryption, narrow CORS, short-lived multipart signing, lifecycle/retention policy, Sarvam credentials and webhook authentication, a reliable worker, and organizational consent/provider-retention policy.
+Reload presents this Registration's unfinished sessions without automatic upload/microphone restart. Recover reauthorizes and uploads existing captured audio. Confirmed Discard aborts server state/multipart and removes local data. Upload interruption retains chunks for explicit retry. Withdrawal stops capture and deletes chunks immediately; failed server withdrawal retains a withdrawn metadata tombstone, which cannot be recovered for upload and permits cleanup retry. Successful READY confirmation deletes session and chunks. beforeunload and link warnings permit confirmed exit.
 
-## Current implementation boundary
+IndexedDB is temporary device-local resilience, not permanent storage. Hard crash can lose an incomplete timeslice; eviction, device loss and quota failure cannot be recovered server-side. Organizational browser/device acceptance remains necessary.
 
-The branch contains the additive Prisma domain, consent/recording authorization and state APIs, storage/provider interfaces, worker leasing primitive, configuration validation, and deterministic provider mocks. Browser IndexedDB chunk persistence, S3 multipart signing, Sarvam/Gemini transport, webhook verification, transcript review routes/UI, transliteration, retention worker, and Playwright coverage remain production prerequisites and are intentionally not implied by a green typecheck.
+## Database and upload
+
+CREATED → RECORDING ↔ PAUSED → STOPPED → UPLOADING → READY; ABORTED/FAILED are terminal. Registration/recording locks plus unique active_key prevent concurrent unfinished sessions. CHECK prohibits null active_key in unfinished states. The key remains occupied through upload and clears terminally. All 30 new clinical FKs use RESTRICT; historical migrations are unchanged.
+
+RecordingStorageProvider supports multipart create/sign/complete/abort, HEAD, signed read and delete. Server alone generates clinical-recordings/{opaqueTenantId}/{opaqueRecordingId}/source.{webm|ogg|mp4}; no names, phone/email, diagnosis or browser-selected key.
+
+POST /api/clinical-ai/recordings/:id/upload/init validates identity/state/consent/MIME/exact duration/expected bytes and persists/reuses upload metadata. /upload/part signs bounded expected part numbers/sizes. Browser PUTs directly to S3, one 8 MiB part at a time (nonfinal ≥5 MiB), retaining ETags and retrying up to three times with fresh instructions. /upload/complete validates contiguous unique ascending parts/ETags, locks and reauthorizes, completes multipart, verifies exact nonzero HEAD length/MIME/limit, then sets READY. Identical completion is idempotent; conflicts are rejected. HEAD permits recovery if storage completed before a database interruption. /upload/abort discards; withdrawal prevents completion and aborts/deletes pending storage.
+
+## Private storage and playback
+
+Official AWS SDK v3 S3 adapter uses configurable TLS endpoint/region/path style, AES256 or aws:kms SSE, no public ACL and bounded signing. InMemoryRecordingStorage is deterministic test-only. LocalRecordingStorageProvider is development-only, outside public, with expiring HMAC-bound instructions, traversal-safe keys, ETag validation and streamed private range playback.
+
+Local completion incrementally hashes parts into full-object SHA-256. S3 verifies size/MIME via HEAD and leaves sha256 nullable: multipart ETag is not SHA-256 and a browser hash is not trusted. Unsafe whole-recording browser digest duplication is avoided; provider checksums or a streaming digest can extend integrity metadata later.
+
+GET /api/clinical-ai/recordings/:id/audio-url requires assigned live Doctor, transcript-read permission, switches/entitlement, READY, retained source and unwithdrawn consent. TTL ≤300 seconds, private no-store responses, safe history metadata and HTML audio player. Local byte requests reauthorize. S3 URLs are bearer capabilities until expiry; do not share/log them. Immediate revocation of already-issued URLs requires object deletion/provider controls.
+
+MySQL contains metadata only, never audio. No public objects, browser provider credentials, patient personal identifiers in keys, binary/generic audit logs or patient-portal audio routes.
+
+## Configuration and boundaries
+
+.env.example has placeholders only. Production rejects local/memory, incomplete S3 or non-TLS endpoints. Require a PRIVATE bucket with public access blocked, least-privilege credentials, supported SSE and narrow CORS for approved origins, PUT/GET/HEAD, ETag exposure. S3-compatible code is not live R2/B2/vendor certification.
+
+Defaults: 120 minutes, 512 MiB and 300-second URLs. Optional retention sets metadata only; no cleanup worker is implemented. Orphan multipart lifecycle, consent/provider policy, live bucket acceptance and supported browser acceptance require separate operational sign-off.
+
+No live S3 or transcription calls, webhook, production worker, deployment or AI-3. AI-2A.2 owns live Sarvam/worker/webhook/immutable transcript integration and subsequent approved review/retention operations.
+
+## Verification
+
+Scripts enforce disposable localhost test schemas. Override DATABASE_URL per process; never change production/.env. npm run build invokes migrations and therefore must target disposable DB. verify:clinical-audio checks migration/index/FKs/concurrency/state/consent/isolation. test:clinical-audio runs unit and mock-backed DB integration. test:e2e:clinical-audio uses fake Chromium microphone/local private storage; CLINICAL_AUDIO_E2E_DISABLED=true starts a separate kill-switch run. Exact evidence is in the implementation report.
