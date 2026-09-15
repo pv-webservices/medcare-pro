@@ -16,6 +16,7 @@ import {
   ClinicCapacityConfigurationError,
   ClinicLimitReachedError,
 } from "@/lib/clinicCapacityErrors";
+import { ClinicalAudioDisabledError, RecordingStateError } from "@/lib/clinical-audio/errors";
 
 /**
  * Shared error mapping for API routes.
@@ -169,6 +170,9 @@ export function toErrorResponse(
     // Written for the user, so passed through rather than genericised.
     return jsonError(error.message, 409);
   }
+
+  if (error instanceof RecordingStateError) return jsonError(error.message, 409);
+  if (error instanceof ClinicalAudioDisabledError) return jsonError("Clinical audio recording is not enabled.", 403);
 
   if (error instanceof ZodError) {
     return jsonError(

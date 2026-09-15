@@ -15,6 +15,12 @@ const folder = resolve(tmpdir(), `medcare-portal-migration-${Date.now()}`);
 mkdirSync(folder);
 const migration = "20260913020000_patient_portal_password_email_auth";
 const root = process.cwd();
+const migrationEntries = readdirSync(resolve(root, "prisma/migrations"), {
+  withFileTypes: true,
+});
+const fullMigrationCount = migrationEntries.filter((entry) =>
+  entry.isDirectory(),
+).length;
 const schema = execFileSync(
   "git",
   ["show", "a2b4e607cd79f7037525be48d51a37eb32e7f905:prisma/schema.prisma"],
@@ -22,9 +28,7 @@ const schema = execFileSync(
 );
 writeFileSync(resolve(folder, "baseline.prisma"), schema);
 mkdirSync(resolve(folder, "migrations"));
-for (const entry of readdirSync(resolve(root, "prisma/migrations"), {
-  withFileTypes: true,
-}))
+for (const entry of migrationEntries)
   if (entry.isDirectory() && entry.name < migration)
     cpSync(
       resolve(root, "prisma/migrations", entry.name),
@@ -70,7 +74,9 @@ async function main() {
   stage = "empty replay";
   emptyUrl.pathname = `/${emptyName}`;
   deploy(emptyUrl.toString(), false);
-  console.log("PASS Complete 34-migration chain from empty database");
+  console.log(
+    `PASS Complete ${fullMigrationCount}-migration chain from empty database`,
+  );
   const upgradeUrl = new URL(source);
   stage = "baseline replay";
   upgradeUrl.pathname = `/${upgradeName}`;

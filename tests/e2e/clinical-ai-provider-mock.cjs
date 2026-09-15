@@ -10,6 +10,8 @@ if (
   );
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, options) => {
+  if (String(url).startsWith("https://api.sarvam.ai/"))
+    throw new Error("Live Sarvam transport is forbidden in automated E2E.");
   if (String(url).startsWith("https://generativelanguage.googleapis.com/")) {
     const payload = JSON.parse(options.body);
     const { input } = JSON.parse(payload.contents[0].parts[0].text);
