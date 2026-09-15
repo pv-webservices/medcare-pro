@@ -36,13 +36,19 @@ try {
     ),
   );
   for (const name of ["20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards"]) check("AI-2A.2 migration applied: " + name, migrations.some((migration) => migration.migration_name === name));
-  for (const name of ["20260914010000_clinical_recording_transcription", "20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards"]) {
+  for (const name of ["20260914010000_clinical_recording_transcription", "20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards", "20260915120000_clinical_ai2a3_hardening"]) {
     const checksum = createHash("sha256").update(await readFile(`prisma/migrations/${name}/migration.sql`)).digest("hex");
     check("Migration checksum matches: " + name, migrations.some((migration) => migration.migration_name === name && migration.checksum === checksum));
   }
   const transcriptionIndexes = await prisma.$queryRaw<{ INDEX_NAME: string; NON_UNIQUE: bigint }[]>`SELECT INDEX_NAME,NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='transcription_runs'`;
   for (const name of ["transcription_runs_active_key_key", "transcription_runs_provider_provider_job_id_key"]) check("Transcription unique index: " + name, transcriptionIndexes.some((index) => index.INDEX_NAME === name && Number(index.NON_UNIQUE) === 0));
   const evidenceTriggers = await prisma.$queryRaw<{ TRIGGER_NAME: string }[]>`SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()`;
+  check("Permanent fallback unique key", transcriptionIndexes.some(index => index.INDEX_NAME === "transcription_runs_fallback_key_key" && Number(index.NON_UNIQUE) === 0));
+  for (const name of ["derived_segment_owner_guard", "derived_view_source_guard", "derived_segment_identity_guard", "derived_view_identity_guard"]) check("Derived evidence trigger: " + name, evidenceTriggers.some(trigger => trigger.TRIGGER_NAME === name));
+  const derivedIndexes = await prisma.$queryRaw<{ INDEX_NAME: string; NON_UNIQUE: bigint }[]>`SELECT INDEX_NAME,NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='transcript_derived_views'`;
+  check("Derived source/type unique key", derivedIndexes.some(index => index.INDEX_NAME === "derived_source_type_key" && Number(index.NON_UNIQUE) === 0));
+  const derivedFks = await prisma.$queryRaw<{ DELETE_RULE: string }[]>`SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME IN ('transcript_derived_views','transcript_derived_segments')`;
+  check("All four derived foreign keys restrictive", derivedFks.length === 4 && derivedFks.every(fk => fk.DELETE_RULE === "RESTRICT"));
   for (const name of ["transcription_active_key_insert", "transcription_active_key_update", "clinical_transcript_source_immutable", "clinical_transcript_segment_immutable", "clinical_transcript_segment_no_delete", "transcript_correction_append_only", "transcript_correction_no_delete", "transcript_speaker_identity_immutable"]) check("Evidence trigger: " + name, evidenceTriggers.some((trigger) => trigger.TRIGGER_NAME === name));
   const indexes = await prisma.$queryRaw<
     Array<{ INDEX_NAME: string }>

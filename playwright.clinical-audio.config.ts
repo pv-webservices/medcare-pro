@@ -50,6 +50,8 @@ export default defineConfig({
         process.env.CLINICAL_AUDIO_E2E_DISABLED === "true" ? "false" : "true",
       RECORDING_STORAGE_PROVIDER: "local",
       TRANSCRIPTION_PRIMARY_PROVIDER: "sarvam",
+      TRANSCRIPTION_FALLBACK_PROVIDER: "gemini",
+      GEMINI_TRANSCRIPTION_API_KEY: "synthetic-fallback-never-sent",
       TRANSCRIPTION_AUTO_FALLBACK: "false",
       SARVAM_API_SUBSCRIPTION_KEY: "synthetic-never-sent",
       SARVAM_TRANSCRIPTION_MODEL: "saaras:v4",

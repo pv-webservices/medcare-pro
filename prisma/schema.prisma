@@ -36,6 +36,7 @@ datasource db {
 /// The top-level tenant. One signup = one Tenant, which can own many Clinics.
 /// Holds no credentials of its own — see the note on User.passwordHash.
 model Tenant {
+  allowGeminiTranscriptionFallback Boolean @default(false) @map("allow_gemini_transcription_fallback")
   aiRuns            AiRun[]
   portalAuditEvents PatientPortalAuditEvent[]
   id                String                    @id @default(cuid())
@@ -159,6 +160,7 @@ model Tenant {
 /// A login within a Tenant. Signup creates exactly one of these (the owner);
 /// further users are invited by an Owner/Admin.
 model User {
+  transcriptDerivedViews TranscriptDerivedView[] @relation("TranscriptDerivedViewCreatedBy")
   aiRuns                      AiRun[]
   portalIdentityVerifications PatientPortalLink[]       @relation("PortalIdentityVerifier")
   portalRevocations           PatientPortalLink[]       @relation("PortalRevoker")
@@ -2494,6 +2496,9 @@ model ConsultationRecording {
   uploadedAt       DateTime?                   @map("uploaded_at")
   audioDeleteAfter DateTime?                   @map("audio_delete_after")
   audioDeletedAt   DateTime?                   @map("audio_deleted_at")
+  audioCleanupToken String? @map("audio_cleanup_token") @db.Char(36)
+  audioCleanupLeaseExpiresAt DateTime? @map("audio_cleanup_lease_expires_at")
+  audioCleanupNextAttemptAt DateTime? @map("audio_cleanup_next_attempt_at")
   version          Int                         @default(1)
   createdAt        DateTime                    @default(now()) @map("created_at")
   updatedAt        DateTime                    @updatedAt @map("updated_at")
@@ -2563,6 +2568,10 @@ model TranscriptionRun {
   audioBytes            BigInt?                @map("audio_bytes")
   latencyMs             Int?                   @map("latency_ms")
   fallbackFromRunId     String?                @map("fallback_from_run_id")
+  fallbackKey String? @unique @map("fallback_key") @db.VarChar(191)
+  providerArtifactName String? @map("provider_artifact_name") @db.VarChar(255)
+  providerArtifactDeletePendingAt DateTime? @map("provider_artifact_delete_pending_at")
+  providerArtifactDeletedAt DateTime? @map("provider_artifact_deleted_at")
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -2577,6 +2586,7 @@ model TranscriptionRun {
   @@index([provider, status, nextAttemptAt])
   @@unique([provider, providerJobId])
   @@index([leaseExpiresAt])
+  @@index([providerArtifactDeletePendingAt, providerArtifactDeletedAt], map: "transcription_artifact_cleanup_idx")
   @@index([tenantId, createdAt])
   @@map("transcription_runs")
 }
@@ -2603,6 +2613,7 @@ model ClinicalTranscript {
   segments           ClinicalTranscriptSegment[]
   speakerMappings    TranscriptSpeakerMapping[]
   corrections        TranscriptCorrection[]
+  derivedViews TranscriptDerivedView[]
 
   @@index([tenantId, clinicId, createdAt])
   @@map("clinical_transcripts")
@@ -2617,10 +2628,46 @@ model ClinicalTranscriptSegment {
   endMs        Int                @map("end_ms")
   text         String             @db.Text
   transcript   ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
+  derivedSegments TranscriptDerivedSegment[]
 
   @@unique([transcriptId, ordinal])
   @@index([transcriptId, ordinal])
   @@map("clinical_transcript_segments")
+}
+
+model TranscriptDerivedView {
+  id String @id @default(cuid())
+  transcriptId String @map("transcript_id")
+  sourceHash String @map("source_hash") @db.Char(64)
+  type String @default("ROMANIZED") @db.VarChar(32)
+  provider String @default("SARVAM") @db.VarChar(32)
+  status String @default("QUEUED") @db.VarChar(32)
+  isPartial Boolean @default(false) @map("is_partial")
+  createdByUserId String @map("created_by_user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  leaseToken String? @map("lease_token") @db.Char(36)
+  leaseExpiresAt DateTime? @map("lease_expires_at")
+  transcript ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
+  createdBy User @relation("TranscriptDerivedViewCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, map: "derived_view_created_by_fkey")
+  segments TranscriptDerivedSegment[]
+  @@unique([transcriptId, sourceHash, type], map: "derived_source_type_key")
+  @@index([status, leaseExpiresAt], map: "derived_queue_idx")
+  @@map("transcript_derived_views")
+}
+
+model TranscriptDerivedSegment {
+  id String @id @default(cuid())
+  derivedViewId String @map("derived_view_id")
+  sourceSegmentId String @map("source_segment_id")
+  text String @db.Text
+  status String @db.VarChar(32)
+  sourceLanguageCode String? @map("source_language_code") @db.VarChar(32)
+  view TranscriptDerivedView @relation(fields: [derivedViewId], references: [id], onDelete: Restrict)
+  sourceSegment ClinicalTranscriptSegment @relation(fields: [sourceSegmentId], references: [id], onDelete: Restrict)
+  @@unique([derivedViewId, sourceSegmentId], map: "derived_segment_key")
+  @@index([sourceSegmentId], map: "derived_segment_source_idx")
+  @@map("transcript_derived_segments")
 }
 
 model TranscriptSpeakerMapping {

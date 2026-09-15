@@ -11,10 +11,14 @@ import { getClinicalAudioConfig } from "../../src/lib/clinical-audio/config";
 import { LocalRecordingStorageProvider } from "../../src/lib/clinical-audio/storage/local";
 import type { SarvamJobStatus } from "../../src/lib/transcription/providers/sarvam";
 import { TranscriptionFailure } from "../../src/lib/transcription/errors";
+import { workRomanizationOnce, SarvamTransliterationClient } from "../../src/lib/transcription/romanization";
 assertClinicalAudioDatabase();
 process.env.AI_ENABLED = "true"; process.env.CLINICAL_AUDIO_ENABLED = "true"; process.env.RECORDING_STORAGE_PROVIDER = "local";
 try {
   const recording = await prisma.consultationRecording.findUniqueOrThrow({ where: { id: process.argv[2] } });
+  if (process.argv.includes("--romanized")) {
+    await workRomanizationOnce(new SarvamTransliterationClient("synthetic", async () => new Response(JSON.stringify({ source_language_code: "hi-IN", transliterated_text: "mujhe teen din se bukhar hai" }))), recording.tenantId);
+  } else {
   const run = await prisma.transcriptionRun.findUniqueOrThrow({ where: { activeKey: recording.id } });
   const config = getSarvamBatchConfig({ TRANSCRIPTION_PRIMARY_PROVIDER: "sarvam", SARVAM_API_SUBSCRIPTION_KEY: "synthetic-never-sent" });
   const storage = new LocalRecordingStorageProvider(getClinicalAudioConfig({ ...process.env, RECORDING_LOCAL_ROOT: resolve(tmpdir(), "medcare-ai2a1-e2e-private"), RECORDING_LOCAL_SIGNING_SECRET: "disposable-local-audio-signing-secret" })!);
@@ -27,5 +31,14 @@ try {
     async start() { state = "Running"; return status(); }, async status() { return status(); },
     async result() { return { request_id: "synthetic", transcript: "Metformin 500 mg once daily. No chest pain for three days; left knee pain.", language_code: "en-IN", diarized_transcript: { entries: [{ transcript: "Metformin 500 mg once daily.", start_time_seconds: 0, end_time_seconds: 10, speaker_id: "speaker_0" }, { transcript: "No chest pain for three days; left knee pain.", start_time_seconds: 17, end_time_seconds: 20, speaker_id: "speaker_1" }] } }; },
   };
-  await workTranscriptionOnce("synthetic-e2e-worker", { config, storage, provider, tenantId: recording.tenantId });
+  await workTranscriptionOnce("synthetic-e2e-worker", { config, storage, provider, tenantId: recording.tenantId, gemini: { async transcribe(input) {
+    await input.stream.cancel();
+    await new Promise(resolve => setTimeout(resolve, 12000));
+    return { sourceText: "मुझे तीन दिन से बुखार है. Metformin 500 mg. آپ میٹفارمین", segments: [
+      { ordinal: 0, speakerLabel: "spk_1", startMs: 0, endMs: 1000, text: "मुझे तीन दिन से बुखार है" },
+      { ordinal: 1, speakerLabel: "spk_2", startMs: 1000, endMs: 2000, text: "Metformin 500 mg." },
+      { ordinal: 2, speakerLabel: "spk_1", startMs: 2000, endMs: 3000, text: "آپ میٹفارمین" },
+    ] };
+  } } });
+  }
 } finally { await prisma.$disconnect(); }

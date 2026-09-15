@@ -13,6 +13,9 @@ import { addCorrection, confirmSpeaker, getTranscript, reviewTranscript } from "
 import type { SarvamJobStatus } from "@/lib/transcription/providers/sarvam";
 import { TranscriptionFailure } from "@/lib/transcription/errors";
 import { ConflictError } from "@/lib/apiHandler";
+import { fallbackEligibility, requestGeminiFallback, setFallbackSettings } from "@/lib/transcription/fallback";
+import { getRomanizedView, requestRomanization, workRomanizationOnce, SarvamTransliterationClient } from "@/lib/transcription/romanization";
+import { cleanupAudioOnce, cleanupProviderArtifactOnce } from "@/lib/clinical-audio/cleanup";
 import { POST as sarvamCallback } from "@/app/api/clinical-ai/transcription/webhooks/sarvam/route";
 let checks = 0;
 function check(label: string, assertion: unknown) { assert.ok(assertion, label); checks++; console.log(`PASS ${label}`); }
@@ -209,5 +212,76 @@ try {
   process.env.CLINICAL_AUDIO_ENABLED = "false";
   await assert.rejects(getTranscript(actor, evidence.id)); check("kill switch blocks transcript reads", true);
   process.env.CLINICAL_AUDIO_ENABLED = "true";
+  process.env.TRANSCRIPTION_FALLBACK_PROVIDER = "gemini";
+  process.env.GEMINI_TRANSCRIPTION_API_KEY = "synthetic-fallback-never-sent";
+  const fallbackRecording = await ready();
+  const failedPrimary = await requestTranscription(actor, fallbackRecording.id);
+  await prisma.transcriptionRun.update({ where: { id: failedPrimary.run.id }, data: { status: "FAILED", failureCode: "NETWORK", activeKey: null } });
+  await assert.rejects(requestGeminiFallback(actor, fallbackRecording.id)); check("tenant fallback defaults disabled", true);
+  await assert.rejects(setFallbackSettings(actor, true)); check("clinician cannot change organization processor governance", true);
+  await assert.rejects(setFallbackSettings(fixture.admin.actor, true)); check("clinic-scoped admin cannot opt the whole tenant into Google processing", true);
+  await setFallbackSettings(fixture.owner.actor, true);
+  await assert.rejects(requestGeminiFallback(fixture.foreign.actor, fallbackRecording.id)); check("foreign fallback denied", true);
+  await assert.rejects(requestGeminiFallback(fixture.scopedUser.actor, fallbackRecording.id)); check("cross-clinic fallback denied", true);
+  await assert.rejects(requestGeminiFallback(fixture.admin.actor, fallbackRecording.id)); check("unlinked admin fallback denied", true);
+  await prisma.consultationRecording.update({ where: { id: fallbackRecording.id }, data: { durationMs: 31 * 60_000 } });
+  check("31 minute fallback unavailable", (await fallbackEligibility(actor, fallbackRecording.id)).reason === "DURATION_LIMIT");
+  await assert.rejects(requestGeminiFallback(actor, fallbackRecording.id));
+  await prisma.consultationRecording.update({ where: { id: fallbackRecording.id }, data: { durationMs: 29 * 60_000 } });
+  check("29 minute failed Sarvam run eligible", (await fallbackEligibility(actor, fallbackRecording.id)).available);
+  const fallbackRequests = await Promise.all(Array.from({ length: 10 }, () => requestGeminiFallback(actor, fallbackRecording.id)));
+  check("ten concurrent fallback requests create exactly one run", new Set(fallbackRequests.map(r => r.run.id)).size === 1 && fallbackRequests.filter(r => r.created).length === 1);
+  const fallbackRun = fallbackRequests[0].run;
+  const geminiSource = { sourceText: "मुझे तीन दिन से बुखार है. Metformin 500 mg. آپ میٹفارمین پانچ سو ملی گرام لے رہے ہیں", providerRequestId: "synthetic-gemini", segments: [
+    { ordinal: 0, speakerLabel: "spk_1", startMs: 0, endMs: 1000, text: "मुझे तीन दिन से बुखार है" },
+    { ordinal: 1, speakerLabel: "spk_2", startMs: 1000, endMs: 2000, text: "Metformin 500 mg." },
+    { ordinal: 2, speakerLabel: "spk_1", startMs: 2000, endMs: 3000, text: "آپ میٹفارمین پانچ سو ملی گرام لے رہے ہیں" },
+  ] };
+  await workTranscriptionOnce("gemini-synthetic-worker", { config, storage, provider, gemini: { async transcribe(input) { await input.stream.cancel(); await input.artifact("files/synthetic", false); return geminiSource; } } });
+  const completedFallback = await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: fallbackRun.id }, include: { transcript: true } });
+  check("fallback preserves failed Sarvam provenance and own source", completedFallback.status === "COMPLETED" && completedFallback.fallbackFromRunId === failedPrimary.run.id && completedFallback.transcript?.sourceText === geminiSource.sourceText && (await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: failedPrimary.run.id } })).status === "FAILED");
+  const fallbackTranscript = completedFallback.transcript!;
+  await assert.rejects(requestGeminiFallback(actor, fallbackRecording.id)); check("successful source cannot request Gemini comparison", true);
+  const derivedRequests = await Promise.all(Array.from({ length: 10 }, () => requestRomanization(actor, fallbackTranscript.id)));
+  check("duplicate Romanization requests reuse same view", new Set(derivedRequests.map(v => v.id)).size === 1);
+  await assert.rejects(getRomanizedView(fixture.foreign.actor, fallbackTranscript.id)); check("foreign derived-view access denied", true);
+  let transliterationCalls = 0;
+  const transliterator = new SarvamTransliterationClient("synthetic", async () => { transliterationCalls++; return new Response(JSON.stringify({ source_language_code: "hi-IN", transliterated_text: "mujhe teen din se bukhar hai" })); });
+  await workRomanizationOnce(transliterator, actor.tenantId);
+  const derivedView = await getRomanizedView(actor, fallbackTranscript.id);
+  check("mixed-script view aligned and partial; Latin passthrough and Urdu preserved", derivedView?.isPartial && derivedView.segments.length === 3 && transliterationCalls === 1 && derivedView.segments.some(s => s.status === "PASSTHROUGH" && s.text === "Metformin 500 mg.") && derivedView.segments.some(s => s.status === "UNSUPPORTED" && s.text === geminiSource.segments[2].text));
+  check("Romanization cannot rewrite source", (await getTranscript(actor, fallbackTranscript.id)).sourceText === geminiSource.sourceText);
+  await assert.rejects(prisma.transcriptDerivedSegment.create({ data: { derivedViewId: derivedRequests[0].id, sourceSegmentId: transcript.segments[0].id, text: "synthetic foreign source", status: "PASSTHROUGH" } }));
+  check("database rejects derived segment bound to another transcript", true);
+  await assert.rejects(prisma.transcriptDerivedView.create({ data: { transcriptId: fallbackTranscript.id, sourceHash: "0".repeat(64), type: "SYNTHETIC_INVALID", createdByUserId: actor.userId } }));
+  check("database rejects derived view with a foreign source hash", true);
+  await prisma.consultationRecording.update({ where: { id: fallbackRecording.id }, data: { audioDeleteAfter: new Date(Date.now() + 60000) } });
+  check("unexpired audio is excluded from cleanup", await cleanupAudioOnce(storage, actor.tenantId) === 0 && !(await prisma.consultationRecording.findUniqueOrThrow({ where: { id: fallbackRecording.id } })).audioDeletedAt);
+  await prisma.consultationRecording.update({ where: { id: fallbackRecording.id }, data: { audioDeleteAfter: new Date(Date.now() - 1000) } });
+  let deletions = 0;
+  const failingStorage = Object.create(storage) as InMemoryRecordingStorage;
+  failingStorage.deleteObject = async () => { throw new Error("SYNTHETIC_STORAGE_OUTAGE"); };
+  await cleanupAudioOnce(failingStorage, actor.tenantId);
+  check("storage outage leaves audio undeleted and schedules retry", !(await prisma.consultationRecording.findUniqueOrThrow({ where: { id: fallbackRecording.id } })).audioDeletedAt);
+  await prisma.consultationRecording.update({ where: { id: fallbackRecording.id }, data: { audioCleanupNextAttemptAt: new Date(0) } });
+  const deletingStorage = Object.create(storage) as InMemoryRecordingStorage;
+  deletingStorage.deleteObject = async input => { deletions++; await storage.deleteObject(input); };
+  await Promise.all([cleanupAudioOnce(deletingStorage, actor.tenantId), cleanupAudioOnce(deletingStorage, actor.tenantId)]);
+  check("two cleanup workers delete exactly once and mark audio deleted", deletions === 1 && (await prisma.consultationRecording.findUniqueOrThrow({ where: { id: fallbackRecording.id } })).audioDeletedAt);
+  await cleanupAudioOnce(deletingStorage, actor.tenantId); check("already deleted audio remains idempotent", deletions === 1);
+  const missingRecording = await ready();
+  await prisma.consultationRecording.update({ where: { id: missingRecording.id }, data: { audioDeleteAfter: new Date(0) } });
+  const missingStorage = Object.create(storage) as InMemoryRecordingStorage;
+  missingStorage.deleteObject = async () => { throw Object.assign(new Error("synthetic missing object"), { name: "NotFound" }); };
+  await cleanupAudioOnce(missingStorage, actor.tenantId);
+  check("confirmed missing object is marked deleted safely", (await prisma.consultationRecording.findUniqueOrThrow({ where: { id: missingRecording.id } })).audioDeletedAt);
+  await assert.rejects(requestGeminiFallback(actor, fallbackRecording.id)); await assert.rejects(requestTranscription(actor, fallbackRecording.id)); check("deleted audio rejects both providers", true);
+  check("source, corrections and derived views survive audio deletion", (await getTranscript(actor, fallbackTranscript.id)).sourceHash === fallbackTranscript.sourceHash && (await getRomanizedView(actor, fallbackTranscript.id))?.status === "COMPLETED");
+  let artifactDeletions = 0;
+  await Promise.all([cleanupProviderArtifactOnce({ async deleteFile() { artifactDeletions++; } }, actor.tenantId), cleanupProviderArtifactOnce({ async deleteFile() { artifactDeletions++; } }, actor.tenantId)]);
+  check("provider cleanup is durable and exclusive", artifactDeletions === 1 && (await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: fallbackRun.id } })).providerArtifactDeletedAt);
+  const fallbackAudits = await prisma.auditLog.findMany({ where: { targetId: { in: [fallbackRun.id, fallbackRecording.id] } } });
+  check("fallback and retention audits contain metadata only", !JSON.stringify(fallbackAudits).includes("Metformin") && !JSON.stringify(fallbackAudits).includes("files/synthetic") && !JSON.stringify(fallbackAudits).includes("बुखार"));
+  await setFallbackSettings(fixture.owner.actor, false);
   console.log(`Clinical transcription: ${checks} checks passed.`);
 } finally { await prisma.$disconnect(); }

@@ -1,0 +1,13 @@
+import { describe, it, expect, vi } from "vitest";
+vi.mock("@/lib/transcription/transcripts", () => ({ getTranscript: vi.fn() }));
+import { romanizationLanguage, splitTransliteration, SarvamTransliterationClient } from "@/lib/transcription/romanization";
+describe("Romanization preserves evidence", () => {
+  it.each(["Metformin 500 mg once daily.", "Aapko fever kab se hai?", "7.2%", ""]) ("passes Latin/digits through %s", text => expect(romanizationLanguage(text)).toBe("PASSTHROUGH"));
+  it.each([["मुझे तीन दिन से बुखार है", "hi-IN"], ["জ্বর", "bn-IN"], ["fever है", "hi-IN"]])("supports script %s", (text, language) => expect(romanizationLanguage(text)).toBe(language));
+  it.each(["آپ میٹفارمین پانچ سو ملی گرام لے رہے ہیں", "Hello آپ", "漢字", "है آپ"]) ("preserves unsupported script %s", text => expect(romanizationLanguage(text)).toBe("UNSUPPORTED"));
+  it.each([999, 1000, 1001, 16000])("losslessly partitions length %i", n => { const text = "अ".repeat(n); const chunks = splitTransliteration(text); expect(chunks.join("")).toBe(text); expect(chunks.every(c => c.length <= 1000)).toBe(true); });
+  it("preserves graphemes, surrogate pairs and whitespace", () => { const text = "है 👨‍👩‍👦 ".repeat(300); const chunks = splitTransliteration(text); expect(chunks.join("")).toBe(text); expect(chunks.every(c => c.length <= 1000 && !/^[\uDC00-\uDFFF]|[\uD800-\uDBFF]$/u.test(c))).toBe(true); });
+  it("calls transliteration without translation or spoken normalization", async () => { const f = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ transliterated_text: "mujhe teen din se bukhar hai", source_language_code: "hi-IN" }))); expect(await new SarvamTransliterationClient("synthetic-never-sent", f).transliterate("मुझे तीन दिन से बुखार है", "hi-IN")).toBe("mujhe teen din se bukhar hai"); expect(JSON.parse(f.mock.calls[0][1]!.body as string)).toEqual({ input: "मुझे तीन दिन से बुखार है", source_language_code: "hi-IN", target_language_code: "en-IN", numerals_format: "international", spoken_form: false }); });
+  it.each([429, 500])("bounds retry for %i", async status => { const f = vi.fn<typeof fetch>().mockImplementation(async () => new Response(null, { status })); await expect(new SarvamTransliterationClient("synthetic", f).transliterate("बुखार", "hi-IN")).rejects.toThrow(); expect(f).toHaveBeenCalledTimes(3); });
+  it("rejects oversize requests before transport", async () => { const f = vi.fn<typeof fetch>(); await expect(new SarvamTransliterationClient("synthetic", f).transliterate("अ".repeat(1001), "hi-IN")).rejects.toThrow(); expect(f).not.toHaveBeenCalled(); });
+});

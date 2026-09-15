@@ -27,6 +27,7 @@ export class S3RecordingStorageProvider implements RecordingStorageProvider {
         secretAccessKey: c.secretAccessKey,
       },
       maxAttempts: 2,
+      requestHandler: { connectionTimeout: 10_000, requestTimeout: 30_000 },
       requestChecksumCalculation: "WHEN_REQUIRED",
       responseChecksumValidation: "WHEN_REQUIRED",
     });

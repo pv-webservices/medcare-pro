@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getSarvamBatchConfig } from "@/lib/transcription/batchConfig";
 const s3Schema = z.object({
   endpoint: z.url().refine((v) => new URL(v).protocol === "https:"),
   region: z.string().trim().min(1),
@@ -12,6 +13,11 @@ export function getClinicalAudioConfig(
   env: Record<string, string | undefined> = process.env,
 ) {
   if (env.CLINICAL_AUDIO_ENABLED !== "true") return null;
+  if (env.NODE_ENV === "production") {
+    if (!/^\d+$/.test(env.RECORDING_AUDIO_RETENTION_DAYS ?? "")) return null;
+    try { getSarvamBatchConfig(env); } catch { return null; }
+    if (!["persistent", "scheduled-once", "external"].includes(env.CLINICAL_AUDIO_WORKER_MODE ?? "")) return null;
+  }
   const config = z
     .object({
       storageProvider: z.enum(["s3", "memory", "local"]),
@@ -29,7 +35,7 @@ export function getClinicalAudioConfig(
     });
   if (
     !config.success ||
-    (env.NODE_ENV === "production" && config.data.storageProvider !== "s3")
+    (env.NODE_ENV === "production" && (config.data.storageProvider !== "s3" || !config.data.retentionDays))
   )
     return null;
   const s3 = s3Schema.safeParse({

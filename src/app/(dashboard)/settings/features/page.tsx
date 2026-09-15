@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import FeatureMatrix from "@/components/settings/FeatureMatrix";
+import ClinicalAiSettings from "@/components/settings/ClinicalAiSettings";
 import PageHeader from "@/components/ui/PageHeader";
 import { getFeatureOverview, type FeatureOverview } from "@/lib/features";
 import { PermissionError } from "@/lib/rbac";
@@ -68,6 +69,7 @@ export default async function FeatureSettingsPage() {
       />
 
       <FeatureMatrix features={overview.features} canManage={overview.canManage} />
+      <ClinicalAiSettings canManage={overview.canManage} />
     </section>
   );
 }

@@ -7,12 +7,14 @@ import { ClinicalAudioDisabledError } from "@/lib/clinical-audio/errors";
 import { getRecordingStorageProvider, type RecordingStorageProvider } from "@/lib/clinical-audio/storage";
 import { getSarvamBatchConfig, type SarvamBatchConfig } from "./batchConfig";
 import { SarvamBatchClient } from "./providers/sarvam";
+import { GeminiTranscriptionProvider } from "./providers/gemini";
+import type { NormalizedTranscript } from "./types";
 import { TranscriptionFailure } from "./errors";
 import { normalizeSarvamResult, transcriptSourceHash } from "./normalize";
 import { ACTIVE_TRANSCRIPTION_STATUSES, LEASE_MS, claimNextTranscriptionRun, fencedRunUpdate, retainedRecording, transcriptionAudit } from "./service";
 
 type BatchTransport = Pick<SarvamBatchClient, "createJob" | "upload" | "start" | "status" | "result">;
-type Dependencies = { config: SarvamBatchConfig; provider: BatchTransport; storage: RecordingStorageProvider; tenantId?: string };
+type Dependencies = { config: SarvamBatchConfig; provider: BatchTransport; storage: RecordingStorageProvider; tenantId?: string; gemini?: Pick<GeminiTranscriptionProvider, "transcribe"> };
 const released = { lockedBy: null, lockedAt: null, leaseToken: null, leaseExpiresAt: null };
 const actorFor = (run: TranscriptionRun) => ({ userId: run.requestedByUserId, tenantId: run.tenantId });
 
@@ -27,12 +29,12 @@ export async function workTranscriptionOnce(workerId: string, dependencies?: Dep
     const run = await claimNextTranscriptionRun(workerId, dependencies?.tenantId);
     if (!run) break;
     count++;
-    await processRun(run, { config, provider, storage });
+    await processRun(run, { config, provider, storage, gemini: dependencies?.gemini });
   }
   return count;
 }
 
-async function processRun(claim: TranscriptionRun, { config, provider, storage }: Dependencies) {
+async function processRun(claim: TranscriptionRun, { config, provider, storage, gemini }: Dependencies) {
   const controller = new AbortController();
   let renewing = false;
   const heartbeat = setInterval(() => {
@@ -48,6 +50,23 @@ async function processRun(claim: TranscriptionRun, { config, provider, storage }
     const extension = mime === "audio/ogg" ? "ogg" : mime === "audio/mp4" ? "mp4" : mime === "audio/webm" ? "webm" : null;
     if (!extension) throw new TranscriptionFailure("UNSUPPORTED_AUDIO");
     const filename = `${recording.id}.${extension}`;
+    const since = run.submittedAt ?? run.startedAt ?? run.queuedAt;
+    let source: NormalizedTranscript;
+    if (run.provider === "GEMINI") {
+      const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: run.tenantId } });
+      if (!tenant.allowGeminiTranscriptionFallback || !run.fallbackFromRunId) throw new TranscriptionFailure("CONFIGURATION");
+      if (run.submissionIntentAt) throw new TranscriptionFailure("PROVIDER_FAILURE");
+      const primary = await prisma.transcriptionRun.findUnique({ where: { id: run.fallbackFromRunId } });
+      if (!primary || primary.recordingId !== run.recordingId || primary.tenantId !== run.tenantId || primary.provider !== "SARVAM" || !["FAILED", "TIMED_OUT"].includes(primary.status)) throw new TranscriptionFailure("CONFIGURATION");
+      const head = await storage.headObject({ key: recording.storageKey! });
+      if (BigInt(head.size) !== recording.byteSize) throw new TranscriptionFailure("SOURCE_MISSING");
+      const stream = await storage.getObjectStream({ key: recording.storageKey! });
+      await fencedRunUpdate(run, { submissionIntentAt: new Date(), submittedAt: new Date(), status: "PROCESSING" });
+      await prisma.$transaction(async tx => { await transcriptionAudit(tx, actor, { ...run, status: "PROCESSING" }, "FALLBACK_STARTED"); });
+      source = await (gemini ?? new GeminiTranscriptionProvider()).transcribe({ stream, bytes: Number(recording.byteSize), mime: mime!, durationMs: recording.durationMs!, signal: controller.signal, artifact: async (name, deleted) => {
+        await prisma.transcriptionRun.update({ where: { id: run.id }, data: deleted ? { providerArtifactDeletedAt: new Date(), providerArtifactDeletePendingAt: null } : { providerArtifactName: name, providerArtifactDeletePendingAt: new Date() } });
+      } });
+    } else {
     if (!run.providerJobId) {
       // No documented provider idempotency key: ambiguous creates cannot auto-resubmit.
       if (run.submissionIntentAt) throw new TranscriptionFailure("PROVIDER_FAILURE");
@@ -81,13 +100,13 @@ async function processRun(claim: TranscriptionRun, { config, provider, storage }
       });
     }
     if (status.job_state === "Failed") throw new TranscriptionFailure("PROVIDER_FAILURE");
-    const since = run.submittedAt ?? run.startedAt ?? run.queuedAt;
     if (status.job_state !== "Completed") {
       if (Date.now() - since.getTime() >= config.jobTimeoutMinutes * 60_000) throw new TranscriptionFailure("TIMEOUT");
       await fencedRunUpdate(run, { status: status.job_state === "Running" ? "PROCESSING" : "SUBMITTED", lastPollAt: new Date(), nextAttemptAt: new Date(Date.now() + (run.lastPollAt ? config.pollIntervalSeconds : config.pollAfterSeconds) * 1000), ...released });
       return;
     }
-    const source = normalizeSarvamResult(await provider.result(status, filename, controller.signal), recording.durationMs!);
+    source = normalizeSarvamResult(await provider.result(status, filename, controller.signal), recording.durationMs!);
+    }
     const sourceHash = transcriptSourceHash(source);
     await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM registrations WHERE id = ${run.registrationId} FOR UPDATE`;
@@ -109,7 +128,7 @@ async function processRun(claim: TranscriptionRun, { config, provider, storage }
     const ambiguousCreate = current.submissionIntentAt !== null && current.providerJobId === null;
     // A documented 429 is a definite rejection, unlike ambiguous network/5xx creation.
     const definiteCreateRejection = ambiguousCreate && failure.code === "RATE_LIMIT";
-    const retry = failure.retryable && (!ambiguousCreate || definiteCreateRejection) && current.attemptNumber < 3;
+    const retry = current.provider === "SARVAM" && failure.retryable && (!ambiguousCreate || definiteCreateRejection) && current.attemptNumber < 3;
     await prisma.$transaction(async (tx) => {
       const changed = await tx.transcriptionRun.updateMany({ where: { id: claim.id, leaseToken: claim.leaseToken, leaseExpiresAt: { gt: new Date() }, status: { in: [...ACTIVE_TRANSCRIPTION_STATUSES] } }, data: { failureCode: failure.code, ...(retry ? { ...(definiteCreateRejection ? { submissionIntentAt: null } : {}), attemptNumber: { increment: 1 }, nextAttemptAt: new Date(Date.now() + 5_000 * 2 ** current.attemptNumber + Math.floor(Math.random() * 1_000)) } : { status: failure.code === "TIMEOUT" ? "TIMED_OUT" : "FAILED", activeKey: null, completedAt: new Date(), nextAttemptAt: null }), ...released } });
       if (changed.count === 1 && !retry) await transcriptionAudit(tx, actorFor(claim), { ...current, status: failure.code === "TIMEOUT" ? "TIMED_OUT" : "FAILED" }, "failed", { failureCategory: failure.code });

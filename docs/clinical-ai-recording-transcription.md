@@ -1,4 +1,6 @@
-# Clinical AI recording and transcription — AI-2A.2
+# Clinical AI recording and transcription — AI-2A.3
+
+AI-2A.3 adds explicit tenant-approved Gemini fallback, separately stored Romanized source views, raw-audio/provider-file cleanup, read-only production preflight, metadata health checks and a real-provider storage acceptance harness. See [production runbook](clinical-ai2a3-production-runbook.md), [Gemini synthetic QA](clinical-audio-synthetic-gemini-qa.md) and [Sarvam synthetic transliteration QA](clinical-audio-synthetic-transliteration-qa.md). The sections below preserve the foundation and primary Sarvam contracts. No production release or enablement is part of this milestone.
 
 ## AI-2A.1 foundation scope and data flow
 

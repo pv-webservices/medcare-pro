@@ -1,4 +1,71 @@
-# AI-2A.2 implementation report
+# AI-2A.3 implementation report and aggregate AI-2A status
+
+Starting SHA: `ad2a5419eb24ae992b9f4707b106988cf2936d9a`, verified against the fetched remote branch. Baseline CI passed for that exact SHA (run 34888393739). Branch remains `codex/clinical-ai-recording-transcription`; existing [PR #6](https://github.com/pv-webservices/medcare-pro/pull/6) is the sole review destination. Final commit SHA and final CI state are recorded in the handoff and PR. User-owned `.codex/config.toml` MCP changes are excluded from this implementation commit.
+
+## Aggregate implementation
+
+The complete AI-2A layer contains explicit face-to-face recording consent, native browser capture/recovery, private multipart storage/playback, durable Sarvam Saaras v4 Batch transcription, immutable source/speaker/time evidence, clinician corrections and explicit review, tenant-approved Gemini fallback, separately stored Romanized source views, bounded raw-audio/provider-file cleanup, read-only production preflight, metadata health monitoring and a real-provider storage acceptance harness. Existing consultation Save and prescription issuance remain authoritative; no auto-write, medication extraction, reconciliation, telephony or AI-3 work is included.
+
+Gemini uses the current `gemini-3.5-transcribe` Files/Interactions contract: streamed Files upload, `store:false`, verbatim mode, automatic language detection, speaker diarization and word offsets. Duration is capped at 30 minutes. Fallback requires a retained READY recording, valid consent, live assigned-Doctor/RBAC/tenant/clinic/entitlement checks, an eligible terminal technical Sarvam failure, no successful source transcript, valid server configuration and tenant-wide processor opt-in. The tenant default is false; clinic-scoped admins cannot grant tenant-wide approval. **Try Gemini** requires an explicit confirmation; retry remains Sarvam-only. Unique fallback/active keys preserve failed-primary provenance and prevent duplicate paid submissions. Ambiguous submission fails closed. Files are explicitly deleted in `finally`; durable metadata tracks pending deletion retries.
+
+Configured Sarvam MCP and official endpoint documentation were consulted. The MCP language reference is broader than current transliteration endpoint coverage; the implementation uses the narrower documented languages. `POST /transliterate` targets `en-IN`, international numerals, `spoken_form:false`; no translation is used. Grapheme-safe, lossless splitting bounds each request to 1000 characters. Latin segments pass through exactly without provider calls; unsupported scripts (including the actual Urdu-script QA example) and failed segments preserve original text with a partial indicator. Derived views/segments live in dedicated tables, keyed by transcript/source hash/type and source segment. MariaDB source/identity triggers and four restrictive foreign keys protect bindings. A READ COMMITTED locked creation transaction reuses a single view across ten concurrent requests.
+
+Retention is explicit from 1 to 3650 days for enabled production. READY completion freezes `audioDeleteAfter`; no historical backfill or implicit zero-day deletion is introduced. Cleanup uses skip-locked claims, 120-second fencing and metadata-only deletion/failure audits. Storage outage preserves the deletion state and schedules a 60-second retry; confirmed missing objects are idempotent. Active transcription is protected for at most 24 hours past the deadline, then fenced terminally with a full-lease delay before deletion. Source, corrections, review, speaker mappings and derived views survive deletion. Timestamp clicks show **Audio no longer retained** and both transcription providers reject deleted/expired audio. Terminal Gemini artifact cleanup is separately leased and retryable. Provider-side abandoned multipart lifecycle and each processor's own retention settings remain release prerequisites.
+
+## Database and local validation
+
+One additive migration: `20260915120000_clinical_ai2a3_hardening`. All 38 earlier migrations remain unchanged. Fresh disposable MariaDB 11.4.9 schemas replayed all 39 migrations successfully, including a separately named portal database required by its test guard. The audio verifier passes 46 checks covering checksums, existing evidence guards, new fallback/derived indexes, ownership triggers and restrictive foreign keys.
+
+- Full unit suite: **167 files / 2,614 tests PASS**.
+- Focused audio/provider suite: **eight files / 148 tests PASS**, including Gemini 36, Romanization 20, preflight 13 and retention nine tests.
+- Recording DB integration: **40 checks PASS**; transcription/fallback/derived/retention DB integration: **74 checks PASS**.
+- Audio browser: 15 enabled recording/original-transcript cases PASS; initial fallback case exceeded a 20-second status wait while its request remained in progress. Its corrected standalone rerun PASS verifies explicit opt-in/confirmation, PROCESSING to COMPLETED, provider display, 31-minute direct/UI rejection, partial Hindi/Latin/Urdu view and post-deletion behavior. Independent audio-off server: one case PASS. Aggregate: **16 enabled cases plus one independent audio-off case PASS**; one intentional off-only skip in the enabled suite.
+- AI-1 DB: **32 checks PASS**. Prescription schema verifier **nine**, DB **58** PASS. Patient Portal verifier **16**, focused unit **61**, DB **88** PASS. RBAC **65**, Registrations **62** PASS.
+
+Final production build PASS: all 39 migrations current, compiler and TypeScript PASS, 107 static pages generated. Browser regressions PASS: AI-1 eight, Electronic Prescription 26, and Patient Portal desktop/mobile two cases. Initial interrupted browser runs (including a local out-of-memory worker crash) and an incorrectly named portal test attempt are excluded from passing counts. Test guards were preserved. Full lint: zero errors/five pre-existing warnings. Staged real-secret/raw-audio exclusion and whitespace scans PASS; no provider credentials or raw audio enter source control.
+
+## Live provider acceptance
+
+Existing live Sarvam acceptance remains authoritative because its transport was preserved: [live QA](qa/2026-09-ai2a2-live-sarvam.md), two synthetic Hindi/Hinglish/English voices, `saaras:v4`, 23,390 ms WebM, zero clinically material and two minor transcription errors. No additional paid Sarvam STT job was run for this milestone.
+
+**RUN — SYNTHETIC AUDIO ONLY** for Gemini. The first call failed normalization; one additional diagnostic attempt was separately authorized. Its successful HTTP response established absent IDs with `store:false` and `spk:0` speaker labels. Parser correction and offline capture normalization PASS (seven segments/two speakers); no third call was made. Uploaded Files were explicitly deleted after both calls. [Clinical-anchor matrix](clinical-audio-synthetic-gemini-qa.md) identifies ambiguous chest-pain negation despite retained dose/frequency/duration/laterality/numeric anchors. Live clinical-quality acceptance remains required; neither the imperfect synthetic voice fixture nor successful HTTP/normalization is production approval.
+
+Sarvam transliteration transport **PASS — synthetic text only**: [QA](clinical-audio-synthetic-transliteration-qa.md). `Mane` differs from intended `Mujhe`; derived display never replaces original evidence.
+
+**NOT RUN — real provider credentials not configured** for S3-compatible storage acceptance. The harness checks a private 18 MiB synthetic WAV, three signed parts, approved-origin CORS/ETag, HEAD bytes/MIME/SSE, signed-read integrity/expiry, browser playback, anonymous denial, bucket privacy APIs, deletion/absence and multipart abort, with finally cleanup. Unsupported privacy APIs or missing origin evidence make a real run conditional. No bucket/account or public audio object was created.
+
+## Production preflight — current local configuration
+
+Read-only command was run against disposable local MariaDB; current local development audio is already enabled. This is a local readiness report, not production verification. Actual environment values were not printed or changed.
+
+| Check | Result |
+| --- | --- |
+| CLINICAL_AUDIO_ENABLED | PASS (ENABLED) |
+| Private real storage provider | FAIL |
+| Storage configuration completeness | FAIL |
+| Storage TLS | FAIL |
+| Explicit retention 1–3650 days | FAIL |
+| Sarvam key present | PASS |
+| Sarvam model/polling configuration | PASS |
+| Sarvam webhook secret | PASS |
+| Public callback HTTPS origin | PASS |
+| Explicit Gemini fallback policy | FAIL |
+| Gemini key present | PASS |
+| Gemini fallback configuration | FAIL |
+| Worker supervision declared | FAIL |
+| Database migration status | PASS |
+
+Metadata health command executes successfully and reports queue, lease/deadline, cleanup/retention and derived backlog counts without clinical text. The [production runbook](clinical-ai2a3-production-runbook.md) documents supervision alternatives without assuming Hostinger capabilities, private storage/CORS/encryption/lifecycle acceptance, processor governance, termination budgets, retention and rollout prerequisites. Enabled production fails closed on incomplete core configuration; missing Gemini disables fallback without breaking primary Sarvam, AI-1 or prescriptions. Recommended initial production flag remains `CLINICAL_AUDIO_ENABLED=false`.
+
+## Privacy and production
+
+No real patient data or audio used. No credentials, transcript or Romanized clinical text in application generic logs/AiRun/audits. Raw synthetic QA capture stays in dedicated local temporary artifacts; source/derived clinical text stays only in its dedicated clinical tables. No public audio objects, production environment/DB mutations, Hostinger configuration, deployment or feature enablement occurred. This is implementation review, not compliance approval.
+
+**NOT DEPLOYED**
+
+**CONDITIONAL PASS — AI-2A code is complete, but live Gemini and/or real object-storage acceptance remains required before production.**
+
+## Historical AI-2A.2 implementation report
 
 ## Scope and Git
 

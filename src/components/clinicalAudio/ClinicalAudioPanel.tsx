@@ -299,7 +299,7 @@ export default function ClinicalAudioPanel({
                   }
                 />
               )}
-              {recording.status === "READY" && <TranscriptPanel recordingId={recording.id} onSeek={(milliseconds) => seekRecording(recording.id, milliseconds)} />}
+              {recording.status === "READY" && <TranscriptPanel recordingId={recording.id} audioRetained={!recording.audioDeletedAt} onSeek={(milliseconds) => seekRecording(recording.id, milliseconds)} />}
             </div>
           ))}
         </div>

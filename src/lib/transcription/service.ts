@@ -38,7 +38,7 @@ export async function claimNextTranscriptionRun(workerId: string, tenantId?: str
   const scope = tenantId ?? null;
   return prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM transcription_runs
-      WHERE provider = 'SARVAM' AND status IN ('QUEUED','PREPARING','SUBMITTED','PROCESSING')
+      WHERE provider IN ('SARVAM','GEMINI') AND status IN ('QUEUED','PREPARING','SUBMITTED','PROCESSING')
       AND (${scope} IS NULL OR tenant_id = ${scope})
       AND (next_attempt_at IS NULL OR next_attempt_at <= ${now})
       AND (lease_expires_at IS NULL OR lease_expires_at <= ${now})
@@ -51,15 +51,16 @@ export async function claimNextTranscriptionRun(workerId: string, tenantId?: str
 
 export const LEASE_MS = 120_000;
 export function publicRun(run: TranscriptionRun, transcriptId?: string | null) {
-  return { id: run.id, recordingId: run.recordingId, provider: run.provider, model: run.model, status: run.status, failureCode: run.failureCode, queuedAt: run.queuedAt, completedAt: run.completedAt, transcriptId: transcriptId ?? null };
+  return { id: run.id, recordingId: run.recordingId, provider: run.provider, model: run.model, fallbackFromRunId: run.fallbackFromRunId, status: run.status, failureCode: run.failureCode, queuedAt: run.queuedAt, completedAt: run.completedAt, transcriptId: transcriptId ?? null };
 }
 export async function transcriptionAudit(tx: Prisma.TransactionClient, actor: ActorContext, run: TranscriptionRun, event: string, metadata: Record<string, string | number | boolean | null> = {}) {
-  await writeAuditLog(tx, { action: `clinical-transcription.${event}`, targetType: "TranscriptionRun", targetId: run.id, actorUserId: actor.userId, actorTenantId: actor.tenantId, afterValue: { runId: run.id, recordingId: run.recordingId, provider: run.provider, status: run.status, ...metadata } });
+  const action = run.provider === "GEMINI" ? `CLINICAL_TRANSCRIPTION_${event.startsWith("FALLBACK_") ? event : "FALLBACK_" + event.toUpperCase()}` : `clinical-transcription.${event}`;
+  await writeAuditLog(tx, { action, targetType: "TranscriptionRun", targetId: run.id, actorUserId: actor.userId, actorTenantId: actor.tenantId, afterValue: { runId: run.id, recordingId: run.recordingId, provider: run.provider, status: run.status, ...metadata } });
 }
 export async function retainedRecording(actor: ActorContext, recordingId: string, tx: Prisma.TransactionClient = prisma) {
   const recording = await recordingForActor(actor, recordingId, "clinical-ai:transcription", tx, false);
   if (recording.consent.withdrawnAt) throw new TranscriptionFailure("CONSENT_INVALID");
-  if (recording.status !== "READY" || recording.audioDeletedAt || !recording.storageKey || !recording.durationMs || !recording.byteSize || (recording.audioDeleteAfter && recording.audioDeleteAfter <= new Date())) throw new TranscriptionFailure("SOURCE_MISSING");
+  if (recording.status !== "READY" || recording.audioDeletedAt || recording.audioCleanupToken || !recording.storageKey || !recording.durationMs || !recording.byteSize || (recording.audioDeleteAfter && recording.audioDeleteAfter <= new Date())) throw new TranscriptionFailure("SOURCE_MISSING");
   return recording;
 }
 export async function latestTranscription(actor: ActorContext, recordingId: string) {

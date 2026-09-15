@@ -31,6 +31,7 @@ export function publicRecording(r: ConsultationRecording) {
     durationMs: r.durationMs,
     byteSize: r.byteSize === null ? null : Number(r.byteSize),
     audioDeletedAt: r.audioDeletedAt,
+    audioDeleteAfter: r.audioDeleteAfter,
     createdAt: r.createdAt,
     version: r.version,
   };
