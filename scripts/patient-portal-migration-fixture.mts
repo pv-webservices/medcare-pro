@@ -14,7 +14,9 @@ assertPatientPortalTestDatabase();
 const path = process.argv.at(-1)!;
 async function main() {
   if (process.argv.includes("--before")) {
-    const f = await createPrescriptionFixture(prisma);
+    const f = await createPrescriptionFixture(prisma, {
+      legacyTenantSchema: true,
+    });
     const visit = await f.visit();
     const d = await saveConsultationDraft(f.doctorUser.actor, visit.id, {
       consultation: consultationSchema.parse({

@@ -15,33 +15,38 @@ export function assertPrescriptionTestDatabase() {
       "Fixture writes require a disposable localhost medcare_ep database.",
     );
 }
-export async function createPrescriptionFixture(db: PrismaClient) {
+export async function createPrescriptionFixture(
+  db: PrismaClient,
+  options: { legacyTenantSchema?: boolean } = {},
+) {
   assertPrescriptionTestDatabase();
   await seedFeatureCatalogue(db);
   const plan = await db.plan.findUniqueOrThrow({
     where: { key: DEFAULT_PLAN_KEY },
   });
   const stamp = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-  const tenant = await db.tenant.create({
-    data: {
-      businessName: "Prescription synthetic clinic",
-      email: `rx-tenant-${stamp}@example.test`,
-      slug: `rx-${stamp}`,
-      status: "ACTIVE",
+  async function createTenant(
+    kind: "tenant" | "foreign",
+    businessName: string,
+  ) {
+    const data = {
+      businessName,
+      email: `rx-${kind}-${stamp}@example.test`,
+      slug: `rx-${kind}-${stamp}`,
+      status: "ACTIVE" as const,
       emailVerifiedAt: new Date(),
       planId: plan.id,
-    },
-  });
-  const foreignTenant = await db.tenant.create({
-    data: {
-      businessName: "Foreign synthetic clinic",
-      email: `rx-foreign-${stamp}@example.test`,
-      slug: `rx-foreign-${stamp}`,
-      status: "ACTIVE",
-      emailVerifiedAt: new Date(),
-      planId: plan.id,
-    },
-  });
+    };
+    if (!options.legacyTenantSchema) return db.tenant.create({ data });
+    const id = `legacy-${kind}-${crypto.randomUUID()}`;
+    await db.$executeRaw`INSERT INTO tenants (id, business_name, email, email_verified_at, slug, status, is_platform, plan_id, updated_at) VALUES (${id}, ${businessName}, ${data.email}, ${data.emailVerifiedAt}, ${data.slug}, ${data.status}, false, ${data.planId}, NOW(3))`;
+    return { id, ...data, businessName, isPlatform: false };
+  }
+  const tenant = await createTenant("tenant", "Prescription synthetic clinic");
+  const foreignTenant = await createTenant(
+    "foreign",
+    "Foreign synthetic clinic",
+  );
   await seedDefaultRoles(db, tenant.id);
   await seedDefaultRoles(db, foreignTenant.id);
   const clinic = await db.clinic.create({
