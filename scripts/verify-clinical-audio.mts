@@ -36,10 +36,15 @@ try {
     ),
   );
   for (const name of ["20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards"]) check("AI-2A.2 migration applied: " + name, migrations.some((migration) => migration.migration_name === name));
-  for (const name of ["20260914010000_clinical_recording_transcription", "20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards", "20260915120000_clinical_ai2a3_hardening"]) {
-    const checksum = createHash("sha256").update(await readFile(`prisma/migrations/${name}/migration.sql`)).digest("hex");
+  for (const name of ["20260914010000_clinical_recording_transcription", "20260914120000_sarvam_batch_transcription", "20260914120100_transcription_evidence_guards", "20260915120000_clinical_ai2a3_hardening", "20260916140000_clinical_audio_r2_upload_id"]) {
+    const sql = (await readFile(`prisma/migrations/${name}/migration.sql`, "utf8")).replace(/\r\n/g, "\n");
+    const checksum = createHash("sha256").update(Buffer.from(sql, "utf8")).digest("hex");
     check("Migration checksum matches: " + name, migrations.some((migration) => migration.migration_name === name && migration.checksum === checksum));
   }
+  const uploadIdCol = await prisma.$queryRaw<
+    Array<{ CHARACTER_MAXIMUM_LENGTH: bigint | number }>
+  >`SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='consultation_recordings' AND COLUMN_NAME='upload_id'`;
+  check("upload_id column widened to 1024", uploadIdCol.length === 1 && Number(uploadIdCol[0].CHARACTER_MAXIMUM_LENGTH) === 1024);
   const transcriptionIndexes = await prisma.$queryRaw<{ INDEX_NAME: string; NON_UNIQUE: bigint }[]>`SELECT INDEX_NAME,NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='transcription_runs'`;
   for (const name of ["transcription_runs_active_key_key", "transcription_runs_provider_provider_job_id_key"]) check("Transcription unique index: " + name, transcriptionIndexes.some((index) => index.INDEX_NAME === name && Number(index.NON_UNIQUE) === 0));
   const evidenceTriggers = await prisma.$queryRaw<{ TRIGGER_NAME: string }[]>`SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()`;

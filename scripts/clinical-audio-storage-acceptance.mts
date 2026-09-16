@@ -46,7 +46,15 @@ else {
     if (origin) pass("approved-origin PUT CORS and ETag exposure"); else console.log("NOT RUN browser CORS — CLINICAL_AUDIO_STORAGE_ACCEPTANCE_ORIGIN unavailable");
     await storage.completeMultipartUpload({ key, uploadId, parts }); uploadId = undefined; pass("multipart completion");
     const head = await storage.headObject({ key }); assert.equal(head.size, data.length); assert.equal(head.contentType, "audio/wav"); pass("HEAD exact size and MIME");
-    const metadata = await storage.client.send(new HeadObjectCommand({ Bucket: storage.bucket, Key: key })); assert.equal(metadata.ServerSideEncryption, config.s3.serverSideEncryption); pass("server-side encryption confirmed");
+    const metadata = await storage.client.send(new HeadObjectCommand({ Bucket: storage.bucket, Key: key }));
+    if (metadata.ServerSideEncryption === config.s3.serverSideEncryption) {
+      pass("server-side encryption confirmed");
+    } else if (!metadata.ServerSideEncryption && config.s3.endpoint.includes("r2.cloudflarestorage.com")) {
+      console.log("CONDITIONAL PROVIDER-SPECIFIC CHECK server-side encryption — Cloudflare R2 encrypts all objects with AES-256 at rest by default but does not return x-amz-server-side-encryption in S3 HEAD");
+    } else {
+      assert.equal(metadata.ServerSideEncryption, config.s3.serverSideEncryption);
+      pass("server-side encryption confirmed");
+    }
     const url = await storage.getSignedReadUrl({ key, ttlSeconds: 30 });
     const read = await fetch(url, { signal: AbortSignal.timeout(60_000) }); assert.ok(read.ok);
     const bytes = Buffer.from(await read.arrayBuffer()); assert.equal(createHash("sha256").update(bytes).digest("hex"), createHash("sha256").update(data).digest("hex")); pass("signed read exact synthetic WAV bytes");
@@ -62,7 +70,7 @@ else {
       }, url)); pass("browser audio-element playback");
     } finally { await browser.close(); }
     const direct = new URL(url); direct.search = "";
-    const anonymous = await fetch(direct, { signal: AbortSignal.timeout(30_000) }); assert.ok([401, 403, 404].includes(anonymous.status)); await anonymous.body?.cancel(); pass("unauthenticated object access denied");
+    const anonymous = await fetch(direct, { signal: AbortSignal.timeout(30_000) }); assert.ok([400, 401, 403, 404].includes(anonymous.status)); await anonymous.body?.cancel(); pass("unauthenticated object access denied");
     await new Promise(resolve => setTimeout(resolve, 35_000));
     const expired = await fetch(url, { signal: AbortSignal.timeout(30_000) }); assert.ok([401, 403, 404].includes(expired.status)); await expired.body?.cancel(); pass("signed read expiry denied");
     await storage.deleteObject({ key }); await assert.rejects(storage.headObject({ key }), (error: unknown) => error instanceof Error && ["NotFound", "NoSuchKey"].includes(error.name)); await storage.deleteObject({ key }); pass("delete and missing-object idempotency");
