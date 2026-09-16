@@ -1,6 +1,7 @@
 import { z } from "zod";
 // Released capabilities only; broader rewriting is deliberately deferred.
 export const WRITING_MODES = ["SPELLING", "GRAMMAR"] as const;
+export type WritingMode = (typeof WRITING_MODES)[number];
 const restricted = {
   modes: ["SPELLING", "GRAMMAR"] as readonly (typeof WRITING_MODES)[number][],
   semanticRisk: "VERY_HIGH" as const,

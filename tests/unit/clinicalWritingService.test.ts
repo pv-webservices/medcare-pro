@@ -44,12 +44,12 @@ const input = {
 };
 const output = {
   changed: true,
-  suggestedText: "The patient has severe headache for three days.",
+  suggestedText: "Patient has severe headache for 3 days.",
   suggestions: [
     {
       category: "GRAMMAR",
       originalFragment: input.text,
-      suggestedFragment: "The patient has severe headache for three days.",
+      suggestedFragment: "Patient has severe headache for 3 days.",
       reason: "PHI provider explanation",
       confidence: "HIGH",
     },
@@ -123,6 +123,60 @@ describe("Writing service authorization and privacy", () => {
     });
     expect(JSON.stringify(m.complete.mock.calls)).not.toContain(input.text);
     expect(JSON.stringify(m.reserve.mock.calls)).not.toContain(input.text);
+  });
+  it("accepts a high-confidence conservative spelling correction", async () => {
+    const spellingInput = { ...input, mode: "SPELLING", text: "Diabates" };
+    const spellingOutput = {
+      changed: true,
+      suggestedText: "Diabetes",
+      suggestions: [
+        {
+          category: "SPELLING",
+          originalFragment: "Diabates",
+          suggestedFragment: "Diabetes",
+          reason: "spelling",
+          confidence: "HIGH",
+        },
+      ],
+    };
+    await expect(
+      requestWritingAssistance(actor, spellingInput, {
+        generateStructured: vi
+          .fn()
+          .mockResolvedValue({ output: spellingOutput }),
+      }),
+    ).resolves.toMatchObject({
+      changed: true,
+      suggestedText: "Diabetes",
+      status: "SUCCEEDED",
+    });
+  });
+  it("rejects a relaxed spelling correction below HIGH confidence", async () => {
+    const result = await requestWritingAssistance(
+      actor,
+      { ...input, mode: "SPELLING", text: "Diabates" },
+      {
+        generateStructured: vi.fn().mockResolvedValue({
+          output: {
+            changed: true,
+            suggestedText: "Diabetes",
+            suggestions: [
+              {
+                category: "SPELLING",
+                originalFragment: "Diabates",
+                suggestedFragment: "Diabetes",
+                reason: "spelling",
+                confidence: "MEDIUM",
+              },
+            ],
+          },
+        }),
+      },
+    );
+    expect(result).toMatchObject({
+      changed: false,
+      status: "SAFETY_REJECTED",
+    });
   });
   it("blocks foreign context before provider", async () => {
     m.context.mockRejectedValue(new ScopeError());
