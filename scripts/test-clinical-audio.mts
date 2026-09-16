@@ -14,6 +14,8 @@ import {
   completeRecordingUpload,
   discardRecording,
   getRecordingAudioUrl,
+  uploadPartSchema,
+  uploadCompleteSchema,
 } from "@/lib/clinical-audio/uploadService";
 import {
   InMemoryRecordingStorage,
@@ -31,6 +33,33 @@ async function denied(label: string, work: Promise<unknown>) {
   check(label, true);
 }
 try {
+  const r2UploadId = "a".repeat(343);
+  check(
+    "uploadPartSchema accepts 343-char R2 uploadId",
+    uploadPartSchema.safeParse({ uploadId: r2UploadId, partNumber: 1 }).success,
+  );
+  check(
+    "uploadCompleteSchema accepts 343-char R2 uploadId",
+    uploadCompleteSchema.safeParse({
+      uploadId: r2UploadId,
+      parts: [{ partNumber: 1, etag: '"0123456789abcdef"' }],
+    }).success,
+  );
+  check(
+    "uploadPartSchema accepts up to 1024-char uploadId",
+    uploadPartSchema.safeParse({ uploadId: "b".repeat(1024), partNumber: 1 }).success,
+  );
+  check(
+    "uploadPartSchema rejects 1025-char uploadId",
+    !uploadPartSchema.safeParse({ uploadId: "b".repeat(1025), partNumber: 1 }).success,
+  );
+  check(
+    "uploadCompleteSchema rejects 1025-char uploadId",
+    !uploadCompleteSchema.safeParse({
+      uploadId: "b".repeat(1025),
+      parts: [{ partNumber: 1, etag: '"0123456789abcdef"' }],
+    }).success,
+  );
   const f = await createClinicalAudioFixture();
   const actor = f.doctorUser.actor;
   const s = new InMemoryRecordingStorage();

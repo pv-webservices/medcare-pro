@@ -2480,7 +2480,7 @@ model ConsultationRecording {
   consentId        String                      @unique @map("consent_id")
   status           ConsultationRecordingStatus @default(CREATED)
   activeKey        String?                     @unique @map("active_key") @db.VarChar(191)
-  uploadId         String?                     @map("upload_id") @db.VarChar(255)
+  uploadId         String?                     @map("upload_id") @db.VarChar(1024)
   uploadPartSize   Int?                        @map("upload_part_size")
   uploadPartCount  Int?                        @map("upload_part_count")
   uploadExpectedBytes BigInt?                  @map("upload_expected_bytes")

@@ -22,12 +22,12 @@ export const uploadInitSchema = z.strictObject({
   durationMs: z.number().int().min(0).max(7_200_000),
 });
 export const uploadPartSchema = z.strictObject({
-  uploadId: z.string().min(1).max(255),
+  uploadId: z.string().min(1).max(1024),
   partNumber: z.number().int().min(1).max(10000),
 });
 export const uploadCompleteSchema = z
   .strictObject({
-    uploadId: z.string().min(1).max(255),
+    uploadId: z.string().min(1).max(1024),
     parts: z
       .array(
         z.strictObject({
