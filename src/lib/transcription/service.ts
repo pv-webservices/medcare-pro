@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { recordingForActor } from "@/lib/clinical-audio/recordingService";
 import { getRecordingStorageProvider } from "@/lib/clinical-audio/storage";
 import { writeAuditLog } from "@/lib/audit";
-import { ConflictError } from "@/lib/apiHandler";
+import { ConflictError } from "@/lib/domainErrors";
 import { getSarvamBatchConfig } from "./batchConfig";
 import { TranscriptionFailure } from "./errors";
 import { ACTIVE_TRANSCRIPTION_STATUSES } from "./types";

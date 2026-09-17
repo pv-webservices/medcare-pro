@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { FeatureTier } from "@prisma/client";
 import { z } from "zod";
 import { AUDIT_ACTIONS, writeAuditLog } from "@/lib/audit";
-import { BadRequestError } from "@/lib/apiHandler";
+import { BadRequestError } from "@/lib/domainErrors";
 import {
   FeatureError,
   isTenantEntitled,

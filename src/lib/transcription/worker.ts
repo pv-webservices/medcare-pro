@@ -1,6 +1,6 @@
 import type { TranscriptionRun } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ConflictError } from "@/lib/apiHandler";
+import { ConflictError } from "@/lib/domainErrors";
 import { PermissionError, ScopeError } from "@/lib/rbac";
 import { FeatureError } from "@/lib/featureResolution";
 import { ClinicalAudioDisabledError } from "@/lib/clinical-audio/errors";

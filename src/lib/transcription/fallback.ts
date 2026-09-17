@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePermission, ScopeError, type ActorContext } from "@/lib/rbac";
-import { ConflictError } from "@/lib/apiHandler";
+import { ConflictError } from "@/lib/domainErrors";
 import { writeAuditLog } from "@/lib/audit";
 import { getGeminiTranscriptionConfig, GEMINI_DIARIZED_MAX_DURATION_MS } from "./providers/gemini";
 import { retainedRecording, publicRun, transcriptionAudit } from "./service";

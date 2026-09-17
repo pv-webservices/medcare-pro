@@ -5,7 +5,7 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { ConflictError } from "@/lib/apiHandler";
+import { ConflictError } from "@/lib/domainErrors";
 import { ScopeError, type ActorContext } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
 import { authorizeClinicalAudio, type AudioPermission } from "./authorization";
