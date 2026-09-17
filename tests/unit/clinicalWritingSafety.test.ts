@@ -115,11 +115,11 @@ describe("Clinical meaning anchors", () => {
     ["A 500 mg B 850 mg", "A 850 mg B 500 mg", false],
     [
       "Patient has sever headache for 3 days.",
-      "The patient has severe headache for three days.",
+      "Patient has severe headache for 3 days.",
       true,
     ],
     ["Metformin 500 mg", "Metformin 500 mg. Start insulin.", false],
-    ["7 days", "seven days", true],
+    ["7 days", "seven days", false],
     ["Metformin", "Methotrexate", false],
     ["Pain", "", false],
     [".5 ml", "5 ml", false],
@@ -153,6 +153,72 @@ describe("Clinical meaning anchors", () => {
         FIELD_POLICIES.historyOfPresentIllness,
       ),
     ).toBe(false);
+  });
+});
+
+describe("Conservative spelling token diff", () => {
+  it.each([
+    ["Diabates", "Diabetes"],
+    ["fevr", "fever"],
+    ["headach", "headache"],
+    ["paitent", "patient"],
+    ["diabates.", "Diabetes!"],
+  ])("allows MEDIUM-risk spelling %s -> %s", (source, target) => {
+    expect(
+      safe(source, target, FIELD_POLICIES.historyOfPresentIllness, "SPELLING"),
+    ).toBe(true);
+  });
+
+  it("requires reviewed spelling in VERY_HIGH-risk fields", () => {
+    expect(
+      safe("Diabates", "Diabetes", FIELD_POLICIES.diagnosis, "SPELLING"),
+    ).toBe(false);
+    expect(
+      safe("fevr", "fever", FIELD_POLICIES.diagnosis, "SPELLING"),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["left knee", "right knee"],
+    ["no chest pain", "chest pain"],
+    ["Metformin 500 mg", "Metformin 50 mg"],
+    ["once daily", "twice daily"],
+    ["HbA1c 7.2%", "HbA1c 72%"],
+    ["possible pneumonia", "pneumonia"],
+    ["penicillin allergy", "no penicillin allergy"],
+    ["ileum", "ilium"],
+  ])("rejects unsafe spelling candidate %s -> %s", (source, target) => {
+    expect(
+      safe(
+        source,
+        target,
+        FIELD_POLICIES.historyOfPresentIllness,
+        "SPELLING",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("Conservative grammar token diff", () => {
+  it.each([
+    ["Patient are stable.", "Patient is stable."],
+    ["Patient has the fever.", "Patient has fever."],
+    ["patient has fever", "Patient has fever."],
+  ])("allows narrow grammar %s -> %s", (source, target) => {
+    expect(safe(source, target, FIELD_POLICIES.diagnosis, "GRAMMAR")).toBe(
+      true,
+    );
+  });
+
+  it.each([
+    ["Patient had fever", "Patient has fever"],
+    ["Patient was febrile", "Patient is febrile"],
+    ["fever from 3 days", "fever for 3 days"],
+    ["no chest pain", "chest pain"],
+  ])("rejects meaning-changing grammar %s -> %s", (source, target) => {
+    expect(safe(source, target, FIELD_POLICIES.diagnosis, "GRAMMAR")).toBe(
+      false,
+    );
   });
 });
 describe("Structured result and config", () => {

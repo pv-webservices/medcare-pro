@@ -24,8 +24,16 @@ function check(label: string, value: unknown) {
 }
 const output = {
   changed: true,
-  suggestedText: "The patient has severe headache for three days.",
-  suggestions: [],
+  suggestedText: "Patient has severe headache for 3 days.",
+  suggestions: [
+    {
+      category: "GRAMMAR" as const,
+      originalFragment: "Patient has sever headache for 3 days.",
+      suggestedFragment: "Patient has severe headache for 3 days.",
+      reason: "synthetic language correction",
+      confidence: "HIGH" as const,
+    },
+  ],
 };
 const provider: AiProvider = {
   async generateStructured<T>() {
