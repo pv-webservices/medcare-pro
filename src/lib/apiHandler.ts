@@ -17,6 +17,9 @@ import {
   ClinicLimitReachedError,
 } from "@/lib/clinicCapacityErrors";
 import { ClinicalAudioDisabledError, RecordingStateError } from "@/lib/clinical-audio/errors";
+import { BadRequestError, ConflictError } from "@/lib/domainErrors";
+
+export { BadRequestError, ConflictError } from "@/lib/domainErrors";
 
 /**
  * Shared error mapping for API routes.
@@ -26,28 +29,6 @@ import { ClinicalAudioDisabledError, RecordingStateError } from "@/lib/clinical-
  * confirm the record exists), and an unexpected error never reaches the client
  * as a stack trace.
  */
-
-/** Thrown for client-side mistakes that are not schema violations. Maps to 400. */
-export class BadRequestError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BadRequestError";
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
-
-/**
- * Thrown when a write conflicts with data already stored — e.g. an availability
- * window overlapping one already set. Maps to 409, and its message is shown to
- * the user, so phrase it for them.
- */
-export class ConflictError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ConflictError";
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
 
 /**
  * Reads and JSON-parses a request body, turning a malformed one into a 400

@@ -21,10 +21,27 @@ globalThis.fetch = async (url, options) => {
     const suggestedText = input.text.includes("500 mg")
       ? input.text.replace("500 mg", "850 mg")
       : input.text.replace(/\bsever\b/g, "severe");
+    const originalFragment = input.text.includes("500 mg")
+      ? "500 mg"
+      : "sever";
+    const suggestedFragment = input.text.includes("500 mg")
+      ? "850 mg"
+      : "severe";
     const output = {
       changed: suggestedText !== input.text,
       suggestedText,
-      suggestions: [],
+      suggestions:
+        suggestedText === input.text
+          ? []
+          : [
+              {
+                category: input.mode,
+                originalFragment,
+                suggestedFragment,
+                reason: "Synthetic provider-contract correction",
+                confidence: "HIGH",
+              },
+            ],
     };
     return new Response(
       JSON.stringify({

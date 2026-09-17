@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ScopeError, type ActorContext } from "@/lib/rbac";
-import { ConflictError } from "@/lib/apiHandler";
+import { ConflictError } from "@/lib/domainErrors";
 import { recordingForActor } from "@/lib/clinical-audio/recordingService";
 import { transcriptionAudit } from "./service";
 
