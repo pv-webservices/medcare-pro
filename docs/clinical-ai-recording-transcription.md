@@ -69,6 +69,18 @@ Polling works without callbacks. Optional callbacks require both an HTTPS origin
 
 Polling settings: `SARVAM_POLL_AFTER_SECONDS` (default 30), `SARVAM_POLL_INTERVAL_SECONDS` (default 30), `SARVAM_JOB_TIMEOUT_MINUTES` (default 180). Polling schedule and checkpoints persist in MySQL. Run `npm run clinical-audio:worker` for the loop or `npm run clinical-audio:worker:once` for a bounded single pass. SIGINT/SIGTERM stops new claims after the current job checkpoint returns. A worker runtime and scheduler are deployment prerequisites; this phase does not deploy them.
 
+### Hostinger-compatible HTTP cron trigger
+
+When the application is deployed on a platform that does not preserve arbitrary build files, set `CLINICAL_AUDIO_WORKER_MODE=external` and use the deployed Node.js route handlers instead of invoking a file beneath `.next`:
+
+- `POST /api/internal/clinical-audio/worker` claims at most one transcription run, then performs at most one Romanization pass.
+- `POST /api/internal/clinical-audio/cleanup` performs at most one recording-retention pass and one provider-artifact pass.
+- `GET /api/internal/clinical-audio/health` returns queue/lease/retention counters only.
+
+All three routes require `Authorization: Bearer <CLINICAL_AUDIO_CRON_SECRET>`. The dedicated server-only secret must be 32–512 characters. It is never accepted in a URL, path or request body and must not be logged. Missing configuration, invalid authentication, or disabled clinical audio fails closed. Responses are private/no-store and contain only bounded operational counts—never transcript text, patient identifiers, object keys, signed URLs, provider payloads or credentials.
+
+The CLI scripts remain local/VPS operational entry points. Production cron commands must call the HTTPS routes; they must not depend on custom files within `.next/server`.
+
 ## Durability and private transport
 
 Two additive migrations introduce per-recording active keys, unique `(provider, providerJobId)`, fencing tokens, submission intent, upload checkpoints and last poll time. A CHECK prevents active rows with null keys; triggers enforce recording-key binding, COMPLETED terminal status and immutable source/segments/provider speaker identity/append-only correction history. Claims use row locks, skip-locked selection, expiration reclaim and 120-second leases with periodic renewal. Every worker write is fenced against a stale token/expired lease. A provider job ID is persisted before upload/start. Recovery queries the existing job before resuming. The worker requires a database version supporting `FOR UPDATE SKIP LOCKED` (locally verified with MariaDB 11.4.9).
