@@ -48,6 +48,9 @@ export default defineConfig({
       GEMINI_MODEL: "synthetic-model",
       CLINICAL_AUDIO_ENABLED:
         process.env.CLINICAL_AUDIO_E2E_DISABLED === "true" ? "false" : "true",
+      CLINICAL_AUDIO_CRON_SECRET:
+        "synthetic-http-cron-secret-at-least-32-characters",
+      CLINICAL_AUDIO_WORKER_MODE: "external",
       RECORDING_STORAGE_PROVIDER: "local",
       TRANSCRIPTION_PRIMARY_PROVIDER: "sarvam",
       TRANSCRIPTION_FALLBACK_PROVIDER: "gemini",

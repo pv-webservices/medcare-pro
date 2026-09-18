@@ -22,5 +22,6 @@ export function clinicalAudioPreflight(env: Record<string, string | undefined> =
     { name: "Gemini key present", result: (env.GEMINI_TRANSCRIPTION_API_KEY || env.GEMINI_API_KEY)?.trim() ? "PASS" : fallbackRequired ? "FAIL" : "UNAVAILABLE" },
     { name: "Gemini fallback configuration", result: gemini ? "PASS" : fallbackRequired ? "FAIL" : "UNAVAILABLE" },
     check("worker supervision declared", ["persistent", "scheduled-once", "external"].includes(env.CLINICAL_AUDIO_WORKER_MODE ?? "")),
+    check("HTTP cron secret", env.CLINICAL_AUDIO_WORKER_MODE !== "external" || ((env.CLINICAL_AUDIO_CRON_SECRET?.length ?? 0) >= 32 && (env.CLINICAL_AUDIO_CRON_SECRET?.length ?? 0) <= 512)),
   ] };
 }
