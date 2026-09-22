@@ -27,7 +27,7 @@ globalThis.fetch = async (url, options) => {
     const suggestedFragment = input.text.includes("500 mg")
       ? "850 mg"
       : "severe";
-    const output = {
+    const annotatedOutput = {
       changed: suggestedText !== input.text,
       suggestedText,
       suggestions:
@@ -43,6 +43,12 @@ globalThis.fetch = async (url, options) => {
               },
             ],
     };
+    // Safe candidates exercise the new minimal provider contract end to end.
+    // Unsafe dose candidates retain perfect HIGH metadata to prove it cannot
+    // override deterministic validation.
+    const output = input.text.includes("500 mg")
+      ? annotatedOutput
+      : { suggestedText };
     return new Response(
       JSON.stringify({
         candidates: [

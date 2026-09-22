@@ -55,6 +55,16 @@ export const writingRequestSchema = z
         message: "This clinical field exceeds the assistant's length limit.",
       });
   });
+// Provider annotations are untrusted and irrelevant to candidate validation.
+// Strip them here; only a bounded, usable candidate is part of this contract.
+// Keep the public/UI response strict and separate below.
+export const writingCandidateSchema = z.object({
+  suggestedText: z
+    .string()
+    .min(1)
+    .max(10000)
+    .refine((text) => text.trim().length > 0),
+});
 export const writingResponseSchema = z.strictObject({
   changed: z.boolean(),
   suggestedText: z.string().max(10000),
