@@ -5,7 +5,11 @@ import {
   writingRequestSchema,
   writingResponseSchema,
 } from "@/lib/clinical-ai/writingSchemas";
-import { validateClinicalMeaningPreserved as safe } from "@/lib/clinical-ai/writingSafety";
+import {
+  assessClinicalWriting,
+  computeWritingDiff,
+  validateClinicalMeaningPreserved as safe,
+} from "@/lib/clinical-ai/writingSafety";
 import { getAiConfig } from "@/lib/ai/config";
 const input = {
   registrationId: "visit",
@@ -173,9 +177,9 @@ describe("Conservative spelling token diff", () => {
     expect(
       safe("Diabates", "Diabetes", FIELD_POLICIES.diagnosis, "SPELLING"),
     ).toBe(false);
-    expect(
-      safe("fevr", "fever", FIELD_POLICIES.diagnosis, "SPELLING"),
-    ).toBe(true);
+    expect(safe("fevr", "fever", FIELD_POLICIES.diagnosis, "SPELLING")).toBe(
+      true,
+    );
   });
 
   it.each([
@@ -189,12 +193,7 @@ describe("Conservative spelling token diff", () => {
     ["ileum", "ilium"],
   ])("rejects unsafe spelling candidate %s -> %s", (source, target) => {
     expect(
-      safe(
-        source,
-        target,
-        FIELD_POLICIES.historyOfPresentIllness,
-        "SPELLING",
-      ),
+      safe(source, target, FIELD_POLICIES.historyOfPresentIllness, "SPELLING"),
     ).toBe(false);
   });
 });
@@ -221,6 +220,142 @@ describe("Conservative grammar token diff", () => {
     );
   });
 });
+describe("Locally derived diff and reason codes", () => {
+  it.each([
+    ["Patient has diabates.", "Patient has diabetes."],
+    ["Patient has fever", "Patient has fever."],
+    ["The patient has fever", "Patient has fever"],
+    ["patient has fever", "The patient has fever"],
+    ["🙂 cafe\u0301 fevr", "🙂 café fever"],
+    ["Patient are stable.", "Patient is stable."],
+  ])(
+    "reconstructs candidate without provider fragments: %s",
+    (source, target) => {
+      const [edit] = computeWritingDiff(source, target);
+      expect(
+        source.slice(0, edit.sourceStart) +
+          edit.suggestedFragment +
+          source.slice(edit.sourceEnd),
+      ).toBe(target);
+      expect(source.slice(edit.sourceStart, edit.sourceEnd)).toBe(
+        edit.originalFragment,
+      );
+      expect(target.slice(edit.targetStart, edit.targetEnd)).toBe(
+        edit.suggestedFragment,
+      );
+      expect(edit.originalFragment.length).toBeGreaterThan(0);
+      expect(edit.suggestedFragment.length).toBeGreaterThan(0);
+    },
+  );
+  it("has no diff for unchanged input", () => {
+    expect(computeWritingDiff("No fever", "No fever")).toEqual([]);
+    expect(
+      assessClinicalWriting("No fever", "No fever", FIELD_POLICIES.diagnosis)
+        .reason,
+    ).toBe("NO_CHANGE");
+  });
+  it.each([
+    ["500 mg", "50 mg", "NUMBER_CHANGED"],
+    ["10 cm", "10 mm", "UNIT_CHANGED"],
+    ["No fever", "Has fever", "NEGATION_CHANGED"],
+    ["Left knee", "Right knee", "LATERALITY_CHANGED"],
+    ["Possible fever", "Confirmed fever", "UNCERTAINTY_CHANGED"],
+    ["Patient has fever", "Patient has fever and cough", "CLINICAL_FACT_ADDED"],
+    [
+      "Patient has fever and cough",
+      "Patient has fever",
+      "CLINICAL_FACT_REMOVED",
+    ],
+  ])("returns non-PHI reason for %s", (source, target, reason) => {
+    expect(
+      assessClinicalWriting(
+        source,
+        target,
+        FIELD_POLICIES.historyOfPresentIllness,
+      ),
+    ).toMatchObject({ safe: false, reason, edits: [] });
+  });
+});
+
+describe("Independent deterministic safety acceptance matrix", () => {
+  it.each([
+    ["Patient has diabates.", "Patient has diabetes."],
+    ["Patient has fevr.", "Patient has fever."],
+    ["The paitent is stable.", "The patient is stable."],
+    ["He have cough for two days.", "He has cough for two days."],
+    [
+      "Patient reports fever cough and headache",
+      "Patient reports fever, cough, and headache.",
+    ],
+    ["  Patient   is stable.  ", "Patient is stable."],
+    ["Patient reports café pain.", "Patient reports cafe\u0301 pain."],
+  ])("accepts safe surface edit %s", (source, target) => {
+    expect(safe(source, target, FIELD_POLICIES.historyOfPresentIllness)).toBe(
+      true,
+    );
+  });
+  it.each([
+    ["Patient had fever", "Patient has fever"],
+    ["Patient is unwell", "Patient is well"],
+    ["Patient is afebrile", "Patient is febrile"],
+    ["Patient has hypertension", "Patient has hypotension"],
+    ["hyperkalemia", "hypokalemia"],
+    ["Clonidine", "Clonazidine"],
+    ["Insulin", "Inzulin"],
+    ["Patient feels cold", "Patient feels cool"],
+    ["10 cm", "10 mm"],
+    ["1,000 mg", "1.000 mg"],
+    ["98.6°F", "101°F"],
+    ["BP 120/80", "BP 140/90"],
+    ["Pain in left knee", "Pain in right knee"],
+    ["Bilateral pain", "Unilateral pain"],
+    ["Patient denies fever", "Patient reports fever"],
+    ["Possible pneumonia", "Pneumonia"],
+    ["Suspected appendicitis", "Confirmed appendicitis"],
+    ["rule out appendicitis", "appendicitis"],
+    ["Patient has fever", "Patient has fever and cough"],
+    ["Patient has fever and cough", "Patient has fever"],
+    ["Continue current treatment.", "Start antibiotics."],
+    ["No allergy", "Allergy"],
+    ["Patient doesn't report fever", "Patient does report fever"],
+    ["No fever. Cough present.", "No fever, cough present."],
+    ["No fever, cough", "No fever cough"],
+    [
+      "Possible pneumonia; confirmed asthma",
+      "Possible pneumonia confirmed asthma",
+    ],
+    ["A-B", "AB"],
+    ["HER2−", "HER2+"],
+    ["Grade Ⅰ", "Grade Ⅱ"],
+    ["Na 1 20", "Na 120"],
+    ["Take fevr 5 mg", "Take fever 5 mg"],
+    ["sever nerve", "severe nerve"],
+    ["Fever absent, cough present", "Fever, absent cough present"],
+    ["HIV negative, HCV positive", "HIV, negative HCV positive"],
+    ["Allergy to eggs, milk tolerated", "Allergy to eggs milk tolerated"],
+    ["Concentration 5 μM", "Concentration 5 μm"],
+    ["Concentration 5 µM", "Concentration 5 µm"],
+    ["Concentration 5 nM", "Concentration 5 nm"],
+    ["ms 5", "Ms 5"],
+    ["mmol/L 5", "Mmol/L 5"],
+    ["Result. mmol/L 5", "Result. Mmol/L 5"],
+    ["pH 7.4", "PH 7.4"],
+    [
+      "Patient reports mild fever for 2 days.",
+      "The patient presented with an acute febrile illness that began approximately forty-eight hours ago.",
+    ],
+    [
+      "fevr headach paitent patinet suffring diabates fevr headach paitent",
+      "fever headache patient patient suffering diabetes fever headache patient",
+    ],
+  ])("rejects semantic or ambiguous edit %s", (source, target) => {
+    for (const policy of Object.values(FIELD_POLICIES))
+      expect(safe(source, target, policy), `${source} -> ${target}`).toBe(
+        false,
+      );
+  });
+});
+
 describe("Structured result and config", () => {
   it.each(["CLARITY", "CLINICAL_WORDING"])(
     "rejects deferred response category %s",
