@@ -8,7 +8,7 @@ export async function getClinicalAudioHealth() {
   const sarvamDeadline = new Date(
     now.getTime() - getSarvamBatchConfig().jobTimeoutMinutes * 60_000,
   );
-  const [oldest, stale, pastDeadline, cleanup, overdue, derived] =
+  const [oldest, stale, pastDeadline, cleanup, overdue, derived, facts] =
     await Promise.all([
       prisma.transcriptionRun.findFirst({
         where: { status: "QUEUED" },
@@ -49,6 +49,9 @@ export async function getClinicalAudioHealth() {
       prisma.transcriptDerivedView.count({
         where: { status: { in: ["QUEUED", "PROCESSING"] } },
       }),
+      prisma.clinicalFactExtractionRun.count({
+        where: { status: { in: ["QUEUED", "PROCESSING"] } },
+      }),
     ]);
 
   return {
@@ -58,5 +61,6 @@ export async function getClinicalAudioHealth() {
     providerCleanupBacklog: cleanup,
     retentionOverdue: overdue,
     romanizationBacklog: derived,
+    factExtractionBacklog: facts,
   };
 }

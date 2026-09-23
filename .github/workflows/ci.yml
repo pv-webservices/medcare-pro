@@ -108,6 +108,7 @@ jobs:
           npx tsx prisma/seed.ts
           npm run clinical-ai:backfill -- --apply
           npm run test:clinical-transcription
+          npm run test:clinical-facts
 
       - name: Run Registrations verifier
         run: npm run verify:registrations

@@ -25,6 +25,8 @@ export async function createClinicalAudioFixture() {
         "clinical-ai:recording",
         "clinical-ai:transcription",
         "clinical-ai:transcript-read",
+        "clinical-ai:facts-extract",
+        "clinical-ai:facts-review",
       ],
     },
   });

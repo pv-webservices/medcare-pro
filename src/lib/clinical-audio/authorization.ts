@@ -13,7 +13,9 @@ import { ClinicalAudioDisabledError } from "./errors";
 export type AudioPermission =
   | "clinical-ai:recording"
   | "clinical-ai:transcription"
-  | "clinical-ai:transcript-read";
+  | "clinical-ai:transcript-read"
+  | "clinical-ai:facts-extract"
+  | "clinical-ai:facts-review";
 export async function authorizeClinicalAudio(
   actor: ActorContext,
   registrationId: string,

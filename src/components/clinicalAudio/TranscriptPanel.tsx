@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { audioRequest } from "./useClinicalRecorder";
+import FactsPanel from "./FactsPanel";
 
 type Run = { id: string; provider: string; status: string; failureCode: string | null; transcriptId: string | null };
 type Derived = { status: string; isPartial: boolean; segments: { sourceSegmentId: string; text: string; status: string }[] };
@@ -94,6 +95,7 @@ export default function TranscriptPanel({ recordingId, onSeek, audioRetained = t
       <details><summary className="cursor-pointer text-sm">Full immutable provider source</summary><p className="whitespace-pre-wrap break-words">{transcript.sourceText}</p><p className="break-all text-xs text-muted">SHA-256 integrity checksum (not a digital signature): {transcript.sourceHash}</p></details>
       <p className="text-sm text-muted">Confirm all speakers, including Doctor and Patient. Review records your documentation check, not a guarantee of transcription accuracy.</p>
       <button disabled={busy || !reviewReady || !!transcript.reviewedAt} className={button} onClick={() => void save(`/api/clinical-ai/transcripts/${transcript.id}/review`, { attested: true, expectedVersion: transcript.version })}>I have reviewed this transcript for clinical documentation</button>
+      <FactsPanel transcriptId={transcript.id} transcriptVersion={transcript.version} segmentStartMs={Object.fromEntries(transcript.segments.map((segment) => [segment.id, segment.startMs]))} onSeek={(milliseconds) => { if (!audioRetained) return Promise.reject(new Error("Audio no longer retained")); return onSeek(milliseconds); }} />
     </>}
   </section>;
 }

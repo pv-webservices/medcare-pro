@@ -14,5 +14,15 @@ export class AiError extends Error {
       "AI writing assistance is temporarily unavailable. Your clinical note has not been changed.",
     );
     this.name = "AiError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+
+  static [Symbol.hasInstance](instance: unknown): boolean {
+    return (
+      typeof instance === "object" &&
+      instance !== null &&
+      (instance as Error).name === "AiError" &&
+      "code" in instance
+    );
   }
 }

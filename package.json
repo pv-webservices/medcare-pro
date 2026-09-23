@@ -73,6 +73,7 @@
     "clinical-audio:health": "tsx scripts/clinical-audio-health.mts",
     "clinical-audio:storage-acceptance": "tsx scripts/clinical-audio-storage-acceptance.mts",
     "test:clinical-transcription": "vitest run sarvamBatch sarvamWebhook --maxWorkers=4 && tsx scripts/test-clinical-transcription.mts",
+    "test:clinical-facts": "vitest run factEvidence effectiveTranscript clinicalFactsRoutes && tsx scripts/test-clinical-facts.mts",
     "test:e2e:prescriptions": "playwright test --config=playwright.prescriptions.config.ts",
     "patient-portal:backfill": "tsx scripts/backfill-patient-portal.mts",
     "patient-portal:password-auth-backfill": "tsx scripts/backfill-patient-portal-password-auth.mts",

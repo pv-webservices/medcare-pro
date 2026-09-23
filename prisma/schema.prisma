@@ -148,6 +148,9 @@ model Tenant {
 
   /// Enforced from the constrain migration onward, once the backfill has
   /// generated and validated a slug for every existing row.
+  factExtractionRuns     ClinicalFactExtractionRun[]
+  clinicalFactCandidates ClinicalFactCandidate[]
+  clinicalFactReviews    ClinicalFactReview[]
   @@unique([slug])
   @@index([status])
   @@index([isPlatform])
@@ -284,6 +287,8 @@ model User {
   transcriptionRunsRequested TranscriptionRun[]             @relation("TranscriptionRunRequestedBy")
   transcriptCorrections      TranscriptCorrection[]         @relation("TranscriptCorrectionCreatedBy")
   transcriptReviews          TranscriptReview[]             @relation("TranscriptReviewedBy")
+  factExtractionsRequested   ClinicalFactExtractionRun[]    @relation("FactExtractionRequestedBy")
+  factReviews                ClinicalFactReview[]           @relation("FactReviewedBy")
 
   @@index([tenantId])
   @@index([accountStatus])
@@ -479,6 +484,8 @@ model Clinic {
   transcriptionRuns            TranscriptionRun[]
   clinicalTranscripts          ClinicalTranscript[]
   transcriptReviews            TranscriptReview[]
+  factExtractionRuns           ClinicalFactExtractionRun[]
+  clinicalFactCandidates       ClinicalFactCandidate[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -991,6 +998,8 @@ model Registration {
   /// converting the same appointment twice: AP-5's second attempt hits this
   /// index rather than racing past an application check. Unlimited rows may
   /// hold NULL, which is what every pre-AP-1 registration holds.
+  factExtractionRuns     ClinicalFactExtractionRun[]
+  clinicalFactCandidates ClinicalFactCandidate[]
   @@unique([appointmentId])
   @@index([clinicId])
   @@index([patientId])
@@ -2619,6 +2628,7 @@ model ClinicalTranscript {
   corrections        TranscriptCorrection[]
   derivedViews TranscriptDerivedView[]
   reviews      TranscriptReview[]
+  factExtractionRuns ClinicalFactExtractionRun[]
 
   @@index([tenantId, clinicId, createdAt])
   @@map("clinical_transcripts")
@@ -2643,6 +2653,7 @@ model TranscriptReview {
   registration      Registration       @relation(fields: [registrationId], references: [id], onDelete: Restrict)
   transcript        ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
   reviewedBy        User               @relation("TranscriptReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  factExtractionRuns ClinicalFactExtractionRun[]
 
   @@unique([transcriptId, transcriptVersion])
   @@index([tenantId, clinicId, reviewedAt])
@@ -2659,6 +2670,7 @@ model ClinicalTranscriptSegment {
   text         String             @db.Text
   transcript   ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
   derivedSegments TranscriptDerivedSegment[]
+  factEvidence ClinicalFactEvidence[]
 
   @@unique([transcriptId, ordinal])
   @@index([transcriptId, ordinal])
@@ -2725,6 +2737,7 @@ model TranscriptCorrection {
   createdAt     DateTime           @default(now()) @map("created_at")
   transcript    ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
   createdBy     User               @relation("TranscriptCorrectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  factEvidence  ClinicalFactEvidence[]
 
   @@index([transcriptId, createdAt])
   @@map("transcript_corrections")
@@ -2902,4 +2915,110 @@ model PatientPortalAuditEvent {
   @@index([portalAccountId, createdAt])
   @@index([tenantId, createdAt])
   @@map("patient_portal_audit_events")
+}
+
+/// AI-3: one extraction per current transcript review (idempotency_key), run by
+/// the leased worker. Identity columns are immutable (DB trigger).
+model ClinicalFactExtractionRun {
+  id                 String                  @id @default(cuid())
+  tenantId           String                  @map("tenant_id")
+  clinicId           String                  @map("clinic_id")
+  registrationId     String                  @map("registration_id")
+  transcriptId       String                  @map("transcript_id")
+  transcriptReviewId String                  @map("transcript_review_id")
+  effectiveHash      String                  @map("effective_hash") @db.Char(64)
+  status             String                  @default("QUEUED") @db.VarChar(32)
+  failureCode        String?                 @map("failure_code") @db.VarChar(64)
+  provider           String                  @db.VarChar(32)
+  model              String                  @db.VarChar(101)
+  promptVersion      String                  @map("prompt_version") @db.VarChar(32)
+  schemaVersion      String                  @map("schema_version") @db.VarChar(32)
+  chunkCount         Int                     @default(0) @map("chunk_count")
+  candidateCount     Int                     @default(0) @map("candidate_count")
+  rejectedCount      Int                     @default(0) @map("rejected_count")
+  /// Counts per rejection reason code only; never clinical text.
+  rejectionCounts    Json?                   @map("rejection_counts")
+  attemptNumber      Int                     @default(1) @map("attempt_number")
+  nextAttemptAt      DateTime?               @map("next_attempt_at")
+  activeKey          String?                 @unique @map("active_key") @db.VarChar(191)
+  idempotencyKey     String                  @unique @map("idempotency_key") @db.Char(64)
+  leaseToken         String?                 @map("lease_token") @db.Char(36)
+  leaseExpiresAt     DateTime?               @map("lease_expires_at")
+  requestedByUserId  String                  @map("requested_by_user_id")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  startedAt          DateTime?               @map("started_at")
+  completedAt        DateTime?               @map("completed_at")
+  tenant             Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic             Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration       Registration            @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  transcript         ClinicalTranscript      @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
+  transcriptReview   TranscriptReview        @relation(fields: [transcriptReviewId], references: [id], onDelete: Restrict)
+  requestedBy        User                    @relation("FactExtractionRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  facts              ClinicalFactCandidate[]
+
+  @@index([status, nextAttemptAt, leaseExpiresAt], map: "fact_extraction_queue_idx")
+  @@index([tenantId, transcriptId, createdAt], map: "fact_extraction_transcript_idx")
+  @@map("clinical_fact_extraction_runs")
+}
+
+/// AI-3 candidate fact: immutable once written. The decision of the doctor
+/// lives in append-only ClinicalFactReview rows.
+model ClinicalFactCandidate {
+  id              String                    @id @default(cuid())
+  tenantId        String                    @map("tenant_id")
+  clinicId        String                    @map("clinic_id")
+  registrationId  String                    @map("registration_id")
+  extractionRunId String                    @map("extraction_run_id")
+  category        String                    @db.VarChar(32)
+  assertion       String                    @db.VarChar(16)
+  subject         String                    @db.VarChar(16)
+  statement       String                    @db.VarChar(500)
+  attributes      Json
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic          Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration    Registration              @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  extractionRun   ClinicalFactExtractionRun @relation(fields: [extractionRunId], references: [id], onDelete: Restrict)
+  evidence        ClinicalFactEvidence[]
+  reviews         ClinicalFactReview[]
+
+  @@index([extractionRunId])
+  @@index([tenantId, registrationId])
+  @@map("clinical_fact_candidates")
+}
+
+/// Exact transcript span supporting a fact, validated before insert.
+model ClinicalFactEvidence {
+  id           String                    @id @default(cuid())
+  factId       String                    @map("fact_id")
+  segmentId    String                    @map("segment_id")
+  correctionId String?                   @map("correction_id")
+  speakerType  String                    @map("speaker_type") @db.VarChar(32)
+  quote        String                    @db.VarChar(300)
+  charStart    Int                       @map("char_start")
+  charEnd      Int                       @map("char_end")
+  fact         ClinicalFactCandidate     @relation(fields: [factId], references: [id], onDelete: Restrict)
+  segment      ClinicalTranscriptSegment @relation(fields: [segmentId], references: [id], onDelete: Restrict)
+  correction   TranscriptCorrection?     @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+
+  @@index([factId])
+  @@index([segmentId])
+  @@map("clinical_fact_evidence")
+}
+
+/// Append-only doctor decision; the latest row per fact is current.
+model ClinicalFactReview {
+  id               String                @id @default(cuid())
+  tenantId         String                @map("tenant_id")
+  factId           String                @map("fact_id")
+  decision         String                @db.VarChar(16)
+  reason           String?               @db.VarChar(500)
+  reviewedByUserId String                @map("reviewed_by_user_id")
+  reviewedAt       DateTime              @default(now()) @map("reviewed_at")
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  fact             ClinicalFactCandidate @relation(fields: [factId], references: [id], onDelete: Restrict)
+  reviewedBy       User                  @relation("FactReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([factId, reviewedAt])
+  @@map("clinical_fact_reviews")
 }

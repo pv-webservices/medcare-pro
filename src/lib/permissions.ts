@@ -187,6 +187,8 @@ export const CLINICAL_AI_PERMISSIONS: readonly string[] = [
   "clinical-ai:recording",
   "clinical-ai:transcription",
   "clinical-ai:transcript-read",
+  "clinical-ai:facts-extract",
+  "clinical-ai:facts-review",
 ];
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   { module: "Clinical AI", permissions: [
@@ -194,6 +196,8 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     { key: "clinical-ai:recording", label: "Consultation recording", description: "Record consented face-to-face consultations." },
     { key: "clinical-ai:transcription", label: "Clinical transcription", description: "Request and review transcription processing." },
     { key: "clinical-ai:transcript-read", label: "Transcript access", description: "View consented consultation transcripts and playback." },
+    { key: "clinical-ai:facts-extract", label: "Clinical fact extraction", description: "Request evidence-linked fact candidates from a reviewed transcript." },
+    { key: "clinical-ai:facts-review", label: "Clinical fact review", description: "Accept or dismiss extracted fact candidates." },
   ] },
   { module: "Patient portal", permissions: [{ key: "patient_portal:manage", label: "Manage patient portal access", description: "Activate, resend and revoke portal access for verified patients." }] },
   {

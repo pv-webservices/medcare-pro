@@ -15,8 +15,12 @@ const mocks = vi.hoisted(() => ({
   cleanupAudio: vi.fn(),
   cleanupProvider: vi.fn(),
   health: vi.fn(),
+  facts: vi.fn(),
 }));
 
+vi.mock("@/lib/clinical-facts/service", () => ({
+  workFactExtractionOnce: mocks.facts,
+}));
 vi.mock("@/lib/transcription/worker", () => ({
   workTranscriptionOnce: mocks.worker,
 }));
@@ -48,6 +52,7 @@ beforeEach(() => {
   vi.stubEnv("CLINICAL_AUDIO_CRON_SECRET", secret);
   mocks.worker.mockResolvedValue(1);
   mocks.romanization.mockResolvedValue(0);
+  mocks.facts.mockResolvedValue(1);
   mocks.cleanupAudio.mockResolvedValue(1);
   mocks.cleanupProvider.mockResolvedValue(0);
   mocks.health.mockResolvedValue({
@@ -57,6 +62,7 @@ beforeEach(() => {
     providerCleanupBacklog: 0,
     retentionOverdue: 0,
     romanizationBacklog: 0,
+    factExtractionBacklog: 0,
   });
 });
 
@@ -138,9 +144,12 @@ describe("bounded clinical-audio cron routes", () => {
   it("runs one worker pass and returns operational metadata only", async () => {
     const response = await workerPost(request("/worker"));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, processed: 1, romanized: 0 });
+    expect(await response.json()).toEqual({ ok: true, processed: 1, romanized: 0, facts: 1 });
     expect(mocks.worker).toHaveBeenCalledOnce();
     expect(mocks.worker.mock.calls[0][2]).toBe(1);
+    // One fact extraction pass per trigger, under the same worker identity.
+    expect(mocks.facts).toHaveBeenCalledOnce();
+    expect(mocks.facts.mock.calls[0][0]).toBe(mocks.worker.mock.calls[0][0]);
     const secondResponse = await workerPost(request("/worker"));
     const serialized = JSON.stringify(await secondResponse.json()).toLowerCase();
     for (const forbidden of ["transcript", "patient", "audio", "storage", "provider", "secret"])
@@ -205,6 +214,7 @@ describe("bounded clinical-audio cron routes", () => {
     const response = await healthGet(request("/health", secret, "GET"));
     expect(response.status).toBe(200);
     expect(Object.keys(await response.json()).sort()).toEqual([
+      "factExtractionBacklog",
       "ok",
       "oldestQueuedAt",
       "processingPastDeadline",
