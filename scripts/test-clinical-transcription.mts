@@ -36,9 +36,9 @@ try {
     const recording = await createRecording(actor, visit.id, { attested: true, method: "VERBAL", consenterType: "PATIENT" });
     await transitionRecording(actor, recording.id, "start", { clientElapsedMs: 0, mimeType: "audio/webm;codecs=opus" });
     await transitionRecording(actor, recording.id, "stop", { clientElapsedMs: 20_000 });
-    const upload = await initRecordingUpload(actor, recording.id, { mimeType: "audio/webm;codecs=opus", durationMs: 20_000, byteSize: 2048 });
+    const upload = await initRecordingUpload(actor, recording.id, { mimeType: "audio/webm;codecs=opus", durationMs: 20_000, byteSize: 2048 }, storage);
     const etag = await storage.putPart(upload.uploadId!, 1, new Uint8Array(2048));
-    await completeRecordingUpload(actor, recording.id, { uploadId: upload.uploadId, parts: [{ partNumber: 1, etag }] });
+    await completeRecordingUpload(actor, recording.id, { uploadId: upload.uploadId, parts: [{ partNumber: 1, etag }] }, storage);
     return recording;
   }
   const recording = await ready();
