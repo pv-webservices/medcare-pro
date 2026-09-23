@@ -5,6 +5,7 @@ import { ScopeError, type ActorContext } from "@/lib/rbac";
 import { ConflictError } from "@/lib/domainErrors";
 import { recordingForActor } from "@/lib/clinical-audio/recordingService";
 import { transcriptionAudit } from "./service";
+import { effectiveTranscriptHash, effectiveTranscriptSegments } from "./effectiveTranscript";
 
 export const speakerConfirmationSchema = z.strictObject({ speakerType: z.enum(["UNKNOWN", "DOCTOR", "PATIENT", "CAREGIVER", "OTHER"]), expectedVersion: z.number().int().positive() });
 export const correctionSchema = z.strictObject({ correctedText: z.string().min(1).max(16_000).refine((text) => !!text.trim()), expectedVersion: z.number().int().positive() });
@@ -66,8 +67,21 @@ export async function reviewTranscript(actor: ActorContext, transcriptId: string
   return mutateTranscript(actor, transcriptId, input.expectedVersion, async (tx, transcript) => {
     const mappings = transcript.speakerMappings;
     if (!mappings.length || mappings.some((mapping) => mapping.speakerType === "UNKNOWN" || !mapping.confirmedAt) || mappings.filter((mapping) => mapping.speakerType === "DOCTOR").length !== 1 || !mappings.some((mapping) => mapping.speakerType === "PATIENT")) throw new ConflictError("Confirm all speakers, including Doctor and Patient, before review.");
-    await tx.clinicalTranscript.update({ where: { id: transcriptId }, data: { version: { increment: 1 }, reviewedAt: new Date(), reviewedByUserId: actor.userId } });
-    await transcriptionAudit(tx, actor, transcript.transcriptionRun, "reviewed", { transcriptId });
+    const reviewed = await tx.clinicalTranscript.update({ where: { id: transcriptId }, data: { version: { increment: 1 }, reviewedAt: new Date(), reviewedByUserId: actor.userId } });
+    // Append-only snapshot of exactly what was attested; AI-3 binds to it.
+    const snapshot = await tx.transcriptReview.create({ data: { tenantId: transcript.tenantId, clinicId: transcript.clinicId, registrationId: transcript.registrationId, transcriptId, transcriptVersion: reviewed.version, effectiveHash: effectiveTranscriptHash(effectiveTranscriptSegments(transcript)), reviewedByUserId: actor.userId, reviewedAt: reviewed.reviewedAt! } });
+    await transcriptionAudit(tx, actor, transcript.transcriptionRun, "reviewed", { transcriptId, transcriptReviewId: snapshot.id });
     return { saved: true };
   });
+}
+/** The review snapshot that still describes the transcript, or null when the
+ * transcript changed since its last review. The fingerprint is recomputed, so
+ * a snapshot is never trusted on version equality alone. */
+export async function getCurrentTranscriptReview(actor: ActorContext, transcriptId: string) {
+  const transcript = await authorizedTranscript(actor, transcriptId, prisma);
+  const snapshot = await prisma.transcriptReview.findUnique({ where: { transcriptId_transcriptVersion: { transcriptId, transcriptVersion: transcript.version } } });
+  if (!snapshot || snapshot.tenantId !== actor.tenantId) return null;
+  const segments = effectiveTranscriptSegments(transcript);
+  if (effectiveTranscriptHash(segments) !== snapshot.effectiveHash) return null;
+  return { id: snapshot.id, transcriptVersion: snapshot.transcriptVersion, effectiveHash: snapshot.effectiveHash, reviewedByUserId: snapshot.reviewedByUserId, reviewedAt: snapshot.reviewedAt, segments };
 }

@@ -42,7 +42,9 @@ AI-3 must never:
    any change, and review history survives only in the generic audit log. AI-3
    needs an immutable record of *exactly what* was reviewed.
 
-**Proposed fix — `transcript_reviews` (append-only, DB-trigger enforced):**
+**Fix — `transcript_reviews` (append-only, DB-trigger enforced). Built** in
+migration `20260923120000_transcript_review_snapshots`, with
+`src/lib/transcription/effectiveTranscript.ts` and `getCurrentTranscriptReview()`:**
 
 | Field | Notes |
 |---|---|
@@ -53,7 +55,13 @@ AI-3 must never:
 
 `reviewTranscript()` writes one row inside its existing transaction.
 `clinical_transcripts.reviewedAt` stays for compatibility. A review is
-**current** only while `transcript.version == transcript_version`.
+**current** only while `transcript.version == transcript_version` **and** the
+recomputed effective hash still equals `effective_hash`;
+`getCurrentTranscriptReview()` returns null otherwise and is the only entry
+point AI-3 may use. Insert triggers reject rows whose tenant, clinic,
+registration or version do not match the transcript, and update/delete
+triggers make snapshots immutable. Transcripts reviewed before this migration
+have no snapshot and must be reviewed again before extraction.
 
 ## 4. End-to-end flow
 

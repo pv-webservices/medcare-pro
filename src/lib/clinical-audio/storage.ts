@@ -111,7 +111,9 @@ export class InMemoryRecordingStorage implements RecordingStorageProvider {
     this.objects.delete(i.key);
   }
 }
-let memory: InMemoryRecordingStorage | undefined;
+const globalForMemory = globalThis as unknown as {
+  __medcareInMemoryRecordingStorage: InMemoryRecordingStorage | undefined;
+};
 export function getRecordingStorageProvider(): RecordingStorageProvider {
   const c = getClinicalAudioConfig();
   if (!c) throw new Error("STORAGE_UNAVAILABLE");
@@ -120,6 +122,7 @@ export function getRecordingStorageProvider(): RecordingStorageProvider {
   if (c.storageProvider === "local" && process.env.NODE_ENV !== "production")
     return new LocalRecordingStorageProvider(c);
   if (c.storageProvider === "memory" && process.env.NODE_ENV !== "production")
-    return (memory ??= new InMemoryRecordingStorage());
+    return (globalForMemory.__medcareInMemoryRecordingStorage ??=
+      new InMemoryRecordingStorage());
   throw new Error("STORAGE_UNAVAILABLE");
 }

@@ -9,7 +9,7 @@ import { getRecordingStorageProvider, InMemoryRecordingStorage } from "@/lib/cli
 import { claimNextTranscriptionRun, fencedRunUpdate, requestTranscription } from "@/lib/transcription/service";
 import { workTranscriptionOnce as unscopedWork } from "@/lib/transcription/worker";
 import { getSarvamBatchConfig } from "@/lib/transcription/batchConfig";
-import { addCorrection, confirmSpeaker, getTranscript, reviewTranscript } from "@/lib/transcription/transcripts";
+import { addCorrection, confirmSpeaker, getCurrentTranscriptReview, getTranscript, reviewTranscript } from "@/lib/transcription/transcripts";
 import type { SarvamJobStatus } from "@/lib/transcription/providers/sarvam";
 import { TranscriptionFailure } from "@/lib/transcription/errors";
 import { ConflictError } from "@/lib/apiHandler";
@@ -36,9 +36,9 @@ try {
     const recording = await createRecording(actor, visit.id, { attested: true, method: "VERBAL", consenterType: "PATIENT" });
     await transitionRecording(actor, recording.id, "start", { clientElapsedMs: 0, mimeType: "audio/webm;codecs=opus" });
     await transitionRecording(actor, recording.id, "stop", { clientElapsedMs: 20_000 });
-    const upload = await initRecordingUpload(actor, recording.id, { mimeType: "audio/webm;codecs=opus", durationMs: 20_000, byteSize: 2048 });
+    const upload = await initRecordingUpload(actor, recording.id, { mimeType: "audio/webm;codecs=opus", durationMs: 20_000, byteSize: 2048 }, storage);
     const etag = await storage.putPart(upload.uploadId!, 1, new Uint8Array(2048));
-    await completeRecordingUpload(actor, recording.id, { uploadId: upload.uploadId, parts: [{ partNumber: 1, etag }] });
+    await completeRecordingUpload(actor, recording.id, { uploadId: upload.uploadId, parts: [{ partNumber: 1, etag }] }, storage);
     return recording;
   }
   const recording = await ready();
@@ -101,9 +101,21 @@ try {
   await reviewTranscript(actor, evidence.id, { attested: true, expectedVersion: transcript.version });
   transcript = await getTranscript(actor, evidence.id);
   check("explicit clinician review persists", !!transcript.reviewedAt && transcript.reviewedByUserId === actor.userId);
+  const snapshots = await prisma.transcriptReview.findMany({ where: { transcriptId: evidence.id } });
+  const currentReview = await getCurrentTranscriptReview(actor, evidence.id);
+  check("review writes one snapshot bound to the reviewed version and fingerprint", snapshots.length === 1 && snapshots[0].transcriptVersion === transcript.version && snapshots[0].reviewedByUserId === actor.userId && currentReview?.id === snapshots[0].id && currentReview.effectiveHash === snapshots[0].effectiveHash && currentReview.segments.length === 2);
+  await assert.rejects(prisma.transcriptReview.update({ where: { id: snapshots[0].id }, data: { effectiveHash: "0".repeat(64) } }));
+  await assert.rejects(prisma.transcriptReview.delete({ where: { id: snapshots[0].id } }));
+  check("review snapshots are append-only at the database", (await prisma.transcriptReview.findUniqueOrThrow({ where: { id: snapshots[0].id } })).effectiveHash === snapshots[0].effectiveHash);
+  const snapshotScope = { tenantId: snapshots[0].tenantId, clinicId: snapshots[0].clinicId, registrationId: snapshots[0].registrationId, transcriptId: evidence.id, effectiveHash: "0".repeat(64), reviewedByUserId: actor.userId };
+  await assert.rejects(prisma.transcriptReview.create({ data: { ...snapshotScope, transcriptVersion: transcript.version + 7 } }));
+  await assert.rejects(prisma.transcriptReview.create({ data: { ...snapshotScope, tenantId: fixture.foreign.actor.tenantId, transcriptVersion: transcript.version } }));
+  check("snapshot inserts must match the transcript's scope and current version", (await prisma.transcriptReview.count({ where: { transcriptId: evidence.id } })) === 1);
+  await assert.rejects(getCurrentTranscriptReview(fixture.foreign.actor, evidence.id)); check("foreign tenant cannot read review snapshot", true);
   await addCorrection(actor, transcript.segments[1].id, { correctedText: "No chest pain for three days. Left knee pain.", expectedVersion: transcript.version });
   transcript = await getTranscript(actor, evidence.id);
   check("correction invalidates review, preserving source checksum and times", !transcript.reviewedAt && transcript.sourceHash === evidence.sourceHash && transcript.segments[1].startMs === 17000 && transcript.sourceText === evidence.sourceText);
+  check("correction makes the review snapshot stale but keeps its history", (await getCurrentTranscriptReview(actor, evidence.id)) === null && (await prisma.transcriptReview.count({ where: { transcriptId: evidence.id } })) === 1);
   await addCorrection(actor, transcript.segments[1].id, { correctedText: "No chest pain for three days; left knee pain.", expectedVersion: transcript.version });
   transcript = await getTranscript(actor, evidence.id);
   const history = transcript.segments[1].corrections;
