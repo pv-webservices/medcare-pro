@@ -11,8 +11,10 @@ export function authorizeClinicalAudioCron(request: Request): Response | null {
     return Response.json({ ok: false }, { status: 503, headers });
   if (auth !== "authorized")
     return Response.json({ ok: false }, { status: 401, headers });
+  // Authenticated, but the feature is switched off: nothing to do is not a
+  // failure, and saying so lets operators confirm the cron credentials work.
   if (!clinicalAudioCronEnabled())
-    return Response.json({ ok: false }, { status: 503, headers });
+    return Response.json({ ok: true, enabled: false }, { status: 200, headers });
   return null;
 }
 

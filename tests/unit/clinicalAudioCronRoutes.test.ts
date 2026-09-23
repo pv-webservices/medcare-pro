@@ -131,10 +131,21 @@ describe("bounded clinical-audio cron routes", () => {
     expect(mocks.worker.mock.calls.every((call) => call[2] === 1)).toBe(true);
   });
 
-  it("fails safely while clinical audio is disabled", async () => {
+  it("does no work while clinical audio is disabled, but confirms authentication", async () => {
     vi.stubEnv("CLINICAL_AUDIO_ENABLED", "false");
-    expect((await workerPost(request("/worker"))).status).toBe(503);
+    for (const response of [
+      await workerPost(request("/worker")),
+      await cleanupPost(request("/cleanup")),
+      await healthGet(request("/health", secret, "GET")),
+    ]) {
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true, enabled: false });
+    }
     expect(mocks.worker).not.toHaveBeenCalled();
+    expect(mocks.cleanupAudio).not.toHaveBeenCalled();
+    expect(mocks.health).not.toHaveBeenCalled();
+    // Disabled state is only revealed to an authenticated caller.
+    expect((await workerPost(request("/worker", "wrong-secret-value"))).status).toBe(401);
   });
 
   it("bounds cleanup and exposes no object or storage identifiers", async () => {
