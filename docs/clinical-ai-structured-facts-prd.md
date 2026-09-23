@@ -207,19 +207,33 @@ extract from the summary**, because a summary destroys evidence linkage.
   idempotency, staleness), Playwright E2E (extract → review → stale), and a
   synthetic live-provider QA report before release.
 
-## 13. Open questions for approval
+## 13. Decisions on open questions
 
-- **Q1.** Approve the four AI-3 tables plus `transcript_reviews` for PRD §7?
-- **Q2.** Should AI-3 sit under the existing `clinical_ai` module, or have its own
-  sellable feature key (`clinical_ai_facts`)? The same question applies to recording.
-- **Q3.** Should v1 include all 14 categories, or start with the 8 that AI-4 needs
-  (`SYMPTOM`, `MEDICATION_MENTION`, `ALLERGY`, `MEASUREMENT`, `DIAGNOSIS_MENTION`,
-  `INVESTIGATION`, `ADVICE`, `FOLLOW_UP`)?
-- **Q4.** Which consultation languages must v1 support? This determines the
-  negation-cue lists in §7.4. Romanized views are never used as evidence; the
-  source transcript is.
-- **Q5.** Should accepted facts later pre-fill consultation fields on explicit
-  doctor action, or remain AI-4 input only? (Recommended: AI-4 input only for v1.)
+- **Q1. Approve the four AI-3 tables plus `transcript_reviews` for PRD §7?**
+  - **Decision:** **Approved.**
+  - **Details:** The four AI-3 tables (`clinical_fact_extraction_runs`, `clinical_fact_candidates`, `clinical_fact_evidence`, `clinical_fact_reviews`) and `transcript_reviews` are approved as specified in §6. All tables enforce strict multi-tenant isolation (`tenant_id`, `clinic_id`, RESTRICT foreign keys) derived server-side from session auth. Review records are append-only. Clinical candidate and evidence text remain strictly inside these clinical tables and are prohibited from generic `ai_runs`, audit logs, or telemetry.
+
+- **Q2. Should AI-3 sit under the existing `clinical_ai` module, or have its own sellable feature key (`clinical_ai_facts`)?**
+  - **Decision:** **Sit under the existing `clinical_ai` module feature entitlement.**
+  - **Details:** `clinical_ai` remains the consolidated commercial tier (`tier: "PREMIUM"`). Subdividing into separate sellable keys at this stage introduces unnecessary packaging overhead without operational benefit. Operational and safety controls are provided by:
+    - Independent runtime kill switch: `CLINICAL_FACTS_ENABLED` (alongside `AI_ENABLED` and `CLINICAL_AUDIO_ENABLED`).
+    - Granular server-side RBAC permissions: `clinical-ai:facts-extract` and `clinical-ai:facts-review` (viewing reuses `clinical-ai:transcript-read`).
+    - Strict linked assigned-Doctor authorization per visit.
+
+- **Q3. Should v1 include all 14 categories, or start with the 8 that AI-4 needs?**
+  - **Decision:** **Start with the 8 core categories in v1.**
+  - **Details:** v1 will support the 8 categories strictly consumed by AI-4: `SYMPTOM`, `MEDICATION_MENTION`, `ALLERGY`, `MEASUREMENT`, `DIAGNOSIS_MENTION`, `INVESTIGATION`, `ADVICE`, and `FOLLOW_UP`. This reduces hallucination surface, minimizes doctor review fatigue, and aligns with Ponytail simplicity. The remaining 6 categories (`CHIEF_COMPLAINT`, `HISTORY`, `PAST_MEDICAL_HISTORY`, `EXAM_FINDING`, `ASSESSMENT`, `PLAN`) are deferred to v1.1 after AI-4 reconciliation pipeline validation.
+
+- **Q4. Which consultation languages must v1 support?**
+  - **Decision:** **English, Hindi, and Hinglish (`en-IN`, `hi-IN`).**
+  - **Details:** Covers the verified clinical consultation mix established in AI-2 Sarvam production QA. Negation cues in §7.4 are strictly anchored for v1:
+    - English: `no`, `not`, `denies`, `denied`, `never`, `without`, `none`, `nil`, `negative`, `absent`, `rules out`, `ruled out`
+    - Hindi / Hinglish: `nahi`, `nahin`, `na`, `mat`, `nhi` (and Devanagari script: नहीं, ना, मत)
+    Regional language extensions will be added in subsequent phases with dedicated physician-validated negation lexicons.
+
+- **Q5. Should accepted facts later pre-fill consultation fields on explicit doctor action, or remain AI-4 input only?**
+  - **Decision:** **AI-4 input only for v1 (approved as recommended).**
+  - **Details:** AI-3 facts will not directly populate or mutate consultation notes, electronic prescriptions, or diagnosis records. AI-3 acts strictly as an auditable, verified evidence extraction engine feeding into the downstream AI-4 documentation assistant. AI-4 will formulate draft documentation subject to explicit clinician acceptance and save before any EHR record is modified.
 
 ## 14. Out of scope
 
