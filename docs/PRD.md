@@ -161,7 +161,7 @@ accepts or dismisses. Detailed specs live in `docs/clinical-ai-*.md`.
 | `registration_edit_log` | `id`, `registration_id` (FK), `edited_by_user_id`, `role_at_time`, `changed_fields` (JSON), `timestamp` | Immutable audit trail |
 | `notifications` | `id`, `account_id`, `clinic_id` (nullable), `type`, `message`, `related_record_id`, `read`, `created_at` | |
 | `whatsapp_messages` | `id`, `clinic_id`, `patient_id`, `template_name`, `status`, `sent_at` | Logged sends via the BSP |
-| `transcript_reviews` | `id`, `tenant_id`, `clinic_id`, `transcript_id`, `transcript_version`, `effective_hash`, `reviewed_by_user_id`, `reviewed_at` | **Proposed (AI-3 prerequisite, pending approval).** Append-only snapshot of exactly what the doctor reviewed |
+| `transcript_reviews` | `id`, `tenant_id`, `clinic_id`, `transcript_id`, `transcript_version`, `effective_hash`, `reviewed_by_user_id`, `reviewed_at` | **Built (AI-3 prerequisite, migration `20260923120000_transcript_review_snapshots`).** Append-only snapshot of exactly what the doctor reviewed; DB triggers forbid update/delete and bind it to the transcript scope and current version |
 | `clinical_fact_extraction_runs` | `id`, `tenant_id`, `clinic_id`, `transcript_review_id`, `status`, `model`, `prompt_version`, `idempotency_key` | **Proposed (AI-3, pending approval)** |
 | `clinical_fact_candidates` | `id`, `tenant_id`, `clinic_id`, `extraction_run_id`, `category`, `assertion`, `subject`, `statement`, `attributes` | **Proposed (AI-3, pending approval).** Immutable |
 | `clinical_fact_evidence` | `id`, `fact_id`, `segment_id`, `correction_id`, `quote`, `char_start`, `char_end` | **Proposed (AI-3, pending approval).** Immutable |

@@ -144,6 +144,7 @@ model Tenant {
   consultationRecordings ConsultationRecording[]
   transcriptionRuns      TranscriptionRun[]
   clinicalTranscripts    ClinicalTranscript[]
+  transcriptReviews      TranscriptReview[]
 
   /// Enforced from the constrain migration onward, once the backfill has
   /// generated and validated a slug for every existing row.
@@ -282,6 +283,7 @@ model User {
   recordingsCreated          ConsultationRecording[]        @relation("RecordingCreatedBy")
   transcriptionRunsRequested TranscriptionRun[]             @relation("TranscriptionRunRequestedBy")
   transcriptCorrections      TranscriptCorrection[]         @relation("TranscriptCorrectionCreatedBy")
+  transcriptReviews          TranscriptReview[]             @relation("TranscriptReviewedBy")
 
   @@index([tenantId])
   @@index([accountStatus])
@@ -476,6 +478,7 @@ model Clinic {
   consultationRecordings       ConsultationRecording[]
   transcriptionRuns            TranscriptionRun[]
   clinicalTranscripts          ClinicalTranscript[]
+  transcriptReviews            TranscriptReview[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -982,6 +985,7 @@ model Registration {
   consultationRecordings ConsultationRecording[]
   transcriptionRuns      TranscriptionRun[]
   clinicalTranscripts    ClinicalTranscript[]
+  transcriptReviews      TranscriptReview[]
 
   /// One registration per appointment. This is the database-level guard against
   /// converting the same appointment twice: AP-5's second attempt hits this
@@ -2614,9 +2618,35 @@ model ClinicalTranscript {
   speakerMappings    TranscriptSpeakerMapping[]
   corrections        TranscriptCorrection[]
   derivedViews TranscriptDerivedView[]
+  reviews      TranscriptReview[]
 
   @@index([tenantId, clinicId, createdAt])
   @@map("clinical_transcripts")
+}
+
+/// AI-3 prerequisite: append-only snapshot of exactly what a clinician
+/// reviewed. A review is current only while transcriptVersion equals the
+/// transcript's version; DB triggers forbid update/delete and bind the row to
+/// the transcript's tenant, clinic, registration and current version.
+model TranscriptReview {
+  id                String             @id @default(cuid())
+  tenantId          String             @map("tenant_id")
+  clinicId          String             @map("clinic_id")
+  registrationId    String             @map("registration_id")
+  transcriptId      String             @map("transcript_id")
+  transcriptVersion Int                @map("transcript_version")
+  effectiveHash     String             @map("effective_hash") @db.Char(64)
+  reviewedByUserId  String             @map("reviewed_by_user_id")
+  reviewedAt        DateTime           @default(now()) @map("reviewed_at")
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  clinic            Clinic             @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  registration      Registration       @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  transcript        ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
+  reviewedBy        User               @relation("TranscriptReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([transcriptId, transcriptVersion])
+  @@index([tenantId, clinicId, reviewedAt])
+  @@map("transcript_reviews")
 }
 
 model ClinicalTranscriptSegment {
