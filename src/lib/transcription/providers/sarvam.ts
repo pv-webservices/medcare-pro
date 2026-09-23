@@ -22,13 +22,25 @@ export function sarvamBlobUrl(raw: string): URL {
   return url;
 }
 
+// Conservative sustained throughput to the provider blob store. The worker
+// lease heartbeat keeps the claim alive for the whole upload.
+const MIN_UPLOAD_BYTES_PER_SECOND = 256 * 1024;
+const MAX_UPLOAD_TIMEOUT_MS = 60 * 60_000;
+
+/** A recording may be up to CLINICAL_RECORDING_MAX_BYTES, far beyond what the
+ * JSON request timeout can carry, so the audio PUT gets a size-scaled deadline. */
+export function sarvamUploadTimeoutMs(bytes: number, requestTimeoutMs: number): number {
+  const scaled = Math.ceil(bytes / MIN_UPLOAD_BYTES_PER_SECOND) * 1000;
+  return Math.min(MAX_UPLOAD_TIMEOUT_MS, Math.max(requestTimeoutMs, scaled));
+}
+
 /** Checkpoints are deliberately separate so the worker can durably persist job IDs. */
 export class SarvamBatchClient {
   constructor(private readonly config: SarvamBatchConfig, private readonly transport: typeof fetch = fetch) {}
 
-  private async request(url: string | URL, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+  private async request(url: string | URL, init: RequestInit, signal?: AbortSignal, timeoutMs = this.config.requestTimeoutMs): Promise<Response> {
     try {
-      const timeout = AbortSignal.timeout(this.config.requestTimeoutMs);
+      const timeout = AbortSignal.timeout(timeoutMs);
       const response = await this.transport(url, { ...init, redirect: "error", signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
       if (!response.ok) {
         // Read only the bounded error code, never retain/log error.message/body.
@@ -69,7 +81,7 @@ export class SarvamBatchClient {
       const destination = destinations[filename];
       if (!destination) throw new TranscriptionFailure("INVALID_RESPONSE");
       const init: RequestInit & { duplex: "half" } = { method: "PUT", headers: { "x-ms-blob-type": "BlockBlob", "Content-Length": String(bytes), "Content-Type": contentType }, body: stream, duplex: "half" };
-      const response = await this.request(sarvamBlobUrl(destination.file_url), init, signal);
+      const response = await this.request(sarvamBlobUrl(destination.file_url), init, signal, sarvamUploadTimeoutMs(bytes, this.config.requestTimeoutMs));
       await response.body?.cancel();
     } finally { if (!stream.locked) await stream.cancel().catch(() => undefined); }
   }

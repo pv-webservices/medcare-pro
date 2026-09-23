@@ -13,6 +13,66 @@ test.beforeAll(async ({ request }) => {
   for (const path of ["/api/clinical-ai/local-storage", "/api/clinical-ai/recordings/synthetic/audio-url", "/api/clinical-ai/recordings/synthetic/transcriptions/latest", "/api/clinical-ai/transcripts/synthetic", "/api/clinical-ai/transcripts/synthetic/romanized", "/api/clinical-ai/recordings/synthetic/transcriptions/fallback", "/api/settings/clinical-ai"]) expect((await request.get(path)).status()).toBe(401);
 });
 test.afterAll(async () => { await prisma.$disconnect(); });
+test("HTTP cron authentication fences duplicate claims without provider IO", async ({ page }) => {
+  test.skip(process.env.CLINICAL_AUDIO_E2E_DISABLED === "true");
+  const visit = await open(page);
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Record patient consent", exact: true }).click();
+  await expect(page.getByText("Consent recorded", { exact: false }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Check microphone", exact: true }).click();
+  const startRecording = page.getByRole("button", { name: "Start recording", exact: true });
+  await expect(startRecording).toBeEnabled();
+  await startRecording.click();
+  await expect(page.getByLabel("Recording elapsed time")).toHaveText("0:04", { timeout: 15000 });
+  await page.getByRole("button", { name: "Stop recording", exact: true }).click();
+  await page.getByRole("button", { name: "Upload / Resume upload", exact: true }).click();
+  await prisma.transcriptionRun.updateMany({
+    where: { status: { in: ["QUEUED", "PREPARING", "SUBMITTED", "PROCESSING"] } },
+    data: {
+      status: "CANCELLED",
+      activeKey: null,
+      completedAt: new Date(),
+      leaseToken: null,
+      leaseExpiresAt: null,
+      lockedBy: null,
+      lockedAt: null,
+    },
+  });
+  await page.getByRole("button", { name: "Generate transcript", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: /QUEUED|PREPARING/ })).toBeVisible();
+  const recording = await prisma.consultationRecording.findFirstOrThrow({ where: { registrationId: visit.id, status: "READY" } });
+  const initial = await prisma.transcriptionRun.findUniqueOrThrow({ where: { activeKey: recording.id } });
+  expect(initial.status).toBe("QUEUED");
+  await prisma.consultationRecordingConsent.update({
+    where: { id: recording.consentId },
+    data: { withdrawnAt: new Date(), withdrawnByUserId: recording.createdByUserId },
+  });
+
+  const path = "/api/internal/clinical-audio/worker";
+  expect((await page.request.get(path)).status()).toBe(405);
+  expect((await page.request.post(path)).status()).toBe(401);
+  expect((await page.request.post(path, { headers: { Authorization: "Bearer incorrect-synthetic-secret" } })).status()).toBe(401);
+  expect((await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: initial.id } })).status).toBe("QUEUED");
+
+  const authorization = { Authorization: "Bearer synthetic-http-cron-secret-at-least-32-characters" };
+  const triggered = await Promise.all([
+    page.request.post(path, { headers: authorization }),
+    page.request.post(path, { headers: authorization }),
+  ]);
+  expect(triggered.every(response => response.ok())).toBe(true);
+  const bodies = await Promise.all(triggered.map(response => response.json()));
+  expect(bodies.map(body => body.processed).sort()).toEqual([0, 1]);
+  expect(bodies.every(body => Object.keys(body).every((key: string) => ["ok", "processed", "romanized"].includes(key)))).toBe(true);
+  const failed = await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: initial.id } });
+  expect(failed.status).toBe("FAILED");
+  expect(failed.failureCode).toBe("CONSENT_INVALID");
+  expect(failed.providerJobId).toBeNull();
+  expect(await prisma.transcriptionRun.count({ where: { recordingId: recording.id } })).toBe(1);
+
+  const cleanup = await page.request.post("/api/internal/clinical-audio/cleanup", { headers: authorization });
+  expect(cleanup.ok()).toBe(true);
+  expect(Object.keys(await cleanup.json()).sort()).toEqual(["ok", "providerArtifacts", "recordings"]);
+});
 test("tenant opt-in, explicit Gemini fallback, duration limit, partial Romanization and audio expiry", async ({ page, playwright }) => {
   test.setTimeout(180000);
   test.skip(process.env.CLINICAL_AUDIO_E2E_DISABLED === "true");

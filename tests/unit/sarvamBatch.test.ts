@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { getSarvamBatchConfig } from "@/lib/transcription/batchConfig";
 import { normalizeSarvamResult, readBoundedProviderJson, transcriptSourceHash } from "@/lib/transcription/normalize";
-import { SarvamBatchClient, sarvamBlobUrl } from "@/lib/transcription/providers/sarvam";
+import { SarvamBatchClient, sarvamBlobUrl, sarvamUploadTimeoutMs } from "@/lib/transcription/providers/sarvam";
 
 const env = { TRANSCRIPTION_PRIMARY_PROVIDER: "sarvam", SARVAM_API_SUBSCRIPTION_KEY: "synthetic-key-never-live" };
 const result = () => ({ request_id: "synthetic-request", transcript: "Metformin 500 mg once daily. No chest pain.", language_code: "en-IN", diarized_transcript: { entries: [{ transcript: "Metformin 500 mg once daily.", start_time_seconds: 0.0006, end_time_seconds: 18, speaker_id: "speaker_0" }, { transcript: "No chest pain.", start_time_seconds: 17, end_time_seconds: 20, speaker_id: "speaker_1" }] } });
@@ -96,5 +96,19 @@ describe("Sarvam direct REST transport", () => {
     });
     await new SarvamBatchClient(getSarvamBatchConfig(env), transport).upload("job", "recording.webm", new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4)); controller.close(); } }), 4, "audio/webm");
     expect(transport.mock.calls[1][1]?.redirect).toBe("error");
+  });
+});
+describe("Sarvam audio upload deadline", () => {
+  const MiB = 1024 * 1024;
+  it("keeps the request timeout for small recordings", () => expect(sarvamUploadTimeoutMs(4, 30_000)).toBe(30_000));
+  it("scales with size so a maximum-size recording is not cut off at the JSON request timeout", () => expect(sarvamUploadTimeoutMs(512 * MiB, 30_000)).toBe(2_048_000));
+  it("is capped so a stalled upload cannot hold a worker indefinitely", () => expect(sarvamUploadTimeoutMs(4096 * MiB, 30_000)).toBe(3_600_000));
+  it("applies the scaled deadline to the blob PUT only", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "job", upload_urls: { "recording.webm": { file_url: "https://account.blob.core.windows.net/audio/recording.webm?sig=synthetic" } } }))).mockResolvedValueOnce(new Response(null, { status: 201 }));
+    const bytes = 100 * MiB;
+    await new SarvamBatchClient(getSarvamBatchConfig(env), transport).upload("job", "recording.webm", new ReadableStream({ start(controller) { controller.close(); } }), bytes, "audio/webm");
+    expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([30_000, sarvamUploadTimeoutMs(bytes, 30_000)]);
+    timeout.mockRestore();
   });
 });
