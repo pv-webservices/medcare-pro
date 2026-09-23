@@ -1,5 +1,11 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { authenticateClinicalAudioCron } from "@/lib/clinical-audio/cronAuth";
+import {
+  authenticateClinicalAudioCron,
+  resolveClinicalAudioCronSecret,
+} from "@/lib/clinical-audio/cronAuth";
 
 const mocks = vi.hoisted(() => ({
   worker: vi.fn(),
@@ -66,8 +72,27 @@ describe("clinical-audio cron machine authentication", () => {
 
   it("fails closed when the server secret is absent or invalid", async () => {
     vi.stubEnv("CLINICAL_AUDIO_CRON_SECRET", "");
+    vi.stubEnv("CLINICAL_AUDIO_CRON_SECRET_FILE", join(tmpdir(), "missing-clinical-audio-secret"));
     expect((await workerPost(request("/worker"))).status).toBe(503);
     expect(mocks.worker).not.toHaveBeenCalled();
+  });
+
+  it("reads the secret from a private server file when no env value is set", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cron-secret-"));
+    const file = join(dir, "secret");
+    writeFileSync(file, `${secret}\n`);
+    try {
+      const env = { CLINICAL_AUDIO_CRON_SECRET_FILE: file };
+      expect(authenticateClinicalAudioCron(request("/worker"), env)).toBe("authorized");
+      expect(authenticateClinicalAudioCron(request("/worker", "wrong-secret-value"), env)).toBe("unauthorized");
+      expect(resolveClinicalAudioCronSecret(env)).toBe(secret);
+      // An explicit env value always wins over the file.
+      expect(authenticateClinicalAudioCron(request("/worker"), { ...env, CLINICAL_AUDIO_CRON_SECRET: "x".repeat(40) })).toBe("unauthorized");
+      writeFileSync(file, "too-short");
+      expect(authenticateClinicalAudioCron(request("/worker"), env)).toBe("unconfigured");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("accepts only the Authorization header, using fixed-length digests", () => {

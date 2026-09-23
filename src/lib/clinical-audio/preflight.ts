@@ -1,4 +1,5 @@
 import { getClinicalAudioConfig } from "./config";
+import { resolveClinicalAudioCronSecret } from "./cronAuth";
 import { getSarvamBatchConfig } from "@/lib/transcription/batchConfig";
 import { getGeminiTranscriptionConfig } from "@/lib/transcription/providers/gemini";
 export function clinicalAudioPreflight(env: Record<string, string | undefined> = process.env, fallbackRequired = false) {
@@ -7,6 +8,7 @@ export function clinicalAudioPreflight(env: Record<string, string | undefined> =
   const production = { ...env, NODE_ENV: "production", CLINICAL_AUDIO_ENABLED: "true" };
   let sarvam = false; try { getSarvamBatchConfig(production); sarvam = true; } catch {}
   let gemini = false; try { getGeminiTranscriptionConfig(production); gemini = true; } catch {}
+  const cronSecret = resolveClinicalAudioCronSecret(env);
   let callback = false; try { const u = new URL(env.CLINICAL_TRANSCRIPTION_PUBLIC_BASE_URL || ""); callback = u.protocol === "https:" && !u.username && !u.password && !u.search && !u.hash && u.pathname === "/"; } catch {}
   return { state: enabled ? "ENABLED" : "CONFIGURED BUT DISABLED", checks: [
     check("CLINICAL_AUDIO_ENABLED", ["true", "false"].includes(env.CLINICAL_AUDIO_ENABLED ?? "")),
@@ -22,6 +24,6 @@ export function clinicalAudioPreflight(env: Record<string, string | undefined> =
     { name: "Gemini key present", result: (env.GEMINI_TRANSCRIPTION_API_KEY || env.GEMINI_API_KEY)?.trim() ? "PASS" : fallbackRequired ? "FAIL" : "UNAVAILABLE" },
     { name: "Gemini fallback configuration", result: gemini ? "PASS" : fallbackRequired ? "FAIL" : "UNAVAILABLE" },
     check("worker supervision declared", ["persistent", "scheduled-once", "external"].includes(env.CLINICAL_AUDIO_WORKER_MODE ?? "")),
-    check("HTTP cron secret", env.CLINICAL_AUDIO_WORKER_MODE !== "external" || ((env.CLINICAL_AUDIO_CRON_SECRET?.length ?? 0) >= 32 && (env.CLINICAL_AUDIO_CRON_SECRET?.length ?? 0) <= 512)),
+    check("HTTP cron secret", env.CLINICAL_AUDIO_WORKER_MODE !== "external" || ((cronSecret?.length ?? 0) >= 32 && (cronSecret?.length ?? 0) <= 512)),
   ] };
 }

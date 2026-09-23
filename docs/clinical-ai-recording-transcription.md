@@ -77,16 +77,19 @@ When the application is deployed on a platform that does not preserve arbitrary 
 - `POST /api/internal/clinical-audio/cleanup` performs at most one recording-retention pass and one provider-artifact pass.
 - `GET /api/internal/clinical-audio/health` returns queue/lease/retention counters only.
 
-All three routes require `Authorization: Bearer <CLINICAL_AUDIO_CRON_SECRET>`. The dedicated server-only secret must be 32–512 characters. It is never accepted in a URL, path or request body and must not be logged. Missing configuration, invalid authentication, or disabled clinical audio fails closed. Responses are private/no-store and contain only bounded operational counts—never transcript text, patient identifiers, object keys, signed URLs, provider payloads or credentials.
+All three routes require `Authorization: Bearer <secret>`. The server resolves the secret from `CLINICAL_AUDIO_CRON_SECRET` if set, otherwise from the private file named by `CLINICAL_AUDIO_CRON_SECRET_FILE`, defaulting to `~/.clinical-audio-cron-secret` in the hosting account's home directory (read per request, so rotation needs no restart). The dedicated server-only secret must be 32–512 characters. It is never accepted in a URL, path or request body and must not be logged. Missing configuration, invalid authentication, or disabled clinical audio fails closed. Responses are private/no-store and contain only bounded operational counts—never transcript text, patient identifiers, object keys, signed URLs, provider payloads or credentials.
 
 The CLI scripts remain local/VPS operational entry points. Production cron commands must call the HTTPS routes; they must not depend on custom files within `.next/server`. Hostinger's managed Node.js deployment copies only its own build output into `hbuilds/versions/<build>`, so any file a build step writes under `.next/server` is absent at runtime (observed as `MODULE_NOT_FOUND` for `worker.mjs`).
 
-Cron job listings are visible in hPanel and the hosting API, so the secret must not appear in the command. Store the header in a private file outside the site root, then reference it with `curl -H @file`:
+Cron job listings are visible in hPanel and the hosting API, so the secret must not appear in any command. On Hostinger, generate it on the server once, into owner-only files outside the site root. The app reads the secret file, and cron sends the header file with `curl -H @file`. Hostinger's environment-variable API replaces the whole set and returns masked values, so the file avoids touching it:
 
 ```bash
-printf 'Authorization: Bearer %s\n' '<CLINICAL_AUDIO_CRON_SECRET>' > ~/.clinical-audio-cron-header
-chmod 600 ~/.clinical-audio-cron-header
+umask 077
+[ -s ~/.clinical-audio-cron-secret ] || head -c 48 /dev/urandom | base64 | tr -d '\n/+=' > ~/.clinical-audio-cron-secret
+printf 'Authorization: Bearer %s\n' "$(cat ~/.clinical-audio-cron-secret)" > ~/.clinical-audio-cron-header
 ```
+
+To rotate, delete both files and rerun; the app picks up the new secret on the next request.
 
 ```text
 */2 * * * *  curl -fsS --max-time 900 -X POST -H @$HOME/.clinical-audio-cron-header https://<domain>/api/internal/clinical-audio/worker
