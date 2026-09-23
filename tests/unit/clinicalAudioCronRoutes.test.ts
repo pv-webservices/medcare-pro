@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   authenticateClinicalAudioCron,
+  cronSecretFileCandidates,
+  DEFAULT_CRON_SECRET_FILE,
   resolveClinicalAudioCronSecret,
 } from "@/lib/clinical-audio/cronAuth";
 
@@ -93,6 +95,33 @@ describe("clinical-audio cron machine authentication", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("finds the account secret file even when the process HOME points elsewhere", () => {
+    // Hosting runs the app from <home>/domains/<site>/.../nodejs with its own HOME.
+    const account = mkdtempSync(join(tmpdir(), "cron-account-"));
+    const app = join(account, "domains", "site", "hbuilds", "versions", "b1", "nodejs");
+    mkdirSync(app, { recursive: true });
+    writeFileSync(join(account, DEFAULT_CRON_SECRET_FILE), `${secret}\n`);
+    try {
+      const locations = { cwd: app, home: join(tmpdir(), "not-the-account"), userHome: undefined };
+      expect(cronSecretFileCandidates({}, locations)).toContain(join(account, DEFAULT_CRON_SECRET_FILE));
+      expect(resolveClinicalAudioCronSecret({}, locations)).toBe(secret);
+      // An explicit file path is authoritative: no fallback search.
+      expect(cronSecretFileCandidates({ CLINICAL_AUDIO_CRON_SECRET_FILE: "/explicit" }, locations)).toEqual(["/explicit"]);
+    } finally {
+      rmSync(account, { recursive: true, force: true });
+    }
+  });
+
+  it("prefers the account home over directories above the app", () => {
+    const locations = { cwd: join(tmpdir(), "a", "b"), home: join(tmpdir(), "h"), userHome: join(tmpdir(), "u") };
+    const candidates = cronSecretFileCandidates({}, locations);
+    expect(candidates.slice(0, 2)).toEqual([
+      join(tmpdir(), "u", DEFAULT_CRON_SECRET_FILE),
+      join(tmpdir(), "h", DEFAULT_CRON_SECRET_FILE),
+    ]);
+    expect(new Set(candidates).size).toBe(candidates.length);
   });
 
   it("accepts only the Authorization header, using fixed-length digests", () => {

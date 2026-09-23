@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { homedir, userInfo } from "node:os";
+import { dirname, join, resolve } from "node:path";
 
 const MIN_SECRET_LENGTH = 32;
 const MAX_SECRET_LENGTH = 512;
@@ -10,20 +10,67 @@ const MAX_SECRET_LENGTH = 512;
  * crontab listing or hosting API response. */
 export const DEFAULT_CRON_SECRET_FILE = ".clinical-audio-cron-secret";
 
-/** Env value first; otherwise the private secret file. Read per request so a
- * rotated file takes effect without a restart. */
-export function resolveClinicalAudioCronSecret(
-  env: Record<string, string | undefined> = process.env,
-): string | undefined {
-  if (env.CLINICAL_AUDIO_CRON_SECRET) return env.CLINICAL_AUDIO_CRON_SECRET;
-  const path =
-    env.CLINICAL_AUDIO_CRON_SECRET_FILE ||
-    join(homedir(), DEFAULT_CRON_SECRET_FILE);
+type SecretLocations = {
+  cwd: string;
+  home: string | undefined;
+  userHome: string | undefined;
+};
+
+function accountHome(): string | undefined {
   try {
-    return readFileSync(path, "utf8").trim() || undefined;
+    return userInfo().homedir;
   } catch {
     return undefined;
   }
+}
+
+function currentLocations(): SecretLocations {
+  return { cwd: process.cwd(), home: homedir(), userHome: accountHome() };
+}
+
+/**
+ * Where to look for the secret file. The hosting process may run with a HOME
+ * that is not the account home the cron shell uses, so check the account's
+ * passwd home, then HOME, then every directory above the app (the app is
+ * deployed beneath the account home). An explicit path is never second-guessed.
+ */
+export function cronSecretFileCandidates(
+  env: Record<string, string | undefined>,
+  locations: SecretLocations = currentLocations(),
+): string[] {
+  if (env.CLINICAL_AUDIO_CRON_SECRET_FILE)
+    return [env.CLINICAL_AUDIO_CRON_SECRET_FILE];
+  const directories = [locations.userHome, locations.home];
+  for (let dir = resolve(locations.cwd); ; dir = dirname(dir)) {
+    directories.push(dir);
+    if (dirname(dir) === dir) break;
+  }
+  return [
+    ...new Set(
+      directories
+        .filter((dir): dir is string => !!dir)
+        .map((dir) => join(dir, DEFAULT_CRON_SECRET_FILE)),
+    ),
+  ];
+}
+
+/** Env value first; otherwise the first non-empty private secret file. Read
+ * per request so a rotated file takes effect without a restart. */
+export function resolveClinicalAudioCronSecret(
+  env: Record<string, string | undefined> = process.env,
+  locations?: SecretLocations,
+): string | undefined {
+  if (env.CLINICAL_AUDIO_CRON_SECRET) return env.CLINICAL_AUDIO_CRON_SECRET;
+  for (const path of cronSecretFileCandidates(env, locations)) {
+    try {
+      // Runtime-only path: keep bundlers from tracing the whole project.
+      const value = readFileSync(/*turbopackIgnore: true*/ path, "utf8").trim();
+      if (value) return value;
+    } catch {
+      // Absent or unreadable here; try the next location.
+    }
+  }
+  return undefined;
 }
 
 export type ClinicalAudioCronAuth =
