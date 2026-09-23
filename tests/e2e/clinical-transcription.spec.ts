@@ -62,7 +62,7 @@ test("HTTP cron authentication fences duplicate claims without provider IO", asy
   expect(triggered.every(response => response.ok())).toBe(true);
   const bodies = await Promise.all(triggered.map(response => response.json()));
   expect(bodies.map(body => body.processed).sort()).toEqual([0, 1]);
-  expect(bodies.every(body => Object.keys(body).every((key: string) => ["ok", "processed", "romanized"].includes(key)))).toBe(true);
+  expect(bodies.every(body => Object.keys(body).every((key: string) => ["ok", "processed", "romanized", "facts"].includes(key)))).toBe(true);
   const failed = await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: initial.id } });
   expect(failed.status).toBe("FAILED");
   expect(failed.failureCode).toBe("CONSENT_INVALID");

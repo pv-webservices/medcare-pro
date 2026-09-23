@@ -1,9 +1,20 @@
 # Phase AI-3 — Structured Clinical Facts (PRD draft)
 
-> **Status: DRAFT — awaiting product-owner approval.** No schema, migration, API
-> or UI for AI-3 exists yet. `CLAUDE.md` forbids adding tables that are not in
-> `docs/PRD.md`; this document proposes them for review. Nothing here is built
-> until the open questions in §13 are answered and PRD §6.10 is approved.
+> **Status: APPROVED (§13 answered) — v1 built, off by default.** Implemented in
+> migrations `20260923120000_transcript_review_snapshots` and
+> `20260924090000_clinical_fact_extraction`, `src/lib/clinical-facts/*`, routes
+> `GET|POST /api/clinical-ai/transcripts/:id/facts` and
+> `POST /api/clinical-ai/facts/:id/review`, and `FactsPanel` in the transcript
+> panel. Enable per environment with `CLINICAL_FACTS_ENABLED=true`. Existing
+> custom roles are never modified: grant `clinical-ai:facts-extract` and
+> `clinical-ai:facts-review` to doctor roles explicitly (new Doctor seeds include
+> them). Extraction runs in the clinical-audio cron worker pass; `/health`
+> reports `factExtractionBacklog`.
+>
+> v1 limitations: question detection relies on "?" in the transcript, so
+> Hindi/Hinglish questions without it are not recognised as questions;
+> subject=PATIENT accepts Doctor-spoken evidence; contradiction grouping keys on
+> the exact anchor text, so "fever" and "bukhar" are not linked.
 
 ## 1. Purpose
 
