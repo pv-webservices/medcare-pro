@@ -46,6 +46,16 @@ class FactRunFailure extends Error {
   constructor(public readonly failure: string) {
     super(failure);
     this.name = "FactRunFailure";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+
+  static [Symbol.hasInstance](instance: unknown): boolean {
+    return (
+      typeof instance === "object" &&
+      instance !== null &&
+      (instance as Error).name === "FactRunFailure" &&
+      "failure" in instance
+    );
   }
 }
 
@@ -301,7 +311,11 @@ async function processFactRun(run: ClinicalFactExtractionRun, injected?: AiProvi
     await completeAiRun(actor, aiRunId, { status: "SUCCEEDED", outputCharacterCount: 0, latencyMs: Date.now() - start, inputTokens, outputTokens });
   } catch (error) {
     const failure =
-      error instanceof FactRunFailure ? error.failure : error instanceof AiError ? error.code : "FAILED";
+      error instanceof FactRunFailure || (typeof error === "object" && error !== null && (error as Error).name === "FactRunFailure" && "failure" in error)
+        ? (error as FactRunFailure).failure
+        : error instanceof AiError || (typeof error === "object" && error !== null && ((error as Error).name === "AiError" || "code" in error))
+          ? (error as AiError).code
+          : "FAILED";
     if (aiRunId)
       await completeAiRun(actor, aiRunId, { status: failure, outputCharacterCount: 0, latencyMs: Date.now() - start, inputTokens, outputTokens }).catch(() => undefined);
     await failFactRun(run, failure);
