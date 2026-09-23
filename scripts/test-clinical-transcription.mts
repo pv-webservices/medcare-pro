@@ -143,8 +143,9 @@ try {
   const retryJobId = `retry-${randomUUID()}`;
   await prisma.transcriptionRun.update({ where: { id: retryRequest.run.id }, data: { providerJobId: retryJobId, submissionIntentAt: new Date(), submittedAt: new Date(), status: "PROCESSING" } });
   const limitedProvider = { ...provider, async status(): Promise<SarvamJobStatus> { throw new TranscriptionFailure("RATE_LIMIT", true); } };
-  await workTranscriptionOnce("limited-worker", { config, storage, provider: limitedProvider });
+  const workCount = await workTranscriptionOnce("limited-worker", { config, storage, provider: limitedProvider });
   let limited = await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: retryRequest.run.id } });
+  console.log("DIAGNOSTIC limited:", JSON.stringify({ workCount, status: limited.status, attemptNumber: limited.attemptNumber, nextAttemptAt: limited.nextAttemptAt, providerJobId: limited.providerJobId, retryJobId, failureCode: limited.failureCode, leaseToken: limited.leaseToken, lockedBy: limited.lockedBy }));
   check("rate limit persists backoff, same provider job and attempt count", limited.status === "PROCESSING" && limited.attemptNumber === 2 && limited.nextAttemptAt && limited.providerJobId === retryJobId);
   for (let count = 0; count < 2; count++) { await prisma.transcriptionRun.update({ where: { id: limited.id }, data: { nextAttemptAt: new Date(0) } }); await workTranscriptionOnce("limited-worker", { config, storage, provider: limitedProvider }); }
   limited = await prisma.transcriptionRun.findUniqueOrThrow({ where: { id: limited.id } });
