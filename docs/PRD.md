@@ -132,6 +132,16 @@ not a hardcoded enum the UI locks to.
 - **FR-9.1**: Send template messages to patients via the third-party BSP's API (provider and credentials TBD — see Assumptions).
 - **FR-9.2**: Delivery status logged and visible against the message.
 
+### 6.10 Clinical AI *(added post-v2.0)*
+Premium, doctor-controlled documentation assistance. AI output is never clinical
+authority: every AI result is a candidate that the assigned doctor explicitly
+accepts or dismisses. Detailed specs live in `docs/clinical-ai-*.md`.
+- **FR-10.1 (AI-1, built)**: Spelling/grammar suggestions for consultation notes, validated deterministically before doctor review — `docs/clinical-ai-writing-assistant.md`.
+- **FR-10.2 (AI-2, built)**: Consented consultation recording, private audio storage, Sarvam transcription, corrections, speaker confirmation and clinician review — `docs/clinical-ai-recording-transcription.md`.
+- **FR-10.3 (AI-3, DRAFT — pending approval)**: Evidence-linked structured fact candidates from a reviewed transcript, accepted or dismissed per fact — `docs/clinical-ai-structured-facts-prd.md`.
+- **FR-10.4 (AI-4, planned)**: Reconcile the prescription draft against accepted AI-3 facts; discrepancies only, no automatic prescription change.
+- **FR-10.5 (AI-5, planned)**: Deterministic, versioned pre-issue prescription checks with optional AI candidate warnings; requires jurisdiction-specific legal/medical validation before any compliance claim.
+
 ---
 
 ## 7. Data Model
@@ -151,6 +161,11 @@ not a hardcoded enum the UI locks to.
 | `registration_edit_log` | `id`, `registration_id` (FK), `edited_by_user_id`, `role_at_time`, `changed_fields` (JSON), `timestamp` | Immutable audit trail |
 | `notifications` | `id`, `account_id`, `clinic_id` (nullable), `type`, `message`, `related_record_id`, `read`, `created_at` | |
 | `whatsapp_messages` | `id`, `clinic_id`, `patient_id`, `template_name`, `status`, `sent_at` | Logged sends via the BSP |
+| `transcript_reviews` | `id`, `tenant_id`, `clinic_id`, `transcript_id`, `transcript_version`, `effective_hash`, `reviewed_by_user_id`, `reviewed_at` | **Proposed (AI-3 prerequisite, pending approval).** Append-only snapshot of exactly what the doctor reviewed |
+| `clinical_fact_extraction_runs` | `id`, `tenant_id`, `clinic_id`, `transcript_review_id`, `status`, `model`, `prompt_version`, `idempotency_key` | **Proposed (AI-3, pending approval)** |
+| `clinical_fact_candidates` | `id`, `tenant_id`, `clinic_id`, `extraction_run_id`, `category`, `assertion`, `subject`, `statement`, `attributes` | **Proposed (AI-3, pending approval).** Immutable |
+| `clinical_fact_evidence` | `id`, `fact_id`, `segment_id`, `correction_id`, `quote`, `char_start`, `char_end` | **Proposed (AI-3, pending approval).** Immutable |
+| `clinical_fact_reviews` | `id`, `tenant_id`, `fact_id`, `decision`, `reviewed_by_user_id`, `reviewed_at` | **Proposed (AI-3, pending approval).** Append-only |
 
 **Isolation model**: every clinic-scoped table carries `clinic_id`; every account-scoped
 table carries `account_id`. Row-level scoping is enforced in the application layer
