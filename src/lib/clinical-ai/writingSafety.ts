@@ -1,14 +1,6 @@
 import type { FieldPolicy, WritingMode } from "./writingSchemas";
+import { isDictionarySpellingCorrection } from "./clinicalLexicon";
 
-// Explicit equivalences, never fuzzy spelling, synonyms or provider confidence.
-const reviewedSpelling: Record<string, string> = {
-  suffring: "suffering",
-  paitent: "patient",
-  patinet: "patient",
-  headach: "headache",
-  fevr: "fever",
-};
-const narrativeSpelling: Record<string, string> = { diabates: "diabetes" };
 const agreement: Record<string, string> = {
   are: "is",
   were: "was",
@@ -55,6 +47,40 @@ const uncertaintyWords = new Set([
   "reports",
 ]);
 const laterality = new Set(["left", "right", "bilateral", "unilateral"]);
+// Quantity, frequency and duration words: a "spelling" fix must never produce
+// or alter one (dialy -> daily, twoo -> two).
+const quantityWords = new Set([
+  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+  "nine", "ten", "eleven", "twelve", "fifteen", "twenty", "thirty", "forty",
+  "fifty", "hundred", "thousand", "once", "twice", "thrice", "half", "double",
+  "single", "first", "second", "third", "daily", "weekly", "monthly", "yearly",
+  "hourly", "nightly", "morning", "evening", "night", "noon", "midnight",
+  "bedtime", "alternate", "stat", "minute", "minutes", "hour", "hours", "day",
+  "days", "week", "weeks", "month", "months", "year", "years",
+]);
+function isProtectedWord(word: string) {
+  return (
+    negationWords.has(word) ||
+    laterality.has(word) ||
+    uncertaintyWords.has(word) ||
+    units.has(word) ||
+    quantityWords.has(word)
+  );
+}
+function casing(token: string) {
+  if (token === token.toLowerCase()) return "lower";
+  if (token[0] === token[0].toUpperCase() && token.slice(1) === token.slice(1).toLowerCase())
+    return "title";
+  return "other";
+}
+/** A corrected word keeps its casing; abbreviations and mixed case are never
+ * respelled. Only a sentence's first word may gain an initial capital. */
+function casingPreserved(source: string, target: string, sentenceInitial: boolean) {
+  const from = casing(source);
+  const to = casing(target);
+  if (from === "other" || to === "other") return false;
+  return from === to || (sentenceInitial && from === "lower" && to === "title");
+}
 
 export type SafetyReason =
   | "NO_CHANGE"
@@ -227,22 +253,28 @@ export function assessClinicalWriting(
       return reject(a ? "CLINICAL_FACT_REMOVED" : "CLINICAL_FACT_ADDED");
     if (!word(a) || !word(b)) return reject(changedReason(left, right));
     if (medicationContext) return reject("PROTECTED_ANCHOR_CHANGED");
+    if (isProtectedWord(left) || isProtectedWord(right))
+      return reject(changedReason(left, right));
+    const sentenceInitial = i === 0 || [".", "\n"].includes(source[i - 1]);
+    if (!casingPreserved(a, b, sentenceInitial))
+      return reject("PROTECTED_ANCHOR_CHANGED");
+    // "sever" is itself a word, so only this reviewed symptom context applies.
     const reviewed =
-      reviewedSpelling[left] === right ||
-      (left === "sever" &&
-        right === "severe" &&
-        /^(?:headache|headach|pain|fever|fevr)$/u.test(
-          key(source[i + 1] ?? ""),
-        ));
-    const narrative =
-      policy.semanticRisk === "MEDIUM" && narrativeSpelling[left] === right;
+      left === "sever" &&
+      right === "severe" &&
+      /^(?:headache|headach|pain|fever|fevr)$/u.test(key(source[i + 1] ?? ""));
+    const spelling = isDictionarySpellingCorrection({
+      source: left,
+      target: right,
+      maxDistance: policy.semanticRisk === "MEDIUM" ? 2 : 1,
+    });
     const subject = key(source[i - 1] ?? "");
     const grammar =
       mode === "GRAMMAR" &&
       agreement[left] === right &&
       (subject === "patient" ||
         (policy.semanticRisk === "MEDIUM" && ["he", "she"].includes(subject)));
-    if (!reviewed && !narrative && !grammar)
+    if (!reviewed && !spelling && !grammar)
       return reject(changedReason(left, right));
     changed++;
     i++;

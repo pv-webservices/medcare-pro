@@ -173,13 +173,16 @@ describe("Conservative spelling token diff", () => {
     ).toBe(true);
   });
 
-  it("requires reviewed spelling in VERY_HIGH-risk fields", () => {
+  it("limits VERY_HIGH-risk fields to single-edit dictionary corrections", () => {
     expect(
       safe("Diabates", "Diabetes", FIELD_POLICIES.diagnosis, "SPELLING"),
-    ).toBe(false);
+    ).toBe(true);
     expect(safe("fevr", "fever", FIELD_POLICIES.diagnosis, "SPELLING")).toBe(
       true,
     );
+    expect(
+      safe("pnuemonai", "pneumonia", FIELD_POLICIES.diagnosis, "SPELLING"),
+    ).toBe(false);
   });
 
   it.each([
