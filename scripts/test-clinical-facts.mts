@@ -93,7 +93,7 @@ try {
   await assert.rejects(requestFactExtraction(fixture.admin.actor, t.id)); check("unlinked Doctor cannot request extraction", true);
 
   // Idempotency: one run and one provider pass however often it is requested.
-  const requests = await Promise.all(Array.from({ length: 5 }, () => requestFactExtraction(actor, t.id).catch(() => null)));
+  const requests = await Promise.all(Array.from({ length: 5 }, () => requestFactExtraction(actor, t.id).catch((err) => { console.error("requestFactExtraction caught error:", err); return null; })));
   const runIds = new Set(requests.filter(Boolean).map((r) => r!.run.id));
   check("concurrent duplicate requests create one run", runIds.size === 1 && (await prisma.clinicalFactExtractionRun.count({ where: { transcriptId: t.id } })) === 1);
   const fake = provider(t.view);
@@ -171,7 +171,7 @@ try {
 
   console.log(`Clinical fact extraction DB checks passed: ${checks}`);
 } catch (error) {
-  console.error(error instanceof Error ? error.message : "Clinical fact extraction checks failed.");
+  console.error(error instanceof Error ? error.stack || error.message : "Clinical fact extraction checks failed.");
   process.exitCode = 1;
 } finally {
   await prisma.$disconnect();
