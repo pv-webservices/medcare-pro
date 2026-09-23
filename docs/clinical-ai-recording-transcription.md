@@ -69,6 +69,35 @@ Polling works without callbacks. Optional callbacks require both an HTTPS origin
 
 Polling settings: `SARVAM_POLL_AFTER_SECONDS` (default 30), `SARVAM_POLL_INTERVAL_SECONDS` (default 30), `SARVAM_JOB_TIMEOUT_MINUTES` (default 180). Polling schedule and checkpoints persist in MySQL. Run `npm run clinical-audio:worker` for the loop or `npm run clinical-audio:worker:once` for a bounded single pass. SIGINT/SIGTERM stops new claims after the current job checkpoint returns. A worker runtime and scheduler are deployment prerequisites; this phase does not deploy them.
 
+### Hostinger-compatible HTTP cron trigger
+
+When the application is deployed on a platform that does not preserve arbitrary build files, set `CLINICAL_AUDIO_WORKER_MODE=external` and use the deployed Node.js route handlers instead of invoking a file beneath `.next`:
+
+- `POST /api/internal/clinical-audio/worker` claims at most one transcription run, then performs at most one Romanization pass.
+- `POST /api/internal/clinical-audio/cleanup` performs at most one recording-retention pass and one provider-artifact pass.
+- `GET /api/internal/clinical-audio/health` returns queue/lease/retention counters only.
+
+All three routes require `Authorization: Bearer <secret>`. The server resolves the secret from `CLINICAL_AUDIO_CRON_SECRET` if set, otherwise from the private file named by `CLINICAL_AUDIO_CRON_SECRET_FILE`, defaulting to `~/.clinical-audio-cron-secret` in the hosting account's home directory (read per request, so rotation needs no restart). The dedicated server-only secret must be 32–512 characters. It is never accepted in a URL, path or request body and must not be logged. Missing configuration returns 503 and invalid authentication 401. An authenticated call while clinical audio is disabled does no work and returns `{"ok":true,"enabled":false}`, which confirms the cron credentials. Responses are private/no-store and contain only bounded operational counts—never transcript text, patient identifiers, object keys, signed URLs, provider payloads or credentials.
+
+The CLI scripts remain local/VPS operational entry points. Production cron commands must call the HTTPS routes; they must not depend on custom files within `.next/server`. Hostinger's managed Node.js deployment copies only its own build output into `hbuilds/versions/<build>`, so any file a build step writes under `.next/server` is absent at runtime (observed as `MODULE_NOT_FOUND` for `worker.mjs`).
+
+Cron job listings are visible in hPanel and the hosting API, so the secret must not appear in any command. On Hostinger, generate it on the server once, into owner-only files outside the site root. The app reads the secret file, and cron sends the header file with `curl -H @file`. Hostinger's environment-variable API replaces the whole set and returns masked values, so the file avoids touching it:
+
+```bash
+umask 077
+[ -s ~/.clinical-audio-cron-secret ] || head -c 48 /dev/urandom | base64 | tr -d '\n/+=' > ~/.clinical-audio-cron-secret
+printf 'Authorization: Bearer %s\n' "$(cat ~/.clinical-audio-cron-secret)" > ~/.clinical-audio-cron-header
+```
+
+To rotate, delete both files and rerun; the app picks up the new secret on the next request.
+
+```text
+*/2 * * * *  curl -fsS --max-time 900 -X POST -H @$HOME/.clinical-audio-cron-header https://<domain>/api/internal/clinical-audio/worker
+15 2 * * *   curl -fsS --max-time 300 -X POST -H @$HOME/.clinical-audio-cron-header https://<domain>/api/internal/clinical-audio/cleanup
+```
+
+Each worker call processes at most one transcription run. A run that is still at the provider returns after one status poll; only the first pass of a run uploads audio. The audio upload has a size-scaled deadline (at least 256 KiB/s, capped at 60 minutes) while the 120-second lease heartbeat keeps the claim alive, so an upload may outlast `--max-time`: a client disconnect does not stop the server-side pass, and overlapping triggers claim different runs. Failed passes log only `{ route, failure }` with a bounded category code; use `GET /api/internal/clinical-audio/health` with the same header for backlog counters.
+
 ## Durability and private transport
 
 Two additive migrations introduce per-recording active keys, unique `(provider, providerJobId)`, fencing tokens, submission intent, upload checkpoints and last poll time. A CHECK prevents active rows with null keys; triggers enforce recording-key binding, COMPLETED terminal status and immutable source/segments/provider speaker identity/append-only correction history. Claims use row locks, skip-locked selection, expiration reclaim and 120-second leases with periodic renewal. Every worker write is fenced against a stale token/expired lease. A provider job ID is persisted before upload/start. Recovery queries the existing job before resuming. The worker requires a database version supporting `FOR UPDATE SKIP LOCKED` (locally verified with MariaDB 11.4.9).
