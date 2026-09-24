@@ -72,7 +72,7 @@
 | **Role Permission** | Remove `clinical-ai:writing` from doctor's role | Assistant denied | HTTP 403 Forbidden | **PASSED** |
 | **Assigned Doctor Verification** | Attempt writing assistance as unassigned doctor | Assistant denied; assigned doctor model enforced | HTTP 403 Forbidden | **PASSED** |
 | **Network / Provider Failure** | Abort network request to `/api/clinical-ai/writing-assist` | PHI-safe user message displayed; no raw error disclosed | "AI writing assistance is temporarily unavailable. Your clinical note has not been changed." | **PASSED** |
-| **Concurrency & Rate Limit** | Durable rate reservations in `usage.ts` | Enforces 6 requests/min per user, 12 per visit, 100 per tenant | Limit correctly enforced without starvation | **PASSED** |
+| **Concurrency & Rate Limit** | Durable rate reservations in `usage.ts` | Enforces 12 requests/min per user, 24 per visit per 5 min, 100 per tenant per hour (`AI_RUN_LIMITS`; raised 2026-09-24 so one doctor can check every field) | Limit correctly enforced without starvation | **PASSED** |
 
 ## Responsive UI Verification
 

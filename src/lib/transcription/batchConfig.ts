@@ -2,6 +2,16 @@ import { z } from "zod";
 import { TranscriptionFailure } from "./errors";
 
 const keytermsSchema = z.array(z.string().trim().min(1).max(64)).max(50).refine((terms) => new Set(terms).size === terms.length);
+// Auto-detection ("unknown") spans 23 languages, so Hindustani speech can come
+// back in Urdu script. Pin the clinic's consultation languages instead.
+const LANGUAGES = ["hi-IN", "en-IN", "unknown"] as const;
+// codemix: English words stay in Latin script, Hindi words in Devanagari.
+const MODES = ["codemix", "verbatim"] as const;
+const choice = <T extends string>(value: string | undefined, allowed: readonly T[], fallback: T): T => {
+  const picked = value?.trim() || fallback;
+  if (!(allowed as readonly string[]).includes(picked)) throw new TranscriptionFailure("CONFIGURATION");
+  return picked as T;
+};
 const integer = (value: string | undefined, fallback: number, maximum: number, minimum = 1) => {
   const parsed = z.coerce.number().int().min(minimum).max(maximum).safeParse(value?.trim() || fallback);
   if (!parsed.success) throw new TranscriptionFailure("CONFIGURATION");
@@ -26,6 +36,8 @@ export function getSarvamBatchConfig(env: Record<string, string | undefined> = p
   return {
     apiKey: env.SARVAM_API_SUBSCRIPTION_KEY.trim(),
     model: "saaras:v4" as const,
+    languageCode: choice(env.SARVAM_TRANSCRIPTION_LANGUAGE, LANGUAGES, "hi-IN"),
+    mode: choice(env.SARVAM_TRANSCRIPTION_MODE, MODES, "codemix"),
     keyterms: keyterms.data,
     callback,
     requestTimeoutMs: integer(env.SARVAM_TIMEOUT_MS, 30000, 120000, 1000),

@@ -334,7 +334,7 @@ test("no-change response accurately describes spelling and grammar capability", 
     .getByRole("button", { name: "Improve grammar", exact: true })
     .click();
   await expect(control.getByRole("status")).toHaveText(
-    "No safe spelling or grammar changes suggested.",
+    "No corrections found. Words that are not recognised are left unchanged for you to review.",
   );
   await expect(note).toHaveValue("Patient has headache for 3 days.");
   await expect(

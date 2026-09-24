@@ -100,7 +100,7 @@ jobs:
 
       # The clinical-audio fixtures refuse any database not named
       # medcare_ep_ai2a1*, so these run against their own disposable database.
-      - name: Run Clinical transcription database tests
+      - name: Run Clinical AI and transcription database tests
         env:
           DATABASE_URL: "mysql://root:ci_test_password@127.0.0.1:3306/medcare_ep_ai2a1_ci"
         run: |
@@ -109,6 +109,7 @@ jobs:
           npm run clinical-ai:backfill -- --apply
           npm run test:clinical-transcription
           npm run test:clinical-facts
+          npm run test:clinical-ai
 
       - name: Run Registrations verifier
         run: npm run verify:registrations

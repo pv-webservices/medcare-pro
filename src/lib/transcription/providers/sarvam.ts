@@ -67,7 +67,7 @@ export class SarvamBatchClient {
   }
 
   async createJob(signal?: AbortSignal): Promise<string> {
-    const parsed = z.object({ job_id: id, job_state: state }).safeParse(await this.api("", { job_parameters: { model: "saaras:v4", mode: "verbatim", language_code: "unknown", with_diarization: true, num_speakers: 2, with_timestamps: true, keyterms: this.config.keyterms }, ...(this.config.callback ? { callback: this.config.callback } : {}) }, signal));
+    const parsed = z.object({ job_id: id, job_state: state }).safeParse(await this.api("", { job_parameters: { model: "saaras:v4", mode: this.config.mode, language_code: this.config.languageCode, with_diarization: true, num_speakers: 2, with_timestamps: true, keyterms: this.config.keyterms }, ...(this.config.callback ? { callback: this.config.callback } : {}) }, signal));
     if (!parsed.success) throw new TranscriptionFailure("INVALID_RESPONSE");
     return parsed.data.job_id;
   }

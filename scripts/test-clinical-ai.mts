@@ -11,6 +11,7 @@ import {
   getConsultationForRegistration,
 } from "@/lib/prescriptions";
 import { AiError } from "@/lib/ai/errors";
+import { AI_RUN_LIMITS } from "@/lib/ai/usage";
 import type { AiProvider } from "@/lib/ai/types";
 process.env.AI_ENABLED = "true";
 process.env.AI_PROVIDER = "gemini";
@@ -234,7 +235,7 @@ async function main() {
   const concurrent = await createClinicalAiFixture(prisma);
   const v = await concurrent.visit();
   const responses = await Promise.allSettled(
-    Array.from({ length: 8 }, () =>
+    Array.from({ length: AI_RUN_LIMITS.perUserPerMinute + 2 }, () =>
       requestWritingAssistance(
         concurrent.doctorUser.actor,
         { ...input, registrationId: v.id },
@@ -243,20 +244,21 @@ async function main() {
     ),
   );
   check(
-    "parallel user requests limited to six",
-    responses.filter((r) => r.status === "fulfilled").length === 6 &&
+    "parallel user requests limited to the per-user limit",
+    responses.filter((r) => r.status === "fulfilled").length ===
+      AI_RUN_LIMITS.perUserPerMinute &&
       responses.filter((r) => r.status === "rejected").length === 2,
   );
   check(
-    "durable reservations exactly six",
+    "durable reservations exactly the per-user limit",
     (await prisma.aiRun.count({
       where: { userId: concurrent.doctorUser.id },
-    })) === 6,
+    })) === AI_RUN_LIMITS.perUserPerMinute,
   );
   // Seed metadata outside the user window to isolate registration/tenant limits.
   for (const [scope, count, ageMs] of [
-    ["registration", 11, 120000],
-    ["tenant", 99, 600000],
+    ["registration", AI_RUN_LIMITS.perVisitPerFiveMinutes - 1, 120000],
+    ["tenant", AI_RUN_LIMITS.perTenantPerHour - 1, 600000],
   ] as const) {
     const boundary = await createClinicalAiFixture(prisma);
     const boundaryVisit = await boundary.visit();
