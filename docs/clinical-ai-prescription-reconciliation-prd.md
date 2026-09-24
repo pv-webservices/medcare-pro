@@ -1,16 +1,20 @@
-# Phase AI-4 — Prescription Reconciliation (PRD draft)
+# Phase AI-4 — Prescription Reconciliation (PRD)
 
-> **Status: DRAFT — awaiting approval of §12.** No code, tables or migrations
-> exist for AI-4. Implements PRD FR-10.4: "Reconcile the prescription draft
-> against accepted AI-3 facts; discrepancies only, no automatic prescription
-> change."
+> **Status: APPROVED (§12 answered as recommended, 2026-09-24) — v1 built, off by
+> default.** No tables or migrations. Code: `src/lib/clinical-reconciliation/*`
+> (normalization tables in `normalize.ts`, rules version `ai4-rules-v1`), route
+> `POST /api/clinical-ai/registrations/:registrationId/reconciliation`, and
+> `ReconciliationPanel` under the prescription medications. Enable with
+> `CLINICAL_RECONCILIATION_ENABLED=true` (requires `CLINICAL_FACTS_ENABLED`)
+> **only after** the named clinician signs off the §5 tables (Q5). Implements PRD
+> FR-10.4.
 
 ## 1. Purpose
 
 While a doctor edits a prescription draft, show where the draft **differs from
 what the doctor accepted as said in the consultation** (AI-3 accepted facts).
-Every item is a prompt to look again, with the evidence quote and an audio
-seek. The doctor decides; MedCare changes nothing.
+Every item is a prompt to look again, with the evidence quote and its time in
+the recording. The doctor decides; MedCare changes nothing.
 
 AI-4 must never:
 
@@ -45,7 +49,8 @@ Doctor edits prescription draft (consultation page)
   → Server loads accepted facts of every current transcript review of the visit
   → Deterministic normalization + comparison (§5, §6), rules version pinned
   → Results: Discrepancies (prominent), Matches (collapsed), Not comparable (count)
-  → Each result shows the fact's evidence quote, "Listen at …", and the draft item
+  → Each result shows the fact's evidence quote, its time in the recording
+    ("At 1:23"; replay it in the transcript panel), and the draft value
 ```
 
 No AI provider call is made (see Q1). Results are recomputed on request and
@@ -111,7 +116,7 @@ already refuses to respell them.
 - Body: `{ items: [{ medicineGenericName, brandName, strength, frequency,
   durationValue, durationUnit }], followUpInstructions }`, validated by Zod with
   the same bounds as the draft save; at most 50 items. Not persisted.
-- Response: `{ rulesVersion, results: [{ code, status: DISCREPANCY|MATCH|NOT_COMPARABLE|CONFLICTING, factId, itemIndex?, said, draft, evidence: [{ segmentId, quote, startMs }] }], notComparableCount }`
+- Response: `{ rulesVersion, acceptedFacts, allergyFacts, results: [{ check: MEDICATION|STRENGTH|FREQUENCY|DURATION|ALLERGY|FOLLOW_UP, status: DISCREPANCY|MATCH|NOT_COMPARABLE|CONFLICTING, factId, itemIndex, said, draft, evidence: [{ segmentId, quote, startMs }] }] }`. Results are ordered discrepancies, conflicts, not comparable, then matches. A §6 code corresponds to `check` + `DISCREPANCY` (e.g. `MEDICATION_NOT_ON_DRAFT` = `MEDICATION` with no matching item).
 - `Cache-Control: private, no-store`. Metadata-only logging (counts, latency).
   No clinical text in logs, `ai_runs` or audit payloads.
 
@@ -128,11 +133,13 @@ already refuses to respell them.
 
 ## 9. UI
 
-A collapsible **Check against consultation** panel below the prescription
-items. It is shown only when the visit has at least one accepted fact on a
-current review. Discrepancies are listed first with evidence and audio seek.
-Matches are collapsed. A footer counts the facts that couldn't be compared and
-shows the fixed notice: *"This compares your draft with facts you accepted from
+A **Check against consultation** panel below the prescription items, shown to
+the authorized doctor while the kill switch is on. "Check draft" sends the
+unsaved editor state; the panel says so when the draft changes after a check,
+and says when the visit has no accepted facts yet. Differences and conflicts are
+listed first with each evidence quote and its time in the recording. Matches and
+facts that couldn't be compared are collapsed with counts. An allergy notice
+appears whenever allergy facts exist, and a footer always shows the fixed notice: *"This compares your draft with facts you accepted from
 the transcript. It is not a safety or interaction check."* There is no Accept,
 Apply or Fix button.
 
@@ -155,7 +162,7 @@ With no tables (Q2 as recommended), expect one PR: normalization module and
 tests, API route, panel, and DB/E2E tests. It needs no migration and doesn't
 touch the production database schema.
 
-## 12. Open questions (decisions needed)
+## 12. Decisions (approved as recommended, 2026-09-24)
 
 - **Q1. Deterministic only, with no AI call in v1?** Recommended: **yes**. Every
   result is reproducible and testable, it costs nothing and there's no

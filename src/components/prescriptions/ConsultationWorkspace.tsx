@@ -19,15 +19,18 @@ import {
 import type { ConsultationWorkspaceData } from "@/lib/prescriptions";
 import ClinicalWritingControl from "./ClinicalWritingControl";
 import ClinicalAudioPanel from "@/components/clinicalAudio/ClinicalAudioPanel";
+import ReconciliationPanel from "./ReconciliationPanel";
 
 export default function ConsultationWorkspace({
   data,
   mayUseAi = false,
   clinicalAudio,
+  reconciliation = false,
 }: {
   data: ConsultationWorkspaceData;
   mayUseAi?: boolean;
   clinicalAudio?: { maxMinutes: number } | null;
+  reconciliation?: boolean;
 }) {
   const router = useRouter();
   const [consultation, setConsultation] = useState(
@@ -367,6 +370,20 @@ export default function ConsultationWorkspace({
                   setDirty(true);
                 }}
               />
+              {reconciliation && (
+                <ReconciliationPanel
+                  registrationId={context.visit.registrationId}
+                  items={medications.map((item) => ({
+                    medicineGenericName: item.medicineGenericName,
+                    brandName: item.brandName,
+                    strength: item.strength,
+                    frequency: item.frequency,
+                    durationValue: item.durationValue,
+                    durationUnit: item.durationUnit,
+                  }))}
+                  followUpInstructions={consultation.followUpInstructions}
+                />
+              )}
             </div>
           </div>
           <div className="sticky bottom-0 flex flex-wrap gap-3 rounded-2xl border border-line bg-canvas p-4 shadow-card">
