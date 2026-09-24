@@ -1,5 +1,5 @@
 import type { FieldPolicy, WritingMode } from "./writingSchemas";
-import { isDictionarySpellingCorrection } from "./clinicalLexicon";
+import { editDistance, isDictionarySpellingCorrection } from "./clinicalLexicon";
 
 const agreement: Record<string, string> = {
   are: "is",
@@ -66,6 +66,25 @@ function isProtectedWord(word: string) {
     units.has(word) ||
     quantityWords.has(word)
   );
+}
+// Duration units sit next to a number the validator already pins. Counts and
+// frequencies (two, twice, daily) stay protected: they are the dose schedule.
+const durationUnits = new Set([
+  "minute", "minutes", "hour", "hours", "day", "days", "week", "weeks",
+  "month", "months", "year", "years",
+]);
+/** A misspelled token may become a duration unit only when that unit is the
+ * single nearest quantity word (yers -> years; monts could be month or months: never). */
+function unambiguousDurationCorrection(source: string, target: string, maxDistance: number) {
+  if (!durationUnits.has(target) || isProtectedWord(source)) return false;
+  let best = maxDistance + 1;
+  let nearest: string[] = [];
+  for (const candidate of quantityWords) {
+    const distance = editDistance(source, candidate, best);
+    if (distance < best) [best, nearest] = [distance, [candidate]];
+    else if (distance === best) nearest.push(candidate);
+  }
+  return best <= maxDistance && nearest.length === 1 && nearest[0] === target;
 }
 function casing(token: string) {
   if (token === token.toLowerCase()) return "lower";
@@ -253,7 +272,11 @@ export function assessClinicalWriting(
       return reject(a ? "CLINICAL_FACT_REMOVED" : "CLINICAL_FACT_ADDED");
     if (!word(a) || !word(b)) return reject(changedReason(left, right));
     if (medicationContext) return reject("PROTECTED_ANCHOR_CHANGED");
-    if (isProtectedWord(left) || isProtectedWord(right))
+    const maxDistance = policy.semanticRisk === "MEDIUM" ? 2 : 1;
+    if (
+      (isProtectedWord(left) || isProtectedWord(right)) &&
+      !unambiguousDurationCorrection(left, right, maxDistance)
+    )
       return reject(changedReason(left, right));
     const sentenceInitial = i === 0 || [".", "\n"].includes(source[i - 1]);
     if (!casingPreserved(a, b, sentenceInitial))
@@ -266,7 +289,7 @@ export function assessClinicalWriting(
     const spelling = isDictionarySpellingCorrection({
       source: left,
       target: right,
-      maxDistance: policy.semanticRisk === "MEDIUM" ? 2 : 1,
+      maxDistance,
     });
     const subject = key(source[i - 1] ?? "");
     const grammar =
@@ -288,6 +311,110 @@ export function assessClinicalWriting(
       : Math.min(4, Math.max(2, Math.ceil(words * 0.1)));
   if (changed > limit) return reject("EDIT_TOO_LARGE");
   return { safe: true, reason: "SAFE_SURFACE_EDIT" as const, edits };
+}
+
+const WORD = /[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu;
+type WordSpan = { text: string; start: number; end: number };
+function wordSpans(text: string): WordSpan[] {
+  return Array.from(text.matchAll(WORD), (match) => ({
+    text: match[0],
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+}
+/** Word pairs the provider substituted one-for-one, found by aligning the
+ * word sequences (longest common subsequence). Insertions, deletions and
+ * reorderings are never paired, so they can never be salvaged. */
+function substitutedWords(source: WordSpan[], target: WordSpan[]) {
+  const n = source.length;
+  const m = target.length;
+  const lcs = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      lcs[i][j] =
+        key(source[i].text) === key(target[j].text)
+          ? lcs[i + 1][j + 1] + 1
+          : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  const pairs: [WordSpan, WordSpan][] = [];
+  let i = 0;
+  let j = 0;
+  let gapI = 0;
+  let gapJ = 0;
+  // Equal-length gaps pair by position (are -> is). Otherwise pair, in order,
+  // only look-alike words, so an inserted article cannot shift the pairing.
+  // Pairing is permissive on purpose: every pair must still pass validation.
+  const closeGap = () => {
+    if (i - gapI === j - gapJ) {
+      for (let k = 0; k < i - gapI; k++) pairs.push([source[gapI + k], target[gapJ + k]]);
+      return;
+    }
+    let next = gapJ;
+    for (let k = gapI; k < i; k++) {
+      const from = key(source[k].text);
+      for (let t = next; t < j; t++) {
+        const to = key(target[t].text);
+        if (from[0] === to[0] && editDistance(from, to, 2) <= 2) {
+          pairs.push([source[k], target[t]]);
+          next = t + 1;
+          break;
+        }
+      }
+    }
+  };
+  while (i < n && j < m) {
+    if (key(source[i].text) === key(target[j].text)) {
+      closeGap();
+      if (source[i].text !== target[j].text) pairs.push([source[i], target[j]]);
+      i++;
+      j++;
+      gapI = i;
+      gapJ = j;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) i++;
+    else j++;
+  }
+  i = n;
+  j = m;
+  closeGap();
+  return pairs;
+}
+function applyWords(original: string, edits: [WordSpan, WordSpan][]) {
+  let text = original;
+  for (const [from, to] of [...edits].sort((x, y) => y[0].start - x[0].start))
+    text = text.slice(0, from.start) + to.text + text.slice(from.end);
+  return text;
+}
+
+/**
+ * When a candidate as a whole fails validation, keep only the individual word
+ * corrections that each pass the same validator on their own, applied to the
+ * doctor's original text. Everything else in the candidate is discarded, and
+ * the combined result must pass validation again.
+ */
+export function salvageClinicalWriting(
+  original: string,
+  suggested: string,
+  policy: FieldPolicy,
+  mode: WritingMode = "GRAMMAR",
+) {
+  const source = wordSpans(original);
+  const target = wordSpans(suggested);
+  if (!source.length || !target.length || source.length * target.length > 1_000_000)
+    return null;
+  // Greedy, in reading order: an edit is kept only if the text with every
+  // edit kept so far plus this one still validates (including the edit cap).
+  const accepted: [WordSpan, WordSpan][] = [];
+  for (const edit of substitutedWords(source, target).sort((x, y) => x[0].start - y[0].start))
+    if (assessClinicalWriting(original, applyWords(original, [...accepted, edit]), policy, mode).safe)
+      accepted.push(edit);
+  if (!accepted.length) return null;
+  const text = applyWords(original, accepted);
+  return {
+    text,
+    edits: accepted.map(([from, to]) => ({
+      originalFragment: from.text,
+      suggestedFragment: to.text,
+    })),
+  };
 }
 
 export function validateClinicalMeaningPreserved(

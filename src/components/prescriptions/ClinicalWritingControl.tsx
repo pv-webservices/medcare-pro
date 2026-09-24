@@ -12,6 +12,15 @@ const labels: Record<(typeof WRITING_MODES)[number], string> = {
   SPELLING: "Fix spelling",
   GRAMMAR: "Improve grammar",
 };
+const UNAVAILABLE =
+  "AI writing assistance is temporarily unavailable. Your clinical note has not been changed.";
+// The route's own messages for these statuses are safe to show as-is.
+const failureMessage = (status: number, error: unknown) =>
+  status === 429
+    ? "You have used the writing assistant many times in the last few minutes. Wait a minute and try again. Your note has not been changed."
+    : [400, 401, 403].includes(status) && typeof error === "string"
+      ? error
+      : UNAVAILABLE;
 export default function ClinicalWritingControl({
   registrationId,
   field,
@@ -32,6 +41,7 @@ export default function ClinicalWritingControl({
   const [suggestion, setSuggestion] = useState<{
     source: string;
     response: WritingResponse;
+    partial: boolean;
   } | null>(null);
   const stale = suggestion !== null && suggestion.source !== text;
   async function improve(mode: (typeof WRITING_MODES)[number]) {
@@ -48,24 +58,30 @@ export default function ClinicalWritingControl({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ registrationId, field, mode, text: source }),
       });
-      const body = await response.json();
-      if (!response.ok || !body.success) throw new Error("unavailable");
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.success) {
+        setMessage(failureMessage(response.status, body.error));
+        return;
+      }
       const checked = writingResponseSchema.parse({
         changed: body.data.changed,
         suggestedText: body.data.suggestedText,
         suggestions: body.data.suggestions,
       });
-      if (checked.changed) setSuggestion({ source, response: checked });
+      if (checked.changed)
+        setSuggestion({
+          source,
+          response: checked,
+          partial: body.data.status === "PARTIAL",
+        });
       else
         setMessage(
           body.data.status === "SAFETY_REJECTED"
             ? "The suggestion could not be verified as preserving clinical meaning. Your note has not been changed."
-            : "No safe spelling or grammar changes suggested.",
+            : "No corrections found. Words that are not recognised are left unchanged for you to review.",
         );
     } catch {
-      setMessage(
-        "AI writing assistance is temporarily unavailable. Your clinical note has not been changed.",
-      );
+      setMessage(UNAVAILABLE);
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -128,6 +144,26 @@ export default function ClinicalWritingControl({
               {suggestion.response.suggestedText}
             </p>
           </div>
+          {suggestion.response.suggestions.length > 0 && (
+            <div>
+              <p className="font-medium">Changes</p>
+              <ul className="list-disc pl-5">
+                {suggestion.response.suggestions.map((edit, index) => (
+                  <li key={index} className="break-words [overflow-wrap:anywhere]">
+                    <span className="line-through">{edit.originalFragment}</span>
+                    {" → "}
+                    <span className="font-medium">{edit.suggestedFragment}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {suggestion.partial && (
+            <p className="text-muted">
+              Only corrections verified as preserving clinical meaning are
+              shown. Other suggested changes were left out.
+            </p>
+          )}
           <p className="text-muted">
             Language correction; review every suggestion before accepting.
             Accepting updates this field locally. Save the draft to retain it.

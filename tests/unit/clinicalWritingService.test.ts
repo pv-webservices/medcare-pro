@@ -235,6 +235,34 @@ describe("Writing service authorization and privacy", () => {
       });
     },
   );
+  it.each([
+    ["GRAMMAR", `${input.text}\n`],
+    ["GRAMMAR", `  ${input.text.replace(/ /g, "  ")}`],
+    ["SPELLING", input.text.replace(/\.$/, "")],
+  ])("treats an invisible %s change as unchanged", async (mode, suggestedText) => {
+    const result = await requestWritingAssistance(actor, { ...input, mode }, {
+      generateStructured: vi.fn().mockResolvedValue({ output: { suggestedText } }),
+    });
+    expect(result).toMatchObject({ changed: false, suggestedText: "", status: "UNCHANGED" });
+  });
+  it("returns only verified word corrections from an unsafe candidate as PARTIAL", async () => {
+    const text = "Patient has hisotory of high blood pressure disasess since 5 yers back";
+    const result = await requestWritingAssistance(actor, { ...input, text }, {
+      generateStructured: vi.fn().mockResolvedValue({
+        output: { suggestedText: "Patient has a history of high blood pressure disease for 5 years." },
+      }),
+    });
+    expect(result).toMatchObject({
+      changed: true,
+      suggestedText: "Patient has history of high blood pressure disasess since 5 years back",
+      status: "PARTIAL",
+      suggestions: [
+        { originalFragment: "hisotory", suggestedFragment: "history" },
+        { originalFragment: "yers", suggestedFragment: "years" },
+      ],
+    });
+    expect(m.complete.mock.calls[0][2]).toMatchObject({ status: "PARTIAL" });
+  });
   it("derives unchanged status from text despite provider changed flag", async () => {
     const result = await requestWritingAssistance(actor, input, {
       generateStructured: vi.fn().mockResolvedValue({

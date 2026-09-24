@@ -5,6 +5,13 @@ import type { AiConfig } from "./config";
 import { AiError } from "./errors";
 import { writeAuditLog, AUDIT_ACTIONS } from "@/lib/audit";
 import type { AiRunInput } from "./types";
+/** A doctor improving every consultation field (8 fields, 2 modes) must not
+ * hit the per-user or per-visit limit; the tenant limit bounds cost. */
+export const AI_RUN_LIMITS = {
+  perUserPerMinute: 12,
+  perVisitPerFiveMinutes: 24,
+  perTenantPerHour: 100,
+} as const;
 export async function reserveAiRun(
   actor: ActorContext,
   clinicId: string,
@@ -38,7 +45,11 @@ export async function reserveAiRun(
           },
         }),
       ]);
-      if (user >= 6 || visit >= 12 || tenant >= 100)
+      if (
+        user >= AI_RUN_LIMITS.perUserPerMinute ||
+        visit >= AI_RUN_LIMITS.perVisitPerFiveMinutes ||
+        tenant >= AI_RUN_LIMITS.perTenantPerHour
+      )
         throw new AiError("RATE_LIMIT");
       return tx.aiRun.create({
         data: {

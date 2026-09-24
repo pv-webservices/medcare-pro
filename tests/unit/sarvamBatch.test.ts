@@ -6,8 +6,15 @@ import { SarvamBatchClient, sarvamBlobUrl, sarvamUploadTimeoutMs } from "@/lib/t
 const env = { TRANSCRIPTION_PRIMARY_PROVIDER: "sarvam", SARVAM_API_SUBSCRIPTION_KEY: "synthetic-key-never-live" };
 const result = () => ({ request_id: "synthetic-request", transcript: "Metformin 500 mg once daily. No chest pain.", language_code: "en-IN", diarized_transcript: { entries: [{ transcript: "Metformin 500 mg once daily.", start_time_seconds: 0.0006, end_time_seconds: 18, speaker_id: "speaker_0" }, { transcript: "No chest pain.", start_time_seconds: 17, end_time_seconds: 20, speaker_id: "speaker_1" }] } });
 describe("Sarvam Batch strict configuration", () => {
-  it("pins server provider/model and auto language", () => expect(getSarvamBatchConfig(env).model).toBe("saaras:v4"));
-  it.each([{ SARVAM_API_SUBSCRIPTION_KEY: "" }, { TRANSCRIPTION_PRIMARY_PROVIDER: "gemini" }, { SARVAM_TRANSCRIPTION_MODEL: "saaras:v3" }, { TRANSCRIPTION_AUTO_FALLBACK: "true" }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: "not json" }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: '["  "]' }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: '["term"," term "]' }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: JSON.stringify(["a".repeat(65)]) }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: JSON.stringify(Array.from({ length: 51 }, (_, i) => `${i}`)) }, { SARVAM_POLL_INTERVAL_SECONDS: "0" }, { CLINICAL_TRANSCRIPTION_PUBLIC_BASE_URL: "https://example.test" }])("fails closed for invalid config %j", (override) => expect(() => getSarvamBatchConfig({ ...env, ...override })).toThrow("CONFIGURATION"));
+  it("pins server provider/model and the consultation language", () => {
+    const config = getSarvamBatchConfig(env);
+    expect(config.model).toBe("saaras:v4");
+    // Never auto-detect by default: it can return Hindi speech in Urdu script.
+    expect(config.languageCode).toBe("hi-IN");
+    expect(config.mode).toBe("codemix");
+    expect(getSarvamBatchConfig({ ...env, SARVAM_TRANSCRIPTION_LANGUAGE: "en-IN", SARVAM_TRANSCRIPTION_MODE: "verbatim" })).toMatchObject({ languageCode: "en-IN", mode: "verbatim" });
+  });
+  it.each([{ SARVAM_API_SUBSCRIPTION_KEY: "" }, { TRANSCRIPTION_PRIMARY_PROVIDER: "gemini" }, { SARVAM_TRANSCRIPTION_MODEL: "saaras:v3" }, { TRANSCRIPTION_AUTO_FALLBACK: "true" }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: "not json" }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: '["  "]' }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: '["term"," term "]' }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: JSON.stringify(["a".repeat(65)]) }, { SARVAM_TRANSCRIPTION_KEYTERMS_JSON: JSON.stringify(Array.from({ length: 51 }, (_, i) => `${i}`)) }, { SARVAM_POLL_INTERVAL_SECONDS: "0" }, { CLINICAL_TRANSCRIPTION_PUBLIC_BASE_URL: "https://example.test" }, { SARVAM_TRANSCRIPTION_LANGUAGE: "ur-IN" }, { SARVAM_TRANSCRIPTION_MODE: "translate" }])("fails closed for invalid config %j", (override) => expect(() => getSarvamBatchConfig({ ...env, ...override })).toThrow("CONFIGURATION"));
   it("trims keyterms and builds authenticated HTTPS callback", () => {
     const config = getSarvamBatchConfig({ ...env, SARVAM_TRANSCRIPTION_KEYTERMS_JSON: '[" Metformin "]', CLINICAL_TRANSCRIPTION_PUBLIC_BASE_URL: "https://example.test", SARVAM_WEBHOOK_SECRET: "s".repeat(32) });
     expect(config.keyterms).toEqual(["Metformin"]);
@@ -55,11 +62,11 @@ describe("Sarvam bounded evidence normalization", () => {
 });
 describe("Sarvam direct REST transport", () => {
   it.each(["http://account.blob.core.windows.net/file", "https://127.0.0.1/private", "https://account.blob.core.windows.net.evil.test/file", "https://user:pass@account.blob.core.windows.net/file", "https://account.blob.core.windows.net:8443/file"]) ("rejects unsafe destination %s", (url) => expect(() => sarvamBlobUrl(url)).toThrow("INVALID_RESPONSE"));
-  it("creates exact verbatim v4 job using server credentials", async () => {
+  it("creates exact codemix hi-IN v4 job using server credentials", async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ job_id: "synthetic-job", job_state: "Accepted" }), { status: 202 }));
     await expect(new SarvamBatchClient(getSarvamBatchConfig(env), transport).createJob()).resolves.toBe("synthetic-job");
     const init = transport.mock.calls[0][1]!;
-    expect(JSON.parse(init.body as string).job_parameters).toEqual({ model: "saaras:v4", mode: "verbatim", language_code: "unknown", with_diarization: true, num_speakers: 2, with_timestamps: true, keyterms: [] });
+    expect(JSON.parse(init.body as string).job_parameters).toEqual({ model: "saaras:v4", mode: "codemix", language_code: "hi-IN", with_diarization: true, num_speakers: 2, with_timestamps: true, keyterms: [] });
     expect(init.redirect).toBe("error");
   });
   it.each([[401, "AUTH"], [429, "RATE_LIMIT"], [500, "PROVIDER_FAILURE"], [422, "UNSUPPORTED_AUDIO"]])("sanitizes HTTP %s", async (status, code) => {
