@@ -139,7 +139,7 @@ accepts or dismisses. Detailed specs live in `docs/clinical-ai-*.md`.
 - **FR-10.1 (AI-1, built)**: Spelling/grammar suggestions for consultation notes, validated deterministically before doctor review — `docs/clinical-ai-writing-assistant.md`.
 - **FR-10.2 (AI-2, built)**: Consented consultation recording, private audio storage, Sarvam transcription, corrections, speaker confirmation and clinician review — `docs/clinical-ai-recording-transcription.md`.
 - **FR-10.3 (AI-3 v1, built — off by default via `CLINICAL_FACTS_ENABLED`)**: Evidence-linked structured fact candidates from a reviewed transcript, accepted or dismissed per fact — `docs/clinical-ai-structured-facts-prd.md`.
-- **FR-10.4 (AI-4, planned)**: Reconcile the prescription draft against accepted AI-3 facts; discrepancies only, no automatic prescription change.
+- **FR-10.4 (AI-4 v1, built — off by default via `CLINICAL_RECONCILIATION_ENABLED`)**: Deterministic comparison of the unsaved prescription draft with accepted AI-3 facts (medications, allergy names, follow-up); discrepancies only, no automatic prescription change and no new tables — `docs/clinical-ai-prescription-reconciliation-prd.md`.
 - **FR-10.5 (AI-5, planned)**: Deterministic, versioned pre-issue prescription checks with optional AI candidate warnings; requires jurisdiction-specific legal/medical validation before any compliance claim.
 
 ---

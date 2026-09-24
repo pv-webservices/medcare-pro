@@ -15,12 +15,14 @@ import {
   reviewFact,
   workFactExtractionOnce as unscopedWork,
 } from "@/lib/clinical-facts/service";
+import { reconcileDraft } from "@/lib/clinical-reconciliation/service";
 
 let checks = 0;
 function check(label: string, assertion: unknown) { assert.ok(assertion, label); checks++; console.log(`PASS ${label}`); }
 
 // Synthetic configuration only: the provider is always injected below.
 process.env.CLINICAL_FACTS_ENABLED = "true";
+process.env.CLINICAL_RECONCILIATION_ENABLED = "true";
 process.env.AI_PROVIDER = "gemini";
 process.env.GEMINI_API_KEY = "synthetic-never-sent";
 process.env.GEMINI_MODEL = "synthetic-model";
@@ -134,12 +136,41 @@ try {
   const accepted = await getAcceptedTranscriptFacts(actor, t.id);
   check("AI-4 input contains only accepted facts", accepted.length === 2 && accepted.every((f) => f.decision === "ACCEPTED"));
 
+  // AI-4: reconciliation reads accepted facts and writes nothing.
+  const medication = listing.facts.find((f) => f.category === "MEDICATION_MENTION")!;
+  const allergy = listing.facts.find((f) => f.category === "ALLERGY")!;
+  await reviewFact(actor, medication.id, { decision: "ACCEPTED" });
+  await reviewFact(actor, allergy.id, { decision: "ACCEPTED" });
+  const visitId = (await prisma.clinicalTranscript.findUniqueOrThrow({ where: { id: t.id } })).registrationId;
+  const draft = {
+    items: [
+      { medicineGenericName: "Paracetamol", brandName: "", strength: "650 mg", frequency: "Once daily", durationValue: 5, durationUnit: "days" },
+      { medicineGenericName: "Penicillin V", brandName: "Penicillin", strength: "", frequency: "", durationValue: null, durationUnit: "" },
+    ],
+    followUpInstructions: "",
+  };
+  const rowCounts = () => Promise.all([prisma.prescription.count(), prisma.prescriptionItem.count(), prisma.clinicalConsultation.count(), prisma.clinicalFactReview.count(), prisma.aiRun.count(), prisma.auditLog.count()]);
+  const before = await rowCounts();
+  const report = await reconcileDraft(actor, visitId, draft);
+  const statusOf = (kind: string) => report.results.find((r) => r.check === kind && r.factId === medication.id)?.status;
+  check("AI-4 flags differing strength and frequency and matches duration", statusOf("STRENGTH") === "DISCREPANCY" && statusOf("FREQUENCY") === "DISCREPANCY" && statusOf("DURATION") === "MATCH");
+  check("AI-4 flags an accepted allergy whose name is on the draft", report.results.some((r) => r.check === "ALLERGY" && r.status === "DISCREPANCY" && r.itemIndex === 1));
+  check("AI-4 ignores facts that are not accepted", report.acceptedFacts === 4 && !report.results.some((r) => r.factId === fever.id || r.factId === chest.id));
+  check("AI-4 evidence carries the segment start time", report.results.every((r) => r.evidence.every((e) => typeof e.startMs === "number")));
+  check("AI-4 writes no prescription, consultation, review, usage or audit rows", JSON.stringify(await rowCounts()) === JSON.stringify(before));
+  await assert.rejects(reconcileDraft(fixture.foreign.actor, visitId, draft)); check("AI-4: foreign tenant is denied", true);
+  await assert.rejects(reconcileDraft(fixture.admin.actor, visitId, draft)); check("AI-4: unlinked user is denied", true);
+  process.env.CLINICAL_RECONCILIATION_ENABLED = "false";
+  await assert.rejects(reconcileDraft(actor, visitId, draft)); check("AI-4 kill switch blocks reconciliation", true);
+  process.env.CLINICAL_RECONCILIATION_ENABLED = "true";
+
   // Staleness: correcting the transcript invalidates everything downstream.
   await addCorrection(actor, view.segments.find((s) => s.ordinal === 1)!.id, { correctedText: "No chest pain. I have fever since 4 days.", expectedVersion: view.version });
   listing = await listTranscriptFacts(actor, t.id);
   check("transcript correction makes the extraction stale", listing.run?.stale === true && !listing.canExtract);
   await assert.rejects(reviewFact(actor, fever.id, { decision: "DISMISSED" })); check("stale facts cannot be reviewed", true);
   check("stale accepted facts never reach AI-4", (await getAcceptedTranscriptFacts(actor, t.id)).length === 0);
+  check("AI-4 reconciliation sees no stale facts", (await reconcileDraft(actor, visitId, draft)).acceptedFacts === 0);
 
   // A run that goes stale before processing fails closed without a provider call.
   t = await reviewedTranscript();
