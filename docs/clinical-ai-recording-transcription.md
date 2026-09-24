@@ -74,7 +74,7 @@ Polling settings: `SARVAM_POLL_AFTER_SECONDS` (default 30), `SARVAM_POLL_INTERVA
 When the application is deployed on a platform that does not preserve arbitrary build files, set `CLINICAL_AUDIO_WORKER_MODE=external` and use the deployed Node.js route handlers instead of invoking a file beneath `.next`:
 
 - `POST /api/internal/clinical-audio/worker` claims at most one transcription run, then performs at most one Romanization pass.
-- `POST /api/internal/clinical-audio/cleanup` performs at most one recording-retention pass and one provider-artifact pass.
+- `POST /api/internal/clinical-audio/cleanup` drains up to 25 overdue recordings and up to 25 provider artifacts per call (stopping early when none remain), so retention keeps pace with expiry.
 - `GET /api/internal/clinical-audio/health` returns queue/lease/retention counters only.
 
 All three routes require `Authorization: Bearer <secret>`. The server resolves the secret from `CLINICAL_AUDIO_CRON_SECRET` if set, otherwise from the private file named by `CLINICAL_AUDIO_CRON_SECRET_FILE`, defaulting to `~/.clinical-audio-cron-secret` in the hosting account's home directory (read per request, so rotation needs no restart). The dedicated server-only secret must be 32–512 characters. It is never accepted in a URL, path or request body and must not be logged. Missing configuration returns 503 and invalid authentication 401. An authenticated call while clinical audio is disabled does no work and returns `{"ok":true,"enabled":false}`, which confirms the cron credentials. Responses are private/no-store and contain only bounded operational counts—never transcript text, patient identifiers, object keys, signed URLs, provider payloads or credentials.
