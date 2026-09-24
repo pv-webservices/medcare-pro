@@ -186,14 +186,22 @@ describe("bounded clinical-audio cron routes", () => {
     expect((await workerPost(request("/worker", "wrong-secret-value"))).status).toBe(401);
   });
 
-  it("bounds cleanup and exposes no object or storage identifiers", async () => {
+  it("drains the overdue backlog and exposes no object or storage identifiers", async () => {
+    mocks.cleanupAudio.mockResolvedValueOnce(1).mockResolvedValueOnce(1).mockResolvedValue(0);
+    mocks.cleanupProvider.mockResolvedValueOnce(1).mockResolvedValue(0);
     const response = await cleanupPost(request("/cleanup"));
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ ok: true, recordings: 1, providerArtifacts: 0 });
+    expect(body).toEqual({ ok: true, recordings: 2, providerArtifacts: 1 });
     expect(JSON.stringify(body).toLowerCase()).not.toMatch(/object|storage|audio.?key|url/);
-    expect(mocks.cleanupAudio).toHaveBeenCalledOnce();
-    expect(mocks.cleanupProvider).toHaveBeenCalledOnce();
+    expect(mocks.cleanupAudio).toHaveBeenCalledTimes(3);
+    expect(mocks.cleanupProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds one cleanup call so a large backlog cannot run unbounded", async () => {
+    const response = await cleanupPost(request("/cleanup"));
+    expect(await response.json()).toEqual({ ok: true, recordings: 25, providerArtifacts: 0 });
+    expect(mocks.cleanupAudio).toHaveBeenCalledTimes(25);
   });
 
   it("logs a failed pass by category only, never the error message", async () => {
