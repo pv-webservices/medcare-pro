@@ -1,4 +1,5 @@
 import englishWords from "an-array-of-english-words";
+import { COMMON_CLINICAL_TERMS } from "./commonClinicalTerms";
 
 /**
  * Deterministic vocabulary for AI-1 spelling validation. Server-only: the
@@ -39,7 +40,11 @@ const CLINICAL_SUPPLEMENT = [
   "melaena",
 ];
 
-const known = new Set<string>([...englishWords, ...CLINICAL_SUPPLEMENT]);
+const known = new Set<string>([
+  ...englishWords,
+  ...CLINICAL_SUPPLEMENT,
+  ...COMMON_CLINICAL_TERMS,
+]);
 
 export function isKnownClinicalWord(word: string): boolean {
   return known.has(word.toLowerCase());
@@ -178,5 +183,21 @@ export function isDictionarySpellingCorrection({
   if (isDrugLike(source) || isDrugLike(target)) return false;
   if (prefixConflict(source, target) || suffixConflict(source, target))
     return false;
-  return editDistance(source, target, maxDistance) <= maxDistance;
+  const distance = editDistance(source, target, maxDistance + 1);
+  if (distance <= maxDistance) return true;
+  // Narrative fields only (high-risk fields keep their single edit): one extra
+  // edit for long words (diareaha -> diarrhea), only onto a common clinical
+  // term that no other such term matches as closely.
+  return (
+    maxDistance >= 2 &&
+    distance === maxDistance + 1 &&
+    source.length >= LONG_WORD &&
+    COMMON_CLINICAL_TERMS.has(target) &&
+    [...COMMON_CLINICAL_TERMS].every(
+      (term) => term === target || editDistance(source, term, distance) > distance,
+    )
+  );
 }
+
+/** Words of this length or more may take one extra edit (see above). */
+const LONG_WORD = 7;
