@@ -384,6 +384,36 @@ function applyWords(original: string, edits: [WordSpan, WordSpan][]) {
   return text;
 }
 
+const isLetter = (char: string | undefined) => !!char && /[\p{L}\p{M}'’]/u.test(char);
+/** Grow [start, end) outward so it never cuts a word in half. */
+function wholeWords(text: string, start: number, end: number) {
+  while (start > 0 && isLetter(text[start - 1]) && isLetter(text[start])) start--;
+  while (end < text.length && isLetter(text[end - 1]) && isLetter(text[end])) end++;
+  return [start, end] as const;
+}
+
+/**
+ * The changes a doctor sees under "Changes" (presentation only; validation
+ * always checks the whole text). Word-for-word substitutions are listed one
+ * by one (fiverr -> fever); anything else falls back to the enclosing
+ * changed span, widened to whole words.
+ */
+export function describeWritingEdits(original: string, suggested: string) {
+  const pairs = substitutedWords(wordSpans(original), wordSpans(suggested)).filter(
+    ([from, to]) => from.text !== to.text,
+  );
+  if (pairs.length && applyWords(original, pairs) === suggested)
+    return pairs.map(([from, to]) => ({ originalFragment: from.text, suggestedFragment: to.text }));
+  return computeWritingDiff(original, suggested).map((edit) => {
+    const [sourceStart, sourceEnd] = wholeWords(original, edit.sourceStart, edit.sourceEnd);
+    const [targetStart, targetEnd] = wholeWords(suggested, edit.targetStart, edit.targetEnd);
+    return {
+      originalFragment: original.slice(sourceStart, sourceEnd),
+      suggestedFragment: suggested.slice(targetStart, targetEnd),
+    };
+  });
+}
+
 /**
  * When a candidate as a whole fails validation, keep only the individual word
  * corrections that each pass the same validator on their own, applied to the
