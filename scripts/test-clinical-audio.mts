@@ -7,7 +7,14 @@ import {
   transitionRecording,
   withdrawRecordingConsent,
   recordingForActor,
+  listRecordings,
 } from "@/lib/clinical-audio/recordingService";
+import {
+  mayUseClinicalAudio,
+  mayViewClinicalAudio,
+} from "@/lib/clinical-audio/authorization";
+import { saveConsultationDraft } from "@/lib/prescriptions";
+import { consultationSchema } from "@/lib/prescriptionValidation";
 import {
   initRecordingUpload,
   signRecordingPart,
@@ -250,6 +257,42 @@ try {
     "wrong Doctor playback denied",
     getRecordingAudioUrl(f.admin.actor, r.id, s),
   );
+  // Issuing closes capture but keeps recordings and transcripts viewable:
+  // transcription queued before issue still completes on the server.
+  const issuedVisit = ready.registrationId;
+  check("draft visit allows capture", await mayUseClinicalAudio(actor, issuedVisit));
+  const issuedDraft = await saveConsultationDraft(actor, issuedVisit, {
+    consultation: consultationSchema.parse({}),
+    medications: [],
+    expectedRevision: 0,
+  });
+  await prisma.prescription.update({
+    where: { id: issuedDraft.id },
+    data: { status: "ISSUED" },
+  });
+  check("issued visit closes capture", !(await mayUseClinicalAudio(actor, issuedVisit)));
+  check("issued visit keeps transcripts viewable", await mayViewClinicalAudio(actor, issuedVisit));
+  check(
+    "issued visit keeps recording history",
+    (await listRecordings(actor, issuedVisit)).some((row) => row.id === r.id),
+  );
+  check(
+    "issued visit keeps playback",
+    (await getRecordingAudioUrl(actor, r.id, s)).expiresIn <= 300,
+  );
+  await denied(
+    "issued visit refuses a new recording",
+    createRecording(actor, issuedVisit, consent),
+  );
+  check(
+    "issued visit hidden from non-assigned user",
+    !(await mayViewClinicalAudio(f.admin.actor, issuedVisit)) &&
+      !(await mayViewClinicalAudio(f.foreign.actor, issuedVisit)),
+  );
+  await prisma.prescription.update({
+    where: { id: issuedDraft.id },
+    data: { status: "DRAFT" },
+  });
   const role = await prisma.role.findUniqueOrThrow({ where: { id: f.roleId } });
   const permissions = role.permissions as string[];
   await prisma.role.update({
@@ -263,6 +306,10 @@ try {
   await denied(
     "recording permission does not grant playback",
     getRecordingAudioUrl(actor, r.id, s),
+  );
+  check(
+    "transcript view needs transcript-read",
+    !(await mayViewClinicalAudio(actor, issuedVisit)),
   );
   await prisma.role.update({ where: { id: f.roleId }, data: { permissions } });
   await prisma.consultationRecording.update({

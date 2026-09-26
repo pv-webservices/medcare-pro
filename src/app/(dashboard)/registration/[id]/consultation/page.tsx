@@ -2,7 +2,10 @@ import ConsultationWorkspace from "@/components/prescriptions/ConsultationWorksp
 import { getConsultationForRegistration } from "@/lib/prescriptions";
 import { prescriptionPage } from "@/lib/prescriptionPages";
 import { mayUseWritingAssistant } from "@/lib/clinical-ai/writingAssistant";
-import { mayUseClinicalAudio } from "@/lib/clinical-audio/authorization";
+import {
+  mayUseClinicalAudio,
+  mayViewClinicalAudio,
+} from "@/lib/clinical-audio/authorization";
 import { getClinicalAudioConfig } from "@/lib/clinical-audio/config";
 import { mayUseReconciliation } from "@/lib/clinical-reconciliation/service";
 export const dynamic = "force-dynamic";
@@ -12,16 +15,20 @@ export default async function ConsultationPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { data, mayUseAi, clinicalAudio, reconciliation } = await prescriptionPage(
-    async (actor) => ({
-      data: await getConsultationForRegistration(actor, id),
-      mayUseAi: await mayUseWritingAssistant(actor, id),
-      clinicalAudio: (await mayUseClinicalAudio(actor, id))
-        ? { maxMinutes: getClinicalAudioConfig()!.maxMinutes }
-        : null,
-      reconciliation: await mayUseReconciliation(actor, id),
-    }),
-  );
+  const { data, mayUseAi, clinicalAudio, reconciliation, finalizedAudio } =
+    await prescriptionPage(async (actor) => {
+      const data = await getConsultationForRegistration(actor, id);
+      const finalized = !!data.prescription && data.prescription.status !== "DRAFT";
+      return {
+        data,
+        mayUseAi: await mayUseWritingAssistant(actor, id),
+        clinicalAudio: (await mayUseClinicalAudio(actor, id))
+          ? { maxMinutes: getClinicalAudioConfig()!.maxMinutes }
+          : null,
+        reconciliation: await mayUseReconciliation(actor, id),
+        finalizedAudio: finalized && (await mayViewClinicalAudio(actor, id)),
+      };
+    });
   return (
     <ConsultationWorkspace
       key={data.prescription?.id ?? id}
@@ -29,6 +36,7 @@ export default async function ConsultationPage({
       mayUseAi={mayUseAi}
       clinicalAudio={clinicalAudio}
       reconciliation={reconciliation}
+      finalizedAudio={finalizedAudio}
     />
   );
 }

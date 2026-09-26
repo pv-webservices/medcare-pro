@@ -10,12 +10,15 @@ export default function ClinicalAudioPanel({
   registrationId,
   maxMinutes = 120,
   inPerson = true,
+  finalized = false,
 }: {
   registrationId: string;
   maxMinutes?: number;
   inPerson?: boolean;
+  /** Issued visit: recording history and transcripts only, no capture. */
+  finalized?: boolean;
 }) {
-  const r = useClinicalRecorder(registrationId, maxMinutes);
+  const r = useClinicalRecorder(registrationId, maxMinutes, finalized);
   const player = useRef<HTMLAudioElement | null>(null);
   const pendingSeek = useRef<number | null>(null);
   const [attested, setAttested] = useState(false),
@@ -43,212 +46,221 @@ export default function ClinicalAudioPanel({
     >
       <h2 className="text-lg font-semibold">Recording &amp; Transcript</h2>
       <p className="text-sm text-muted">
-        Consultation Recording · Face-to-face audio only
+        {finalized
+          ? "Consultation finalized · Recordings and transcripts remain available here. Transcription still in progress continues on the server."
+          : "Consultation Recording · Face-to-face audio only"}
       </p>
-      {!inPerson && (
-        <p role="alert">
-          Select IN PERSON consultation mode to record in this room.
-        </p>
-      )}
       {r.error && (
         <p role="alert" className="break-words text-alert-ink">
           {r.error}
         </p>
       )}
-      {r.recovery
-        .filter((s) => s.recordingId !== r.id)
-        .map((s) => (
-          <div
-            key={s.recordingId}
-            className="space-y-2 rounded-xl border border-line p-3"
-          >
-            <p>An unfinished consultation recording was found.</p>
-            <p>Recorded locally: {duration(s.elapsedMs)}</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                disabled={s.state === "withdrawn"}
-                className={button}
-                onClick={() => void r.upload(s)}
+      {finalized && r.history.length === 0 && !r.error && (
+        <p className="text-sm">No consultation recordings for this visit.</p>
+      )}
+      {!finalized && (
+        <>
+          {!inPerson && (
+            <p role="alert">
+              Select IN PERSON consultation mode to record in this room.
+            </p>
+          )}
+          {r.recovery
+            .filter((s) => s.recordingId !== r.id)
+            .map((s) => (
+              <div
+                key={s.recordingId}
+                className="space-y-2 rounded-xl border border-line p-3"
               >
-                Recover recording
-              </button>
+                <p>An unfinished consultation recording was found.</p>
+                <p>Recorded locally: {duration(s.elapsedMs)}</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    disabled={s.state === "withdrawn"}
+                    className={button}
+                    onClick={() => void r.upload(s)}
+                  >
+                    Recover recording
+                  </button>
+                  <button
+                    className={button}
+                    onClick={() =>
+                      void r.discard(s.recordingId, s.state === "withdrawn")
+                    }
+                  >
+                    Discard recording
+                  </button>
+                </div>
+              </div>
+            ))}
+          {r.state === "idle" && (
+            <div className="space-y-3">
+              <h3 className="font-medium">Patient consent required</h3>
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={attested}
+                  onChange={(e) => setAttested(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  I have informed the patient/representative that this consultation
+                  will be audio recorded and processed for clinical documentation,
+                  and consent has been obtained.
+                </span>
+              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label>
+                  Consent method
+                  <select
+                    aria-label="Consent method"
+                    className="mt-1 block min-h-11 w-full rounded-lg border border-line bg-canvas px-3"
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                  >
+                    {["VERBAL", "WRITTEN", "DIGITAL"].map((v) => (
+                      <option key={v} value={v}>
+                        {v[0] + v.slice(1).toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Consent provided by
+                  <select
+                    aria-label="Consent provided by"
+                    className="mt-1 block min-h-11 w-full rounded-lg border border-line bg-canvas px-3"
+                    value={consenter}
+                    onChange={(e) => setConsenter(e.target.value)}
+                  >
+                    <option value="PATIENT">Patient</option>
+                    <option value="GUARDIAN">Guardian</option>
+                    <option value="AUTHORIZED_REPRESENTATIVE">
+                      Authorized representative
+                    </option>
+                  </select>
+                </label>
+              </div>
               <button
                 className={button}
+                disabled={!attested || !inPerson || r.recovery.length > 0}
                 onClick={() =>
-                  void r.discard(s.recordingId, s.state === "withdrawn")
+                  void r
+                    .consent({
+                      attested: true,
+                      method,
+                      consenterType: consenter,
+                    })
+                    .then(() => setAttested(false))
                 }
               >
-                Discard recording
+                Record patient consent
               </button>
             </div>
+          )}
+          <div className="space-y-2">
+            <p>Consent: {r.id ? "Recorded" : "Not recorded"}</p>
+            <p>
+              Microphone: {r.mic}
+              {r.micReady ? " · Ready" : ""}
+            </p>
+            {r.micReady && (
+              <meter
+                aria-label="Microphone audio level"
+                min={0}
+                max={100}
+                value={r.level}
+                className="h-4 w-full max-w-xs"
+              />
+            )}
           </div>
-        ))}
-      {r.state === "idle" && (
-        <div className="space-y-3">
-          <h3 className="font-medium">Patient consent required</h3>
-          <label className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              checked={attested}
-              onChange={(e) => setAttested(e.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              I have informed the patient/representative that this consultation
-              will be audio recorded and processed for clinical documentation,
-              and consent has been obtained.
-            </span>
-          </label>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label>
-              Consent method
-              <select
-                aria-label="Consent method"
-                className="mt-1 block min-h-11 w-full rounded-lg border border-line bg-canvas px-3"
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-              >
-                {["VERBAL", "WRITTEN", "DIGITAL"].map((v) => (
-                  <option key={v} value={v}>
-                    {v[0] + v.slice(1).toLowerCase()}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Consent provided by
-              <select
-                aria-label="Consent provided by"
-                className="mt-1 block min-h-11 w-full rounded-lg border border-line bg-canvas px-3"
-                value={consenter}
-                onChange={(e) => setConsenter(e.target.value)}
-              >
-                <option value="PATIENT">Patient</option>
-                <option value="GUARDIAN">Guardian</option>
-                <option value="AUTHORIZED_REPRESENTATIVE">
-                  Authorized representative
-                </option>
-              </select>
-            </label>
-          </div>
-          <button
-            className={button}
-            disabled={!attested || !inPerson || r.recovery.length > 0}
-            onClick={() =>
-              void r
-                .consent({
-                  attested: true,
-                  method,
-                  consenterType: consenter,
-                })
-                .then(() => setAttested(false))
-            }
-          >
-            Record patient consent
-          </button>
-        </div>
-      )}
-      <div className="space-y-2">
-        <p>Consent: {r.id ? "Recorded" : "Not recorded"}</p>
-        <p>
-          Microphone: {r.mic}
-          {r.micReady ? " · Ready" : ""}
-        </p>
-        {r.micReady && (
-          <meter
-            aria-label="Microphone audio level"
-            min={0}
-            max={100}
-            value={r.level}
-            className="h-4 w-full max-w-xs"
-          />
-        )}
-      </div>
-      <p role="status" aria-live="polite" className="font-semibold">
-        {r.state === "recording"
-          ? "● Recording"
-          : r.state === "paused"
-            ? "Paused"
-            : r.state === "uploading"
-              ? "Uploading " + r.progress + "%"
-              : r.state === "stopped"
-                ? "Stopped — saved on this device"
-                : r.state === "consented"
-                  ? "Consent recorded"
-                  : r.state === "idle"
-                    ? "Ready for consent"
-                    : r.state}{" "}
-        <span aria-label="Recording elapsed time">{duration(r.elapsed)}</span>
-      </p>
-      {r.state === "recording" && r.elapsed >= (maxMinutes - 5) * 60000 && (
-        <p>Recording will stop automatically within five minutes.</p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {["idle", "consented"].includes(r.state) && (
-          <>
-            <button className={button} onClick={() => void r.checkMicrophone()}>
-              Check microphone
-            </button>
-            <button
-              className={button}
-              disabled={r.state !== "consented" || !r.micReady || !inPerson}
-              onClick={() => void r.start()}
-            >
-              Start recording
-            </button>
-          </>
-        )}
-        {r.state === "recording" && (
-          <button className={button} onClick={() => void r.pause()}>
-            Pause recording
-          </button>
-        )}
-        {r.state === "paused" && (
-          <button className={button} onClick={() => void r.resume()}>
-            Resume recording
-          </button>
-        )}
-        {["recording", "paused"].includes(r.state) && (
-          <>
-            <button className={button} onClick={() => void r.stop()}>
-              Stop recording
-            </button>
-            <button
-              className={button}
-              onClick={() => void r.discard(undefined, true)}
-            >
-              Stop — patient withdrew consent
-            </button>
-          </>
-        )}
-        {r.state === "stopped" && (
-          <>
-            {r.withdrawalPending ? (
-              <button
-                className={button}
-                onClick={() => void r.discard(undefined, true)}
-              >
-                Retry consent withdrawal
-              </button>
-            ) : (
-              <button className={button} onClick={() => void r.upload()}>
-                Upload / Resume upload
+          <p role="status" aria-live="polite" className="font-semibold">
+            {r.state === "recording"
+              ? "● Recording"
+              : r.state === "paused"
+                ? "Paused"
+                : r.state === "uploading"
+                  ? "Uploading " + r.progress + "%"
+                  : r.state === "stopped"
+                    ? "Stopped — saved on this device"
+                    : r.state === "consented"
+                      ? "Consent recorded"
+                      : r.state === "idle"
+                        ? "Ready for consent"
+                        : r.state}{" "}
+            <span aria-label="Recording elapsed time">{duration(r.elapsed)}</span>
+          </p>
+          {r.state === "recording" && r.elapsed >= (maxMinutes - 5) * 60000 && (
+            <p>Recording will stop automatically within five minutes.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {["idle", "consented"].includes(r.state) && (
+              <>
+                <button className={button} onClick={() => void r.checkMicrophone()}>
+                  Check microphone
+                </button>
+                <button
+                  className={button}
+                  disabled={r.state !== "consented" || !r.micReady || !inPerson}
+                  onClick={() => void r.start()}
+                >
+                  Start recording
+                </button>
+              </>
+            )}
+            {r.state === "recording" && (
+              <button className={button} onClick={() => void r.pause()}>
+                Pause recording
               </button>
             )}
-            <button className={button} onClick={() => void r.discard()}>
-              Discard recording
-            </button>
-          </>
-        )}
-        {r.state === "consented" && (
-          <button className={button} onClick={() => void r.discard()}>
-            Discard recording
-          </button>
-        )}
-      </div>
-      <p className="text-sm text-muted">
-        Transcript becomes available after transcription processing.
-      </p>
+            {r.state === "paused" && (
+              <button className={button} onClick={() => void r.resume()}>
+                Resume recording
+              </button>
+            )}
+            {["recording", "paused"].includes(r.state) && (
+              <>
+                <button className={button} onClick={() => void r.stop()}>
+                  Stop recording
+                </button>
+                <button
+                  className={button}
+                  onClick={() => void r.discard(undefined, true)}
+                >
+                  Stop — patient withdrew consent
+                </button>
+              </>
+            )}
+            {r.state === "stopped" && (
+              <>
+                {r.withdrawalPending ? (
+                  <button
+                    className={button}
+                    onClick={() => void r.discard(undefined, true)}
+                  >
+                    Retry consent withdrawal
+                  </button>
+                ) : (
+                  <button className={button} onClick={() => void r.upload()}>
+                    Upload / Resume upload
+                  </button>
+                )}
+                <button className={button} onClick={() => void r.discard()}>
+                  Discard recording
+                </button>
+              </>
+            )}
+            {r.state === "consented" && (
+              <button className={button} onClick={() => void r.discard()}>
+                Discard recording
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-muted">
+            Transcript becomes available after transcription processing.
+          </p>
+        </>
+      )}
       {r.history.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-medium">Recording history</h3>
@@ -299,7 +311,7 @@ export default function ClinicalAudioPanel({
                   }
                 />
               )}
-              {recording.status === "READY" && <TranscriptPanel recordingId={recording.id} audioRetained={!recording.audioDeletedAt} onSeek={(milliseconds) => seekRecording(recording.id, milliseconds)} />}
+              {recording.status === "READY" && <TranscriptPanel recordingId={recording.id} finalized={finalized} audioRetained={!recording.audioDeletedAt} onSeek={(milliseconds) => seekRecording(recording.id, milliseconds)} />}
             </div>
           ))}
         </div>

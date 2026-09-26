@@ -14,7 +14,7 @@ function effectiveText(segment: Segment) {
   const superseded = new Set(segment.corrections.map((entry) => entry.supersedesCorrectionId));
   return segment.corrections.find((entry) => !superseded.has(entry.id))?.correctedText ?? segment.text;
 }
-export default function TranscriptPanel({ recordingId, onSeek, audioRetained = true }: { recordingId: string; onSeek: (milliseconds: number) => Promise<void>; audioRetained?: boolean }) {
+export default function TranscriptPanel({ recordingId, onSeek, audioRetained = true, finalized = false }: { recordingId: string; onSeek: (milliseconds: number) => Promise<void>; audioRetained?: boolean; finalized?: boolean }) {
   const [run, setRun] = useState<Run | null>(null);
   const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [error, setError] = useState("");
@@ -95,7 +95,7 @@ export default function TranscriptPanel({ recordingId, onSeek, audioRetained = t
       <details><summary className="cursor-pointer text-sm">Full immutable provider source</summary><p className="whitespace-pre-wrap break-words">{transcript.sourceText}</p><p className="break-all text-xs text-muted">SHA-256 integrity checksum (not a digital signature): {transcript.sourceHash}</p></details>
       <p className="text-sm text-muted">Confirm all speakers, including Doctor and Patient. Review records your documentation check, not a guarantee of transcription accuracy.</p>
       <button disabled={busy || !reviewReady || !!transcript.reviewedAt} className={button} onClick={() => void save(`/api/clinical-ai/transcripts/${transcript.id}/review`, { attested: true, expectedVersion: transcript.version })}>I have reviewed this transcript for clinical documentation</button>
-      <FactsPanel transcriptId={transcript.id} transcriptVersion={transcript.version} segmentStartMs={Object.fromEntries(transcript.segments.map((segment) => [segment.id, segment.startMs]))} onSeek={(milliseconds) => { if (!audioRetained) return Promise.reject(new Error("Audio no longer retained")); return onSeek(milliseconds); }} />
+      <FactsPanel finalized={finalized} transcriptId={transcript.id} transcriptVersion={transcript.version} segmentStartMs={Object.fromEntries(transcript.segments.map((segment) => [segment.id, segment.startMs]))} onSeek={(milliseconds) => { if (!audioRetained) return Promise.reject(new Error("Audio no longer retained")); return onSeek(milliseconds); }} />
     </>}
   </section>;
 }

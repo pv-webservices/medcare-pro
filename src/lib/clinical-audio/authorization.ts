@@ -100,12 +100,34 @@ export async function mayUseClinicalAudio(
   actor: ActorContext,
   registrationId: string,
 ) {
-  try {
+  return deniedAsFalse(() =>
+    authorizeClinicalAudio(actor, registrationId, "clinical-ai:recording"),
+  );
+}
+/** Finalized visits: recording history and transcripts stay viewable after
+ * issue (the worker keeps transcribing), but nothing new can be captured. */
+export async function mayViewClinicalAudio(
+  actor: ActorContext,
+  registrationId: string,
+) {
+  return deniedAsFalse(async () => {
     await authorizeClinicalAudio(
       actor,
       registrationId,
       "clinical-ai:recording",
+      prisma,
+      false,
     );
+    await authorizeClinicalAudio(
+      actor,
+      registrationId,
+      "clinical-ai:transcript-read",
+    );
+  });
+}
+async function deniedAsFalse(check: () => Promise<unknown>) {
+  try {
+    await check();
     return true;
   } catch (error) {
     if (

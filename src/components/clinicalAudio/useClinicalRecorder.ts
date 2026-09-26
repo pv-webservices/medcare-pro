@@ -32,6 +32,8 @@ export async function audioRequest<T>(url: string, body?: unknown): Promise<T> {
 export function useClinicalRecorder(
   registrationId: string,
   maxMinutes: number,
+  /** History only: no capture support needed, no local recovery. */
+  readOnly = false,
 ) {
   const [state, setState] = useState("idle"),
     [mic, setMic] = useState("Not checked"),
@@ -65,8 +67,8 @@ export function useClinicalRecorder(
           encodeURIComponent(registrationId),
       ),
     );
-    setRecovery(await local.unfinishedSessions(registrationId));
-  }, [registrationId]);
+    if (!readOnly) setRecovery(await local.unfinishedSessions(registrationId));
+  }, [registrationId, readOnly]);
   const release = useCallback(() => {
     cancelAnimationFrame(frame.current);
     stream.current?.getTracks().forEach((t) => {
@@ -84,9 +86,10 @@ export function useClinicalRecorder(
     void Promise.resolve()
       .then(() => {
         if (
-          !window.indexedDB ||
-          !window.MediaRecorder ||
-          !navigator.mediaDevices
+          !readOnly &&
+          (!window.indexedDB ||
+            !window.MediaRecorder ||
+            !navigator.mediaDevices)
         ) {
           setError(
             "This browser does not support consultation recording. Use a browser with microphone, MediaRecorder and IndexedDB support.",
@@ -106,7 +109,7 @@ export function useClinicalRecorder(
       stream.current?.getTracks().forEach((t) => t.stop());
       void context.current?.close();
     };
-  }, [refresh]);
+  }, [refresh, readOnly]);
   const protectedState = state !== "idle" || recovery.length > 0;
   useEffect(() => {
     if (!protectedState) return;

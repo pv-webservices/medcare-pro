@@ -26,11 +26,14 @@ export default function ConsultationWorkspace({
   mayUseAi = false,
   clinicalAudio,
   reconciliation = false,
+  finalizedAudio = false,
 }: {
   data: ConsultationWorkspaceData;
   mayUseAi?: boolean;
   clinicalAudio?: { maxMinutes: number } | null;
   reconciliation?: boolean;
+  /** Issued visit: show recording history and transcripts read-only. */
+  finalizedAudio?: boolean;
 }) {
   const router = useRouter();
   const [consultation, setConsultation] = useState(
@@ -66,6 +69,12 @@ export default function ConsultationWorkspace({
         >
           View prescription
         </Link>
+        {finalizedAudio && (
+          <ClinicalAudioPanel
+            registrationId={context.visit.registrationId}
+            finalized
+          />
+        )}
       </div>
     );
   const draftInput = { consultation, medications, expectedRevision: revision };

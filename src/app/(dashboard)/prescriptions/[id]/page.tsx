@@ -3,6 +3,7 @@ import PrescriptionDocument from "@/components/prescriptions/PrescriptionDocumen
 import PrescriptionActions from "@/components/prescriptions/PrescriptionActions";
 import { getPrescriptionForActor } from "@/lib/prescriptions";
 import { prescriptionPage } from "@/lib/prescriptionPages";
+import { mayViewClinicalAudio } from "@/lib/clinical-audio/authorization";
 export const dynamic = "force-dynamic";
 export default async function PrescriptionPage({
   params,
@@ -10,9 +11,14 @@ export default async function PrescriptionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const data = await prescriptionPage((actor) =>
-    getPrescriptionForActor(actor, id),
-  );
+  const { data, transcripts } = await prescriptionPage(async (actor) => {
+    const data = await getPrescriptionForActor(actor, id);
+    return {
+      data,
+      transcripts:
+        !!data.snapshot && (await mayViewClinicalAudio(actor, data.registrationId)),
+    };
+  });
   return (
     <section className="space-y-5">
       <Link
@@ -69,6 +75,14 @@ export default async function PrescriptionPage({
             mayCorrect={data.mayCorrect}
             mayCancel={data.mayCancel}
           />
+          {transcripts && (
+            <Link
+              className="text-accent underline"
+              href={`/registration/${data.registrationId}/consultation`}
+            >
+              Recording &amp; transcript
+            </Link>
+          )}
           <PrescriptionDocument
             snapshot={data.snapshot}
             status={data.status}
