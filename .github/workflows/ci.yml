@@ -108,6 +108,7 @@ jobs:
           npx tsx prisma/seed.ts
           npm run clinical-ai:backfill -- --apply
           npm run test:clinical-transcription
+          npx tsx scripts/test-clinical-audio.mts
           npm run test:clinical-facts
           npm run test:clinical-ai
 

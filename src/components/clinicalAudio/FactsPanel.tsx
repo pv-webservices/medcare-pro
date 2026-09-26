@@ -46,11 +46,15 @@ export default function FactsPanel({
   transcriptVersion,
   segmentStartMs,
   onSeek,
+  finalized = false,
 }: {
   transcriptId: string;
   transcriptVersion: number;
   segmentStartMs: Record<string, number>;
   onSeek: (milliseconds: number) => Promise<void>;
+  /** Issued visit: facts only feed a draft, so extraction and decisions are
+   * closed (the server refuses them); existing facts stay readable. */
+  finalized?: boolean;
 }) {
   const [listing, setListing] = useState<Listing | null>(null);
   const [hidden, setHidden] = useState(false);
@@ -94,7 +98,7 @@ export default function FactsPanel({
 
   if (hidden) return null;
   const run = listing?.run;
-  const extractable = listing?.canExtract && (!run || run.stale || run.status === "FAILED");
+  const extractable = !finalized && listing?.canExtract && (!run || run.stale || run.status === "FAILED");
   return (
     <section aria-label="Extracted clinical facts" className="mt-4 min-w-0 space-y-3 border-t border-line pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -104,7 +108,11 @@ export default function FactsPanel({
       <p className="text-sm text-muted">
         Suggested from the reviewed transcript. Each fact shows the words it came from. Accept only what you confirm; accepted facts are not added to notes or the prescription.
       </p>
-      {listing && !listing.canExtract && !run && <p className="text-sm">Review the transcript above to extract facts.</p>}
+      {finalized ? (
+        <p className="text-sm">Consultation finalized. Facts can no longer be extracted, accepted or dismissed for this visit.</p>
+      ) : (
+        listing && !listing.canExtract && !run && <p className="text-sm">Review the transcript above to extract facts.</p>
+      )}
       {run?.stale && (
         <p role="alert" className="break-words">
           The transcript changed after these facts were extracted. They are out of date and cannot be accepted.
@@ -155,20 +163,22 @@ export default function FactsPanel({
             </ul>
             <div className="flex flex-wrap items-center gap-2">
               {fact.decision && <span role="status" className="text-sm font-medium">{fact.decision === "ACCEPTED" ? "Accepted" : "Dismissed"}</span>}
-              <button
-                className={button}
-                disabled={busy || !!run?.stale || fact.decision === "ACCEPTED"}
-                onClick={() => void act(`/api/clinical-ai/facts/${fact.id}/review`, { decision: "ACCEPTED" })}
-              >
-                Accept
-              </button>
-              <button
-                className={button}
-                disabled={busy || !!run?.stale || fact.decision === "DISMISSED"}
-                onClick={() => void act(`/api/clinical-ai/facts/${fact.id}/review`, { decision: "DISMISSED" })}
-              >
-                Dismiss
-              </button>
+              {!finalized && <>
+                <button
+                  className={button}
+                  disabled={busy || !!run?.stale || fact.decision === "ACCEPTED"}
+                  onClick={() => void act(`/api/clinical-ai/facts/${fact.id}/review`, { decision: "ACCEPTED" })}
+                >
+                  Accept
+                </button>
+                <button
+                  className={button}
+                  disabled={busy || !!run?.stale || fact.decision === "DISMISSED"}
+                  onClick={() => void act(`/api/clinical-ai/facts/${fact.id}/review`, { decision: "DISMISSED" })}
+                >
+                  Dismiss
+                </button>
+              </>}
             </div>
           </li>
         ))}

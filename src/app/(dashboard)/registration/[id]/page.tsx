@@ -15,6 +15,7 @@ import {
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import ModuleLocked from "@/components/ui/ModuleLocked";
 import { MODULE_FEATURES, moduleLock } from "@/lib/features";
+import { mayViewClinicalAudio } from "@/lib/clinical-audio/authorization";
 
 // Registration detail and edit — PRD §6.3 (FR-3.5, FR-3.6).
 //
@@ -73,6 +74,8 @@ export default async function RegistrationDetailPage({
   const clinicalAccess = !(await moduleLock(actor, MODULE_FEATURES.prescriptions)) && await can(actor, "prescription:read", registration.clinicId);
   const clinical = clinicalAccess ? await getConsultationForRegistration(actor, id) : null;
   const prescriptions = clinicalAccess ? await listPatientPrescriptions(actor, registration.patientId) : null;
+  const finalized = !!clinical?.prescription && clinical.prescription.status !== "DRAFT";
+  const transcripts = finalized && await mayViewClinicalAudio(actor, id);
 
   return (
     <section className="space-y-6">
@@ -85,6 +88,7 @@ export default async function RegistrationDetailPage({
           {clinical.prescription ? clinical.prescription.status === "DRAFT" ? "Continue Consultation" : "View Prescription" : "Start Consultation"}
         </Link>}
         {clinical.prescription && clinical.prescription.status !== "DRAFT" && <Link className="ml-4 text-accent underline" href={`/prescriptions/${clinical.prescription.id}/print`}>Print Prescription</Link>}
+        {transcripts && <Link className="ml-4 text-accent underline" href={`/registration/${id}/consultation`}>Recording &amp; Transcript</Link>}
       </div>}
       <RegistrationDetail
         registration={registration}
