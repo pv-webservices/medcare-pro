@@ -11,6 +11,7 @@ import {
 } from "@/lib/rbac";
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import { MODULE_FEATURES, requireModule } from "@/lib/features";
+import { FeatureError } from "@/lib/featureResolution";
 import { writeAuditLog } from "@/lib/audit";
 import { generatePrescriptionNumber } from "@/lib/prescriptionNumber";
 import {
@@ -25,6 +26,14 @@ import {
   type PrescriptionDraftInput,
   type PrescriptionSnapshot,
 } from "@/lib/prescriptionValidation";
+import { prescriptionChecksEnabled } from "@/lib/prescription-checks/config";
+import { loadCheckContext } from "@/lib/prescription-checks/context";
+import {
+  checkCounts,
+  preIssueChecks,
+  reviewRequired,
+  type PreIssueResult,
+} from "@/lib/prescription-checks/rules";
 
 const visitInclude = {
   patient: true,
@@ -138,6 +147,7 @@ async function audit(
     | "prescriptionNumber"
     | "status"
   >,
+  extra: Record<string, unknown> = {},
 ) {
   await writeAuditLog(tx, {
     action,
@@ -153,6 +163,7 @@ async function audit(
       doctorId: rx.doctorId,
       clinicId: rx.clinicId,
       status: rx.status,
+      ...extra,
     },
   });
 }
@@ -422,6 +433,32 @@ export function buildPrescriptionSnapshot(
   });
 }
 
+async function runPreIssueChecks(actor: ActorContext, rx: Rx) {
+  return preIssueChecks({
+    followUpInstructions: consultationSchema.parse(rx.clinicalJson)
+      .followUpInstructions,
+    medications: medicationInputs(rx),
+    ...(await loadCheckContext(actor, rx.registrationId)),
+  });
+}
+
+/** AI-5 checks of a SAVED draft revision, for the Review step. Read-only;
+ * 404 while PRESCRIPTION_CHECKS_ENABLED is off. */
+export async function getPreIssueChecks(
+  actor: ActorContext,
+  id: string,
+  expectedRevision: number,
+) {
+  if (!prescriptionChecksEnabled()) throw new ScopeError();
+  await requireModule(actor, MODULE_FEATURES.prescriptions);
+  const rx = await rxForActor(actor, id);
+  const visit = await visitForActor(actor, rx.registrationId);
+  assertVisitOwnership(rx, visit);
+  await requirePermission(actor, "prescription:draft", visit.clinicId);
+  assertDraft(rx, expectedRevision);
+  return { revision: rx.revision, ...(await runPreIssueChecks(actor, rx)) };
+}
+
 export async function issuePrescription(
   actor: ActorContext,
   id: string,
@@ -430,6 +467,33 @@ export async function issuePrescription(
   const input = issuePrescriptionSchema.parse(raw);
   await requireModule(actor, MODULE_FEATURES.prescriptions);
   const visible = await rxForActor(actor, id);
+  // Computed on the revision the doctor reviewed; the transaction below
+  // refuses any other revision, so these are the checks for what is issued.
+  let checks: PreIssueResult | null = null;
+  let checksUnavailable = false;
+  if (
+    prescriptionChecksEnabled() &&
+    visible.status === "DRAFT" &&
+    visible.revision === input.expectedRevision
+  ) {
+    // Advisory only (PRD §1): a failure here never blocks issuing; the audit
+    // entry records that the checks could not run.
+    try {
+      checks = await runPreIssueChecks(actor, visible);
+    } catch (error) {
+      if (
+        error instanceof PermissionError ||
+        error instanceof ScopeError ||
+        error instanceof FeatureError
+      )
+        throw error;
+      checksUnavailable = true;
+      console.error("Pre-issue checks unavailable at issue", {
+        prescriptionId: visible.id,
+        error: error instanceof Error ? error.name : "unknown",
+      });
+    }
+  }
   // Unique-number collisions and deadlocks retry the WHOLE transaction.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -441,6 +505,10 @@ export async function issuePrescription(
           assertVisitOwnership(rx, visit);
           await assertPrescribingDoctor(actor, visit, tx);
           assertDraft(rx, input.expectedRevision);
+          if (checks && reviewRequired(checks) && !input.acknowledgedChecks)
+            throw new ConflictError(
+              "Review the pre-issue checks and confirm you have checked them before issuing.",
+            );
           const consultation = await tx.clinicalConsultation.findFirst({
             where: {
               id: rx.consultationId,
@@ -508,11 +576,25 @@ export async function issuePrescription(
             where: { id: rx.consultationId, status: "DRAFT" },
             data: { status: "FINALIZED" },
           });
-          await audit(tx, actor, "PRESCRIPTION_ISSUED", {
-            ...rx,
-            prescriptionNumber: number,
-            status: "ISSUED",
-          });
+          await audit(
+            tx,
+            actor,
+            "PRESCRIPTION_ISSUED",
+            { ...rx, prescriptionNumber: number, status: "ISSUED" },
+            // Codes and counts only: never names, doses or quotes (PHI).
+            checks
+              ? {
+                  preIssueChecks: {
+                    rulesVersion: checks.rulesVersion,
+                    counts: checkCounts(checks),
+                    skipped: checks.skipped,
+                    acknowledged: input.acknowledgedChecks,
+                  },
+                }
+              : checksUnavailable
+                ? { preIssueChecks: { unavailable: true } }
+                : {},
+          );
           return { id: rx.id, prescriptionNumber: number };
         },
       );

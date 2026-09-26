@@ -37,6 +37,8 @@ export const prescriptionDraftSchema = z.strictObject({
 });
 export const issuePrescriptionSchema = z.strictObject({
   expectedRevision: z.number().int().nonnegative(),
+  /** AI-5: the doctor ticked "I have reviewed these checks" (PRD §12 Q2). */
+  acknowledgedChecks: z.boolean().default(false),
 });
 export const correctionPrescriptionSchema = z.strictObject({});
 export const cancelPrescriptionSchema = z.strictObject({

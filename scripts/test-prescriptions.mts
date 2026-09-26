@@ -21,6 +21,7 @@ import {
   cancelPrescription,
   listPrescriptionsForActor,
   listPatientPrescriptions,
+  getPreIssueChecks,
 } from "@/lib/prescriptions";
 import { ScopeError, PermissionError } from "@/lib/rbac";
 import { BadRequestError, ConflictError } from "@/lib/apiHandler";
@@ -504,6 +505,105 @@ async function main() {
       featureId: feature.id,
     },
   });
+  // AI-5 pre-issue checks (docs/clinical-ai-preissue-checks-prd.md).
+  process.env.PRESCRIPTION_CHECKS_ENABLED = "true";
+  const doctor = f.doctorUser.actor;
+  const duplicateVisit = await f.visit();
+  const duplicate = await saveConsultationDraft(doctor, duplicateVisit.id, {
+    ...content,
+    medications: [medication, { ...medication }],
+  });
+  const writesBefore = await Promise.all([
+    prisma.prescription.count(),
+    prisma.auditLog.count(),
+  ]);
+  const found = await getPreIssueChecks(doctor, duplicate.id, duplicate.revision);
+  check(
+    "AI-5 flags a duplicate medicine as review required",
+    found.rulesVersion === "ai5-rules-v1" &&
+      found.checks.some((c) => c.code === "PC-01" && c.tier === "REVIEW_REQUIRED"),
+  );
+  check(
+    "AI-5 checks write nothing",
+    JSON.stringify(writesBefore) ===
+      JSON.stringify(
+        await Promise.all([prisma.prescription.count(), prisma.auditLog.count()]),
+      ),
+  );
+  await rejects(
+    "AI-5 checks refuse a stale revision",
+    () => getPreIssueChecks(doctor, duplicate.id, duplicate.revision + 1),
+    ConflictError,
+  );
+  await rejects(
+    "AI-5 checks hidden from front desk",
+    () => getPreIssueChecks(f.receptionist.actor, duplicate.id, duplicate.revision),
+    ScopeError,
+  );
+  await rejects(
+    "AI-5 checks hidden from another tenant",
+    () => getPreIssueChecks(f.foreign.actor, duplicate.id, duplicate.revision),
+    ScopeError,
+  );
+  await rejects(
+    "Review-required checks need acknowledgement to issue",
+    () => issuePrescription(doctor, duplicate.id, { expectedRevision: duplicate.revision }),
+    ConflictError,
+  );
+  check(
+    "Acknowledged checks never block issuing",
+    (
+      await issuePrescription(doctor, duplicate.id, {
+        expectedRevision: duplicate.revision,
+        acknowledgedChecks: true,
+      })
+    ).prescriptionNumber,
+  );
+  const issuedLog = await prisma.auditLog.findFirstOrThrow({
+    where: { action: "PRESCRIPTION_ISSUED", targetId: duplicate.id },
+  });
+  const summary = (issuedLog.afterValue as {
+    preIssueChecks?: { rulesVersion: string; counts: Record<string, number>; acknowledged: boolean };
+  }).preIssueChecks;
+  check(
+    "Issue audit records check codes and acknowledgement",
+    summary?.rulesVersion === "ai5-rules-v1" &&
+      summary.counts["PC-01"] === 1 &&
+      summary.acknowledged === true,
+  );
+  check(
+    "Issue audit holds no medicine names or notes",
+    !/synthetic/i.test(JSON.stringify(issuedLog.afterValue)),
+  );
+  const considerVisit = await f.visit();
+  const considerDraft = await saveConsultationDraft(doctor, considerVisit.id, content);
+  check(
+    "Consider-only checks issue without acknowledgement",
+    (
+      await issuePrescription(doctor, considerDraft.id, {
+        expectedRevision: considerDraft.revision,
+      })
+    ).prescriptionNumber,
+  );
+  process.env.PRESCRIPTION_CHECKS_ENABLED = "false";
+  const offVisit = await f.visit();
+  const offDraft = await saveConsultationDraft(doctor, offVisit.id, {
+    ...content,
+    medications: [medication, { ...medication }],
+  });
+  await rejects(
+    "AI-5 kill switch hides the checks",
+    () => getPreIssueChecks(doctor, offDraft.id, offDraft.revision),
+    ScopeError,
+  );
+  check(
+    "AI-5 kill switch leaves issuing unchanged",
+    (
+      await issuePrescription(doctor, offDraft.id, {
+        expectedRevision: offDraft.revision,
+      })
+    ).prescriptionNumber,
+  );
   const visits = await Promise.all(Array.from({ length: 6 }, () => f.visit()));
   const numbers = await Promise.all(
     visits.map(async (v) => {
