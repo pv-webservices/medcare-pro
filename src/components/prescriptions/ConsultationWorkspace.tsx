@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
@@ -20,6 +20,7 @@ import type { ConsultationWorkspaceData } from "@/lib/prescriptions";
 import ClinicalWritingControl from "./ClinicalWritingControl";
 import ClinicalAudioPanel from "@/components/clinicalAudio/ClinicalAudioPanel";
 import ReconciliationPanel from "./ReconciliationPanel";
+import PreIssueChecksPanel, { type ChecksSummary } from "./PreIssueChecksPanel";
 
 export default function ConsultationWorkspace({
   data,
@@ -27,6 +28,7 @@ export default function ConsultationWorkspace({
   clinicalAudio,
   reconciliation = false,
   finalizedAudio = false,
+  preIssueChecks = false,
 }: {
   data: ConsultationWorkspaceData;
   mayUseAi?: boolean;
@@ -34,6 +36,8 @@ export default function ConsultationWorkspace({
   reconciliation?: boolean;
   /** Issued visit: show recording history and transcripts read-only. */
   finalizedAudio?: boolean;
+  /** AI-5 checks on the Review step (PRESCRIPTION_CHECKS_ENABLED). */
+  preIssueChecks?: boolean;
 }) {
   const router = useRouter();
   const [consultation, setConsultation] = useState(
@@ -50,6 +54,14 @@ export default function ConsultationWorkspace({
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [checksSummary, setChecksSummary] = useState<ChecksSummary>(null);
+  const [checksKey, setChecksKey] = useState(0);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const onChecksLoaded = useCallback((summary: ChecksSummary) => {
+    setChecksSummary(summary);
+    setAcknowledged(false);
+  }, []);
+  const mustAcknowledge = (checksSummary?.reviewRequired ?? 0) > 0;
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -135,12 +147,15 @@ export default function ConsultationWorkspace({
     try {
       await request(`/api/prescriptions/${id}/issue`, {
         expectedRevision: revision,
+        acknowledgedChecks: acknowledged,
       });
       router.push(`/prescriptions/${id}`);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not issue.");
       setConfirmIssue(false);
+      // The server re-checks at issue; reload what it found.
+      setChecksKey((key) => key + 1);
     } finally {
       setBusy(false);
     }
@@ -240,6 +255,14 @@ export default function ConsultationWorkspace({
       )}
       {review && preview ? (
         <>
+          {preIssueChecks && id && (
+            <PreIssueChecksPanel
+              key={`${revision}-${checksKey}`}
+              prescriptionId={id}
+              revision={revision}
+              onLoaded={onChecksLoaded}
+            />
+          )}
           <PrescriptionDocument
             snapshot={preview}
             draft
@@ -251,6 +274,8 @@ export default function ConsultationWorkspace({
               onClick={() => {
                 setReview(false);
                 setConfirmIssue(false);
+                setChecksSummary(null);
+                setAcknowledged(false);
               }}
             >
               Back to edit
@@ -280,6 +305,7 @@ export default function ConsultationWorkspace({
                   variant="primary"
                   isBusy={busy}
                   busyLabel="Issuing…"
+                  disabled={mustAcknowledge && !acknowledged}
                   onClick={issue}
                 >
                   Confirm and issue
@@ -288,6 +314,28 @@ export default function ConsultationWorkspace({
             }
           >
             <p>I have reviewed the patient, clinical notes and medications.</p>
+            {checksSummary && checksSummary.total > 0 && (
+              <p className="mt-2 text-sm">
+                Pre-issue checks: {checksSummary.total} item
+                {checksSummary.total === 1 ? "" : "s"} to check
+                {mustAcknowledge
+                  ? `, ${checksSummary.reviewRequired} marked review required.`
+                  : "."}
+              </p>
+            )}
+            {mustAcknowledge && (
+              <label className="mt-3 flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5"
+                  checked={acknowledged}
+                  onChange={(event) => setAcknowledged(event.target.checked)}
+                />
+                <span>
+                  I have reviewed the pre-issue checks marked review required.
+                </span>
+              </label>
+            )}
           </Modal>
           {!data.mayIssue && (
             <p className="text-muted">

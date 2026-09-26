@@ -1,7 +1,12 @@
 # Phase AI-5 — Pre-issue Prescription Checks (PRD)
 
-> **Status: DRAFT — awaiting approval of §12.** No code, tables or migrations
-> exist for AI-5. Implements PRD FR-10.5 (v1 scope only, see §1).
+> **Status: APPROVED (§12 decided 2026-09-27) — v1 built, off by default.**
+> No tables or migrations. Code: `src/lib/prescription-checks/*` (rules version
+> `ai5-rules-v1`), `getPreIssueChecks()` and issue-time enforcement in
+> `src/lib/prescriptions.ts`, route `GET /api/prescriptions/:id/pre-issue-checks`,
+> and `PreIssueChecksPanel` on the Review step. Enable with
+> `PRESCRIPTION_CHECKS_ENABLED=true` **only after** the named clinician signs off
+> §5.2 and §5.3 (Q5). Implements PRD FR-10.5 (v1 scope only, see §1).
 
 ## 1. Purpose
 
@@ -64,8 +69,8 @@ never stored. The only persistence is the optional audit entry (Q3).
 |---|---|---|
 | Draft medicines and consultation | Saved `DRAFT` prescription at `expectedRevision` | Stale revision → 409, same as issue |
 | Accepted allergy facts | AI-3, current transcript reviews of the visit | Only when `CLINICAL_FACTS_ENABLED`, else PC-07 is skipped (and the panel says so) |
-| Recording/transcription state | The visit's recordings, runs, transcripts, reviews | Only when clinical audio is enabled for the visit |
-| Actor | Linked assigned Doctor with `prescription:draft` on the visit's clinic | Same scope chain as the draft itself |
+| Recording/transcription state | The visit's READY recordings, latest run, transcripts, reviews (counts only) | Only when clinical audio is enabled |
+| Actor | Any user who can read the draft and holds `prescription:draft` on its clinic; issuing still requires the linked assigned Doctor with `prescription:issue` | PC-07 needs the AI-3 transcript permissions; without them it is reported as skipped |
 
 ## 5. Deterministic rules (rules version `ai5-rules-v1`)
 
@@ -119,10 +124,13 @@ than expected is not flagged, because rounding up to a strip size is normal.
 | PC-05 PRN_WITHOUT_GUIDANCE | Frequency `As needed` and `instructions` empty | "Row 4: 'As needed' without instructions (when, and how often at most)." |
 | PC-06 FOLLOW_UP_NOT_RECORDED | `followUpInstructions` empty | "No follow-up instructions." |
 | PC-07 ALLERGY_NAME_ON_PRESCRIPTION | An accepted, non-stale AI-3 allergy fact's substance equals a row's normalized generic or brand name (AI-4 rule; **name match only**, no class cross-reactivity) | "Accepted allergy 'penicillin' (said at 1:23) matches row 2." |
-| PC-08 CONSULTATION_AUDIO_UNREVIEWED | The visit has a READY recording whose transcription is still running, or whose transcript has no current review | "A consultation transcript is still processing / not reviewed. Facts can't be extracted after issue." |
+| PC-08 CONSULTATION_AUDIO_UNREVIEWED | A READY recording whose transcription is still running, that was never transcribed (audio still retained), or whose transcript has no review of its current version | "Consultation recordings: 1 still processing, 2 not reviewed. Facts can't be extracted after issue." |
 
-Ordering: PC-07, PC-01, PC-02, PC-04, PC-08, then PC-03, PC-05, PC-06. All are
-shown as "Check before issuing"; v1 has no severity levels (see Q4).
+**Tiers (Q2/Q4):** PC-07, PC-01 and PC-02 are **Review required**. The doctor
+ticks one acknowledgement in the issue confirmation, and the server refuses
+`issue` without it (409). The rest are **Consider**: shown, never interrupting.
+Neither tier blocks issuing. Ordering: PC-07, PC-01, PC-02, PC-04, PC-08, PC-03,
+PC-05, PC-06.
 
 PC-08 addresses what happened on 2026-09-26, when a prescription was issued
 while transcription was queued and the AI-3 facts could no longer be used.
@@ -138,7 +146,7 @@ while transcription was queued and the AI-3 facts could no longer be used.
     "rulesVersion": "ai5-rules-v1",
     "revision": 7,
     "checks": [
-      { "code": "PC-04", "itemIndex": 1, "message": "Row 2: 1 tablet × 3 a day × 5 days = 15, quantity is 10." }
+      { "code": "PC-04", "tier": "CONSIDER", "items": [1], "message": "Row 2: 1 tablet × 3 a day × 5 days = 15, quantity is 10." }
     ],
     "skipped": ["PC-07"]
   }
@@ -147,6 +155,9 @@ while transcription was queued and the AI-3 facts could no longer be used.
 
 - 404/403 on scope or permission failure, the same as reading the draft; 409 when
   the revision changed; 404 when AI-5 is disabled (kill switch).
+- `POST /api/prescriptions/:id/issue` accepts `acknowledgedChecks` (default
+  `false`). With the switch on, the server recomputes the checks for the issued
+  revision and returns 409 if a Review-required check exists and it is `false`.
 - `skipped` lists checks that could not run (facts or audio disabled for the
   visit), so an empty `checks` array is never ambiguous.
 - Read-only: no rows written. `Cache-Control: private, no-store`.
@@ -167,8 +178,10 @@ while transcription was queued and the AI-3 facts could no longer be used.
   "N things to check" and one line per check linking to the row (Back to edit).
 - With zero checks: "No issues found by these checks", plus a link listing what
   was checked. It never says "safe" or "compliant".
-- **Confirmation modal:** when warnings exist, it repeats the count (Q2 decides
-  whether a tick-box is required).
+- **Confirmation modal:** repeats the count. When a Review-required check exists,
+  "Confirm and issue" stays disabled until "I have reviewed the pre-issue checks
+  marked review required" is ticked. If the server finds checks the panel did not
+  show (refused issue), the panel reloads.
 - Follows `admin-dashboard-ui` tokens. Accessible: role="status" count, list
   semantics, 44px targets.
 
@@ -193,16 +206,16 @@ About 2 working days after approval: rules and tests (1 day), route, service
 and audit (½ day), Review-step UI and DB integration suite in CI (½ day). No
 migration.
 
-## 12. Decisions needed
+## 12. Decisions (made 2026-09-27, following common clinical decision-support practice: few interruptive alerts, clinician override with an audit trail, no hard stops)
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
-| Q1 | Include FR-10.5's optional **AI candidate warnings** in v1? | **No.** Deterministic only, like AI-4. Revisit once v1 is in use. |
-| Q2 | When warnings exist, must the doctor tick "I have checked these" before issuing? | **Yes, one tick-box in the existing confirmation modal.** It is not a block, just a deliberate acknowledgement. |
-| Q3 | Record which check codes were shown, in the existing `PRESCRIPTION_ISSUED` audit entry? | **Yes, codes and counts only** (for example `{"PC-04":1,"PC-06":1}`). No new table. Useful for tuning noisy checks. |
-| Q4 | Severity levels (block/warn/info)? | **No, v1 is all "check before issuing".** Levels imply clinical judgement that needs a ruleset. |
-| Q5 | Who signs off the §5.2 form↔route table and the §5.3 quantity rule? | **Dr. Hatoda Tyagi**, the same reviewer as AI-4. Stays off until then. |
-| Q6 | Gate under the `prescriptions` module (all prescribing doctors) or `clinical_ai`? | **`prescriptions`**, since no AI is involved, plus the `PRESCRIPTION_CHECKS_ENABLED` kill switch. PC-07 and PC-08 still follow their own AI flags. |
+| Q1 | Include FR-10.5's optional **AI candidate warnings** in v1? | **No.** Deterministic, inspectable rules only, like AI-4. Revisit once v1 is in use. |
+| Q2 | Must the doctor acknowledge before issuing? | **Only for Review-required checks** (PC-07, PC-01, PC-02): one tick-box in the existing confirmation, enforced by the server. Consider-tier checks never interrupt, to limit alert fatigue. |
+| Q3 | Record which checks were shown? | **Yes**, in the existing `PRESCRIPTION_ISSUED` audit entry: `preIssueChecks: { rulesVersion, counts, skipped, acknowledged }`. Codes and counts only, no names or text. No new table. |
+| Q4 | Severity levels? | **Two non-blocking tiers** (Review required / Consider), no hard-stop level. A block would need a validated clinical ruleset. |
+| Q5 | Who signs off the §5.2 form↔route table and the §5.3 quantity rule? | **Dr. Hatoda Tyagi**, the same reviewer as AI-4. `PRESCRIPTION_CHECKS_ENABLED` stays `false` until then. |
+| Q6 | Which module gates it? | **`prescriptions`**, since no AI is involved, plus the `PRESCRIPTION_CHECKS_ENABLED` kill switch. PC-07 and PC-08 follow their own AI flags and permissions. |
 
 ## 13. Out of scope (need a drug master, patient data or a ruleset)
 

@@ -8,6 +8,7 @@ import {
 } from "@/lib/clinical-audio/authorization";
 import { getClinicalAudioConfig } from "@/lib/clinical-audio/config";
 import { mayUseReconciliation } from "@/lib/clinical-reconciliation/service";
+import { prescriptionChecksEnabled } from "@/lib/prescription-checks/config";
 export const dynamic = "force-dynamic";
 export default async function ConsultationPage({
   params,
@@ -37,6 +38,7 @@ export default async function ConsultationPage({
       clinicalAudio={clinicalAudio}
       reconciliation={reconciliation}
       finalizedAudio={finalizedAudio}
+      preIssueChecks={prescriptionChecksEnabled()}
     />
   );
 }
