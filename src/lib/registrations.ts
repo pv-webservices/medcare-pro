@@ -637,6 +637,13 @@ export interface PatientMatch {
 /** Below this a lookup matches most of the clinic, which helps nobody. */
 const MIN_SEARCH_LENGTH = 2;
 const MAX_MATCHES = 10;
+/**
+ * A visit-date filter is how the WhatsApp composer lists a day's or a week's
+ * patients to pick from, so it must return the whole list — not just the
+ * newest few — or older patients can never be chosen. The per-send recipient
+ * cap is enforced separately, on the selection.
+ */
+const MAX_DATE_FILTERED_MATCHES = 500;
 
 /**
  * Finds existing patients at a clinic, so a return visit joins the record the
@@ -685,7 +692,7 @@ export async function findPatientsForActor(
       } : {}),
     },
     orderBy: { createdAt: "desc" },
-    take: (startDate || endDate) ? 50 : MAX_MATCHES,
+    take: (startDate || endDate) ? MAX_DATE_FILTERED_MATCHES : MAX_MATCHES,
     select: {
       id: true,
       patientCode: true,

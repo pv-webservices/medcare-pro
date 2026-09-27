@@ -1,13 +1,23 @@
 import { z } from "zod";
 import { BadRequestError } from "@/lib/apiHandler";
 import { clinicWhereForActor } from "@/lib/clinicScope";
-import { formatClockTime, formatDateOnly } from "@/lib/dates";
+import {
+  dateOnlyInTimeZone,
+  formatClockTime,
+  formatDateOnly,
+} from "@/lib/dates";
+import {
+  DEFAULT_HISTORY_TIMEZONE,
+  getStartOfDayInTimeZone,
+  shiftDateString,
+} from "@/lib/messageHistoryFilter";
 import { formatRupees } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import {
   accessibleClinicScope,
   assertClinicInTenant,
   PermissionError,
+  requirePermission,
   type ActorContext,
 } from "@/lib/rbac";
 import {
@@ -60,7 +70,7 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 const DELAY_BETWEEN_SENDS_MS = 350;
 
 /** One request should not hold a connection open for an unbounded batch. */
-const MAX_RECIPIENTS = 50;
+export const MAX_RECIPIENTS = 50;
 
 export const sendMessageSchema = z.object({
   templateId: z.string().trim().min(1).max(64),
@@ -78,12 +88,18 @@ export const sendMessageSchema = z.object({
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 
+/**
+ * `skipped` is a per-send outcome only — never written to `whatsapp_messages`,
+ * because nothing was attempted. See `patientIdsSentTemplateToday`.
+ */
+export type RecipientStatus = MessageStatus | "skipped";
+
 export interface RecipientResult {
   patientId: string;
   patientName: string;
   patientCode: string;
-  status: MessageStatus;
-  /** The gateway's reason when it refused, shown verbatim. */
+  status: RecipientStatus;
+  /** The gateway's reason when it refused (shown verbatim), or why it was skipped. */
   failureReason: string | null;
 }
 
@@ -91,8 +107,11 @@ export interface SendMessageResult {
   templateName: string;
   sent: number;
   failed: number;
+  skipped: number;
   results: RecipientResult[];
 }
+
+export const ALREADY_SENT_TODAY_REASON = "Already sent this template today.";
 
 export interface MessageRecord {
   id: string;
@@ -206,6 +225,80 @@ async function loadRecipients(
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The current day in clinic-local time, as a half-open [start, end) instant
+ * range. Same zone and day boundary as Message History's "Today" filter, so a
+ * message listed under Today is exactly one that blocks a repeat send.
+ */
+export function todaySendWindow(now: Date = new Date()): { start: Date; end: Date } {
+  const localToday = dateOnlyInTimeZone(now, DEFAULT_HISTORY_TIMEZONE);
+
+  return {
+    start: getStartOfDayInTimeZone(localToday, DEFAULT_HISTORY_TIMEZONE),
+    end: getStartOfDayInTimeZone(
+      shiftDateString(localToday, 1),
+      DEFAULT_HISTORY_TIMEZONE,
+    ),
+  };
+}
+
+interface SentTodayScope {
+  clinic: { tenantId: string };
+  clinicId?: string;
+  patientId?: { in: string[] };
+}
+
+/**
+ * Patients who already received this template today — one template reaches a
+ * patient at most once per day.
+ *
+ * Only `sent` rows count: a failed attempt never reached the patient, so the
+ * front desk must be free to retry it. Matched on the denormalised template
+ * name because that is what the history row carries; names are unique per
+ * account (`@@unique([tenantId, name])`).
+ *
+ * CALLERS OWN SCOPING. `scope` must already pin the rows to the actor's tenant
+ * and reach — this only adds the template and the day.
+ */
+async function patientIdsSentTemplateToday(
+  templateName: string,
+  scope: SentTodayScope,
+  now: Date = new Date(),
+): Promise<Set<string>> {
+  const { start, end } = todaySendWindow(now);
+  const rows = await prisma.whatsappMessage.findMany({
+    where: {
+      ...scope,
+      templateName,
+      status: "sent",
+      sentAt: { gte: start, lt: end },
+    },
+    distinct: ["patientId"],
+    select: { patientId: true },
+  });
+
+  return new Set(rows.map((row) => row.patientId));
+}
+
+/**
+ * The composer's "already sent today" markers: which of a clinic's patients
+ * have received this template today. Requires `message:send` in that clinic.
+ */
+export async function listPatientsSentTemplateToday(
+  actor: ActorContext,
+  templateId: string,
+  clinicId: string,
+): Promise<string[]> {
+  await requirePermission(actor, "message:send", clinicId);
+  const template = await getTemplateForActor(actor, templateId);
+  const sent = await patientIdsSentTemplateToday(template.name, {
+    clinic: { tenantId: actor.tenantId },
+    clinicId,
+  });
+
+  return [...sent];
+}
 
 /**
  * True only when the gateway POSITIVELY reports no WhatsApp account.
@@ -430,9 +523,26 @@ export async function sendToPatients(
     throw new BadRequestError("None of those patients are available to you.");
   }
 
-  const results: RecipientResult[] = [];
+  // Enforced here, not only in the composer: its markers can be stale (a second
+  // tab, a colleague sending the same list), and a duplicate reminder is the
+  // kind of noise that gets a sending number reported.
+  const alreadySent = await patientIdsSentTemplateToday(template.name, {
+    clinic: { tenantId: actor.tenantId },
+    patientId: { in: recipients.map((recipient) => recipient.id) },
+  });
 
-  for (const [index, recipient] of recipients.entries()) {
+  const results: RecipientResult[] = recipients
+    .filter((recipient) => alreadySent.has(recipient.id))
+    .map((recipient) => ({
+      patientId: recipient.id,
+      patientName: recipient.name,
+      patientCode: recipient.patientCode,
+      status: "skipped",
+      failureReason: ALREADY_SENT_TODAY_REASON,
+    }));
+  const toSend = recipients.filter((recipient) => !alreadySent.has(recipient.id));
+
+  for (const [index, recipient] of toSend.entries()) {
     // Re-checked per recipient rather than once for the batch: the ids come
     // from the client, and a patient's clinic is what decides the permission.
     await assertClinicInTenant(actor.tenantId, recipient.clinicId);
@@ -462,15 +572,19 @@ export async function sendToPatients(
       failureReason: outcome.failureReason,
     });
 
-    if (index < recipients.length - 1) {
+    if (index < toSend.length - 1) {
       await wait(DELAY_BETWEEN_SENDS_MS);
     }
   }
 
+  const count = (status: RecipientStatus) =>
+    results.filter((result) => result.status === status).length;
+
   return {
     templateName: template.name,
-    sent: results.filter((result) => result.status === "sent").length,
-    failed: results.filter((result) => result.status === "failed").length,
+    sent: count("sent"),
+    failed: count("failed"),
+    skipped: count("skipped"),
     results,
   };
 }

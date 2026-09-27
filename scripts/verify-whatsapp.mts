@@ -36,10 +36,29 @@ import {
   updateTemplate,
 } from "@/lib/whatsappTemplates";
 import {
+  ALREADY_SENT_TODAY_REASON,
   listMessagesForActor,
+  listPatientsSentTemplateToday,
   sendMessageSchema,
   sendToPatients,
 } from "@/lib/whatsappMessages";
+
+/**
+ * One template reaches a patient once a day, so a section that re-sends to the
+ * same fixture patient first moves this tenant's history back a day.
+ */
+async function startNextDay(tenantId: string): Promise<void> {
+  const rows = await prisma.whatsappMessage.findMany({
+    where: { clinic: { tenantId } },
+    select: { id: true, sentAt: true },
+  });
+  for (const row of rows) {
+    await prisma.whatsappMessage.update({
+      where: { id: row.id },
+      data: { sentAt: new Date(row.sentAt.getTime() - 24 * 60 * 60 * 1000) },
+    });
+  }
+}
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 if (!/@(localhost|127\.0\.0\.1)[:/]/.test(databaseUrl)) {
@@ -531,6 +550,40 @@ async function main(): Promise<void> {
     logged[0].templateName === "Appointment reminder",
   );
 
+  console.log("\nThe same template reaches a patient once a day");
+  calls.length = 0;
+  const repeat = await sendToPatients(t.ownerActor, {
+    templateId: reminder.id,
+    patientIds: [t.ramesh],
+  });
+  check(
+    "a second send today is skipped, not sent",
+    repeat.skipped === 1 && repeat.sent === 0 && repeat.failed === 0,
+    repeat,
+  );
+  check(
+    "and says why",
+    repeat.results[0]?.status === "skipped" &&
+      repeat.results[0]?.failureReason === ALREADY_SENT_TODAY_REASON,
+    repeat.results[0],
+  );
+  check("the gateway was never called", calls.length === 0, calls.length);
+  check(
+    "a skip writes no history row",
+    (await listMessagesForActor(t.ownerActor)).length === 1,
+  );
+  check(
+    "the composer's marker lists that patient",
+    (await listPatientsSentTemplateToday(t.ownerActor, reminder.id, t.clinicA)).includes(
+      t.ramesh,
+    ),
+  );
+  await startNextDay(t.tenantId);
+  check(
+    "and clears once the day turns over",
+    (await listPatientsSentTemplateToday(t.ownerActor, reminder.id, t.clinicA)).length === 0,
+  );
+
   console.log("\nA bad recipient never takes the batch down");
   calls.length = 0;
   rejectNumbers.add("919800000003");
@@ -579,6 +632,7 @@ async function main(): Promise<void> {
   rejectNumbers.delete("919800000003");
 
   console.log("\nA clinic-scoped sender reaches only their own patients");
+  await startNextDay(t.tenantId);
   calls.length = 0;
   const scopedSend = await sendToPatients(t.senderActor, {
     templateId: reminder.id,
@@ -640,6 +694,7 @@ async function main(): Promise<void> {
   );
 
   console.log("\nA number with no WhatsApp account is never messaged");
+  await startNextDay(t.tenantId);
   calls.length = 0;
   notOnWhatsapp.add("919800000001");
   const absent = await sendToPatients(t.ownerActor, {
