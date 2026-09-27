@@ -24,6 +24,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import Select from "@/components/ui/Select";
 import { todayDateOnly } from "@/lib/dates";
 import WhatsAppMediaPreview from "@/components/messages/WhatsAppMediaPreview";
+import PatientMatchList from "@/components/messages/PatientMatchList";
 
 interface MessageComposerProps {
   templates: readonly TemplateRecord[];
@@ -33,6 +34,7 @@ interface MessageComposerProps {
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
+/** Mirrors MAX_RECIPIENTS in @/lib/whatsappMessages, which enforces it. */
 const MAX_RECIPIENTS = 50;
 
 export default function MessageComposer({
@@ -52,6 +54,9 @@ export default function MessageComposer({
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [outcome, setOutcome] = useState<SendMessageResult | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [sentTodayIds, setSentTodayIds] = useState<ReadonlySet<string>>(new Set());
+  const [sentTodayVersion, setSentTodayVersion] = useState(0);
 
   const [todayStr] = useState(() => todayDateOnly());
   const [yesterdayStr] = useState(() =>
@@ -88,20 +93,103 @@ export default function MessageComposer({
     return () => clearTimeout(handle);
   }, [search, startDateFilter, endDateFilter, clinicId]);
 
-  function addRecipient(patient: PatientMatch) {
+  // Advisory markers only — the send route skips these patients itself.
+  useEffect(() => {
+    // Nothing to mark: the composer renders no picker without both.
+    if (!clinicId || !templateId) return;
+
+    let isCurrent = true;
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/whatsapp/sent-today?clinicId=${encodeURIComponent(clinicId)}&templateId=${encodeURIComponent(templateId)}`,
+        );
+        const payload: { success?: boolean; data?: { patientIds?: string[] } } =
+          await response.json().catch(() => ({}));
+        if (isCurrent) {
+          setSentTodayIds(new Set(payload.success ? (payload.data?.patientIds ?? []) : []));
+        }
+      } catch {
+        if (isCurrent) setSentTodayIds(new Set());
+      }
+    })();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [clinicId, templateId, sentTodayVersion]);
+
+  const selectedIds = new Set(recipients.map((entry) => entry.id));
+  const selectedSentToday = recipients.filter((entry) => sentTodayIds.has(entry.id));
+
+  function alreadySentMessage(patient: PatientMatch): string {
+    return `${patient.name} (${patient.patientCode}) has already been sent "${template?.name ?? "this template"}" today. The same template can be sent to a patient once a day.`;
+  }
+
+  function toggleRecipient(patient: PatientMatch) {
     setOutcome(null);
-    setRecipients((current) =>
-      current.some((entry) => entry.id === patient.id)
-        ? current
-        : [...current, patient],
+
+    if (selectedIds.has(patient.id)) {
+      setNotice(null);
+      setRecipients((current) => current.filter((entry) => entry.id !== patient.id));
+      return;
+    }
+    if (sentTodayIds.has(patient.id)) {
+      setNotice(alreadySentMessage(patient));
+      return;
+    }
+    if (recipients.length >= MAX_RECIPIENTS) {
+      setNotice(
+        `You can send to at most ${MAX_RECIPIENTS} patients at a time. Remove someone to add ${patient.name}, or send this batch first.`,
+      );
+      return;
+    }
+
+    setNotice(null);
+    setRecipients((current) => [...current, patient]);
+  }
+
+  function selectAvailable() {
+    setOutcome(null);
+    const eligible = matches.filter(
+      (patient) => !selectedIds.has(patient.id) && !sentTodayIds.has(patient.id),
     );
-    setSearch("");
-    setMatches([]);
+    const room = MAX_RECIPIENTS - recipients.length;
+    const added = eligible.slice(0, room);
+    const skippedSent = matches.filter(
+      (patient) => !selectedIds.has(patient.id) && sentTodayIds.has(patient.id),
+    ).length;
+
+    const parts: string[] = [];
+    if (eligible.length > room) {
+      parts.push(
+        `Selected ${added.length} — a send is limited to ${MAX_RECIPIENTS} patients. Send this batch, then select the rest.`,
+      );
+    }
+    if (skippedSent > 0) {
+      parts.push(
+        `${skippedSent} ${skippedSent === 1 ? "patient was" : "patients were"} left out because they already received this template today.`,
+      );
+    }
+    setNotice(parts.length > 0 ? parts.join(" ") : null);
+    setRecipients((current) => [...current, ...added]);
+  }
+
+  function clearRecipients() {
+    setOutcome(null);
+    setNotice(null);
+    setRecipients([]);
   }
 
   function removeRecipient(patientId: string) {
     setOutcome(null);
+    setNotice(null);
     setRecipients((current) => current.filter((entry) => entry.id !== patientId));
+  }
+
+  function removeSentToday() {
+    setNotice(null);
+    setRecipients((current) => current.filter((entry) => !sentTodayIds.has(entry.id)));
   }
 
   async function handleSend() {
@@ -128,7 +216,9 @@ export default function MessageComposer({
       }
 
       setOutcome(payload.data);
+      setNotice(null);
       setRecipients([]);
+      setSentTodayVersion((version) => version + 1);
       router.refresh();
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
@@ -200,6 +290,7 @@ export default function MessageComposer({
             onChange={(event) => {
               setTemplateId(event.target.value);
               setOutcome(null);
+              setNotice(null);
             }}
           >
             {templates.map((entry) => (
@@ -303,48 +394,56 @@ export default function MessageComposer({
               />
             </div>
             <p className="text-micro text-muted">
-              {isSearching
-                ? "Searching…"
-                : `Patients at ${clinicName ?? "this clinic"}. Up to ${MAX_RECIPIENTS} per send.`}
+              {isSearching ? (
+                "Searching…"
+              ) : (
+                <>
+                  Patients at {clinicName ?? "this clinic"}. Tick any patients —{" "}
+                  <span className="tnum font-semibold text-ink">{recipients.length}</span> of{" "}
+                  <span className="tnum">{MAX_RECIPIENTS}</span> selected.
+                </>
+              )}
             </p>
+
+            {notice && (
+              <p
+                role="alert"
+                className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-label text-warn-ink"
+              >
+                {notice}
+              </p>
+            )}
 
             {/* Matches list */}
             {(search.trim().length >= 2 || startDateFilter !== "" || endDateFilter !== "") && matches.length > 0 && (
-              <div className="mt-2 rounded-2xl border border-line bg-canvas p-2 shadow-card">
-                <div className="flex justify-between items-center px-2 py-1 mb-1">
-                  <span className="text-micro font-medium text-muted">{matches.length} patients found</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOutcome(null);
-                      setRecipients(matches);
-                      setSearch("");
-                      setMatches([]);
-                      setStartDateFilter("");
-                      setEndDateFilter("");
-                    }}
-                    className="text-micro font-semibold text-accent hover:underline"
-                  >
-                    Select All
-                  </button>
-                </div>
-                <ul className="max-h-60 overflow-y-auto divide-y divide-line/40">
-                  {matches.map((patient) => (
-                    <li key={patient.id}>
-                      <button
-                        type="button"
-                        onClick={() => addRecipient(patient)}
-                        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-body hover:bg-canvas-deep transition-colors"
-                      >
-                        <div>
-                          <span className="font-medium text-ink">{patient.name}</span>
-                          <span className="ml-2 text-label text-muted">{patient.patientCode}</span>
-                        </div>
-                        <span className="tnum text-label text-muted">{patient.mobileNumber}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+              <PatientMatchList
+                matches={matches}
+                selectedIds={selectedIds}
+                sentTodayIds={sentTodayIds}
+                maxRecipients={MAX_RECIPIENTS}
+                onToggle={toggleRecipient}
+                onSelectAvailable={selectAvailable}
+                onClearSelection={clearRecipients}
+              />
+            )}
+
+            {selectedSentToday.length > 0 && (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-label text-warn-ink"
+              >
+                <span>
+                  <span className="tnum">{selectedSentToday.length}</span> selected{" "}
+                  {selectedSentToday.length === 1 ? "patient has" : "patients have"} already
+                  been sent &ldquo;{template?.name}&rdquo; today and will be skipped.
+                </span>
+                <button
+                  type="button"
+                  onClick={removeSentToday}
+                  className="font-semibold underline"
+                >
+                  Remove them
+                </button>
               </div>
             )}
 
@@ -354,11 +453,18 @@ export default function MessageComposer({
                 {recipients.map((patient) => (
                   <span
                     key={patient.id}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-canvas px-3 py-1 text-label font-medium text-ink shadow-sm"
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 text-label font-medium shadow-sm ${
+                      sentTodayIds.has(patient.id)
+                        ? "border-warn-line bg-warn-bg text-warn-ink"
+                        : "border-line bg-canvas text-ink"
+                    }`}
                   >
                     <span>{patient.name}</span>
                     <span className="text-muted">·</span>
-                    <span className="text-muted">{patient.patientCode}</span>
+                    <span className="serial text-muted">{patient.patientCode}</span>
+                    {sentTodayIds.has(patient.id) && (
+                      <span className="text-meta">· sent today</span>
+                    )}
                     <button
                       type="button"
                       onClick={() => removeRecipient(patient.id)}
@@ -483,26 +589,28 @@ export default function MessageComposer({
  * hide the eleven that went out — so every row is listed with its own reason.
  */
 function SendOutcome({ outcome }: { outcome: SendMessageResult }) {
-  const failures = outcome.results.filter(
-    (result: RecipientResult) => result.status === "failed",
+  const problems = outcome.results.filter(
+    (result: RecipientResult) => result.status !== "sent",
   );
 
   return (
     <div
       role="status"
       className={`rounded-xl border px-4 py-3 text-body font-medium ${
-        failures.length === 0
+        problems.length === 0
           ? "border-line bg-ok-bg text-ok-ink"
           : "border-line bg-warn-bg text-warn-ink"
       }`}
     >
       <p>
         {outcome.sent} sent
-        {outcome.failed > 0 && `, ${outcome.failed} failed`} — {outcome.templateName}
+        {outcome.failed > 0 && `, ${outcome.failed} failed`}
+        {outcome.skipped > 0 && `, ${outcome.skipped} skipped (already sent today)`} —{" "}
+        {outcome.templateName}
       </p>
-      {failures.length > 0 && (
+      {problems.length > 0 && (
         <ul className="mt-2 grid gap-1 text-meta">
-          {failures.map((result) => (
+          {problems.map((result) => (
             <li key={result.patientId}>
               {result.patientName} ({result.patientCode}): {result.failureReason}
             </li>
