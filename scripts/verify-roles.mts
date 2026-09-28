@@ -517,7 +517,11 @@ async function main(): Promise<void> {
     // since branding was built. What changed is that the screen is now findable
     // instead of reachable only by typing its URL. The two checks below pin
     // that it stays READ-ONLY for them.
-    staffTabs.join(",") === "Dashboard,Tasks,Registrations,Doctors,Settings",
+    //
+    // PB-3 added Billing, earned the same way: Staff holds `invoice:read` per
+    // the billing PRD. It is read-only for them — test:billing pins that a
+    // Staff role cannot create an invoice.
+    staffTabs.join(",") === "Billing,Dashboard,Tasks,Registrations,Doctors,Settings",
     staffTabs,
   );
   check(

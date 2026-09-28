@@ -688,8 +688,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "invoice:create",
         label: "Prepare and issue bills",
         description: "Prepare drafts, issue bills and create replacements.",
-        pending: "stage",
-        pendingNote: "Enforced from PB-2/PB-3",
       },
       {
         key: "payment:record",
@@ -702,8 +700,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "invoice:discount:override",
         label: "Approve large discounts",
         description: "Approve discounts above the clinic limit.",
-        pending: "stage",
-        pendingNote: "Enforced from PB-2/PB-3",
       },
       {
         key: "invoice:cancel",

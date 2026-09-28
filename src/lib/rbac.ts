@@ -280,8 +280,9 @@ function getRolePriority(key: string | null): number {
 export async function resolveRoleNameAtTime(
   actor: ActorContext,
   clinicId?: string,
+  client: Prisma.TransactionClient = prisma,
 ): Promise<string> {
-  const assignments = await prisma.userRole.findMany({
+  const assignments = await client.userRole.findMany({
     where: {
       userId: actor.userId,
       role: { tenantId: actor.tenantId },

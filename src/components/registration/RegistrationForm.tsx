@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { registrationAmountPayload } from "@/lib/registrationAmountPayload";
 import {
   ArrowRight,
   Calendar,
@@ -297,7 +298,7 @@ export default function RegistrationForm({
         city: values.city.trim(),
         doctorId: values.doctorId === "" ? null : values.doctorId,
         department: values.department.trim(),
-        amount: Number(values.amount),
+        ...registrationAmountPayload(isEdit, values.amount, initial?.amount),
         visitDate: isEdit ? values.visitDate : todayDateOnly(),
         visitTime: isEdit ? values.visitTime : nowClockTime(),
         visitType: values.visitType,

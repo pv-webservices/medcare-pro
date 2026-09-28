@@ -105,9 +105,9 @@ describe("billing catalogue and role migration", () => {
     const expectedPending = {
       "invoice:read": undefined,
       "billing:settings:manage": undefined,
-      "invoice:create": "stage",
+      "invoice:create": undefined,
       "payment:record": "stage",
-      "invoice:discount:override": "stage",
+      "invoice:discount:override": undefined,
       "invoice:cancel": "stage",
     } as const;
     for (const [key, pending] of Object.entries(expectedPending)) {
