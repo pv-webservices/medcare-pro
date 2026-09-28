@@ -16,6 +16,8 @@ import {
   notifyRegistrationUpdated,
 } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { requireTenantFeatureEntitlement } from "@/lib/features";
+import { FeatureError } from "@/lib/featureResolution";
 import {
   assertClinicInTenant,
   can,
@@ -980,14 +982,7 @@ async function writeVisit(
     select: { id: true },
   });
 
-  await tx.registrationEditLog.create({
-    data: {
-      registrationId: registration.id,
-      editedByUserId: actor.userId,
-      roleAtTime: options.roleAtTime,
-      changedFields: toJsonValue(diffSnapshots(null, options.snapshot)),
-    },
-  });
+  await writeRegistrationChanges(tx, actor, registration.id, options.roleAtTime, diffSnapshots(null, options.snapshot));
 
   return registration.id;
 }
@@ -1107,13 +1102,25 @@ async function insertRegistration(
   );
 }
 
-/**
- * FR-3.5 / FR-3.6 — edits a registration and logs what changed.
- *
- * The update and its log row share one transaction, so a record can never be
- * changed without the trail recording it (PRD §9). An edit that changes nothing
- * is rejected rather than written, which keeps empty entries out of the log.
- */
+/** Append the existing immutable registration audit shape within the caller's transaction. */
+export async function writeRegistrationChanges(
+  tx: Prisma.TransactionClient,
+  actor: ActorContext,
+  registrationId: string,
+  roleAtTime: string,
+  changed: ChangedFields,
+) {
+  return tx.registrationEditLog.create({
+    data: {
+      registrationId,
+      editedByUserId: actor.userId,
+      // Denormalised: later role changes must not rewrite this history.
+      roleAtTime,
+      changedFields: toJsonValue(changed),
+    },
+  });
+}
+
 export async function updateRegistration(
   actor: ActorContext,
   registrationId: string,
@@ -1138,13 +1145,48 @@ export async function updateRegistration(
   const after = nextSnapshot(before, input, resolved);
   const changed = diffSnapshots(before, after);
 
-  if (Object.keys(changed).length === 0) {
+  let guardBillingAmount = false;
+  if (input.amount !== undefined) {
+    try {
+      await requireTenantFeatureEntitlement(actor.tenantId, "billing");
+      guardBillingAmount = true;
+    } catch (error) {
+      if (!(error instanceof FeatureError)) throw error;
+    }
+  }
+
+  if (!guardBillingAmount && Object.keys(changed).length === 0) {
     throw new BadRequestError("Nothing was changed.");
   }
 
-  const roleAtTime = await resolveRoleNameAtTime(actor, current.clinicId);
+  const roleAtTime = guardBillingAmount ? null : await resolveRoleNameAtTime(actor, current.clinicId);
 
   await prisma.$transaction(async (tx) => {
+    let writeAmount = input.amount !== undefined;
+    if (guardBillingAmount) {
+      // First SQL statement: same Registration-first order as invoices/prescriptions.
+      const locked = await tx.$queryRaw<Array<{ amount: Prisma.Decimal }>>`
+        SELECT amount FROM registrations WHERE id = ${registrationId} FOR UPDATE`;
+      if (!locked[0]) throw new ScopeError();
+      const lockedAmount = locked[0].amount.toFixed(2);
+      writeAmount = after.amount !== lockedAmount;
+      if (writeAmount) {
+        const liveInvoice = await tx.invoice.findFirst({
+          where: { registrationId, tenantId: actor.tenantId, activeKey: registrationId, status: "ISSUED" },
+          select: { id: true },
+        });
+        if (liveInvoice) throw new ConflictError("This visit has been billed — change the bill instead.");
+        if (lockedAmount !== before.amount) {
+          throw new ConflictError("This visit was changed by someone else — reload and try again.");
+        }
+        changed.amount = { from: lockedAmount, to: after.amount };
+      } else {
+        delete changed.amount;
+      }
+      // An explicitly supplied but equal amount is a successful no-op.
+      if (Object.keys(changed).length === 0) return;
+      await requirePermission(actor, "registration:edit", current.clinicId, tx);
+    }
     await tx.patient.update({
       where: { id: current.patientId },
       data: {
@@ -1162,22 +1204,14 @@ export async function updateRegistration(
       data: {
         ...(doctor === undefined ? {} : { doctorId: doctor?.id ?? null }),
         department: after.department,
-        amount: after.amount,
+        ...(writeAmount ? { amount: after.amount } : {}),
         visitType: resolved.visitType,
         visitDate: parseDateTime(resolved.visitDate, resolved.visitTime),
       },
     });
 
-    await tx.registrationEditLog.create({
-      data: {
-        registrationId,
-        editedByUserId: actor.userId,
-        // Denormalised on purpose: revoking the role later must not rewrite
-        // what this person held when they made the edit.
-        roleAtTime,
-        changedFields: toJsonValue(changed),
-      },
-    });
+    await writeRegistrationChanges(tx, actor, registrationId,
+      roleAtTime ?? await resolveRoleNameAtTime(actor, current.clinicId, tx), changed);
   });
 
   const record = await getRegistrationForActor(actor, registrationId);
@@ -1185,7 +1219,7 @@ export async function updateRegistration(
   // FR-7.1 — the patient-record modification case. The field list is read off
   // the same diff that was just logged, so the feed and the audit trail can
   // never name different changes.
-  await notifyRegistrationUpdated(
+  if (Object.keys(changed).length > 0) await notifyRegistrationUpdated(
     actor,
     {
       registrationId,

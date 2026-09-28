@@ -31,10 +31,10 @@ export async function listServiceItemsForActor(actor: ActorContext, filters: { c
 /** Internal invoice helper. Call only AFTER authorizing the invoice/visit's clinic.
  * Derive tenant ownership from that clinic; never accept a tenant from the browser.
  */
-export async function listBillableServicesForClinic(clinicId: string) {
-  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { id: true, tenantId: true } });
+export async function listBillableServicesForClinic(clinicId: string, tx: Prisma.TransactionClient = prisma) {
+  const clinic = await tx.clinic.findUnique({ where: { id: clinicId }, select: { id: true, tenantId: true } });
   if (!clinic) throw new ScopeError();
-  return (await prisma.serviceItem.findMany({ where: { tenantId: clinic.tenantId, isActive: true,
+  return (await tx.serviceItem.findMany({ where: { tenantId: clinic.tenantId, isActive: true,
     OR: [{ clinicId: null }, { clinicId: clinic.id }] }, orderBy: [{ name: "asc" }, { id: "asc" }] })).map(record);
 }
 

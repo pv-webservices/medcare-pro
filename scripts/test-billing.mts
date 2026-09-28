@@ -1,6 +1,7 @@
 /** PB-2 acceptance on a disposable local database only; no retained tenant fixtures. */
 import "dotenv/config";
 import assert from "node:assert/strict";
+import { testBillingInvoices } from "./test-billing-invoices.mjs";
 import { prisma } from "@/lib/prisma";
 import { seedFeatureCatalogue, DEFAULT_PLAN_KEY } from "@/lib/defaultFeatures";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
@@ -123,6 +124,7 @@ async function main() {
   check("All three PB-2 audit actions recorded", new Set(audit.map((row) => row.action)).size === 3);
   check("Settings narrative excluded from audit metadata", !JSON.stringify(audit).includes("Synthetic footer") && !JSON.stringify(audit).includes("Synthetic legal name"));
   check("Rejected writes leave service unchanged", (await prisma.serviceItem.findUniqueOrThrow({ where: { id: local.id } })).price.toFixed(2) === "123.45");
+  checks += await testBillingInvoices({ owner, otherOwner, staff, reception, clinicA: a.id, clinicB: b.id, foreignClinic: f.id });
 }
 function settingsInput(value: Awaited<ReturnType<typeof getBillingSettingsForClinic>>) {
   const { clinicId: _clinicId, ...input } = value;

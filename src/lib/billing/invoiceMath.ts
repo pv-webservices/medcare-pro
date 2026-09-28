@@ -73,3 +73,16 @@ export function derivePaymentStatus(grandTotal: number, amountPaid: number): "UN
   if (amountPaid === grandTotal) return "PAID";
   return amountPaid === 0 ? "UNPAID" : "PARTIAL";
 }
+
+/** A percentage input becomes one exact paise discount, rounded half up. */
+export function discountAmountForPercent(quantity: number, unitPrice: string, percent: string): string {
+  const rate = toPaise(percent);
+  if (rate > 10000) throw new RangeError("Discount must be between 0 and 100 percent.");
+  const gross = computeLine({ quantity, unitPrice, discountAmount: "0.00", taxRatePercent: "0.00" }).gross;
+  return fromPaise(Math.floor((gross * rate + 5000) / 10000));
+}
+
+/** Authorization compares exact ratios; never use the rounded display percentage. */
+export function exceedsDiscountLimit(discount: string, subtotal: string, limitPercent: string): boolean {
+  return toPaise(discount) * 10000 > toPaise(subtotal) * toPaise(limitPercent);
+}

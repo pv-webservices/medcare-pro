@@ -14,7 +14,8 @@ const optionalText = (max: number) => z.string().trim().max(max).nullable().opti
   .transform((value) => value || null);
 export const serviceCategories = ["CONSULTATION", "PROCEDURE", "TEST", "OTHER"] as const;
 export const billingSettingsSchema = z.strictObject({
-  gstin: optionalText(15).refine((value) => value === null || isValidGstin(value), "Enter a valid GSTIN."),
+  gstin: optionalText(15).transform((value) => value?.toUpperCase() ?? null)
+    .refine((value) => value === null || isValidGstin(value), "Enter a valid GSTIN."),
   legalName: optionalText(200),
   invoicePrefix: z.string().regex(/^[A-Z0-9]{1,4}$/, "Use 1–4 uppercase letters or digits.").default("INV"),
   staffDiscountLimitPercent: decimal(10000).default("0.00"),
