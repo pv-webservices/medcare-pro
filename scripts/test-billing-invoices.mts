@@ -165,7 +165,9 @@ export async function testBillingInvoices(context: { owner: ActorContext; otherO
       const after = await issueInvoice(owner, fy2.draft.id, { revision: fy2.draft.revision });
       check("1 April IST starts new FY at sequence one", before.invoiceNumber?.includes("-2627-") && after.invoiceNumber === "INV-2728-00001");
     } finally { mock.timers.reset(); }
-    check("normal issue produces no billing notifications", await prisma.notification.count({ where: { tenantId: owner.tenantId, type: { startsWith: "invoice." } } }) === 0);
+    const billingNotes = await prisma.notification.findMany({ where: { tenantId: owner.tenantId, type: { startsWith: "invoice." } } });
+    check("normal issue produces no billing notifications; override issue produces one",
+      billingNotes.length === 1 && billingNotes[0].type === "invoice.discount_override" && billingNotes[0].relatedRecordId === override.id);
   } catch (error) {
     console.error("PB-3 acceptance failure before fixture cleanup:", error);
     throw error;

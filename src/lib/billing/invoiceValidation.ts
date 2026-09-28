@@ -43,6 +43,28 @@ export const invoiceFiltersSchema = z.strictObject({
 export type InvoiceLineInput = z.output<typeof invoiceLineSchema>;
 export type InvoiceFilters = z.output<typeof invoiceFiltersSchema>;
 
+export const paymentModes = ["CASH", "UPI", "CARD", "BANK_TRANSFER", "OTHER"] as const;
+/** FR-11.16. The balance and the future-time limit are checked under the invoice lock. */
+export const recordPaymentSchema = z.strictObject({
+  amount: money.refine((value) => toPaise(value) > 0, "Enter an amount greater than zero."),
+  mode: z.enum(paymentModes),
+  reference: z.string().trim().max(100).nullable().default(null).transform((value) => value || null),
+  receivedAt: z.iso.datetime({ offset: true }).optional(),
+});
+/** FR-11.17 / FR-11.19: the narrative stays on the record, never in audit metadata. */
+export const billingReasonSchema = z.strictObject({ reason: z.string().trim().min(3, "Give a reason of at least 3 characters.").max(500) });
+export const duesAgeBuckets = ["0-7", "8-30", "31+"] as const;
+export const duesFiltersSchema = z.strictObject({
+  clinicId: z.string().min(1).optional(),
+  doctorId: z.string().min(1).optional(),
+  age: z.enum(duesAgeBuckets).optional(),
+  search: z.string().trim().max(200).optional(),
+  page: z.coerce.number().int().min(1).max(1000000).default(1),
+});
+export type RecordPaymentInput = z.output<typeof recordPaymentSchema>;
+export type DuesAgeBucket = (typeof duesAgeBuckets)[number];
+export type DuesFilters = z.output<typeof duesFiltersSchema>;
+
 export interface InvoiceSnapshot {
   clinic: { name: string; legalName: string | null; address: string | null; city: string | null; logoUrl: string | null; gstin: string | null; footerNote: string | null };
   patient: { patientCode: string; name: string; age: number | null; gender: string | null; mobileNumber: string; city: string | null };
