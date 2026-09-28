@@ -17,11 +17,14 @@
  * Refuses to run unless DATABASE_URL points at localhost: it writes and deletes
  * rows, and must never be aimed at a real clinic's data.
  */
+import { randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { encryptWhatsappApiKey } from "@/lib/whatsappCredentialCrypto";
 import { BadRequestError, ConflictError } from "@/lib/apiHandler";
 import { PermissionError, ScopeError } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultRoles, OWNER_ROLE_NAME } from "@/lib/defaultRoles";
+import { DEFAULT_PLAN_KEY } from "@/lib/defaultFeatures";
 import { createClinic } from "@/lib/clinics";
 import { createRegistration } from "@/lib/registrations";
 import {
@@ -38,7 +41,8 @@ import {
 import {
   ALREADY_SENT_TODAY_REASON,
   listMessagesForActor,
-  listPatientsSentTemplateToday,
+  IN_FLIGHT_STATUS,
+  listSentTemplateToday,
   sendMessageSchema,
   sendToPatients,
 } from "@/lib/whatsappMessages";
@@ -229,6 +233,8 @@ async function startStub(): Promise<string> {
 const TEST_TENANT_NAME = "verify-whatsapp";
 
 async function build() {
+  // Module access is plan-gated; without a plan, createClinic is refused.
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { key: DEFAULT_PLAN_KEY } });
   const tenant = await prisma.tenant.create({
     data: {
       businessName: TEST_TENANT_NAME,
@@ -236,6 +242,7 @@ async function build() {
       // Stage 3 made tenants.slug NOT NULL. Mirrors the email's uniqueness.
       slug: `${TEST_TENANT_NAME}-${Date.now()}`,
       emailVerifiedAt: new Date(),
+      planId: plan.id,
     },
     select: { id: true },
   });
@@ -299,6 +306,11 @@ async function build() {
     data: { clinicId: clinicA.id, name: "Dr Rao", department: "Cardiology" },
     select: { id: true },
   });
+  // A registration's doctor must work at its clinic.
+  const clinicBDoctor = await prisma.doctor.create({
+    data: { clinicId: clinicB.id, name: "Dr Iyer", department: "Dermatology" },
+    select: { id: true },
+  });
 
   const first = await createRegistration(ownerActor, {
     clinicId: clinicA.id,
@@ -339,7 +351,7 @@ async function build() {
     gender: "Female",
     city: "Bengaluru",
     address: "44 Palm Grove",
-    doctorId: doctor.id,
+    doctorId: clinicBDoctor.id,
     department: "Dermatology",
     amount: 1000,
     visitDate: "2026-08-11",
@@ -359,6 +371,39 @@ async function build() {
   };
 }
 
+/**
+ * Sends resolve their gateway from the database (the account's default
+ * device), not from the environment, so the test account gets a provider
+ * account and a connected device that both point at the stub. The API key is
+ * encrypted with a throwaway key generated for this run.
+ */
+async function connectStubDevice(tenantId: string, baseUrl: string): Promise<void> {
+  process.env.WHATSAPP_PROVIDER_ENCRYPTION_KEY = randomBytes(32).toString("hex");
+
+  const account = await prisma.whatsappProviderAccount.create({
+    data: { tenantId, name: "Stub gateway", apiBaseUrl: baseUrl, encryptedApiKey: "pending" },
+    select: { id: true },
+  });
+  await prisma.whatsappProviderAccount.update({
+    where: { id: account.id },
+    data: { encryptedApiKey: encryptWhatsappApiKey("STUB_KEY", tenantId, account.id) },
+  });
+  const device = await prisma.whatsappDevice.create({
+    data: {
+      tenantId,
+      providerAccountId: account.id,
+      name: "Stub device",
+      phoneNumber: "919999999999",
+      connectionStatus: "CONNECTED",
+      lastStatusCheckedAt: new Date(),
+    },
+    select: { id: true },
+  });
+  await prisma.tenantWhatsappSettings.create({
+    data: { tenantId, defaultDeviceId: device.id },
+  });
+}
+
 async function main(): Promise<void> {
   const baseUrl = await startStub();
   // Pointed at the stub BEFORE anything can send. Belt and braces: the real
@@ -370,6 +415,7 @@ async function main(): Promise<void> {
   console.log(`  (stub gateway on ${baseUrl} — no live sends)\n`);
 
   const t = await build();
+  await connectStubDevice(t.tenantId, baseUrl);
 
   console.log("Placeholder rendering (pure)");
   check(
@@ -572,16 +618,17 @@ async function main(): Promise<void> {
     "a skip writes no history row",
     (await listMessagesForActor(t.ownerActor)).length === 1,
   );
+  const marker = await listSentTemplateToday(t.ownerActor, reminder.id, t.clinicA);
+  check("the composer's marker lists that patient", marker.patientIds.includes(t.ramesh));
   check(
-    "the composer's marker lists that patient",
-    (await listPatientsSentTemplateToday(t.ownerActor, reminder.id, t.clinicA)).includes(
-      t.ramesh,
-    ),
+    "and their normalised number",
+    marker.mobileNumbers.includes("919800000001"),
+    marker.mobileNumbers,
   );
   await startNextDay(t.tenantId);
   check(
     "and clears once the day turns over",
-    (await listPatientsSentTemplateToday(t.ownerActor, reminder.id, t.clinicA)).length === 0,
+    (await listSentTemplateToday(t.ownerActor, reminder.id, t.clinicA)).patientIds.length === 0,
   );
 
   console.log("\nA bad recipient never takes the batch down");
@@ -713,6 +760,34 @@ async function main(): Promise<void> {
     calls.map((call) => call.path),
   );
   notOnWhatsapp.delete("919800000001");
+
+  // The production duplicate: a long bulk request outlives the proxy timeout,
+  // the user presses Send again, and both requests work through the same list
+  // — possibly on different app instances. Only the database lock is shared.
+  console.log("\nOverlapping bulk sends never message anyone twice");
+  await startNextDay(t.tenantId);
+  calls.length = 0;
+  const overlap = { templateId: reminder.id, patientIds: [t.ramesh, t.priya] };
+  const [firstRun, secondRun] = await Promise.all([
+    sendToPatients(t.ownerActor, overlap),
+    sendToPatients(t.ownerActor, overlap),
+  ]);
+  check(
+    "each patient was sent by exactly one of the two requests",
+    firstRun.sent + secondRun.sent === 2 && firstRun.skipped + secondRun.skipped === 2,
+    [firstRun, secondRun],
+  );
+  check(
+    "the gateway saw one send per patient",
+    calls.filter((call) => call.path.endsWith("/send-message")).length === 2,
+    calls.map((call) => call.path),
+  );
+  check(
+    "no row is left in flight",
+    (await listMessagesForActor(t.ownerActor)).every(
+      (message) => message.status !== IN_FLIGHT_STATUS,
+    ),
+  );
 
   console.log("\nDevice status drives the warning on the Messages page");
   const { getDeviceStatus, checkNumber } = await import("@/lib/whatsapp");
@@ -871,6 +946,9 @@ main()
       await prisma.whatsappMessage.deleteMany({
         where: { clinic: { tenantId: id } },
       });
+      await prisma.tenantWhatsappSettings.deleteMany({ where: { tenantId: id } });
+      await prisma.whatsappDevice.deleteMany({ where: { tenantId: id } });
+      await prisma.whatsappProviderAccount.deleteMany({ where: { tenantId: id } });
       await prisma.registration.deleteMany({ where: { clinic: { tenantId: id } } });
       await prisma.patient.deleteMany({ where: { tenantId: id } });
       await prisma.doctor.deleteMany({ where: { clinic: { tenantId: id } } });

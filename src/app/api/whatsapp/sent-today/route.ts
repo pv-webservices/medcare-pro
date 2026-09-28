@@ -1,10 +1,11 @@
 import { BadRequestError, jsonOk, toErrorResponse } from "@/lib/apiHandler";
 import { requireActor } from "@/lib/session";
-import { listPatientsSentTemplateToday } from "@/lib/whatsappMessages";
+import { listSentTemplateToday } from "@/lib/whatsappMessages";
 import { MODULE_FEATURES, requireModule } from "@/lib/features";
 
-// "Already sent today" markers for the composer — which of a clinic's patients
-// have received this template today, so the front desk sees it before sending.
+// "Already sent today" markers for the composer — which of a clinic's patients,
+// and which mobile numbers, have received this template today, so the front
+// desk sees it before sending.
 //
 // Read-only and advisory: POST /api/whatsapp/send enforces the same rule
 // itself and skips those patients, so a stale marker can never cause a
@@ -22,9 +23,7 @@ export async function GET(request: Request) {
       throw new BadRequestError("A template and a clinic are required.");
     }
 
-    return jsonOk({
-      patientIds: await listPatientsSentTemplateToday(actor, templateId, clinicId),
-    });
+    return jsonOk(await listSentTemplateToday(actor, templateId, clinicId));
   } catch (error: unknown) {
     return toErrorResponse(error, "GET /api/whatsapp/sent-today");
   }

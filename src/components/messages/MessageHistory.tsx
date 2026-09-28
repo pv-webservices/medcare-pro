@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Info } from "lucide-react";
-import type { MessageRecord } from "@/lib/whatsappMessages";
+import { IN_FLIGHT_STATUS, type MessageRecord } from "@/lib/whatsappMessages";
 
 interface MessageHistoryProps {
   messages: readonly MessageRecord[];
@@ -124,6 +124,12 @@ export default function MessageHistory({
                     {message.status === "sent" ? (
                       <span className="inline-flex items-center rounded-xl bg-[#DCFCE7] px-3 py-1 text-label font-semibold text-[#15803D]">
                         Accepted
+                      </span>
+                    ) : message.status === IN_FLIGHT_STATUS ? (
+                      // Reserved before the gateway call; a row that stays here
+                      // was interrupted mid-send and may or may not have gone out.
+                      <span className="inline-flex items-center rounded-xl bg-warn-bg px-3 py-1 text-label font-semibold text-warn-ink">
+                        Sending
                       </span>
                     ) : (
                       <div className="space-y-1">
