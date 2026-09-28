@@ -13,12 +13,17 @@ import {
   Smile,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PatientMatch } from "@/lib/registrations";
 import { renderTemplate } from "@/lib/whatsappTemplateText";
 import type { TemplateRecord } from "@/lib/whatsappTemplates";
-import type { RecipientResult, SendMessageResult } from "@/lib/whatsappMessages";
+import type {
+  RecipientResult,
+  SendMessageResult,
+  SentToday,
+} from "@/lib/whatsappMessages";
+import { toWhatsappDigits } from "@/lib/whatsappNumber";
 import Button from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
 import Select from "@/components/ui/Select";
@@ -36,6 +41,69 @@ interface MessageComposerProps {
 const SEARCH_DEBOUNCE_MS = 300;
 /** Mirrors MAX_RECIPIENTS in @/lib/whatsappMessages, which enforces it. */
 const MAX_RECIPIENTS = 50;
+/**
+ * Patients per request. A whole batch in one request can run for minutes —
+ * a number check and a send per patient — and outlive the hosting proxy's
+ * timeout: the browser then reports a failure while the server carries on
+ * sending, and pressing Send again overlapped the two. Small requests finish
+ * well inside that limit and let the button show real progress.
+ */
+const SEND_CHUNK_SIZE = 5;
+
+const EMPTY_SENT_TODAY: SentToday = { patientIds: [], mobileNumbers: [] };
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+type PostSendResult =
+  | { ok: true; data: SendMessageResult }
+  | { ok: false; error: string };
+
+/** One request to the send route, for one chunk of the selection. */
+async function postSend(
+  templateId: string,
+  patients: readonly PatientMatch[],
+): Promise<PostSendResult> {
+  try {
+    const response = await fetch("/api/whatsapp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateId, patientIds: patients.map((entry) => entry.id) }),
+    });
+    const payload: { success?: boolean; error?: string; data?: SendMessageResult } =
+      await response.json().catch(() => ({}));
+
+    if (!response.ok || !payload.success || !payload.data) {
+      return { ok: false, error: payload.error ?? "Could not send. Try again." };
+    }
+    return { ok: true, data: payload.data };
+  } catch {
+    return {
+      ok: false,
+      error: "Could not reach the server. Check your connection and try again.",
+    };
+  }
+}
+
+/** Folds each request's result into one outcome for the whole send. */
+function mergeOutcomes(
+  total: SendMessageResult | null,
+  next: SendMessageResult,
+): SendMessageResult {
+  if (!total) return next;
+  return {
+    templateName: next.templateName,
+    sent: total.sent + next.sent,
+    failed: total.failed + next.failed,
+    skipped: total.skipped + next.skipped,
+    results: [...total.results, ...next.results],
+  };
+}
 
 export default function MessageComposer({
   templates,
@@ -55,8 +123,12 @@ export default function MessageComposer({
   const [isSending, setIsSending] = useState(false);
   const [outcome, setOutcome] = useState<SendMessageResult | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [sentTodayIds, setSentTodayIds] = useState<ReadonlySet<string>>(new Set());
+  const [sentToday, setSentToday] = useState<SentToday>(EMPTY_SENT_TODAY);
   const [sentTodayVersion, setSentTodayVersion] = useState(0);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  // State updates land a render late, so a fast double-click could start two
+  // sends before `isSending` disabled the button. The ref flips immediately.
+  const isSendingRef = useRef(false);
 
   const [todayStr] = useState(() => todayDateOnly());
   const [yesterdayStr] = useState(() =>
@@ -104,13 +176,13 @@ export default function MessageComposer({
         const response = await fetch(
           `/api/whatsapp/sent-today?clinicId=${encodeURIComponent(clinicId)}&templateId=${encodeURIComponent(templateId)}`,
         );
-        const payload: { success?: boolean; data?: { patientIds?: string[] } } =
+        const payload: { success?: boolean; data?: SentToday } =
           await response.json().catch(() => ({}));
         if (isCurrent) {
-          setSentTodayIds(new Set(payload.success ? (payload.data?.patientIds ?? []) : []));
+          setSentToday(payload.success && payload.data ? payload.data : EMPTY_SENT_TODAY);
         }
       } catch {
-        if (isCurrent) setSentTodayIds(new Set());
+        if (isCurrent) setSentToday(EMPTY_SENT_TODAY);
       }
     })();
 
@@ -119,11 +191,28 @@ export default function MessageComposer({
     };
   }, [clinicId, templateId, sentTodayVersion]);
 
+  const sentTodayPatientIds = new Set(sentToday.patientIds);
+  const sentTodayNumbers = new Set(sentToday.mobileNumbers);
+  // A record counts as reached when it, or any record sharing its phone, got
+  // the template today — the phone is what receives the message.
+  const isSentToday = (patient: PatientMatch) =>
+    sentTodayPatientIds.has(patient.id) ||
+    sentTodayNumbers.has(toWhatsappDigits(patient.mobileNumber));
+  const sentTodayIds = new Set(
+    [...matches, ...recipients].filter(isSentToday).map((patient) => patient.id),
+  );
+
   const selectedIds = new Set(recipients.map((entry) => entry.id));
-  const selectedSentToday = recipients.filter((entry) => sentTodayIds.has(entry.id));
+  const selectedByNumber = new Map(
+    recipients.map((entry) => [toWhatsappDigits(entry.mobileNumber), entry]),
+  );
+  const selectedSentToday = recipients.filter(isSentToday);
 
   function alreadySentMessage(patient: PatientMatch): string {
-    return `${patient.name} (${patient.patientCode}) has already been sent "${template?.name ?? "this template"}" today. The same template can be sent to a patient once a day.`;
+    const templateName = template?.name ?? "this template";
+    return sentTodayPatientIds.has(patient.id)
+      ? `${patient.name} (${patient.patientCode}) has already been sent "${templateName}" today. The same template can be sent to a patient once a day.`
+      : `${patient.mobileNumber} has already been sent "${templateName}" today through another patient record with the same number, so ${patient.name} (${patient.patientCode}) would receive it twice.`;
   }
 
   function toggleRecipient(patient: PatientMatch) {
@@ -134,8 +223,15 @@ export default function MessageComposer({
       setRecipients((current) => current.filter((entry) => entry.id !== patient.id));
       return;
     }
-    if (sentTodayIds.has(patient.id)) {
+    if (isSentToday(patient)) {
       setNotice(alreadySentMessage(patient));
+      return;
+    }
+    const sameNumber = selectedByNumber.get(toWhatsappDigits(patient.mobileNumber));
+    if (sameNumber) {
+      setNotice(
+        `${patient.name} (${patient.patientCode}) has the same mobile number as ${sameNumber.name} (${sameNumber.patientCode}), who is already selected. One message per number, so that phone does not receive it twice.`,
+      );
       return;
     }
     if (recipients.length >= MAX_RECIPIENTS) {
@@ -151,17 +247,34 @@ export default function MessageComposer({
 
   function selectAvailable() {
     setOutcome(null);
-    const eligible = matches.filter(
-      (patient) => !selectedIds.has(patient.id) && !sentTodayIds.has(patient.id),
-    );
     const room = MAX_RECIPIENTS - recipients.length;
-    const added = eligible.slice(0, room);
-    const skippedSent = matches.filter(
-      (patient) => !selectedIds.has(patient.id) && sentTodayIds.has(patient.id),
-    ).length;
+    const numbers = new Set(selectedByNumber.keys());
+    const added: PatientMatch[] = [];
+    let leftOver = 0;
+    let skippedSent = 0;
+    let skippedSameNumber = 0;
+
+    for (const patient of matches) {
+      if (selectedIds.has(patient.id)) continue;
+      if (isSentToday(patient)) {
+        skippedSent += 1;
+        continue;
+      }
+      const number = toWhatsappDigits(patient.mobileNumber);
+      if (numbers.has(number)) {
+        skippedSameNumber += 1;
+        continue;
+      }
+      if (added.length >= room) {
+        leftOver += 1;
+        continue;
+      }
+      numbers.add(number);
+      added.push(patient);
+    }
 
     const parts: string[] = [];
-    if (eligible.length > room) {
+    if (leftOver > 0) {
       parts.push(
         `Selected ${added.length} — a send is limited to ${MAX_RECIPIENTS} patients. Send this batch, then select the rest.`,
       );
@@ -169,6 +282,11 @@ export default function MessageComposer({
     if (skippedSent > 0) {
       parts.push(
         `${skippedSent} ${skippedSent === 1 ? "patient was" : "patients were"} left out because they already received this template today.`,
+      );
+    }
+    if (skippedSameNumber > 0) {
+      parts.push(
+        `${skippedSameNumber} ${skippedSameNumber === 1 ? "record was" : "records were"} left out because the mobile number is shared with a patient already selected.`,
       );
     }
     setNotice(parts.length > 0 ? parts.join(" ") : null);
@@ -193,37 +311,44 @@ export default function MessageComposer({
   }
 
   async function handleSend() {
-    if (!template || recipients.length === 0) return;
+    if (!template || recipients.length === 0 || isSendingRef.current) return;
+    isSendingRef.current = true;
+
+    const batch = recipients;
+    let total: SendMessageResult | null = null;
+    let done = 0;
 
     setError(null);
     setOutcome(null);
+    setNotice(null);
     setIsSending(true);
+    setProgress({ done: 0, total: batch.length });
     try {
-      const response = await fetch("/api/whatsapp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateId: template.id,
-          patientIds: recipients.map((entry) => entry.id),
-        }),
-      });
-      const payload: { success?: boolean; error?: string; data?: SendMessageResult } =
-        await response.json().catch(() => ({}));
+      for (const group of chunk(batch, SEND_CHUNK_SIZE)) {
+        const result = await postSend(template.id, group);
 
-      if (!response.ok || !payload.success || !payload.data) {
-        setError(payload.error ?? "Could not send. Try again.");
-        return;
+        if (!result.ok) {
+          setError(
+            done === 0
+              ? result.error
+              : `Sending stopped after ${done} of ${batch.length} patients: ${result.error} The rest are still selected — press Send to continue. Anyone who already received it is skipped automatically.`,
+          );
+          break;
+        }
+
+        total = mergeOutcomes(total, result.data);
+        done += group.length;
+        const finished = new Set(group.map((entry) => entry.id));
+        setRecipients((current) => current.filter((entry) => !finished.has(entry.id)));
+        setProgress({ done, total: batch.length });
+        setOutcome(total);
       }
-
-      setOutcome(payload.data);
-      setNotice(null);
-      setRecipients([]);
+    } finally {
+      isSendingRef.current = false;
+      setIsSending(false);
+      setProgress(null);
       setSentTodayVersion((version) => version + 1);
       router.refresh();
-    } catch {
-      setError("Could not reach the server. Check your connection and try again.");
-    } finally {
-      setIsSending(false);
     }
   }
 
@@ -487,7 +612,11 @@ export default function MessageComposer({
               disabled={!template || recipients.length === 0 || isSending || !isConfigured}
               variant="primary"
               isBusy={isSending}
-              busyLabel={`Sending to ${recipients.length}…`}
+              busyLabel={
+                progress
+                  ? `Sending… ${progress.done} of ${progress.total} done`
+                  : "Sending…"
+              }
               className="rounded-xl px-5 py-2.5 font-semibold text-body shadow-cta"
             >
               <Send className="h-4 w-4 mr-2" />

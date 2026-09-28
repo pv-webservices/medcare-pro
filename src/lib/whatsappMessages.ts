@@ -33,6 +33,8 @@ import {
   buildDocumentContentUrl,
 } from "@/lib/mediaSecurity";
 import { MediaConfigurationError } from "@/lib/mediaTypes";
+import { toWhatsappDigits } from "@/lib/whatsappNumber";
+import type { Prisma } from "@prisma/client";
 import {
   assertCanSendSomewhere,
   getTemplateForActor,
@@ -69,6 +71,9 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 /** Enough to be polite to the gateway without making a bulk send feel stuck. */
 const DELAY_BETWEEN_SENDS_MS = 350;
 
+/** A claim is two statements; this only bounds waiting behind other claims. */
+const CLAIM_WAIT_MS = 10_000;
+
 /** One request should not hold a connection open for an unbounded batch. */
 export const MAX_RECIPIENTS = 50;
 
@@ -89,8 +94,22 @@ export const sendMessageSchema = z.object({
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 
 /**
+ * Written to `whatsapp_messages.status` BEFORE the gateway is called, and
+ * replaced by `sent` or `failed` once it answers. It is what an overlapping
+ * send — a retry after a timed-out request, a second tab, the other app
+ * instance — sees, so it cannot message the same person again meanwhile.
+ *
+ * A row left `sending` (the process died mid-call) may or may not have gone
+ * out, so it keeps blocking the template for that day, like `sent`.
+ */
+export const IN_FLIGHT_STATUS = "sending";
+
+/** Statuses that mean "this template already reached (or is reaching) them". */
+const BLOCKING_STATUSES = ["sent", IN_FLIGHT_STATUS];
+
+/**
  * `skipped` is a per-send outcome only — never written to `whatsapp_messages`,
- * because nothing was attempted. See `patientIdsSentTemplateToday`.
+ * because nothing was attempted. See `claimRecipient`.
  */
 export type RecipientStatus = MessageStatus | "skipped";
 
@@ -112,6 +131,8 @@ export interface SendMessageResult {
 }
 
 export const ALREADY_SENT_TODAY_REASON = "Already sent this template today.";
+export const SAME_NUMBER_SENT_TODAY_REASON =
+  "This mobile number already received this template today (it is shared with another patient record).";
 
 export interface MessageRecord {
   id: string;
@@ -144,17 +165,8 @@ interface Recipient {
   values: TemplateValues;
 }
 
-function toDigits(mobileNumber: string): string {
-  // The gateway wants digits only, e.g. 919812345678. Anything the front desk
-  // typed for readability — spaces, +, hyphens, brackets — is stripped.
-  const digits = mobileNumber.replace(/\D/g, "");
-  
-  if (digits.length === 10) {
-    return `91${digits}`;
-  }
-  
-  return digits;
-}
+/** The gateway wants digits only, e.g. 919812345678. */
+const toDigits = toWhatsappDigits;
 
 async function loadRecipients(
   actor: ActorContext,
@@ -246,58 +258,124 @@ export function todaySendWindow(now: Date = new Date()): { start: Date; end: Dat
 interface SentTodayScope {
   clinic: { tenantId: string };
   clinicId?: string;
-  patientId?: { in: string[] };
+}
+
+/** Who this template has already reached today — by record and by phone. */
+export interface SentToday {
+  patientIds: string[];
+  /** Normalised with `toWhatsappDigits`. */
+  mobileNumbers: string[];
 }
 
 /**
- * Patients who already received this template today — one template reaches a
- * patient at most once per day.
+ * Who already received this template today — one template reaches a person at
+ * most once per day.
  *
- * Only `sent` rows count: a failed attempt never reached the patient, so the
- * front desk must be free to retry it. Matched on the denormalised template
- * name because that is what the history row carries; names are unique per
- * account (`@@unique([tenantId, name])`).
+ * Matched by patient AND by normalised mobile number: `patients.mobile_number`
+ * is not unique, so the same person registered twice (or a family sharing a
+ * phone) is several records behind one WhatsApp chat, and a bulk "select all"
+ * picks every one of them.
+ *
+ * `sent` and `sending` rows count; a `failed` attempt never reached the
+ * patient, so the front desk must be free to retry it. Matched on the
+ * denormalised template name because that is what the history row carries;
+ * names are unique per account (`@@unique([tenantId, name])`).
  *
  * CALLERS OWN SCOPING. `scope` must already pin the rows to the actor's tenant
  * and reach — this only adds the template and the day.
  */
-async function patientIdsSentTemplateToday(
+async function sentTemplateToday(
+  client: Prisma.TransactionClient,
   templateName: string,
   scope: SentTodayScope,
   now: Date = new Date(),
-): Promise<Set<string>> {
+): Promise<SentToday> {
   const { start, end } = todaySendWindow(now);
-  const rows = await prisma.whatsappMessage.findMany({
+  const rows = await client.whatsappMessage.findMany({
     where: {
       ...scope,
       templateName,
-      status: "sent",
+      status: { in: BLOCKING_STATUSES },
       sentAt: { gte: start, lt: end },
     },
-    distinct: ["patientId"],
-    select: { patientId: true },
+    select: { patientId: true, patient: { select: { mobileNumber: true } } },
   });
 
-  return new Set(rows.map((row) => row.patientId));
+  return {
+    patientIds: [...new Set(rows.map((row) => row.patientId))],
+    mobileNumbers: [
+      ...new Set(rows.map((row) => toWhatsappDigits(row.patient.mobileNumber))),
+    ],
+  };
 }
 
 /**
- * The composer's "already sent today" markers: which of a clinic's patients
- * have received this template today. Requires `message:send` in that clinic.
+ * The composer's "already sent today" markers for one clinic. Requires
+ * `message:send` in that clinic. Advisory only — `claimRecipient` is the
+ * guard, and it also sees the account's other clinics.
  */
-export async function listPatientsSentTemplateToday(
+export async function listSentTemplateToday(
   actor: ActorContext,
   templateId: string,
   clinicId: string,
-): Promise<string[]> {
+): Promise<SentToday> {
   await requirePermission(actor, "message:send", clinicId);
   const template = await getTemplateForActor(actor, templateId);
-  const sent = await patientIdsSentTemplateToday(template.name, {
+
+  return sentTemplateToday(prisma, template.name, {
     clinic: { tenantId: actor.tenantId },
     clinicId,
   });
+}
 
-  return [...sent];
+type Claim =
+  | { kind: "claimed"; messageId: string }
+  | { kind: "duplicate"; reason: string };
+
+/**
+ * Reserves one recipient for this template today, or says why it may not be
+ * sent — the guard against duplicate messages.
+ *
+ * The check and the `sending` row it writes happen under a lock on the
+ * account's tenant row, so no two requests can both pass the check for the
+ * same person. That matters because a bulk send is one long request: it can
+ * outlive the hosting proxy's timeout, the user then retries while the first
+ * request is still working through the list on the server, and production
+ * runs more than one app instance — an in-memory lock would see only half of
+ * that. The lock is held for two statements, never across the gateway call.
+ */
+async function claimRecipient(
+  tenantId: string,
+  templateName: string,
+  recipient: Pick<Recipient, "id" | "clinicId" | "mobileNumber">,
+): Promise<Claim> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${tenantId} FOR UPDATE`;
+
+      const sent = await sentTemplateToday(tx, templateName, {
+        clinic: { tenantId },
+      });
+      if (sent.patientIds.includes(recipient.id)) {
+        return { kind: "duplicate", reason: ALREADY_SENT_TODAY_REASON } as const;
+      }
+      if (sent.mobileNumbers.includes(toWhatsappDigits(recipient.mobileNumber))) {
+        return { kind: "duplicate", reason: SAME_NUMBER_SENT_TODAY_REASON } as const;
+      }
+
+      const row = await tx.whatsappMessage.create({
+        data: {
+          clinicId: recipient.clinicId,
+          patientId: recipient.id,
+          templateName,
+          status: IN_FLIGHT_STATUS,
+        },
+        select: { id: true },
+      });
+      return { kind: "claimed", messageId: row.id } as const;
+    },
+    { maxWait: CLAIM_WAIT_MS, timeout: CLAIM_WAIT_MS },
+  );
 }
 
 /**
@@ -324,6 +402,11 @@ export interface DeliveryTarget {
   clinicId: string;
   mobileNumber: string;
   values: TemplateValues;
+  /**
+   * The `sending` row `claimRecipient` reserved. When set, the outcome is
+   * written onto that row instead of a new one, so one attempt stays one row.
+   */
+  claimedMessageId?: string;
 }
 
 export interface DeliveryOutcome {
@@ -465,21 +548,32 @@ export async function deliverTemplate(
   const status: MessageStatus = outcome.ok ? "sent" : "failed";
 
   try {
-    await prisma.whatsappMessage.create({
-      data: {
-        clinicId: target.clinicId,
-        patientId: target.patientId,
-        mediaAssetId: usedMediaAssetId,
-        whatsappDeviceId: config?.deviceId ?? null,
-        senderNumber: config?.sender ?? null,
-        // Denormalised copy — see the schema note. History must survive the
-        // template being renamed or deleted.
-        templateName: template.name,
-        status,
-        providerMessageId: outcome.providerMessageId,
-        failureReason: outcome.ok ? null : outcome.message,
-      },
-    });
+    const result = {
+      mediaAssetId: usedMediaAssetId,
+      whatsappDeviceId: config?.deviceId ?? null,
+      senderNumber: config?.sender ?? null,
+      status,
+      providerMessageId: outcome.providerMessageId,
+      failureReason: outcome.ok ? null : outcome.message,
+    };
+
+    if (target.claimedMessageId) {
+      await prisma.whatsappMessage.update({
+        where: { id: target.claimedMessageId },
+        data: result,
+      });
+    } else {
+      await prisma.whatsappMessage.create({
+        data: {
+          ...result,
+          clinicId: target.clinicId,
+          patientId: target.patientId,
+          // Denormalised copy — see the schema note. History must survive the
+          // template being renamed or deleted.
+          templateName: template.name,
+        },
+      });
+    }
 
     if (usedMediaAssetId && outcome.ok) {
       await prisma.mediaAsset
@@ -496,6 +590,64 @@ export async function deliverTemplate(
   }
 
   return { status, failureReason: outcome.ok ? null : outcome.message };
+}
+
+/**
+ * Claims, then delivers, one recipient of a bulk send.
+ *
+ * The claim is taken immediately before the gateway call — not once for the
+ * whole batch up front — because a batch can run for minutes and an
+ * overlapping request may reach the same person in the meantime.
+ */
+async function sendOne(
+  actor: ActorContext,
+  template: TemplateRecord,
+  recipient: Recipient,
+  hasSentBefore: boolean,
+): Promise<{ status: RecipientStatus; failureReason: string | null }> {
+  let claim: Claim;
+  try {
+    claim = await claimRecipient(actor.tenantId, template.name, recipient);
+  } catch (claimError: unknown) {
+    // Fail closed: without a claim there is no proof this is not a duplicate.
+    console.error(`Could not reserve WhatsApp send for recipient ${recipient.id}`, claimError);
+    return {
+      status: "failed",
+      failureReason: "Could not start this send. Try again in a moment.",
+    };
+  }
+
+  if (claim.kind === "duplicate") {
+    return { status: "skipped", failureReason: claim.reason };
+  }
+
+  if (hasSentBefore) {
+    await wait(DELAY_BETWEEN_SENDS_MS);
+  }
+
+  try {
+    return await deliverTemplate(template, {
+      patientId: recipient.id,
+      tenantId: actor.tenantId,
+      clinicId: recipient.clinicId,
+      mobileNumber: recipient.mobileNumber,
+      values: recipient.values,
+      claimedMessageId: claim.messageId,
+    });
+  } catch (deliverError: unknown) {
+    console.error(`Failed delivering template to recipient ${recipient.id}`, deliverError);
+    const failureReason = "Failed to deliver message to this recipient.";
+    // deliverTemplate only throws before the gateway call — its sends and row
+    // write catch their own errors — so nothing went out: release the claim
+    // as `failed`, which lets the front desk retry.
+    await prisma.whatsappMessage
+      .update({
+        where: { id: claim.messageId },
+        data: { status: "failed", failureReason },
+      })
+      .catch(() => {});
+    return { status: "failed", failureReason };
+  }
 }
 
 /**
@@ -523,46 +675,23 @@ export async function sendToPatients(
     throw new BadRequestError("None of those patients are available to you.");
   }
 
-  // Enforced here, not only in the composer: its markers can be stale (a second
-  // tab, a colleague sending the same list), and a duplicate reminder is the
-  // kind of noise that gets a sending number reported.
-  const alreadySent = await patientIdsSentTemplateToday(template.name, {
-    clinic: { tenantId: actor.tenantId },
-    patientId: { in: recipients.map((recipient) => recipient.id) },
-  });
+  // The order the front desk picked them in, so when two selected records share
+  // a phone it is the first of them that gets the message.
+  const order = new Map(input.patientIds.map((id, index) => [id, index]));
+  const ordered = [...recipients].sort(
+    (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
+  );
 
-  const results: RecipientResult[] = recipients
-    .filter((recipient) => alreadySent.has(recipient.id))
-    .map((recipient) => ({
-      patientId: recipient.id,
-      patientName: recipient.name,
-      patientCode: recipient.patientCode,
-      status: "skipped",
-      failureReason: ALREADY_SENT_TODAY_REASON,
-    }));
-  const toSend = recipients.filter((recipient) => !alreadySent.has(recipient.id));
+  const results: RecipientResult[] = [];
+  let hasSentBefore = false;
 
-  for (const [index, recipient] of toSend.entries()) {
+  for (const recipient of ordered) {
     // Re-checked per recipient rather than once for the batch: the ids come
     // from the client, and a patient's clinic is what decides the permission.
     await assertClinicInTenant(actor.tenantId, recipient.clinicId);
 
-    let outcome: DeliveryOutcome;
-    try {
-      outcome = await deliverTemplate(template, {
-        patientId: recipient.id,
-        tenantId: actor.tenantId,
-        clinicId: recipient.clinicId,
-        mobileNumber: recipient.mobileNumber,
-        values: recipient.values,
-      });
-    } catch (deliverError: unknown) {
-      console.error(`Failed delivering template to recipient ${recipient.id}`, deliverError);
-      outcome = {
-        status: "failed",
-        failureReason: "Failed to deliver message to this recipient.",
-      };
-    }
+    const outcome = await sendOne(actor, template, recipient, hasSentBefore);
+    if (outcome.status !== "skipped") hasSentBefore = true;
 
     results.push({
       patientId: recipient.id,
@@ -571,10 +700,6 @@ export async function sendToPatients(
       status: outcome.status,
       failureReason: outcome.failureReason,
     });
-
-    if (index < toSend.length - 1) {
-      await wait(DELAY_BETWEEN_SENDS_MS);
-    }
   }
 
   const count = (status: RecipientStatus) =>
