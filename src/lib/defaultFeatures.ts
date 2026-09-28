@@ -37,6 +37,7 @@ export interface DefaultFeatureDefinition {
  * governs.
  */
 export const DEFAULT_FEATURES: readonly DefaultFeatureDefinition[] = [
+  { key: "billing", name: "Patient billing", description: "Itemised visit invoices, manual payments and dues.", tier: "CORE", globalEnabled: true, inDefaultPlan: true },
   { key: "clinical_ai", name: "Clinical AI", description: "Clinician-controlled documentation language assistance.", tier: "PREMIUM", globalEnabled: false, inDefaultPlan: false },
   { key: "patient_portal", name: "Patient portal", description: "Secure self-service access to personal visits, appointments and issued prescriptions.", tier: "CORE", globalEnabled: true, inDefaultPlan: true },
   {

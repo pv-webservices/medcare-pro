@@ -41,6 +41,7 @@ export type AuditCategory =
   | "entitlements"
   | "appointments"
   | "tasks"
+  | "billing"
   | "prescriptions"
   | "dashboard"
   | "platform";
@@ -63,6 +64,17 @@ export interface AuditDescription {
 export const AUDIT_DESCRIPTIONS: Readonly<
   Record<AuditAction, AuditDescription>
 > = {
+  [AUDIT_ACTIONS.SERVICE_ITEM_CREATED]: {"label":"Service item created","detail":"A service was added to the billing price list.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.SERVICE_ITEM_UPDATED]: {"label":"Service item updated","detail":"A service price or availability was updated.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.BILLING_SETTINGS_UPDATED]: {"label":"Billing settings updated","detail":"Clinic billing settings were saved.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.INVOICE_DRAFT_CREATED]: {"label":"Bill draft created","detail":"A draft bill was prepared for a visit.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.INVOICE_DRAFT_UPDATED]: {"label":"Bill draft saved","detail":"An explicit save updated a draft bill.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.INVOICE_DRAFT_DISCARDED]: {"label":"Bill draft discarded","detail":"An unissued draft was discarded.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.INVOICE_ISSUED]: {"label":"Bill issued","detail":"A visit bill was issued and its snapshot frozen.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.INVOICE_CANCELLED]: {"label":"Bill cancelled","detail":"An issued bill was cancelled and retained.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.INVOICE_REPLACEMENT_CREATED]: {"label":"Replacement bill created","detail":"A new draft was prepared for a cancelled bill.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.PAYMENT_RECORDED]: {"label":"Payment recorded","detail":"A manual payment was recorded against an issued bill.","side":"tenant","category":"billing"},
+  [AUDIT_ACTIONS.PAYMENT_VOIDED]: {"label":"Payment voided","detail":"A mistaken payment was voided and retained.","side":"tenant","category":"billing"},
   [AUDIT_ACTIONS.PATIENT_PORTAL_ACTIVATION_CREATED]: { label: "Patient portal activation created", detail: "Authorized staff confirmed identity and created a short-lived patient activation.", side: "tenant", category: "access" },
   [AUDIT_ACTIONS.PATIENT_PORTAL_ACTIVATION_RESENT]: { label: "Patient portal activation resent", detail: "A new identity-verified activation replaced the previous link.", side: "tenant", category: "access" },
   [AUDIT_ACTIONS.PATIENT_PORTAL_ACCESS_REVOKED]: { label: "Patient portal access revoked", detail: "Patient access and current portal sessions were revoked immediately.", side: "tenant", category: "access" },
@@ -663,6 +675,7 @@ export const AUDIT_CATEGORIES: readonly {
   { key: "appointments", label: "Appointments" },
   { key: "tasks", label: "Tasks" },
   { key: "prescriptions", label: "Prescriptions" },
+  { key: "billing", label: "Billing" },
   { key: "dashboard", label: "Dashboard" },
   { key: "platform", label: "Platform" },
 ];

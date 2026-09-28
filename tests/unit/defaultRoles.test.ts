@@ -35,6 +35,7 @@ describe("DEFAULT_ROLES", () => {
       "dashboard:tasks:view",
       "task:view",
       "task:complete",
+      "invoice:read",
     ]);
   });
 

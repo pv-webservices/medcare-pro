@@ -70,6 +70,7 @@ not a hardcoded enum the UI locks to.
 - Role creation and assignment (Owner/Admin/Staff seed roles, extensible)
 - Admin settings: theme customization, logo upload
 - WhatsApp messaging via a third-party BSP (provider integration TBD)
+- Patient billing: service price list, itemised invoices, optional GST, manual payments with part-payment and dues, printable invoices, collections report (§6.11).
 
 ### Out of Scope (MVP) — Future Roadmap
 - IVR / after-hours smart receptionist (deprioritized, revisit post-MVP)
@@ -142,6 +143,10 @@ accepts or dismisses. Detailed specs live in `docs/clinical-ai-*.md`.
 - **FR-10.4 (AI-4 v1, built — off by default via `CLINICAL_RECONCILIATION_ENABLED`)**: Deterministic comparison of the unsaved prescription draft with accepted AI-3 facts (medications, allergy names, follow-up); discrepancies only, no automatic prescription change and no new tables — `docs/clinical-ai-prescription-reconciliation-prd.md`.
 - **FR-10.5 (AI-5 v1, built — off by default)**: Deterministic, versioned pre-issue prescription checks with optional AI candidate warnings; requires jurisdiction-specific legal/medical validation before any compliance claim. **v1 built — off by default via `PRESCRIPTION_CHECKS_ENABLED`**: non-blocking internal-consistency warnings (two tiers; Review-required needs one acknowledgement), no compliance claim — `docs/clinical-ai-preissue-checks-prd.md`.
 
+### 6.11 Patient Billing
+
+Itemised billing per Registration/visit: clinic billing settings and service price lists (FR-11.1–FR-11.6); drafts, sequential financial-year numbers and immutable issue snapshots (FR-11.7–FR-11.15); manual part-payments and dues (FR-11.16–FR-11.18); cancellation and replacement (FR-11.19–FR-11.20); invoice listing, print, collections reports and notifications (FR-11.21–FR-11.24). See [Patient Billing PRD](patient-billing-prd.md) for the complete specification. PB-1 provides the foundation; later stages implement the workflows.
+
 ---
 
 ## 7. Data Model
@@ -166,6 +171,12 @@ accepts or dismisses. Detailed specs live in `docs/clinical-ai-*.md`.
 | `clinical_fact_candidates` | `id`, `tenant_id`, `clinic_id`, `extraction_run_id`, `category`, `assertion`, `subject`, `statement`, `attributes` | **Built (AI-3 v1).** Immutable by trigger |
 | `clinical_fact_evidence` | `id`, `fact_id`, `segment_id`, `correction_id`, `quote`, `char_start`, `char_end` | **Built (AI-3 v1).** Immutable by trigger |
 | `clinical_fact_reviews` | `id`, `tenant_id`, `fact_id`, `decision`, `reviewed_by_user_id`, `reviewed_at` | **Built (AI-3 v1).** Append-only by trigger |
+| `clinic_billing_settings` | `id`, `tenant_id`, `clinic_id`, GSTIN, prefix, discount limit, footer | PB-1 foundation (pending merge) |
+| `service_items` | `id`, `tenant_id`, `clinic_id`, name, category, price, tax rate, SAC, active | PB-1 foundation (pending merge) |
+| `invoices` | ownership, active key, number, FY, lifecycle, totals, snapshot, replacement | PB-1 foundation (pending merge) |
+| `invoice_lines` | invoice, position, service reference, quantities, prices, discount, tax | PB-1 foundation (pending merge) |
+| `invoice_payments` | tenant, clinic, invoice, amount, mode, received instant, void metadata | PB-1 foundation (pending merge) |
+| `invoice_number_sequences` | clinic, financial year, last number | PB-1 foundation (pending merge) |
 
 **Isolation model**: every clinic-scoped table carries `clinic_id`; every account-scoped
 table carries `account_id`. Row-level scoping is enforced in the application layer
@@ -193,6 +204,9 @@ user's role is clinic-scoped) — this is a deliberate reversal of the old
 - **Compliance**: WhatsApp sends only use provider-approved templates.
 
 ## 10. Assumptions & Dependencies
+
+- GST treatment is configured by each clinic with its CA; the application performs arithmetic only and makes no compliance claim.
+- Registrations.amount mirrors the live invoice total once billed (D8).
 
 - **WhatsApp BSP provider is not yet named.** The PRD assumes a generic BSP with a template-send endpoint and delivery-status webhook — confirm the actual provider (e.g. Interakt, Gupshup, AiSensy, Wati) before building `lib/whatsapp.ts`, since auth method and payload shape differ per provider.
 - **Email verification requires a transactional email service** (e.g. Resend, SendGrid) — not yet selected; needed before Stage 1 (signup) can be finished end-to-end.

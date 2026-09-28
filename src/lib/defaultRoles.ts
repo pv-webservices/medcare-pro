@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   ALL_PERMISSIONS,
+  BILLING_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
   CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
@@ -111,6 +112,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "dashboard:tasks:view",
       "task:view",
       "task:complete",
+      "invoice:read",
     ],
   },
   // --- Stage 1 additions ---------------------------------------------------
@@ -152,6 +154,7 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "task:view",
       "task:create",
       "task:complete",
+      "invoice:read",
     ],
   },
   {
@@ -196,6 +199,9 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "task:view",
       "task:create",
       "task:complete",
+      "invoice:read",
+      "invoice:create",
+      "payment:record",
     ],
   },
 ];
@@ -213,6 +219,7 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
     (permission) =>
       !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
+      !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(
         permission as (typeof TASK_PERMISSIONS)[number],
@@ -310,6 +317,7 @@ export const PRE_TASK_ROLE_PERMISSIONS: Readonly<
     (permission) =>
       !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
+      !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       permission !== "dashboard:tasks:view" &&
       !DASHBOARD_LAYOUT_PERMISSIONS.includes(
@@ -494,6 +502,7 @@ export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
     (permission) =>
       !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
+      !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
   ),
@@ -503,6 +512,7 @@ export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
     (permission) =>
       !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
+      !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission),
   ).map((permission) =>
     permission === "appointment:self:read" ? "appointment:read" : permission,
