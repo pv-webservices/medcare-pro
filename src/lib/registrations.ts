@@ -52,25 +52,17 @@ import {
  */
 
 /**
- * Whether this visit is the patient's first here or a return.
- *
- * A String column rather than an enum (see prisma/schema.prisma): a clinic that
- * wants a third type later should not need a migration to get one.
+ * Whether this visit is the patient's first here or a return. Defined in
+ * @/lib/visitTypes so client components can import it without this module's
+ * server-only dependencies; re-exported for existing server callers.
  */
-export const VISIT_TYPES = ["NEW", "FOLLOW_UP"] as const;
-export type VisitType = (typeof VISIT_TYPES)[number];
-
-export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
-  NEW: "New patient",
-  FOLLOW_UP: "Follow-up",
-};
-
-/** Anything unrecognised reads as a new visit rather than breaking the page. */
-export function toVisitType(value: string): VisitType {
-  return (VISIT_TYPES as readonly string[]).includes(value)
-    ? (value as VisitType)
-    : "NEW";
-}
+import {
+  VISIT_TYPES,
+  VISIT_TYPE_LABELS,
+  toVisitType,
+  type VisitType,
+} from "@/lib/visitTypes";
+export { VISIT_TYPES, VISIT_TYPE_LABELS, toVisitType, type VisitType };
 
 /** One screen of results. Not in the PRD; a list with no ceiling is a problem. */
 const PAGE_SIZE = 25;
