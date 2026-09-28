@@ -106,9 +106,9 @@ describe("billing catalogue and role migration", () => {
       "invoice:read": undefined,
       "billing:settings:manage": undefined,
       "invoice:create": undefined,
-      "payment:record": "stage",
+      "payment:record": undefined,
       "invoice:discount:override": undefined,
-      "invoice:cancel": "stage",
+      "invoice:cancel": undefined,
     } as const;
     for (const [key, pending] of Object.entries(expectedPending)) {
       expect(findPermission(key)).toBeDefined();

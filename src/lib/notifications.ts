@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { formatRupees } from "@/lib/money";
 import {
   accessibleClinicScope,
   PermissionError,
@@ -338,6 +339,66 @@ export async function notifyRegistrationUpdated(
 }
 
 // ---------------------------------------------------------------------------
+// Billing — PB-4 (FR-11.24)
+// ---------------------------------------------------------------------------
+
+/**
+ * What every billing notification names: the invoice number and an amount.
+ *
+ * Never the patient. The bill itself sits behind `invoice:read`; the feed is
+ * read account-wide by Admins. Issue and payment events are audited only.
+ */
+export interface InvoiceEventInput {
+  invoiceId: string;
+  clinicId: string;
+  clinicName: string;
+  invoiceNumber: string;
+  /** 2-decimal string: the bill total, or the voided payment's amount. */
+  amount: string;
+}
+
+export async function notifyInvoiceCancelled(
+  actor: ActorContext,
+  invoice: InvoiceEventInput,
+): Promise<void> {
+  await recordNotification({
+    tenantId: actor.tenantId,
+    clinicId: invoice.clinicId,
+    type: "invoice.cancelled",
+    message: `Bill ${invoice.invoiceNumber} (${formatRupees(invoice.amount)}) at ${invoice.clinicName} was cancelled by ${await actorName(actor)}.`,
+    relatedRecordId: invoice.invoiceId,
+  });
+}
+
+export async function notifyPaymentVoided(
+  actor: ActorContext,
+  invoice: InvoiceEventInput,
+): Promise<void> {
+  await recordNotification({
+    tenantId: actor.tenantId,
+    clinicId: invoice.clinicId,
+    type: "payment.voided",
+    message: `A ${formatRupees(invoice.amount)} payment on bill ${invoice.invoiceNumber} at ${invoice.clinicName} was voided by ${await actorName(actor)}.`,
+    relatedRecordId: invoice.invoiceId,
+  });
+}
+
+export async function notifyInvoiceDiscountOverride(
+  actor: ActorContext,
+  invoice: InvoiceEventInput & { discount: string },
+): Promise<void> {
+  await recordNotification({
+    tenantId: actor.tenantId,
+    clinicId: invoice.clinicId,
+    type: "invoice.discount_override",
+    message:
+      `Bill ${invoice.invoiceNumber} (${formatRupees(invoice.amount)}) at ${invoice.clinicName} was issued by ` +
+      `${await actorName(actor)} with a ${formatRupees(invoice.discount)} discount above the staff limit.`,
+    relatedRecordId: invoice.invoiceId,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Appointments — AP-8
 // ---------------------------------------------------------------------------
 
@@ -467,6 +528,8 @@ function hrefFor(type: string, relatedRecordId: string | null): string | null {
   // AP-8. Points at the appointment, which is still readable after it is
   // cancelled or missed — nothing in this system deletes one.
   if (type.startsWith("appointment.")) return `/appointments/${relatedRecordId}`;
+  // PB-4. Cancelled bills and voided payments stay readable on the bill.
+  if (type.startsWith("invoice.") || type.startsWith("payment.")) return `/billing/${relatedRecordId}`;
   return null;
 }
 

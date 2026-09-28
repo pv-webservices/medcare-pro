@@ -6,15 +6,17 @@ import { can, requirePermission, resolveRoleNameAtTime, ScopeError, type ActorCo
 import { clinicWhereForActor } from "@/lib/clinicScope";
 import { writeAuditLog } from "@/lib/audit";
 import { writeRegistrationChanges } from "@/lib/registrations";
+import { notifyInvoiceCancelled, notifyInvoiceDiscountOverride } from "@/lib/notifications";
 import { billingClinic } from "./billingAccess";
 import { getBillingSettingsForClinic } from "./billingSettings";
 import { listBillableServicesForClinic } from "./serviceItems";
 import { computeLine, computeTotals, derivePaymentStatus, exceedsDiscountLimit, fromPaise, toPaise } from "./invoiceMath";
 import { financialYearFor } from "./financialYear";
 import { formatInvoiceNumber } from "./invoiceNumber";
-import { invoiceFiltersSchema, issueInvoiceSchema, saveInvoiceSchema, type InvoiceLineInput, type InvoiceSnapshot } from "./invoiceValidation";
+import { billingReasonSchema, invoiceFiltersSchema, issueInvoiceSchema, saveInvoiceSchema, type InvoiceLineInput, type InvoiceSnapshot } from "./invoiceValidation";
 
 const include = { lines: { orderBy: { position: "asc" as const } } } satisfies Prisma.InvoiceInclude;
+export { include as invoiceInclude };
 type Invoice = Prisma.InvoiceGetPayload<{ include: typeof include }>;
 const visitInclude = { patient: true, clinic: true, doctor: true } satisfies Prisma.RegistrationInclude;
 type Visit = Prisma.RegistrationGetPayload<{ include: typeof visitInclude }>;
@@ -25,7 +27,7 @@ async function visitForActor(actor: ActorContext, id: string, tx: Prisma.Transac
   await billingClinic(actor, visit.clinicId, tx);
   return visit;
 }
-async function invoiceForActor(actor: ActorContext, id: string, tx: Prisma.TransactionClient = prisma) {
+export async function invoiceForActor(actor: ActorContext, id: string, tx: Prisma.TransactionClient = prisma) {
   const invoice = await tx.invoice.findFirst({ where: { id, tenantId: actor.tenantId }, include });
   if (!invoice) throw new ScopeError();
   await billingClinic(actor, invoice.clinicId, tx);
@@ -46,8 +48,10 @@ function record(row: Invoice) {
     invoiceNumber: row.invoiceNumber, revision: row.revision, paymentStatus: row.paymentStatus,
     amountPaid: row.amountPaid.toFixed(2), balanceDue: row.balanceDue.toFixed(2), totals: totalsRecord(row),
     lines: linesRecord(row), snapshot: row.snapshot as unknown as InvoiceSnapshot | null,
-    issuedAt: row.issuedAt?.toISOString() ?? null, createdById: row.createdById };
+    issuedAt: row.issuedAt?.toISOString() ?? null, createdById: row.createdById,
+    cancelledAt: row.cancelledAt?.toISOString() ?? null, cancelReason: row.cancelReason, replacesInvoiceId: row.replacesInvoiceId };
 }
+export { record as toInvoiceRecord };
 export type InvoiceRecord = ReturnType<typeof record>;
 
 function calculate(lines: InvoiceLineInput[]) {
@@ -74,7 +78,7 @@ async function audit(tx: Prisma.TransactionClient, actor: ActorContext, row: Inv
 }
 
 /** Clinical and billing writes share Registration FIRST. No invoice/sequence lock can precede it. */
-async function withVisitLock<T>(actor: ActorContext, registrationId: string, work: (tx: Prisma.TransactionClient, visit: Visit) => Promise<T>) {
+export async function withVisitLock<T>(actor: ActorContext, registrationId: string, work: (tx: Prisma.TransactionClient, visit: Visit) => Promise<T>) {
   return prisma.$transaction(async (tx) => {
     await requireModule(actor, MODULE_FEATURES.billing, tx);
     const visible = await visitForActor(actor, registrationId, tx);
@@ -82,7 +86,7 @@ async function withVisitLock<T>(actor: ActorContext, registrationId: string, wor
     return work(tx, await visitForActor(actor, registrationId, tx));
   }, { isolationLevel: "ReadCommitted", timeout: 15000, maxWait: 15000 });
 }
-async function lockedInvoice(tx: Prisma.TransactionClient, actor: ActorContext, id: string, visit: Visit) {
+export async function lockedInvoice(tx: Prisma.TransactionClient, actor: ActorContext, id: string, visit: Visit) {
   await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} AND registration_id = ${visit.id} FOR UPDATE`;
   const row = await invoiceForActor(actor, id, tx);
   if (row.registrationId !== visit.id || row.clinicId !== visit.clinicId || row.patientId !== visit.patientId) throw new ScopeError();
@@ -148,8 +152,9 @@ export async function issueInvoice(actor: ActorContext, id: string, input: unkno
   await requireModule(actor, MODULE_FEATURES.billing);
   const visible = await invoiceForActor(actor, id);
   for (let attempt = 0; attempt < 3; attempt++) {
+    let result;
     try {
-      return await withVisitLock(actor, visible.registrationId, async (tx, visit) => {
+      result = await withVisitLock(actor, visible.registrationId, async (tx, visit) => {
         const row = await lockedInvoice(tx, actor, id, visit);
         await requirePermission(actor, "invoice:create", visit.clinicId, tx);
         draft(row, data.revision);
@@ -161,8 +166,9 @@ export async function issueInvoice(actor: ActorContext, id: string, input: unkno
         const discountOverride = exceedsDiscountLimit(computed.totals.discountTotal, computed.totals.subtotal, settings.staffDiscountLimitPercent);
         if (discountOverride) await requirePermission(actor, "invoice:discount:override", visit.clinicId, tx);
         // Finish identity/role reads before serializing this clinic's numbering.
-        const doctor = row.doctorId ? await tx.doctor.findFirst({ where: { id: row.doctorId, clinicId: visit.clinicId } }) : null;
-        if (row.doctorId && !doctor) throw new ScopeError();
+        // The visit's CURRENT doctor is billed: it may have changed since the draft.
+        const doctor = visit.doctorId ? await tx.doctor.findFirst({ where: { id: visit.doctorId, clinicId: visit.clinicId } }) : null;
+        if (visit.doctorId && !doctor) throw new ScopeError();
         const before = visit.amount.toFixed(2);
         const roleAtTime = before !== computed.totals.grandTotal
           ? await resolveRoleNameAtTime(actor, visit.clinicId, tx) : null;
@@ -187,7 +193,7 @@ export async function issueInvoice(actor: ActorContext, id: string, input: unkno
           invoiceNumber, documentType, issuedAt: issuedAt.toISOString(),
         };
         const issued = await tx.invoice.update({ where: { id }, data: { status: "ISSUED", revision: { increment: 1 },
-          invoiceNumber, financialYear, documentType, issuedAt, issuedById: actor.userId, snapshot: snapshot as unknown as Prisma.InputJsonValue,
+          doctorId: visit.doctorId, invoiceNumber, financialYear, documentType, issuedAt, issuedById: actor.userId, snapshot: snapshot as unknown as Prisma.InputJsonValue,
           ...computed.totals, amountPaid: "0.00", balanceDue: computed.totals.grandTotal,
           paymentStatus: derivePaymentStatus(toPaise(computed.totals.grandTotal), 0) }, include });
         if (before !== computed.totals.grandTotal) {
@@ -196,14 +202,76 @@ export async function issueInvoice(actor: ActorContext, id: string, input: unkno
             { amount: { from: before, to: computed.totals.grandTotal } });
         }
         await audit(tx, actor, issued, "INVOICE_ISSUED", { discountOverride });
-        return record(issued);
+        return { invoice: record(issued), discountOverride, clinicName: visit.clinic.name };
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2002"].includes(error.code) && attempt < 2) continue;
       throw error;
     }
+    // After commit only: a feed failure must never roll back an issued bill.
+    if (result.discountOverride) {
+      await notifyInvoiceDiscountOverride(actor, { invoiceId: result.invoice.id, clinicId: result.invoice.clinicId, clinicName: result.clinicName,
+        invoiceNumber: result.invoice.invoiceNumber!, amount: result.invoice.totals.grandTotal, discount: result.invoice.totals.discountTotal });
+    }
+    return result.invoice;
   }
   throw new ConflictError("Could not issue the bill. Try again.");
+}
+
+/** FR-11.19. Payments must be voided first, so a cancelled bill never holds ACTIVE money. */
+export async function cancelInvoice(actor: ActorContext, id: string, input: unknown) {
+  const { reason } = billingReasonSchema.parse(input);
+  await requireModule(actor, MODULE_FEATURES.billing);
+  const visible = await invoiceForActor(actor, id);
+  const result = await withVisitLock(actor, visible.registrationId, async (tx, visit) => {
+    const row = await lockedInvoice(tx, actor, id, visit);
+    await requirePermission(actor, "invoice:cancel", visit.clinicId, tx);
+    if (row.status === "DRAFT") throw new ConflictError("Discard a draft instead of cancelling it.");
+    if (row.status !== "ISSUED") throw new ConflictError("This bill is already cancelled.");
+    if (await tx.invoicePayment.count({ where: { invoiceId: id, status: "ACTIVE" } })) throw new ConflictError("Void this bill's payments before cancelling it.");
+    const before = visit.amount.toFixed(2);
+    const roleAtTime = before !== "0.00" ? await resolveRoleNameAtTime(actor, visit.clinicId, tx) : null;
+    const cancelled = await tx.invoice.update({ where: { id }, data: { status: "CANCELLED", activeKey: null, cancelledAt: new Date(),
+      cancelledById: actor.userId, cancelReason: reason, revision: { increment: 1 } }, include });
+    if (roleAtTime) {
+      await tx.registration.update({ where: { id: visit.id }, data: { amount: "0.00" } });
+      await writeRegistrationChanges(tx, actor, visit.id, roleAtTime, { amount: { from: before, to: "0.00" } });
+    }
+    await audit(tx, actor, cancelled, "INVOICE_CANCELLED");
+    return { invoice: record(cancelled), clinicName: visit.clinic.name };
+  });
+  await notifyInvoiceCancelled(actor, { invoiceId: result.invoice.id, clinicId: result.invoice.clinicId, clinicName: result.clinicName,
+    invoiceNumber: result.invoice.invoiceNumber!, amount: result.invoice.totals.grandTotal });
+  return result.invoice;
+}
+
+/** FR-11.20. A new draft for the same visit; replaces_invoice_id is unique, so one per cancelled bill. */
+export async function createReplacementInvoice(actor: ActorContext, cancelledInvoiceId: string) {
+  await requireModule(actor, MODULE_FEATURES.billing);
+  const visible = await invoiceForActor(actor, cancelledInvoiceId);
+  try {
+    return await withVisitLock(actor, visible.registrationId, async (tx, visit) => {
+      const source = await lockedInvoice(tx, actor, cancelledInvoiceId, visit);
+      await requirePermission(actor, "invoice:create", visit.clinicId, tx);
+      if (source.status !== "CANCELLED" || !source.invoiceNumber) throw new ConflictError("Only a cancelled issued bill can be replaced.");
+      if (await tx.invoice.findUnique({ where: { replacesInvoiceId: source.id } })) throw new ConflictError("This bill already has a replacement.");
+      if (await tx.invoice.findUnique({ where: { activeKey: visit.id } })) throw new ConflictError("This visit already has a live bill.");
+      // A retired or out-of-scope service keeps its copied text and price as a custom line.
+      const billable = new Set((await listBillableServicesForClinic(visit.clinicId, tx)).map((service) => service.id));
+      const computed = calculate(linesRecord(source).map((line) => ({ serviceItemId: line.serviceItemId && billable.has(line.serviceItemId) ? line.serviceItemId : null,
+        description: line.description, category: line.category, quantity: line.quantity, unitPrice: line.unitPrice,
+        discountAmount: line.discountAmount, taxRatePercent: line.taxRatePercent, sacCode: line.sacCode })));
+      const row = await tx.invoice.create({ data: { tenantId: actor.tenantId, clinicId: visit.clinicId, registrationId: visit.id,
+        patientId: visit.patientId, doctorId: visit.doctorId, activeKey: visit.id, replacesInvoiceId: source.id, createdById: actor.userId,
+        ...computed.totals, amountPaid: "0.00", balanceDue: computed.totals.grandTotal,
+        lines: { create: computed.lines } }, include });
+      await audit(tx, actor, row, "INVOICE_REPLACEMENT_CREATED", { replacesInvoiceId: source.id, replacesInvoiceNumber: source.invoiceNumber });
+      return record(row);
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new ConflictError("This bill already has a replacement.");
+    throw error;
+  }
 }
 export async function discardDraftInvoice(actor: ActorContext, id: string) {
   await requireModule(actor, MODULE_FEATURES.billing);

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getLiveInvoiceForRegistration } from "@/lib/billing/invoices";
+import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES } from "@/lib/billing/billingLabels";
+import StatusPill from "@/components/ui/StatusPill";
 import StaffPortalCard from "@/components/patientPortal/StaffPortalCard";
 import PrescriptionHistory from "@/components/prescriptions/PrescriptionHistory";
 import { getConsultationForRegistration, listPatientPrescriptions } from "@/lib/prescriptions";
@@ -85,8 +87,8 @@ export default async function RegistrationDetailPage({
     <section className="space-y-6">
       {billingAccess && <div className="space-y-3 rounded-2xl border border-line bg-canvas p-5">
         <h2 className="text-lg font-semibold">Bill</h2>
-        <p>{bill ? bill.status === "ISSUED" ? <span className="rounded-full bg-canvas-deep px-3 py-1 text-sm">{bill.paymentStatus}</span> : "Draft bill" : "Not billed"}</p>
-        {(bill || mayCreateBill) && <Link className="font-semibold text-accent underline" href={bill?.status === "ISSUED" ? `/billing/${bill.id}` : `/registration/${id}/bill`}>
+        <p>{bill ? bill.status === "ISSUED" ? <StatusPill tone={PAYMENT_STATUS_TONES[bill.paymentStatus]}>{PAYMENT_STATUS_LABELS[bill.paymentStatus]}</StatusPill> : "Draft bill" : "Not billed"}</p>
+        {(bill?.status === "ISSUED" || mayCreateBill) && <Link className="font-semibold text-accent underline" href={bill?.status === "ISSUED" ? `/billing/${bill.id}` : `/registration/${id}/bill`}>
           {bill ? bill.status === "ISSUED" ? "View bill" : "Continue bill" : "Create bill"}
         </Link>}
       </div>}

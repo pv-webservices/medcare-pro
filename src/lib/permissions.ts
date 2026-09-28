@@ -693,8 +693,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "payment:record",
         label: "Record payments",
         description: "Record manual payments against issued invoices.",
-        pending: "stage",
-        pendingNote: "Enforced from PB-2/PB-3",
       },
       {
         key: "invoice:discount:override",
@@ -705,8 +703,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "invoice:cancel",
         label: "Cancel bills and void payments",
         description: "Cancel bills and void mistaken payments with a reason.",
-        pending: "stage",
-        pendingNote: "Enforced from PB-2/PB-3",
       },
       {
         key: "billing:settings:manage",
