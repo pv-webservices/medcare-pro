@@ -20,11 +20,8 @@ import RegistrationForm, {
 } from "@/components/registration/RegistrationForm";
 import PatientVisits from "@/components/registration/PatientVisits";
 import { formatRupees } from "@/lib/money";
-import {
-  VISIT_TYPE_LABELS,
-  type PatientVisit,
-  type RegistrationRecord,
-} from "@/lib/registrations";
+import type { PatientVisit, RegistrationRecord } from "@/lib/registrations";
+import { VISIT_TYPE_LABELS } from "@/lib/visitTypes";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";

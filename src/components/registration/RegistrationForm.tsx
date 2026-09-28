@@ -16,12 +16,8 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { CURRENCY_SYMBOL } from "@/lib/money";
-import {
-  VISIT_TYPES,
-  VISIT_TYPE_LABELS,
-  type PatientMatch,
-  type VisitType,
-} from "@/lib/registrations";
+import type { PatientMatch } from "@/lib/registrations";
+import { VISIT_TYPES, VISIT_TYPE_LABELS, type VisitType } from "@/lib/visitTypes";
 import { todayDateOnly, nowClockTime } from "@/lib/dates";
 
 /**

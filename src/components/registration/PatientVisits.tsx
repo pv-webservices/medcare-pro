@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatRupees } from "@/lib/money";
-import { VISIT_TYPE_LABELS, type PatientVisit } from "@/lib/registrations";
+import type { PatientVisit } from "@/lib/registrations";
+import { VISIT_TYPE_LABELS } from "@/lib/visitTypes";
 
 /**
  * Every visit on this patient's record — the "has this person been here
