@@ -190,6 +190,15 @@ export const CLINICAL_AI_PERMISSIONS: readonly string[] = [
   "clinical-ai:facts-extract",
   "clinical-ai:facts-review",
 ];
+export const BILLING_PERMISSIONS: readonly string[] = [
+  "invoice:read",
+  "invoice:create",
+  "payment:record",
+  "invoice:discount:override",
+  "invoice:cancel",
+  "billing:settings:manage",
+];
+
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   { module: "Clinical AI", permissions: [
     { key: "clinical-ai:writing", label: "Clinical writing assistance", description: "Request language suggestions for an authorized consultation." },
@@ -667,6 +676,53 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   },
   DASHBOARD_PERMISSION_GROUP,
   DASHBOARD_LAYOUT_PERMISSION_GROUP,
+  {
+    module: "Billing",
+    permissions: [
+      {
+        key: "invoice:read",
+        label: "View bills",
+        description: "See invoices, payments and dues in permitted clinics.",
+        pending: "stage",
+        pendingNote: "Enforced from PB-2/PB-3",
+      },
+      {
+        key: "invoice:create",
+        label: "Prepare and issue bills",
+        description: "Prepare drafts, issue bills and create replacements.",
+        pending: "stage",
+        pendingNote: "Enforced from PB-2/PB-3",
+      },
+      {
+        key: "payment:record",
+        label: "Record payments",
+        description: "Record manual payments against issued invoices.",
+        pending: "stage",
+        pendingNote: "Enforced from PB-2/PB-3",
+      },
+      {
+        key: "invoice:discount:override",
+        label: "Approve large discounts",
+        description: "Approve discounts above the clinic limit.",
+        pending: "stage",
+        pendingNote: "Enforced from PB-2/PB-3",
+      },
+      {
+        key: "invoice:cancel",
+        label: "Cancel bills and void payments",
+        description: "Cancel bills and void mistaken payments with a reason.",
+        pending: "stage",
+        pendingNote: "Enforced from PB-2/PB-3",
+      },
+      {
+        key: "billing:settings:manage",
+        label: "Manage billing settings",
+        description: "Manage the service price list and clinic billing settings.",
+        pending: "stage",
+        pendingNote: "Enforced from PB-2/PB-3",
+      },
+    ],
+  },
 ] as const;
 
 /** Operational/action permissions shown separately from Dashboard Data. */
@@ -801,6 +857,7 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
     !CLINICAL_AI_PERMISSIONS.includes(permission) &&
     permission !== "patient_portal:manage" &&
+    !BILLING_PERMISSIONS.includes(permission) &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
@@ -857,6 +914,7 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
     !CLINICAL_AI_PERMISSIONS.includes(permission) &&
     permission !== "patient_portal:manage" &&
+    !BILLING_PERMISSIONS.includes(permission) &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
@@ -905,6 +963,7 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
       !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
+      !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(permission as TaskPermission) &&

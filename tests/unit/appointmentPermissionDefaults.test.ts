@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
+  BILLING_PERMISSIONS,
   CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
@@ -205,6 +206,7 @@ describe("the stage sets stay disjoint", () => {
         !STAGE_AP1_PERMISSIONS.includes(permission) &&
         !CLINICAL_AI_PERMISSIONS.includes(permission) &&
         permission !== "patient_portal:manage" &&
+        !BILLING_PERMISSIONS.includes(permission) &&
         !PRESCRIPTION_PERMISSIONS.includes(permission) &&
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
         !TASK_PERMISSIONS.includes(
@@ -228,6 +230,7 @@ describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
         STAGE_AP1_PERMISSIONS.length -
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
         PRESCRIPTION_PERMISSIONS.length -
+        BILLING_PERMISSIONS.length -
         CLINICAL_AI_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_LAYOUT_PERMISSIONS.length -
@@ -353,6 +356,7 @@ describe("what each seeded role holds after AP-1", () => {
       ...PRE_APPOINTMENTS_ROLE_PERMISSIONS[ROLE_KEYS.STAFF],
       "task:view",
       "task:complete",
+      "invoice:read",
     ]);
   });
 });
@@ -479,6 +483,7 @@ describe("what the backfill would append", () => {
           !permission.startsWith("dashboard:") &&
           !CLINICAL_AI_PERMISSIONS.includes(permission) &&
           permission !== "patient_portal:manage" &&
+          !BILLING_PERMISSIONS.includes(permission) &&
           !PRESCRIPTION_PERMISSIONS.includes(permission) &&
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
           !TASK_PERMISSIONS.includes(

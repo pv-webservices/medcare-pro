@@ -51,6 +51,9 @@ import {
  *                                      saying the same thing.
  */
 export const NOTIFICATION_TYPES = [
+  "invoice.cancelled",
+  "payment.voided",
+  "invoice.discount_override",
   "clinic.created",
   "clinic.updated",
   "doctor.created",
@@ -70,6 +73,9 @@ export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 /** Shown as the item's category chip. PRD vocabulary, not generic words. */
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
+  "invoice.cancelled": "Bill cancelled",
+  "payment.voided": "Payment voided",
+  "invoice.discount_override": "Bill discount approved",
   "clinic.created": "Clinic added",
   "clinic.updated": "Clinic updated",
   "doctor.created": "Doctor added",
