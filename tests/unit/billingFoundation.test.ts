@@ -102,7 +102,21 @@ describe("billing catalogue and role migration", () => {
   });
   it("registers a pending catalogue and CORE default feature", () => {
     expect(BILLING_PERMISSIONS).toHaveLength(6);
-    for (const key of BILLING_PERMISSIONS) expect(findPermission(key)).toMatchObject({ pending: "stage", pendingNote: "Enforced from PB-2/PB-3" });
+    const expectedPending = {
+      "invoice:read": undefined,
+      "billing:settings:manage": undefined,
+      "invoice:create": "stage",
+      "payment:record": "stage",
+      "invoice:discount:override": "stage",
+      "invoice:cancel": "stage",
+    } as const;
+    for (const [key, pending] of Object.entries(expectedPending)) {
+      expect(findPermission(key)).toBeDefined();
+      expect(findPermission(key)?.pending).toBe(pending);
+      expect(findPermission(key)?.pendingNote).toBe(
+        pending === undefined ? undefined : "Enforced from PB-2/PB-3",
+      );
+    }
     expect(DEFAULT_FEATURES.find((f) => f.key === MODULE_FEATURES.billing)).toMatchObject({ name: "Patient billing", tier: "CORE", globalEnabled: true, inDefaultPlan: true });
   });
   it.each(Object.keys(PRE_BILLING_ROLE_PERMISSIONS))("only tops up the exact system snapshot for %s", (key) => {

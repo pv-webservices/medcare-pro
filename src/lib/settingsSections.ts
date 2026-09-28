@@ -49,6 +49,14 @@ export interface SettingsSection {
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   {
+    href: "/settings/billing",
+    title: "Patient billing",
+    description: "Manage clinic billing settings and the service price list.",
+    viewPermissions: ["invoice:read"],
+    managePermissions: ["billing:settings:manage"],
+    feature: "billing",
+  },
+  {
     href: "/settings/dashboard",
     title: "Dashboard",
     description:
