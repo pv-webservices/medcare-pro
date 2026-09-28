@@ -683,8 +683,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "invoice:read",
         label: "View bills",
         description: "See invoices, payments and dues in permitted clinics.",
-        pending: "stage",
-        pendingNote: "Enforced from PB-2/PB-3",
       },
       {
         key: "invoice:create",
@@ -718,8 +716,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
         key: "billing:settings:manage",
         label: "Manage billing settings",
         description: "Manage the service price list and clinic billing settings.",
-        pending: "stage",
-        pendingNote: "Enforced from PB-2/PB-3",
       },
     ],
   },
