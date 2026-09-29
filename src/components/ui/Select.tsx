@@ -376,7 +376,13 @@ export default function Select({
         aria-hidden="true"
         tabIndex={-1}
         className="pointer-events-none absolute inset-0 -z-10 h-full w-full opacity-0"
-        onChange={onChange}
+        // Always handled, so React never sees a `value` without `onChange` (the
+        // warning uncontrolled `defaultValue` callers used to trigger). Uncontrolled
+        // mode keeps its own state in step; the caller's handler still runs.
+        onChange={(event) => {
+          if (!isControlled) setInternalValue(event.target.value);
+          onChange?.(event);
+        }}
         onBlur={onBlur}
         onFocus={onFocus}
         {...rest}

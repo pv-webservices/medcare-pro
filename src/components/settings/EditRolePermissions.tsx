@@ -44,6 +44,8 @@ interface EditRolePermissionsProps {
   role: RoleSummary;
   grantablePermissions: readonly string[];
   canManage: boolean;
+  /** Permission groups whose module is not installed on this database (display only). */
+  uninstalledModules?: readonly string[];
   onBack: () => void;
   onSaved: () => void;
 }
@@ -158,6 +160,7 @@ export default function EditRolePermissions({
   role,
   grantablePermissions,
   canManage,
+  uninstalledModules = [],
   onBack,
   onSaved,
 }: EditRolePermissionsProps) {
@@ -784,6 +787,11 @@ export default function EditRolePermissions({
                         <p className="mt-0.5 text-meta text-muted truncate">
                           {meta.description}
                         </p>
+                        {uninstalledModules.includes(group.module) && (
+                          <p className="mt-1.5 inline-block rounded-lg border border-warn-line bg-warn-bg px-2 py-0.5 text-micro font-medium text-warn-ink">
+                            Module not installed on this database
+                          </p>
+                        )}
                       </div>
                     </div>
 

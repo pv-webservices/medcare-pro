@@ -249,3 +249,60 @@ jobs:
           name: prescription-playwright-results
           path: test-results/
           retention-days: 7
+
+  billing-database:
+    name: Billing Database Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci_test_password
+          MARIADB_DATABASE: medcare_pb2_ci
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=3s --health-retries=10
+
+    env:
+      CI: "true"
+      # test:billing only runs against a localhost database named medcare_pb2[_suffix].
+      DATABASE_URL: "mysql://root:ci_test_password@127.0.0.1:3306/medcare_pb2_ci"
+      TZ: "Asia/Kolkata"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Node 24: on Node 20/22 tsx evaluates @/lib modules twice under these .mts
+      # scripts, so instanceof checks fail (see scripts/require-node-24.mts).
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Deploy database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed base feature catalogue
+        run: npx tsx prisma/seed.ts
+
+      - name: Install billing feature and role top-ups (local CI database)
+        run: npm run billing:backfill -- --apply
+
+      - name: Verify billing schema and catalogue
+        run: npm run verify:billing
+
+      - name: Billing database tests (default sql_mode)
+        run: npm run test:billing
+
+      - name: Billing database tests (strict sql_mode, ONLY_FULL_GROUP_BY)
+        run: npm run test:billing:strict

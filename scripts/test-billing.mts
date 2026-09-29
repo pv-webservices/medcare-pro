@@ -1,4 +1,5 @@
 /** PB-2 acceptance on a disposable local database only; no retained tenant fixtures. */
+import "./require-node-24.mjs";
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { testBillingInvoices } from "./test-billing-invoices.mjs";

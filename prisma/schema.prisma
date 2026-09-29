@@ -726,8 +726,8 @@ model ClinicTelephonyTestCall {
   createdAt           DateTime                                @default(now()) @map("created_at")
   updatedAt           DateTime                                @updatedAt @map("updated_at")
 
-  clinic      Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  requestedBy User   @relation("ClinicTelephonyTestCallRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  clinic      Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade, map: "clinic_test_calls_clinic_fkey")
+  requestedBy User   @relation("ClinicTelephonyTestCallRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict, map: "clinic_test_calls_requester_fkey")
 
   @@index([clinicId, createdAt], map: "clinic_test_calls_clinic_created_idx")
   @@index([requestedByUserId, createdAt], map: "clinic_test_calls_requester_created_idx")
@@ -756,7 +756,7 @@ model ClinicTelephonyCall {
   createdAt          DateTime                         @default(now()) @map("created_at")
   updatedAt          DateTime                         @updatedAt @map("updated_at")
 
-  clinic Clinic                     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinic Clinic                     @relation(fields: [clinicId], references: [id], onDelete: Cascade, map: "clinic_calls_clinic_fkey")
   events ClinicTelephonyCallEvent[]
 
   @@index([clinicId, startedAt], map: "clinic_calls_clinic_started_idx")
@@ -772,7 +772,7 @@ model ClinicTelephonyCallEvent {
   eventType  ClinicTelephonyCallEventType @map("event_type")
   occurredAt DateTime                     @default(now()) @map("occurred_at")
 
-  call ClinicTelephonyCall @relation(fields: [callId], references: [id], onDelete: Cascade)
+  call ClinicTelephonyCall @relation(fields: [callId], references: [id], onDelete: Cascade, map: "clinic_call_events_call_fkey")
 
   @@unique([callId, eventType], map: "clinic_call_events_call_type_key")
   @@index([callId, occurredAt], map: "clinic_call_events_call_occurred_idx")

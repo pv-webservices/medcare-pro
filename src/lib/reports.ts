@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { registrationTotals } from "@/lib/registrationTotals";
 import {
   accessibleClinicScope,
   PermissionError,
@@ -473,15 +474,8 @@ export async function getRevenueReport(
   const previous = previousRange(period, range);
 
   const [current, prior, patientCount, series] = await Promise.all([
-    prisma.registration.aggregate({
-      where: registrationsIn(clinicIds, range),
-      _sum: { amount: true },
-      _count: { _all: true },
-    }),
-    prisma.registration.aggregate({
-      where: registrationsIn(clinicIds, previous),
-      _sum: { amount: true },
-    }),
+    registrationTotals(registrationsIn(clinicIds, range)),
+    registrationTotals(registrationsIn(clinicIds, previous)),
     // FR-6.2's "average revenue per patient" is per person, not per visit —
     // counted here as distinct patients with a visit in the window, so a
     // follow-up does not inflate the denominator.
@@ -556,12 +550,9 @@ export async function getDailyRevenueSnapshotForClinicIds(
   }
 
   const range = currentRange("daily", date);
-  const aggregate = await prisma.registration.aggregate({
-    where: {
-      ...registrationsIn(clinicIds, range),
-      clinic: { tenantId: actor.tenantId },
-    },
-    _sum: { amount: true },
+  const aggregate = await registrationTotals({
+    ...registrationsIn(clinicIds, range),
+    clinic: { tenantId: actor.tenantId },
   });
 
   return {
