@@ -82,7 +82,8 @@
     "test:e2e:patient-portal": "playwright test --config=playwright.patient-portal.config.ts",
     "billing:backfill": "tsx scripts/backfill-billing.mts",
     "verify:billing": "tsx scripts/verify-billing.mts",
-    "test:billing": "tsx scripts/test-billing.mts"
+    "test:billing": "tsx scripts/test-billing.mts",
+    "test:e2e:billing": "playwright test --config=playwright.billing.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",

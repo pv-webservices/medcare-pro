@@ -25,6 +25,9 @@ import { resolveSelectedClinicId } from "@/lib/selectedClinic";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 import ModuleLocked from "@/components/ui/ModuleLocked";
 import { MODULE_FEATURES, moduleLock } from "@/lib/features";
+import CollectionsSection from "@/components/reports/CollectionsSection";
+import { getCollectionsReport, type CollectionsReport } from "@/lib/billing/collectionsReport";
+import { FeatureError } from "@/lib/featureResolution";
 
 // Revenue report — PRD §6.6 (FR-6.1 … FR-6.4).
 //
@@ -106,6 +109,19 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     await permissionsHeldAnywhere(actor),
     REPORT_EXPORT_PERMISSION,
   );
+
+  // FR-11.23: the Billing section needs invoice:read as well and the billing
+  // feature. A refusal drops the section; the revenue report is unchanged.
+  let collections: CollectionsReport | null = null;
+  if (report.hasClinics) {
+    try {
+      collections = await getCollectionsReport(actor, filters);
+    } catch (error: unknown) {
+      if (!(error instanceof PermissionError || error instanceof FeatureError)) {
+        throw error;
+      }
+    }
+  }
 
   const againstLabel = PREVIOUS_PERIOD_LABELS[report.period];
   const isUp = (report.kpis.revenueChangePercent ?? 0) >= 0;
@@ -267,6 +283,14 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               }
             />
           </div>
+
+          {collections && (
+            <CollectionsSection
+              report={collections}
+              canExport={canExport}
+              clinicId={selectedClinicId}
+            />
+          )}
         </>
       )}
     </section>

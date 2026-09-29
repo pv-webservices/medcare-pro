@@ -20,3 +20,12 @@ export async function getInvoiceDetailForActor(actor: ActorContext, id: string) 
     liveInvoiceId: live && live.id !== row.id ? live.id : null, may: { recordPayment: mayRecordPayment, cancel: mayCancel, create: mayCreate } };
 }
 export type InvoiceDetail = Awaited<ReturnType<typeof getInvoiceDetailForActor>>;
+
+/** /billing/[id]/print (FR-11.22): the frozen bill plus its ACTIVE payments, read live. */
+export async function getInvoicePrintForActor(actor: ActorContext, id: string) {
+  await requireModule(actor, MODULE_FEATURES.billing);
+  const row = await invoiceForActor(actor, id);
+  const payments = await prisma.invoicePayment.findMany({ where: { invoiceId: row.id, tenantId: actor.tenantId, status: "ACTIVE" },
+    include: paymentInclude, orderBy: [{ receivedAt: "asc" }, { createdAt: "asc" }] });
+  return { invoice: toInvoiceRecord(row), payments: payments.map(toPaymentRecord) };
+}

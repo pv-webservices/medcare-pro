@@ -3,6 +3,7 @@ import "dotenv/config";
 import assert from "node:assert/strict";
 import { testBillingInvoices } from "./test-billing-invoices.mjs";
 import { testBillingPayments } from "./test-billing-payments.mjs";
+import { testBillingCollections } from "./test-billing-collections.mjs";
 import { prisma } from "@/lib/prisma";
 import { seedFeatureCatalogue, DEFAULT_PLAN_KEY } from "@/lib/defaultFeatures";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
@@ -127,6 +128,7 @@ async function main() {
   check("Rejected writes leave service unchanged", (await prisma.serviceItem.findUniqueOrThrow({ where: { id: local.id } })).price.toFixed(2) === "123.45");
   checks += await testBillingInvoices({ owner, otherOwner, staff, reception, clinicA: a.id, clinicB: b.id, foreignClinic: f.id });
   checks += await testBillingPayments({ owner, otherOwner, staff, reception, clinicA: a.id, clinicB: b.id });
+  checks += await testBillingCollections({ tenant, actor, otherOwner });
 }
 function settingsInput(value: Awaited<ReturnType<typeof getBillingSettingsForClinic>>) {
   const { clinicId: _clinicId, ...input } = value;

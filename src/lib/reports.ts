@@ -231,8 +231,11 @@ async function reportableClinics(
  * that is a refusal, not an empty report. A *selected* clinic outside their
  * reach is different: that is a filter that matches nothing, and returns an
  * empty list so the page renders zeros rather than an error.
+ *
+ * Exported for the billing collections report (FR-11.23), which must cover
+ * exactly the clinics this resolver allows for its own permission list.
  */
-async function resolveReportClinics(
+export async function resolveReportClinics(
   actor: ActorContext,
   selectedClinicId: string | null | undefined,
   permissions: readonly string[],
