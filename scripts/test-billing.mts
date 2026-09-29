@@ -27,7 +27,24 @@ async function rejects(label: string, work: () => Promise<unknown>, kind: new (.
 }
 const input = (name: string, clinicId: string | null = null) => ({ name, clinicId, category: "CONSULTATION", price: "123.45" });
 
+/**
+ * `npm run test:billing:strict` runs this whole file on ONE pooled connection with
+ * MySQL 8's default sql_mode (ONLY_FULL_GROUP_BY included) set on that session.
+ */
+export const STRICT_SQL_MODE = "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION";
+const strictSqlMode = process.env.BILLING_TEST_SQL_MODE === "strict";
+async function sessionSqlMode() {
+  return (await prisma.$queryRaw<Array<{ mode: string }>>`SELECT @@SESSION.sql_mode AS mode`)[0].mode;
+}
+async function applyStrictSqlMode() {
+  // A session variable only holds for the connection it was set on, so the pool must be exactly one.
+  if (url.searchParams.get("connection_limit") !== "1") throw new Error("Strict sql_mode runs need connection_limit=1 (use npm run test:billing:strict).");
+  await prisma.$executeRawUnsafe(`SET SESSION sql_mode = '${STRICT_SQL_MODE}'`);
+  check("strict sql_mode is set on the test connection", (await sessionSqlMode()).split(",").includes("ONLY_FULL_GROUP_BY"));
+}
+
 async function main() {
+  if (strictSqlMode) await applyStrictSqlMode();
   await seedFeatureCatalogue(prisma);
   const plan = await prisma.plan.findUniqueOrThrow({ where: { key: DEFAULT_PLAN_KEY } });
   async function tenant(kind: string) {
@@ -129,6 +146,8 @@ async function main() {
   checks += await testBillingInvoices({ owner, otherOwner, staff, reception, clinicA: a.id, clinicB: b.id, foreignClinic: f.id });
   checks += await testBillingPayments({ owner, otherOwner, staff, reception, clinicA: a.id, clinicB: b.id });
   checks += await testBillingCollections({ tenant, actor, otherOwner });
+  // Fails if the pool reconnected and silently dropped the session's sql_mode mid-run.
+  if (strictSqlMode) check("strict sql_mode held for the whole run", (await sessionSqlMode()).split(",").includes("ONLY_FULL_GROUP_BY"));
 }
 function settingsInput(value: Awaited<ReturnType<typeof getBillingSettingsForClinic>>) {
   const { clinicId: _clinicId, ...input } = value;

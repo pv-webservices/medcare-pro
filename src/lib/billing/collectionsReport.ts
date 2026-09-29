@@ -209,8 +209,10 @@ export async function getCollectionsReport(
       _sum: { amount: true }, _count: { _all: true } }),
     prisma.invoice.groupBy({ by: ["clinicId"], where: { tenantId, clinicId: { in: clinicIds }, status: "ISSUED", balanceDue: { gt: 0 } },
       _sum: { balanceDue: true }, _count: { _all: true } }),
-    prisma.invoice.aggregate({ where: issuedIn(tenantId, clinicIds, previous.instants), _sum: { grandTotal: true } }),
-    prisma.invoicePayment.aggregate({ where: collectedIn(tenantId, clinicIds, previous.instants), _sum: { amount: true } }),
+    // groupBy, not aggregate: see dues.ts — Prisma's aggregate derived table fails under
+    // ONLY_FULL_GROUP_BY on MariaDB when its prepared statement is re-executed.
+    prisma.invoice.groupBy({ by: ["clinicId"], where: issuedIn(tenantId, clinicIds, previous.instants), _sum: { grandTotal: true } }),
+    prisma.invoicePayment.groupBy({ by: ["clinicId"], where: collectedIn(tenantId, clinicIds, previous.instants), _sum: { amount: true } }),
     buildSeries(tenantId, clinicIds, period, seriesWindow.instants, keys),
   ]);
 
@@ -245,10 +247,10 @@ export async function getCollectionsReport(
     kpis: {
       billed: sum(billedByClinic.map((row) => money(row._sum.grandTotal))).toFixed(2),
       billCount: billedByClinic.reduce((total, row) => total + row._count._all, 0),
-      previousBilled: money(priorBilled._sum.grandTotal).toFixed(2),
+      previousBilled: sum(priorBilled.map((row) => money(row._sum.grandTotal))).toFixed(2),
       collected: collectedTotal.toFixed(2),
       paymentCount: collectedByClinicMode.reduce((total, row) => total + row._count._all, 0),
-      previousCollected: money(priorCollected._sum.amount).toFixed(2),
+      previousCollected: sum(priorCollected.map((row) => money(row._sum.amount))).toFixed(2),
       outstanding: sum(outstandingByClinic.map((row) => money(row._sum.balanceDue))).toFixed(2),
       outstandingCount: outstandingByClinic.reduce((total, row) => total + row._count._all, 0),
       discounts: sum(billedByClinic.map((row) => money(row._sum.discountTotal))).toFixed(2),
