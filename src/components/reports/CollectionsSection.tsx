@@ -13,7 +13,7 @@ import { PREVIOUS_PERIOD_LABELS, REPORT_PERIOD_LABELS } from "@/lib/reportPeriod
  * the page drops it on refusal, and the API re-checks for every download.
  *
  * GrowthChart plots one series, so Billed and Collected are two charts side by
- * side, stacked on a phone.
+ * side, stacked on a phone, each titled through GrowthChart's own heading.
  */
 
 const IST_TIME = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
@@ -71,17 +71,11 @@ export default function CollectionsSection({ report, canExport, clinicId }: {
     </div>
 
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <section aria-labelledby="billing-billed-title" className="space-y-2">
-        <h3 id="billing-billed-title" className="text-body font-semibold text-ink">Billed</h3>
-        <GrowthChart series={report.billedSeries}
-          caption={`Billed per ${unit} by issue date across ${scope}; cancelled bills excluded. Registrations are visits billed.`}
-          actions={exportLink("trend", "the billed and collected trend")} />
-      </section>
-      <section aria-labelledby="billing-collected-title" className="space-y-2">
-        <h3 id="billing-collected-title" className="text-body font-semibold text-ink">Collected</h3>
-        <GrowthChart series={report.collectedSeries}
-          caption={`Collected per ${unit} by payment date across ${scope}; voided payments excluded. Registrations are visits paid for.`} />
-      </section>
+      <GrowthChart series={report.billedSeries} title="Billed" legend="Billed"
+        caption={`Billed per ${unit} by issue date across ${scope}; cancelled bills excluded. Registrations are visits billed.`}
+        actions={exportLink("trend", "the billed and collected trend")} />
+      <GrowthChart series={report.collectedSeries} title="Collected" legend="Collected"
+        caption={`Collected per ${unit} by payment date across ${scope}; voided payments excluded. Registrations are visits paid for.`} />
     </div>
 
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

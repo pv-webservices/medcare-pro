@@ -10,6 +10,10 @@ interface GrowthChartProps {
   /** Names the series, so the chart needs no legend. */
   caption: string;
   actions?: ReactNode;
+  /** Card heading. Defaults to the revenue report's wording. */
+  title?: string;
+  /** The series' legend chip. Defaults to the revenue report's wording. */
+  legend?: string;
 }
 
 // Geometry is in viewBox units; the SVG scales to its container.
@@ -41,6 +45,8 @@ export default function GrowthChart({
   series,
   caption,
   actions,
+  title = "Revenue trend",
+  legend = "Total revenue",
 }: GrowthChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -85,7 +91,7 @@ export default function GrowthChart({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold tracking-tight text-ink">
-            Revenue trend
+            {title}
           </h2>
           <p className="mt-0.5 text-label text-muted">
             {caption}
@@ -95,7 +101,7 @@ export default function GrowthChart({
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-canvas-deep/50 px-3 py-1.5 text-label font-medium text-ink">
             <span className="h-2 w-2 rounded-full bg-accent" />
-            Total revenue
+            {legend}
           </span>
           <span className="hidden sm:inline-flex items-center gap-1 rounded-xl border border-line bg-canvas-deep/50 px-3 py-1.5 text-label font-medium text-ink">
             Line area

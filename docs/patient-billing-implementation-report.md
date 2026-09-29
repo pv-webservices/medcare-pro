@@ -181,7 +181,7 @@ The raw series SQL was also run under MySQL 8's default `sql_mode` (including `O
 - Under MariaDB with `ONLY_FULL_GROUP_BY`, Prisma's generated aggregate in PB-4's dues query errors. That is a MariaDB-only strictness, not seen on MySQL 8, and outside PB-5.
 
 **Limits and follow-ups:**
-- `GrowthChart` takes one series and was deliberately not modified. Both Billing charts therefore keep its built-in "Revenue trend" title, "Total revenue" legend and "registrations" tooltip wording, and use the same gradient id. The section headings (Billed / Collected) and captions state what each chart shows. A follow-up could add title and legend props.
+- `GrowthChart` takes one series. Since the post-PB-5 hardening it accepts optional `title` and `legend` props (the defaults render the revenue chart byte-identically), and the Billing charts are titled Billed and Collected. Its tooltip still says "registrations" (the captions explain the count), and both charts share one gradient id.
 - The revenue report's `reportFilterSchema` has no doctor filter, so the collections report has none either. FR-11.23's "clinic/doctor filters" is read as "the existing filters".
 - The export's by-clinic file carries every per-clinic figure (billed, collected, discounts, GST, outstanding now). The on-screen by-clinic table shows collections only.
 - Printed payments are ACTIVE entries only; voided entries stay visible on `/billing/[id]`.
