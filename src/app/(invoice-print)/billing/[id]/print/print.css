@@ -1,0 +1,116 @@
+@page {
+  size: A4;
+  margin: 14mm;
+}
+.invoice-print-shell {
+  max-width: 210mm;
+  margin: 24px auto;
+  color: #000;
+  background: #fff;
+}
+.invoice-print-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+}
+.invoice-document {
+  font-size: 11pt;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  /* Keeps the rotated watermark from widening the page on a phone. */
+  overflow: hidden;
+}
+.invoice-document thead {
+  display: table-header-group;
+}
+/* Figures never break mid-number: on a phone the line table scrolls sideways
+   inside its own box instead; only the description may wrap. */
+.invoice-document table {
+  overflow-wrap: normal;
+}
+.invoice-document th,
+.invoice-document td {
+  white-space: nowrap;
+}
+.invoice-document .invoice-lines td:nth-child(2) {
+  white-space: normal;
+  min-width: 10rem;
+}
+.invoice-document tr,
+.invoice-document header,
+.invoice-totals,
+.invoice-cancelled {
+  break-inside: avoid;
+}
+.invoice-document h2 {
+  break-after: avoid;
+}
+.invoice-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 72pt;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(0, 0, 0, 0.12);
+  transform: rotate(-30deg);
+  z-index: 0;
+}
+@media print {
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .invoice-print-shell {
+    max-width: none;
+    margin: 0;
+  }
+  .invoice-print-controls {
+    display: none !important;
+  }
+  .invoice-document {
+    overflow: visible !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+  /* Black print typography; the watermark keeps its grey. */
+  .invoice-document *:not(.invoice-watermark) {
+    color: black !important;
+    border-color: black !important;
+    background: transparent !important;
+  }
+  .invoice-document header {
+    display: flex !important;
+  }
+  .invoice-document header img {
+    max-width: 45mm;
+    max-height: 20mm;
+  }
+  /* Tables must not be clipped by the on-screen horizontal scroller. */
+  .invoice-scroll {
+    overflow: visible !important;
+  }
+  .invoice-document table {
+    font-size: 9.5pt;
+  }
+  .invoice-document th,
+  .invoice-document td {
+    padding: 4px 5px !important;
+  }
+  /* Fixed repeats the watermark on every printed page. */
+  .invoice-watermark {
+    position: fixed;
+  }
+  .invoice-document a {
+    color: black;
+    text-decoration: none;
+  }
+}

@@ -1,5 +1,6 @@
 import { Download } from "lucide-react";
 import { buttonClasses } from "@/components/ui/Button";
+import type { CollectionsExportSection } from "@/lib/billing/collectionsCsv";
 import type { ReportExportSection } from "@/lib/reportCsv";
 import type { ReportPeriod } from "@/lib/reportPeriods";
 
@@ -20,12 +21,14 @@ import type { ReportPeriod } from "@/lib/reportPeriods";
  */
 
 interface ExportCsvLinkProps {
-  section: ReportExportSection;
+  section: ReportExportSection | CollectionsExportSection;
   period: ReportPeriod;
   /** The sidebar switcher's clinic, so the file matches the screen (FR-2.3). */
   clinicId: string | null;
   /** Completes "Export … as CSV", e.g. "the revenue trend". */
   describes: string;
+  /** The report API to download from; the revenue report unless named. */
+  endpoint?: "/api/reports/revenue" | "/api/reports/collections";
 }
 
 export default function ExportCsvLink({
@@ -33,6 +36,7 @@ export default function ExportCsvLink({
   period,
   clinicId,
   describes,
+  endpoint = "/api/reports/revenue",
 }: ExportCsvLinkProps) {
   const params = new URLSearchParams({ period, format: "csv", section });
 
@@ -42,7 +46,7 @@ export default function ExportCsvLink({
 
   return (
     <a
-      href={`/api/reports/revenue?${params.toString()}`}
+      href={`${endpoint}?${params.toString()}`}
       aria-label={`Export ${describes} as CSV`}
       className={buttonClasses("secondary", "sm")}
     >

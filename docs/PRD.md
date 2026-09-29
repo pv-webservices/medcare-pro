@@ -145,7 +145,7 @@ accepts or dismisses. Detailed specs live in `docs/clinical-ai-*.md`.
 
 ### 6.11 Patient Billing
 
-Itemised billing per Registration/visit: clinic billing settings and service price lists (FR-11.1–FR-11.6); drafts, sequential financial-year numbers and immutable issue snapshots (FR-11.7–FR-11.15); manual part-payments and dues (FR-11.16–FR-11.18); cancellation and replacement (FR-11.19–FR-11.20); invoice listing, print, collections reports and notifications (FR-11.21–FR-11.24). See [Patient Billing PRD](patient-billing-prd.md) for the complete specification. PB-1 provides the foundation; later stages implement the workflows.
+Itemised billing per Registration/visit: clinic billing settings and service price lists (FR-11.1–FR-11.6); drafts, sequential financial-year numbers and immutable issue snapshots (FR-11.7–FR-11.15); manual part-payments and dues (FR-11.16–FR-11.18); cancellation and replacement (FR-11.19–FR-11.20); invoice listing, print, collections reports and notifications (FR-11.21–FR-11.24). See [Patient Billing PRD](patient-billing-prd.md) for the complete specification. Built in stages PB-1–PB-5; see the [implementation report](patient-billing-implementation-report.md).
 
 ---
 
@@ -171,12 +171,12 @@ Itemised billing per Registration/visit: clinic billing settings and service pri
 | `clinical_fact_candidates` | `id`, `tenant_id`, `clinic_id`, `extraction_run_id`, `category`, `assertion`, `subject`, `statement`, `attributes` | **Built (AI-3 v1).** Immutable by trigger |
 | `clinical_fact_evidence` | `id`, `fact_id`, `segment_id`, `correction_id`, `quote`, `char_start`, `char_end` | **Built (AI-3 v1).** Immutable by trigger |
 | `clinical_fact_reviews` | `id`, `tenant_id`, `fact_id`, `decision`, `reviewed_by_user_id`, `reviewed_at` | **Built (AI-3 v1).** Append-only by trigger |
-| `clinic_billing_settings` | `id`, `tenant_id`, `clinic_id`, GSTIN, prefix, discount limit, footer | PB-1 foundation (pending merge) |
-| `service_items` | `id`, `tenant_id`, `clinic_id`, name, category, price, tax rate, SAC, active | PB-1 foundation (pending merge) |
-| `invoices` | ownership, active key, number, FY, lifecycle, totals, snapshot, replacement | PB-1 foundation (pending merge) |
-| `invoice_lines` | invoice, position, service reference, quantities, prices, discount, tax | PB-1 foundation (pending merge) |
-| `invoice_payments` | tenant, clinic, invoice, amount, mode, received instant, void metadata | PB-1 foundation (pending merge) |
-| `invoice_number_sequences` | clinic, financial year, last number | PB-1 foundation (pending merge) |
+| `clinic_billing_settings` | `id`, `tenant_id`, `clinic_id`, GSTIN, prefix, discount limit, footer | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
+| `service_items` | `id`, `tenant_id`, `clinic_id`, name, category, price, tax rate, SAC, active | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
+| `invoices` | ownership, active key, number, FY, lifecycle, totals, snapshot, replacement | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
+| `invoice_lines` | invoice, position, service reference, quantities, prices, discount, tax | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
+| `invoice_payments` | tenant, clinic, invoice, amount, mode, received instant, void metadata | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
+| `invoice_number_sequences` | clinic, financial year, last number | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
 
 **Isolation model**: every clinic-scoped table carries `clinic_id`; every account-scoped
 table carries `account_id`. Row-level scoping is enforced in the application layer

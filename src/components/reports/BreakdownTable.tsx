@@ -9,6 +9,9 @@ interface BreakdownTableProps {
   rows: readonly BreakdownRow[];
   emptyMessage: string;
   actions?: ReactNode;
+  /** Column headings; the defaults are the revenue report's. */
+  countLabel?: string;
+  amountLabel?: string;
 }
 
 function getDoctorInitials(name: string): string {
@@ -26,6 +29,8 @@ export default function BreakdownTable({
   rows,
   emptyMessage,
   actions,
+  countLabel = "Registrations",
+  amountLabel = "Revenue",
 }: BreakdownTableProps) {
   const isDoctor = entityLabel.toLowerCase() === "doctor";
   const totalRegistrations = rows.reduce((sum, r) => sum + r.registrations, 0);
@@ -64,15 +69,15 @@ export default function BreakdownTable({
                   </th>
                   <th
                     scope="col"
-                    className="pb-3 text-right text-micro font-semibold uppercase tracking-wider text-muted"
+                    className="pb-3 px-3 text-right text-micro font-semibold uppercase tracking-wider text-muted"
                   >
-                    Registrations
+                    {countLabel}
                   </th>
                   <th
                     scope="col"
-                    className="pb-3 text-right text-micro font-semibold uppercase tracking-wider text-muted"
+                    className="pb-3 px-3 text-right text-micro font-semibold uppercase tracking-wider text-muted"
                   >
-                    Revenue
+                    {amountLabel}
                   </th>
                   <th
                     scope="col"

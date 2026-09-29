@@ -20,7 +20,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   return <section className="space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-bold">{invoice.invoiceNumber ?? "Bill"} · {INVOICE_STATUS_LABELS[invoice.status]}</h1>
-      <div className="flex flex-wrap gap-4"><Link href="/billing/dues" className="text-accent underline">Dues list</Link><Link href="/billing" className="text-accent underline">All bills</Link></div>
+      <div className="flex flex-wrap gap-4">{invoice.snapshot && <Link href={`/billing/${invoice.id}/print`} className="text-accent underline">Print bill</Link>}
+        <Link href="/billing/dues" className="text-accent underline">Dues list</Link><Link href="/billing" className="text-accent underline">All bills</Link></div>
     </header>
     {invoice.status === "CANCELLED" && isIssuedBill && <div role="note" className="space-y-1 rounded-2xl border border-alert-line bg-alert-bg p-5 text-alert-ink">
       <p className="font-semibold">Cancelled{invoice.cancelledAt ? ` on ${ist(invoice.cancelledAt)}` : ""}.</p>

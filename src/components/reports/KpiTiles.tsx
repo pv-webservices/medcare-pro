@@ -90,11 +90,13 @@ interface TileProps {
   icon: ReactNode;
   iconBg: string;
   delta: ReactNode;
-  sparklineData: readonly number[];
-  sparklineColor: string;
+  /** Omitted for a point-in-time figure, which has no trend to draw. */
+  sparklineData?: readonly number[];
+  sparklineColor?: string;
 }
 
-function Tile({
+/** One KPI tile; exported so the billing collections report uses the same tile. */
+export function Tile({
   label,
   value,
   icon,
@@ -124,9 +126,11 @@ function Tile({
 
       <div className="mt-4 flex items-end justify-between gap-2 pt-1 border-t border-line/40">
         <div className="min-w-0 flex-1">{delta}</div>
-        <div className="shrink-0">
-          <MiniSparkline data={sparklineData} color={sparklineColor} />
-        </div>
+        {sparklineData && sparklineColor && (
+          <div className="shrink-0">
+            <MiniSparkline data={sparklineData} color={sparklineColor} />
+          </div>
+        )}
       </div>
     </div>
   );
