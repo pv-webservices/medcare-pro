@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { registrationTotals } from "@/lib/registrationTotals";
 import { accessibleClinicScope, type ActorContext } from "@/lib/rbac";
 import {
   bucketKeysInRange,
@@ -181,16 +182,8 @@ async function buildSummary(
     prevAppt,
     activeDoctors,
   ] = await Promise.all([
-    prisma.registration.aggregate({
-      where: { clinicId: { in: ids }, visitDate: { gte: range.start, lt: range.end } },
-      _sum: { amount: true },
-      _count: { _all: true },
-    }),
-    prisma.registration.aggregate({
-      where: { clinicId: { in: ids }, visitDate: { gte: prev.start, lt: prev.end } },
-      _sum: { amount: true },
-      _count: { _all: true },
-    }),
+    registrationTotals({ clinicId: { in: ids }, visitDate: { gte: range.start, lt: range.end } }),
+    registrationTotals({ clinicId: { in: ids }, visitDate: { gte: prev.start, lt: prev.end } }),
     prisma.appointment.count({
       where: {
         tenantId,

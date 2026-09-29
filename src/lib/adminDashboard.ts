@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { registrationTotals } from "@/lib/registrationTotals";
 import {
   ADMIN_DASHBOARD_ACTION_PERMISSIONS as ACTION_PERMISSIONS,
   ADMIN_DASHBOARD_DATA_PERMISSIONS as DATA_PERMISSIONS,
@@ -533,12 +534,12 @@ async function loadRevenueDashboardStats(
     clinicId: { in: ids }, clinic: { tenantId: actor.tenantId }, visitDate: { gte: start, lt: end },
   });
   const [current, prior, todayAgg, weekAgg, monthAgg, previousMonthAgg, trendRows, doctorGroups] = await Promise.all([
-    prisma.registration.aggregate({ where: whereFor(range.start, range.end), _sum: { amount: true }, _count: { _all: true } }),
-    prisma.registration.aggregate({ where: whereFor(previous.start, previous.end), _sum: { amount: true } }),
-    prisma.registration.aggregate({ where: whereFor(today, tomorrow), _sum: { amount: true } }),
-    prisma.registration.aggregate({ where: whereFor(week, tomorrow), _sum: { amount: true } }),
-    prisma.registration.aggregate({ where: whereFor(month, nextMonth), _sum: { amount: true } }),
-    prisma.registration.aggregate({ where: whereFor(previousMonth, month), _sum: { amount: true } }),
+    registrationTotals(whereFor(range.start, range.end)),
+    registrationTotals(whereFor(previous.start, previous.end)),
+    registrationTotals(whereFor(today, tomorrow)),
+    registrationTotals(whereFor(week, tomorrow)),
+    registrationTotals(whereFor(month, nextMonth)),
+    registrationTotals(whereFor(previousMonth, month)),
     loadOptionalTrendRows("revenue", actor, prisma.$queryRaw<RawTrendRow[]>(Prisma.sql`
       SELECT ${dashboardBucketSql("registrations", interval)} AS bucket, SUM(r.amount) AS value
       FROM registrations r
