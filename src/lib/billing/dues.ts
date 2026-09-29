@@ -43,10 +43,14 @@ export async function listDuesForActor(actor: ActorContext, input: unknown = {},
   const where = await duesWhere(actor, filters, now);
   const [rows, summary] = await Promise.all([
     prisma.invoice.findMany({ where, select: duesSelect, orderBy: [{ issuedAt: "asc" }, { id: "asc" }], take: PAGE_SIZE, skip: (filters.page - 1) * PAGE_SIZE }),
-    prisma.invoice.aggregate({ where, _count: { _all: true }, _sum: { balanceDue: true } }),
+    // Not invoice.aggregate: Prisma wraps it in a derived table (SELECT SUM(x) FROM (SELECT …) sub),
+    // which MariaDB rejects with error 1140 under ONLY_FULL_GROUP_BY when the cached prepared
+    // statement is executed a second time. A real GROUP BY on the already-fixed status is safe
+    // under every sql_mode and keeps the exact same where. It yields at most one row.
+    prisma.invoice.groupBy({ by: ["status"], where, _count: { _all: true }, _sum: { balanceDue: true } }),
   ]);
-  return { items: rows.map((row) => dueRecord(row, now)), total: summary._count._all,
-    totalBalanceDue: (summary._sum.balanceDue?.toFixed(2)) ?? "0.00", page: filters.page, pageSize: PAGE_SIZE };
+  return { items: rows.map((row) => dueRecord(row, now)), total: summary[0]?._count._all ?? 0,
+    totalBalanceDue: summary[0]?._sum.balanceDue?.toFixed(2) ?? "0.00", page: filters.page, pageSize: PAGE_SIZE };
 }
 
 /** The same rows as the screen, additionally intersected with reports:export scope. */
