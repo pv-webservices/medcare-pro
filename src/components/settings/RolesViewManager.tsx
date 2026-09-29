@@ -9,9 +9,11 @@ import type { RolesOverview } from "@/lib/roles";
 
 interface RolesViewManagerProps {
   overview: RolesOverview;
+  /** Permission groups whose module is not installed on this database (display only). */
+  uninstalledModules?: readonly string[];
 }
 
-export default function RolesViewManager({ overview }: RolesViewManagerProps) {
+export default function RolesViewManager({ overview, uninstalledModules = [] }: RolesViewManagerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roleIdParam = searchParams.get("roleId");
@@ -50,6 +52,7 @@ export default function RolesViewManager({ overview }: RolesViewManagerProps) {
         role={editingRole}
         grantablePermissions={overview.grantablePermissions}
         canManage={overview.canManage}
+        uninstalledModules={uninstalledModules}
         onBack={handleBackToOverview}
         onSaved={() => {
           router.refresh();

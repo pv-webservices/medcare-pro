@@ -4,6 +4,8 @@ import RolesViewManager from "@/components/settings/RolesViewManager";
 import PageHeader from "@/components/ui/PageHeader";
 import Skeleton from "@/components/ui/Skeleton";
 import { PermissionError } from "@/lib/rbac";
+import { uninstalledPermissionModules } from "@/lib/featureInstallation";
+import { listMissingCatalogueFeatures } from "@/lib/featureInstallationStatus";
 import { getRolesOverview, type RolesOverview } from "@/lib/roles";
 import { requireActor, UnauthenticatedError } from "@/lib/session";
 
@@ -48,9 +50,12 @@ export default async function RolesSettingsPage() {
     );
   }
 
+  // Display only: groups whose module is not installed on this database get a note.
+  const uninstalledModules = uninstalledPermissionModules(await listMissingCatalogueFeatures());
+
   return (
     <Suspense fallback={<RolesPageSkeleton />}>
-      <RolesViewManager overview={overview} />
+      <RolesViewManager overview={overview} uninstalledModules={uninstalledModules} />
     </Suspense>
   );
 }
