@@ -1,4 +1,5 @@
 /** Read-only PB-1 deployment checks. Explicitly select the database before running. */
+import "./require-node-24.mjs";
 import "dotenv/config";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PLAN_KEY } from "@/lib/defaultFeatures";

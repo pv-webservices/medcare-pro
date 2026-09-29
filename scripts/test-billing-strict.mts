@@ -5,6 +5,7 @@
  * test-billing.mts sets the mode on that session, then checks it still holds at the end.
  * The URL is rewritten here, before @/lib/prisma is imported and builds its client.
  */
+import "./require-node-24.mjs";
 import "dotenv/config";
 
 const url = new URL(process.env.DATABASE_URL ?? "mysql://invalid");
