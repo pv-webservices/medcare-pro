@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_FEATURES, DEFAULT_PLAN_KEY } from "@/lib/defaultFeatures";
 import { planPrescriptionRoleMigration } from "@/lib/prescriptionRoleMigration";
 import { toPermissionList } from "@/lib/rbac";
+import { describeScriptError } from "@/lib/scriptErrors";
 
 const apply = process.argv.includes("--apply");
 const local = ["localhost", "127.0.0.1", "::1"].includes(
@@ -97,9 +98,10 @@ async function main() {
     );
 }
 main()
-  .catch(() => {
+  .catch((error: unknown) => {
+    // Name, code and a redacted reason only: never DATABASE_URL, credentials or data.
     console.error(
-      "Prescription backfill failed. Check schema/configuration; no clinical content is logged.",
+      `Prescription backfill failed. Check schema/configuration; no clinical content is logged. ${describeScriptError(error)}`,
     );
     process.exitCode = 1;
   })
