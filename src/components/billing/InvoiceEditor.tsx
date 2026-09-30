@@ -11,6 +11,7 @@ import type { ServiceItemRecord } from "@/lib/billing/serviceItems";
 import { saveInvoiceSchema, type InvoiceLineInput } from "@/lib/billing/invoiceValidation";
 import { computeLine, computeTotals, fromPaise } from "@/lib/billing/invoiceMath";
 import { formatRupees } from "@/lib/money";
+import { friendlyBillingIssue, friendlyBillingMessage } from "@/lib/billing/billingMessages";
 
 function editable(invoice: InvoiceRecord | null): InvoiceLineInput[] {
   return invoice?.lines.map(({ serviceItemId, description, category, quantity, unitPrice, discountAmount, taxRatePercent, sacCode }) =>
@@ -54,7 +55,7 @@ export default function InvoiceEditor({ registrationId, initial, services, mayCr
   async function perform(action: "create" | "save" | "issue" | "discard") {
     setBusy(true); setError(""); setNotice("");
     try {
-      if (action === "save" && !validation.success) throw new Error(validation.error.issues[0].message);
+      if (action === "save" && !validation.success) throw new Error(friendlyBillingIssue(validation.error.issues[0]));
       const result = action === "create" ? await request(`/api/registrations/${registrationId}/invoice`, "POST", {})
         : action === "save" ? await request(`/api/invoices/${invoice!.id}`, "PUT", validation.success ? validation.data : {})
         : await request(`/api/invoices/${invoice!.id}/${action}`, "POST", action === "issue" ? { revision: invoice!.revision } : {});
@@ -62,7 +63,7 @@ export default function InvoiceEditor({ registrationId, initial, services, mayCr
       setReview(false); setDiscard(false); setNotice("Draft saved.");
       if (action === "issue") router.push(`/billing/${result.id}`);
       if (action === "discard") router.push(`/registration/${registrationId}`);
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "The request failed. Your entered content is retained."); }
+    } catch (failure) { setError(failure instanceof Error ? friendlyBillingMessage(failure.message) : "The request failed. Your entered content is retained."); }
     finally { setBusy(false); }
   }
   if (!invoice) return <div className="space-y-4"><p>No live bill for this visit.</p>{error && <p role="alert">{error}</p>}{mayCreate && <Button isBusy={busy} onClick={() => perform("create")}>Create bill</Button>}</div>;
@@ -86,7 +87,7 @@ export default function InvoiceEditor({ registrationId, initial, services, mayCr
       </div>
     </fieldset>
     {totals ? <dl className="grid gap-3 rounded-2xl bg-canvas-deep p-4 sm:grid-cols-3">{Object.entries(totals).map(([key, value]) => <div key={key}><dt className="capitalize text-muted">{key.replace(/([A-Z])/g, " $1")}</dt><dd className="font-semibold">{formatRupees(fromPaise(value))}</dd></div>)}</dl>
-      : <p role="alert">{validation.success ? "Check the line amounts." : validation.error.issues[0].message}</p>}
+      : <p role="alert">{validation.success ? "Check the line amounts." : friendlyBillingIssue(validation.error.issues[0])}</p>}
     <div className="flex flex-wrap gap-3">
       {mayCreate && <><Button isBusy={busy} disabled={!validation.success} onClick={() => perform("save")}>Save draft</Button><Button variant="secondary" disabled={busy || dirty || !lines.length || !validation.success} onClick={() => setReview(true)}>Review bill</Button></>}
       {mayDiscard && <Button variant="danger" disabled={busy} onClick={() => setDiscard(true)}>Discard draft</Button>}
