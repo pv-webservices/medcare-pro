@@ -60,6 +60,18 @@ DRAFT → ISSUED → CANCELLED, with a replacement draft after cancellation.
   - The series SQL groups by India calendar day (`DATE_ADD(col, INTERVAL 330 MINUTE)`, where the constant comes from the helper). Those days are rolled into weeks, months and years with the same helper.
   - The collected series counts distinct visits paid for in each bucket.
 
+### Post-launch usability (billing UX)
+
+Front-desk feedback after launch. No schema, migration or dependency changes; issuing, payments and cancellation behave as before.
+
+- **Empty price list:** the bill editor explains it ("No services yet…") and links to Settings → Billing only for `billing:settings:manage`. Options read "Name — ₹price"; Add service waits for a choice.
+- **Plain-language errors:** `src/lib/billing/billingMessages.ts` is the one place internal RangeError/Zod wording becomes text a person reads, for the editor (inline, per field) and for `billingErrorResponse`. `parseDiscountPercent` accepts 0–100 with up to 2 decimals and an optional trailing "%".
+- **Labels:** categories and totals use `billingLabels.ts`; CGST/SGST rows are hidden in the editor while both are ₹0; status reads "Draft · not saved yet" / "Draft · saved".
+- **Review before issuing:** Review bill saves unsaved changes first, then loads `GET /api/invoices/[id]/preview` (DRAFT only, read-only). The preview is built with the same `calculate` and `documentTypeFor` that issuing uses, and rendered by `InvoiceDocument` in preview mode ("DRAFT — not yet issued", "Number assigned on issue"). The issued-only print route is unchanged and still 404s for drafts. After issuing, the bill page shows "Bill <number> issued." once.
+- **+ New bill:** `/billing` offers a picker (only with `invoice:create`) over recent visits from `listRegistrationsForActor` (registration:read scoping, plus an opt-in patient-code match), narrowed to clinics where the actor may create bills. Bill state comes from the live invoice (`activeKey`).
+- **Menu:** Billing follows Registrations, in `NAV_LINKS` and in `DashboardNav`'s workspace order.
+- **Owner plan control:** `npm run verify:billing:plans` checks Patient billing in the `/owner/features` and `/owner/plans` loaders, the Standard plan's default link, and the per-plan and global switches (throwaway plan; billing's global row restored).
+
 ## Security and entitlement
 
 - **Permissions:** the six billing permissions from PRD §3 (`invoice:read`, `invoice:create`, `payment:record`, `invoice:discount:override`, `invoice:cancel`, `billing:settings:manage`) are all enforced server-side through `src/lib/rbac.ts`, and no longer marked pending.
