@@ -9,6 +9,6 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
   const context = await billingPage((actor) => getInvoiceEditorForRegistration(actor, id));
   if (context.invoice?.status === "ISSUED") redirect(`/billing/${context.invoice.id}`);
   return <section className="space-y-5"><header><h1 className="text-2xl font-bold">Bill for {context.patientName}</h1><p className="text-muted">{context.clinicName} · Registration / visit</p></header>
-    <InvoiceEditor registrationId={id} initial={context.invoice} services={context.services} mayCreate={context.mayCreate} mayDiscard={context.mayDiscard} />
+    <InvoiceEditor registrationId={id} initial={context.invoice} services={context.services} mayCreate={context.mayCreate} mayDiscard={context.mayDiscard} mayManageServices={context.mayManageServices} />
   </section>;
 }

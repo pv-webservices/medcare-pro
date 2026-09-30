@@ -65,7 +65,7 @@ test("bill a visit, take part and full payment, print, void, cancel and replace"
 
   // Review, then an explicit Issue.
   await page.getByRole("button", { name: "Review bill", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("Grand total: ₹950.00");
+  await expect(page.getByRole("dialog")).toContainText(/Grand total\s*₹950\.00/);
   await page.getByRole("dialog").getByRole("button", { name: "Issue bill", exact: true }).click();
   await expect(page).toHaveURL(/\/billing\/[^/]+$/);
   const billId = page.url().split("/").at(-1)!;

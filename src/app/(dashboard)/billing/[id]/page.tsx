@@ -1,6 +1,7 @@
 import Link from "next/link";
 import InvoiceDocument from "@/components/billing/InvoiceDocument";
 import InvoiceActions from "@/components/billing/InvoiceActions";
+import IssuedNotice from "@/components/billing/IssuedNotice";
 import PaymentList from "@/components/billing/PaymentList";
 import RecordPaymentForm from "@/components/billing/RecordPaymentForm";
 import StatusPill from "@/components/ui/StatusPill";
@@ -23,6 +24,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <div className="flex flex-wrap gap-4">{invoice.snapshot && <Link href={`/billing/${invoice.id}/print`} className="text-accent underline">Print bill</Link>}
         <Link href="/billing/dues" className="text-accent underline">Dues list</Link><Link href="/billing" className="text-accent underline">All bills</Link></div>
     </header>
+    {isIssuedBill && <IssuedNotice invoiceId={invoice.id} />}
     {invoice.status === "CANCELLED" && isIssuedBill && <div role="note" className="space-y-1 rounded-2xl border border-alert-line bg-alert-bg p-5 text-alert-ink">
       <p className="font-semibold">Cancelled{invoice.cancelledAt ? ` on ${ist(invoice.cancelledAt)}` : ""}.</p>
       {invoice.cancelReason && <p className="whitespace-pre-wrap">Reason: {invoice.cancelReason}</p>}

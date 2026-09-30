@@ -1,4 +1,4 @@
-import type { InvoiceSnapshot } from "@/lib/billing/invoiceValidation";
+import type { InvoicePreviewSnapshot, InvoiceSnapshot } from "@/lib/billing/invoiceValidation";
 import Image from "next/image";
 import { amountInWords } from "@/lib/billing/amountInWords";
 import { PAYMENT_MODE_LABELS } from "@/lib/billing/billingLabels";
@@ -19,10 +19,18 @@ export interface InvoicePrintout {
   cancellation: { at: string | null; reason: string | null } | null;
 }
 
-/** Issued detail and print share this frozen document, never live profiles. */
-export default function InvoiceDocument({ snapshot, printout }: { snapshot: InvoiceSnapshot; printout?: InvoicePrintout }) {
-  return <article className="invoice-document relative space-y-6 rounded-2xl border border-line bg-canvas p-5 sm:p-8">
+/**
+ * Issued detail and print share this frozen document, never live profiles.
+ * Preview mode (a snapshot with no number yet) is the saved draft as it will be
+ * issued, before issuing: watermarked, and with no number or issue time.
+ */
+export default function InvoiceDocument({ snapshot, printout }: { snapshot: InvoiceSnapshot | InvoicePreviewSnapshot; printout?: InvoicePrintout }) {
+  const preview = snapshot.invoiceNumber === null;
+  return <article className={`invoice-document relative space-y-6 rounded-2xl border border-line bg-canvas p-5 sm:p-8${preview ? " overflow-hidden" : ""}`}>
     {printout?.cancellation && <div aria-hidden="true" className="invoice-watermark">CANCELLED</div>}
+    {preview && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
+      <span className="-rotate-[30deg] whitespace-nowrap text-3xl font-extrabold tracking-widest text-ink/10 sm:text-5xl">DRAFT — not yet issued</span>
+    </div>}
     <header className="flex flex-wrap justify-between gap-4">
       <div>
         {snapshot.clinic.logoUrl && <Image src={snapshot.clinic.logoUrl} alt={`${snapshot.clinic.name} logo`} width={192} height={64} unoptimized className="mb-3 h-16 max-w-48 object-contain" />}
@@ -31,7 +39,9 @@ export default function InvoiceDocument({ snapshot, printout }: { snapshot: Invo
         {snapshot.clinic.gstin && <p>GSTIN: {snapshot.clinic.gstin}</p>}
       </div>
       <div><h1 className="text-2xl font-bold">{({ INVOICE: "Invoice", TAX_INVOICE: "Tax Invoice", BILL_OF_SUPPLY: "Bill of Supply" })[snapshot.documentType]}</h1>
-        <p>{snapshot.invoiceNumber}</p><p>{new Date(snapshot.issuedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</p></div>
+        {snapshot.invoiceNumber === null
+          ? <><p className="text-muted">Number assigned on issue</p><p className="text-muted">Dated when issued</p></>
+          : <><p>{snapshot.invoiceNumber}</p><p>{new Date(snapshot.issuedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</p></>}</div>
     </header>
     {printout?.cancellation && <div role="note" className="invoice-cancelled rounded-xl border border-alert-line bg-alert-bg p-4 text-alert-ink">
       <p className="font-semibold">CANCELLED{printout.cancellation.at ? ` on ${istDateTime(printout.cancellation.at)}` : ""}. This bill is not payable.</p>

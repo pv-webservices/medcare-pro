@@ -486,9 +486,16 @@ async function assertRegistrationVisible(
   return registration;
 }
 
+/** Internal options for callers other than the Registrations page. */
+interface RegistrationListOptions {
+  /** Also match the search text against the patient code (the "+ New bill" picker). */
+  matchPatientCode?: boolean;
+}
+
 async function buildWhere(
   actor: ActorContext,
   filters: RegistrationFilters,
+  options: RegistrationListOptions = {},
 ): Promise<Prisma.RegistrationWhereInput | null> {
   const clinicWhere = await clinicWhereForActor(
     actor,
@@ -528,6 +535,7 @@ async function buildWhere(
       OR: [
         { name: { contains: filters.search } },
         { mobileNumber: { contains: filters.search } },
+        ...(options.matchPatientCode ? [{ patientCode: { contains: filters.search } }] : []),
       ],
     };
   }
@@ -543,9 +551,10 @@ async function buildWhere(
 export async function listRegistrationsForActor(
   actor: ActorContext,
   filters: RegistrationFilters,
+  options: RegistrationListOptions = {},
 ): Promise<RegistrationPage> {
   const page = filters.page ?? 1;
-  const where = await buildWhere(actor, filters);
+  const where = await buildWhere(actor, filters, options);
 
   if (!where) {
     return { rows: [], total: 0, page, pageSize: PAGE_SIZE };

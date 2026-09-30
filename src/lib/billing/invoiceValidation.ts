@@ -76,3 +76,5 @@ export interface InvoiceSnapshot {
   documentType: "INVOICE" | "TAX_INVOICE" | "BILL_OF_SUPPLY";
   issuedAt: string;
 }
+/** A draft shown as it will print: live details, saved lines, no number or issue time yet. */
+export type InvoicePreviewSnapshot = Omit<InvoiceSnapshot, "invoiceNumber" | "issuedAt"> & { invoiceNumber: null; issuedAt: null };

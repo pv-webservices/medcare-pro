@@ -82,6 +82,7 @@
     "test:e2e:patient-portal": "playwright test --config=playwright.patient-portal.config.ts",
     "billing:backfill": "tsx scripts/backfill-billing.mts",
     "verify:billing": "tsx scripts/verify-billing.mts",
+    "verify:billing:plans": "tsx scripts/verify-billing-plan-control.mts",
     "test:billing": "tsx scripts/test-billing.mts",
     "test:billing:strict": "tsx scripts/test-billing-strict.mts",
     "test:e2e:billing": "playwright test --config=playwright.billing.config.ts"
