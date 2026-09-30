@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
@@ -15,8 +16,10 @@ function editable(invoice: InvoiceRecord | null): InvoiceLineInput[] {
   return invoice?.lines.map(({ serviceItemId, description, category, quantity, unitPrice, discountAmount, taxRatePercent, sacCode }) =>
     ({ serviceItemId, description, category, quantity, unitPrice, discountAmount, taxRatePercent, sacCode })) ?? [];
 }
-export default function InvoiceEditor({ registrationId, initial, services, mayCreate, mayDiscard }: {
+export default function InvoiceEditor({ registrationId, initial, services, mayCreate, mayDiscard, mayManageServices = false }: {
   registrationId: string; initial: InvoiceRecord | null; services: ServiceItemRecord[]; mayCreate: boolean; mayDiscard: boolean;
+  /** Links an empty price list to Settings → Billing; display only. */
+  mayManageServices?: boolean;
 }) {
   const router = useRouter();
   const [invoice, setInvoice] = useState(initial);
@@ -71,8 +74,14 @@ export default function InvoiceEditor({ registrationId, initial, services, mayCr
       {lines.map((line, index) => <InvoiceLineBuilder key={index} line={line} index={index}
         onChange={(next) => setLines(lines.map((old, i) => i === index ? next : old))} onRemove={() => setLines(lines.filter((_, i) => i !== index))} />)}
       <div className="flex flex-wrap items-end gap-3">
-        <Select id="bill-service" label="Service" value={serviceId} onChange={(e) => setServiceId(e.target.value)}><option value="">Select service</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name} · {formatRupees(service.price)}</option>)}</Select>
-        <Button variant="secondary" disabled={!serviceId} onClick={() => { const service = services.find((item) => item.id === serviceId)!; setLines([...lines, { serviceItemId: service.id, description: service.name, category: service.category, quantity: 1, unitPrice: service.price, discountAmount: "0.00", taxRatePercent: service.taxRatePercent, sacCode: service.sacCode }]); }}>Add service</Button>
+        {services.length === 0
+          ? <p role="note" className="rounded-2xl border border-line bg-canvas-deep px-4 py-3 text-body">
+            {mayManageServices
+              ? <>No services yet. Add your price list in <Link href="/settings/billing" className="font-semibold text-accent underline">Settings → Billing</Link>, or use Add custom line.</>
+              : "No services yet. Ask an admin to add services, or use Add custom line."}
+          </p>
+          : <><Select id="bill-service" label="Service" value={serviceId} onChange={(e) => setServiceId(e.target.value)}><option value="">Select service</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name} — {formatRupees(service.price)}</option>)}</Select>
+        <Button variant="secondary" disabled={!serviceId} onClick={() => { const service = services.find((item) => item.id === serviceId)!; setLines([...lines, { serviceItemId: service.id, description: service.name, category: service.category, quantity: 1, unitPrice: service.price, discountAmount: "0.00", taxRatePercent: service.taxRatePercent, sacCode: service.sacCode }]); setServiceId(""); }}>Add service</Button></>}
         <Button variant="secondary" onClick={() => setLines([...lines, { serviceItemId: null, description: "", category: "OTHER", quantity: 1, unitPrice: "0.00", discountAmount: "0.00", taxRatePercent: "0.00", sacCode: null }])}>Add custom line</Button>
       </div>
     </fieldset>

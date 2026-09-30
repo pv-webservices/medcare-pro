@@ -110,6 +110,8 @@ export async function getInvoiceEditorForRegistration(actor: ActorContext, regis
   return { invoice, patientName: visit.patient.name, clinicName: visit.clinic.name,
     mayCreate: await can(actor, "invoice:create", visit.clinicId),
     mayDiscard: !invoice || invoice.createdById === actor.userId || await can(actor, "invoice:cancel", visit.clinicId),
+    // Display only: whether to link an empty price list to Settings → Billing.
+    mayManageServices: await can(actor, "billing:settings:manage", visit.clinicId),
     services: await listBillableServicesForClinic(visit.clinicId) };
 }
 export async function createDraftInvoice(actor: ActorContext, registrationId: string) {
