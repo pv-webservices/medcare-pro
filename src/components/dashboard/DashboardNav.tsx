@@ -55,6 +55,9 @@ function groupLinks(links: readonly NavLink[]): NavGroup[] {
     "/appointments",
     "/tasks",
     "/registration",
+    // Billing follows Registrations (src/lib/navigation.ts). Missing from this
+    // list, it sorted first: indexOf() of an unlisted href is -1.
+    "/billing",
     "/prescriptions",
     "/reports",
     "/notifications",

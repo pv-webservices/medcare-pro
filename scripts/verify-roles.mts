@@ -521,7 +521,7 @@ async function main(): Promise<void> {
     // PB-3 added Billing, earned the same way: Staff holds `invoice:read` per
     // the billing PRD. It is read-only for them — test:billing pins that a
     // Staff role cannot create an invoice.
-    staffTabs.join(",") === "Billing,Dashboard,Tasks,Registrations,Doctors,Settings",
+    staffTabs.join(",") === "Dashboard,Tasks,Registrations,Billing,Doctors,Settings",
     staffTabs,
   );
   check(

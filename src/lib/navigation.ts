@@ -49,7 +49,6 @@ export interface NavLink {
 }
 
 export const NAV_LINKS: readonly NavLink[] = [
-  { href: "/billing", label: "Billing", permission: "invoice:read", feature: "billing" },
   { href: "/prescriptions", label: "Prescriptions", permission: "prescription:read", feature: "prescriptions" },
   // The landing page after sign-in. Always reachable, so a user whose roles
   // grant nothing still lands somewhere rather than on an empty sidebar.
@@ -66,6 +65,8 @@ export const NAV_LINKS: readonly NavLink[] = [
     feature: "tasks",
   },
   { href: "/registration", label: "Registrations", permission: "registration:read", feature: "registrations" },
+  // Right after Registrations: a visit is registered, then billed.
+  { href: "/billing", label: "Billing", permission: "invoice:read", feature: "billing" },
   { href: "/doctors", label: "Doctors", permission: "doctor:read", feature: "doctors" },
   // NO CLINICS TAB. An account is created WITH its clinic — signup collects the
   // name, city and address, and api/auth/signup creates the row — so a screen
