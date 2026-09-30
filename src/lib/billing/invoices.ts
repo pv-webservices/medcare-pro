@@ -13,6 +13,7 @@ import { listBillableServicesForClinic } from "./serviceItems";
 import { computeLine, computeTotals, derivePaymentStatus, exceedsDiscountLimit, fromPaise, toPaise } from "./invoiceMath";
 import { financialYearFor } from "./financialYear";
 import { formatInvoiceNumber } from "./invoiceNumber";
+import { documentTypeFor } from "./documentType";
 import { billingReasonSchema, invoiceFiltersSchema, issueInvoiceSchema, saveInvoiceSchema, type InvoiceLineInput, type InvoiceSnapshot } from "./invoiceValidation";
 
 const include = { lines: { orderBy: { position: "asc" as const } } } satisfies Prisma.InvoiceInclude;
@@ -37,7 +38,7 @@ function totalsRecord(row: Invoice) {
   return { subtotal: row.subtotal.toFixed(2), discountTotal: row.discountTotal.toFixed(2), taxableTotal: row.taxableTotal.toFixed(2),
     cgstTotal: row.cgstTotal.toFixed(2), sgstTotal: row.sgstTotal.toFixed(2), grandTotal: row.grandTotal.toFixed(2) };
 }
-function linesRecord(row: Invoice) {
+export function linesRecord(row: Invoice) {
   return row.lines.map((line) => ({ position: line.position, serviceItemId: line.serviceItemId, description: line.description,
     category: line.category, quantity: line.quantity, unitPrice: line.unitPrice.toFixed(2), discountAmount: line.discountAmount.toFixed(2),
     taxRatePercent: line.taxRatePercent.toFixed(2), sacCode: line.sacCode, taxableAmount: line.taxableAmount.toFixed(2),
@@ -54,7 +55,7 @@ function record(row: Invoice) {
 export { record as toInvoiceRecord };
 export type InvoiceRecord = ReturnType<typeof record>;
 
-function calculate(lines: InvoiceLineInput[]) {
+export function calculate(lines: InvoiceLineInput[]) {
   try {
     const computed = lines.map(computeLine);
     const totals = computeTotals(computed);
@@ -184,7 +185,7 @@ export async function issueInvoice(actor: ActorContext, id: string, input: unkno
         if (next > 99999) throw new ConflictError("This clinic has used all invoice numbers for this financial year.");
         const invoiceNumber = formatInvoiceNumber(settings.invoicePrefix, financialYear, next);
         await tx.invoiceNumberSequence.update({ where: { clinicId_financialYear: { clinicId: visit.clinicId, financialYear } }, data: { lastNumber: next } });
-        const documentType = !settings.gstin ? "INVOICE" : taxed ? "TAX_INVOICE" : "BILL_OF_SUPPLY";
+        const documentType = documentTypeFor(settings.gstin, taxed);
         const snapshot: InvoiceSnapshot = {
           clinic: { name: visit.clinic.name, legalName: settings.legalName, address: visit.clinic.address, city: visit.clinic.city,
             logoUrl: visit.clinic.logoUrl, gstin: settings.gstin, footerNote: settings.footerNote },

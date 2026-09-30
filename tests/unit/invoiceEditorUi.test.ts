@@ -75,3 +75,49 @@ describe("invoiceTotalRows", () => {
       .toEqual(["Subtotal", "Discount", "Taxable amount", "CGST", "SGST", "Grand total"]);
   });
 });
+
+describe("bill preview before issuing", () => {
+  it("renders the saved draft as the future document, watermarked and without a number", async () => {
+    const { default: InvoiceDocument } = await import("@/components/billing/InvoiceDocument");
+    const preview = {
+      clinic: { name: "Synthetic Clinic", legalName: null, address: "1 Test Road", city: "Pune", logoUrl: null, gstin: "27AAAAA0000A1Z5", footerNote: null },
+      patient: { patientCode: "P-0001", name: "Test Patient", age: 30, gender: "Female", mobileNumber: "9000000000", city: null },
+      doctor: { name: "Dr Synthetic", department: "General" }, visit: { date: "2026-09-30T10:00:00.000Z", type: "NEW" },
+      lines: draft.lines, totals: draft.totals, documentType: "BILL_OF_SUPPLY", invoiceNumber: null, issuedAt: null,
+    } as const;
+    const html = renderToStaticMarkup(createElement(InvoiceDocument, { snapshot: preview as never }));
+    expect(html).toContain("DRAFT — not yet issued");
+    expect(html).toContain("Number assigned on issue");
+    expect(html).toContain("Bill of Supply");
+    for (const text of ["Synthetic Clinic", "Test Patient · P-0001", "9000000000", "Dr Synthetic", "Consultation", "Amount in words:"]) expect(html).toContain(text);
+    expect(html).not.toContain("Invalid Date");
+  });
+
+  it("leaves issued documents unchanged: number shown, no draft watermark", async () => {
+    const { default: InvoiceDocument } = await import("@/components/billing/InvoiceDocument");
+    const issued = {
+      clinic: { name: "Synthetic Clinic", legalName: null, address: "", city: "", logoUrl: null, gstin: null, footerNote: null },
+      patient: { patientCode: "P-0001", name: "Test Patient", age: null, gender: null, mobileNumber: "9000000000", city: null },
+      doctor: null, visit: { date: "2026-09-30T10:00:00.000Z", type: "NEW" }, lines: draft.lines, totals: draft.totals,
+      documentType: "INVOICE", invoiceNumber: "INV-2627-00001", issuedAt: "2026-09-30T10:05:00.000Z",
+    } as const;
+    const html = renderToStaticMarkup(createElement(InvoiceDocument, { snapshot: issued as never }));
+    expect(html).toContain("INV-2627-00001");
+    expect(html).not.toContain("DRAFT — not yet issued");
+    expect(html).not.toContain("Number assigned on issue");
+  });
+
+  it("keeps Review enabled: it saves first rather than waiting on Save draft", () => {
+    const html = render({ services: [xray] });
+    expect(html).toMatch(/<button(?![^>]*disabled="")[^>]*>Review bill<\/button>/);
+  });
+});
+
+describe("documentTypeFor", () => {
+  it("matches what issuing assigns", async () => {
+    const { documentTypeFor } = await import("@/lib/billing/documentType");
+    expect(documentTypeFor(null, false)).toBe("INVOICE");
+    expect(documentTypeFor("27AAAAA0000A1Z5", true)).toBe("TAX_INVOICE");
+    expect(documentTypeFor("27AAAAA0000A1Z5", false)).toBe("BILL_OF_SUPPLY");
+  });
+});

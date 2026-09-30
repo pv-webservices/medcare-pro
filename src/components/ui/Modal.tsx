@@ -54,7 +54,7 @@ interface ModalProps {
   footer?: ReactNode;
   /** Blocks Escape and backdrop dismissal — for a write already in flight. */
   isBusy?: boolean;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   children?: ReactNode;
 }
 
@@ -62,6 +62,8 @@ const SIZES = {
   sm: "max-w-md",
   md: "max-w-lg",
   lg: "max-w-2xl",
+  /** A document preview: wide enough for an item table on desktop. */
+  xl: "max-w-4xl",
 } as const;
 
 export default function Modal({
