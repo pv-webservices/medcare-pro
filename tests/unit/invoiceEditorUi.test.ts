@@ -121,3 +121,18 @@ describe("documentTypeFor", () => {
     expect(documentTypeFor("27AAAAA0000A1Z5", false)).toBe("BILL_OF_SUPPLY");
   });
 });
+
+describe("+ New bill picker labels", () => {
+  it("names each visit's bill state for the front desk", async () => {
+    const { NEW_BILL_STATUS_LABELS, NEW_BILL_STATUS_TONES } = await import("@/lib/billing/billingLabels");
+    expect(NEW_BILL_STATUS_LABELS).toEqual({ NOT_BILLED: "Not billed", DRAFT: "Draft", ISSUED: "Issued" });
+    expect(Object.keys(NEW_BILL_STATUS_TONES).sort()).toEqual(Object.keys(NEW_BILL_STATUS_LABELS).sort());
+  });
+
+  it("renders only the + New bill button until opened", async () => {
+    const { default: NewBillPicker } = await import("@/components/billing/NewBillPicker");
+    const html = renderToStaticMarkup(createElement(NewBillPicker));
+    expect(html).toContain(">+ New bill</button>");
+    expect(html).not.toContain('role="dialog"');
+  });
+});

@@ -2,7 +2,9 @@ import Link from "next/link";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
+import NewBillPicker from "@/components/billing/NewBillPicker";
 import { billingPage } from "@/lib/billing/billingPages";
+import { mayStartBills } from "@/lib/billing/newBill";
 import { getInvoiceFilterOptions, listInvoicesForActor } from "@/lib/billing/invoices";
 import { invoiceFiltersSchema } from "@/lib/billing/invoiceValidation";
 import { formatRupees } from "@/lib/money";
@@ -13,9 +15,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const query = Object.fromEntries(Object.entries(await searchParams).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""));
   const parsed = invoiceFiltersSchema.safeParse(query);
   const filters = parsed.success ? parsed.data : invoiceFiltersSchema.parse({});
-  const [invoices, options] = await billingPage((actor) => Promise.all([listInvoicesForActor(actor, filters), getInvoiceFilterOptions(actor)]));
+  const [invoices, options, mayCreate] = await billingPage((actor) => Promise.all([listInvoicesForActor(actor, filters), getInvoiceFilterOptions(actor), mayStartBills(actor)]));
   const link = (page: number) => `/billing?${new URLSearchParams({ ...(parsed.success ? query : {}), page: String(page) })}`;
-  return <section className="space-y-5"><header className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold">Billing</h1><p className="text-muted">Prepare a bill from its registration / visit.</p></div><Link href="/billing/dues" className="font-semibold text-accent underline">Dues list</Link></header>
+  return <section className="space-y-5"><header className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold">Billing</h1><p className="text-muted">Prepare a bill from its registration / visit.</p></div><div className="flex flex-wrap items-center gap-4"><Link href="/billing/dues" className="font-semibold text-accent underline">Dues list</Link>{mayCreate && <NewBillPicker />}</div></header>
     {!parsed.success && <p role="alert">Invalid filters. Showing bills within your permitted clinics.</p>}
     <form className="grid items-end gap-3 rounded-2xl border border-line bg-canvas p-5 sm:grid-cols-3">
       <Input id="invoice-search" name="search" label="Patient / mobile / code / invoice number" defaultValue={filters.search} maxLength={200} />
