@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import type { InvoiceLineInput } from "@/lib/billing/invoiceValidation";
 import { serviceCategories } from "@/lib/billing/billingValidation";
 import { discountAmountForPercent } from "@/lib/billing/invoiceMath";
+import { SERVICE_CATEGORY_LABELS } from "@/lib/billing/billingLabels";
 import { BILLING_MESSAGES, friendlyBillingMessage, lineFieldErrors, parseDiscountPercent, type LineField } from "@/lib/billing/billingMessages";
 
 export default function InvoiceLineBuilder({ line, index, onChange, onRemove, showErrors = false }: {
@@ -39,7 +40,7 @@ export default function InvoiceLineBuilder({ line, index, onChange, onRemove, sh
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Input id={`${id}-description`} label="Description" value={line.description} maxLength={200} error={errorFor("description")}
         onChange={(e) => change("description", { ...line, description: e.target.value })} />
-      <Select id={`${id}-category`} label="Category" value={line.category} onChange={(e) => onChange({ ...line, category: e.target.value as InvoiceLineInput["category"] })}>{serviceCategories.map((category) => <option key={category}>{category}</option>)}</Select>
+      <Select id={`${id}-category`} label="Category" value={line.category} onChange={(e) => onChange({ ...line, category: e.target.value as InvoiceLineInput["category"] })}>{serviceCategories.map((category) => <option key={category} value={category}>{SERVICE_CATEGORY_LABELS[category]}</option>)}</Select>
       <Input id={`${id}-qty`} label="Quantity" type="number" min={1} max={999} step={1} error={errorFor("quantity")}
         value={Number.isNaN(line.quantity) ? "" : line.quantity} onChange={(e) => change("quantity", { ...line, quantity: e.target.value === "" ? NaN : Number(e.target.value) })} />
       <Input id={`${id}-price`} label="Rate (₹)" inputMode="decimal" value={line.unitPrice} error={errorFor("unitPrice")}

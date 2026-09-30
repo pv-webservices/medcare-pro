@@ -46,3 +46,32 @@ describe("bill editor service picker", () => {
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Add service<\/button>/);
   });
 });
+
+describe("bill editor labels", () => {
+  it("shows categories, totals and status in front-desk wording", () => {
+    const html = render({ services: [xray] });
+    expect(html).toContain('<option value="CONSULTATION" selected="">Consultation</option>');
+    expect(html).toContain(">Procedure</option>");
+    expect(html).not.toContain(">CONSULTATION</option>");
+    for (const label of ["Subtotal", "Discount", "Taxable amount", "Grand total"]) expect(html).toContain(`>${label}</dt>`);
+    expect(html).toContain("Draft · saved");
+  });
+
+  it("hides CGST and SGST while both are ₹0 and shows them once GST applies", () => {
+    expect(render()).not.toContain(">CGST</dt>");
+    const taxed = { ...draft, lines: [{ ...draft.lines[0], taxRatePercent: "18.00" }] } as InvoiceRecord;
+    const html = renderToStaticMarkup(createElement(InvoiceEditor, { registrationId: "reg-1", initial: taxed, services: [], mayCreate: true, mayDiscard: true }));
+    expect(html).toContain(">CGST</dt>");
+    expect(html).toContain(">SGST</dt>");
+  });
+});
+
+describe("invoiceTotalRows", () => {
+  it("labels totals in order and drops zero GST rows", async () => {
+    const { invoiceTotalRows } = await import("@/lib/billing/billingLabels");
+    const zeroGst = { subtotal: "500.00", discountTotal: "0.00", taxableTotal: "500.00", cgstTotal: "0.00", sgstTotal: "0.00", grandTotal: "500.00" };
+    expect(invoiceTotalRows(zeroGst).map((row) => row.label)).toEqual(["Subtotal", "Discount", "Taxable amount", "Grand total"]);
+    expect(invoiceTotalRows({ ...zeroGst, cgstTotal: 45, sgstTotal: 45 } as never).map((row) => row.label))
+      .toEqual(["Subtotal", "Discount", "Taxable amount", "CGST", "SGST", "Grand total"]);
+  });
+});

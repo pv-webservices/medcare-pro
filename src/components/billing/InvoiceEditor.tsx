@@ -12,6 +12,7 @@ import { saveInvoiceSchema, type InvoiceLineInput } from "@/lib/billing/invoiceV
 import { computeLine, computeTotals, fromPaise } from "@/lib/billing/invoiceMath";
 import { formatRupees } from "@/lib/money";
 import { friendlyBillingIssue, friendlyBillingMessage } from "@/lib/billing/billingMessages";
+import { invoiceTotalRows } from "@/lib/billing/billingLabels";
 
 function editable(invoice: InvoiceRecord | null): InvoiceLineInput[] {
   return invoice?.lines.map(({ serviceItemId, description, category, quantity, unitPrice, discountAmount, taxRatePercent, sacCode }) =>
@@ -69,7 +70,7 @@ export default function InvoiceEditor({ registrationId, initial, services, mayCr
   if (!invoice) return <div className="space-y-4"><p>No live bill for this visit.</p>{error && <p role="alert">{error}</p>}{mayCreate && <Button isBusy={busy} onClick={() => perform("create")}>Create bill</Button>}</div>;
   if (invoice.status !== "DRAFT") return <p>Bill {invoice.status.toLowerCase()}.</p>;
   return <div className="space-y-5">
-    <p className="text-muted">Draft · {dirty ? "Unsaved changes" : "All changes saved"}</p>
+    <p className="text-muted">Draft · {dirty ? "not saved yet" : "saved"}</p>
     {error && <p role="alert" className="text-alert-ink">{error}</p>}{notice && <p role="status">{notice}</p>}
     <fieldset disabled={busy || !mayCreate} className="space-y-4">
       {lines.map((line, index) => <InvoiceLineBuilder key={index} line={line} index={index}
@@ -86,7 +87,7 @@ export default function InvoiceEditor({ registrationId, initial, services, mayCr
         <Button variant="secondary" onClick={() => setLines([...lines, { serviceItemId: null, description: "", category: "OTHER", quantity: 1, unitPrice: "0.00", discountAmount: "0.00", taxRatePercent: "0.00", sacCode: null }])}>Add custom line</Button>
       </div>
     </fieldset>
-    {totals ? <dl className="grid gap-3 rounded-2xl bg-canvas-deep p-4 sm:grid-cols-3">{Object.entries(totals).map(([key, value]) => <div key={key}><dt className="capitalize text-muted">{key.replace(/([A-Z])/g, " $1")}</dt><dd className="font-semibold">{formatRupees(fromPaise(value))}</dd></div>)}</dl>
+    {totals ? <dl className="grid gap-3 rounded-2xl bg-canvas-deep p-4 sm:grid-cols-3">{invoiceTotalRows(totals).map(({ key, label, value }) => <div key={key}><dt className="text-muted">{label}</dt><dd className="font-semibold">{formatRupees(fromPaise(value))}</dd></div>)}</dl>
       : <p role="alert">{validation.success ? "Check the line amounts." : friendlyBillingIssue(validation.error.issues[0])}</p>}
     <div className="flex flex-wrap gap-3">
       {mayCreate && <><Button isBusy={busy} disabled={!validation.success} onClick={() => perform("save")}>Save draft</Button><Button variant="secondary" disabled={busy || dirty || !lines.length || !validation.success} onClick={() => setReview(true)}>Review bill</Button></>}
