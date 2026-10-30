@@ -56,3 +56,7 @@ next-env.d.ts
 /.playwright-mcp/
 # Temporary development clinical audio; never commit patient audio.
 .private_clinical_audio/
+
+# Deployment bundles — contain a .env with secrets; never commit.
+/medcare-pro-deploy.zip
+*-deploy.zip
