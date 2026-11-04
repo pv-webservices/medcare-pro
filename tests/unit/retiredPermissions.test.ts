@@ -10,6 +10,7 @@ import {
   ALL_PERMISSIONS,
   PERMISSION_GROUPS,
   RETIRED_PERMISSION_KEYS,
+  RETIRED_PERMISSIONS,
   isKnownPermission,
 } from "@/lib/permissions";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
@@ -50,12 +51,17 @@ describe("retired Clinical AI permission keys (RM-1)", () => {
   });
 
   it("fit in a role save that still carries them on a full-catalogue role", () => {
+    // Worst case: a role stored before RM-1 and RM-2 holds both retired sets.
     const result = roleMutationSchema.safeParse({
       action: "updateRole",
       roleId: "role-1",
-      permissions: [...ALL_PERMISSIONS, ...retired],
+      permissions: [...ALL_PERMISSIONS, ...retired, ...RETIRED_PERMISSIONS],
     });
     expect(result.success).toBe(true);
+    // RM-1 keys are kept on the role (option A); RM-2 keys are dropped.
+    const saved = result.success && result.data.action === "updateRole" ? result.data.permissions ?? [] : [];
+    for (const key of retired) expect(saved).toContain(key);
+    for (const key of RETIRED_PERMISSIONS) expect(saved).not.toContain(key);
   });
 
   it("does not make unrelated strings known", () => {

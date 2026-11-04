@@ -489,22 +489,30 @@ function withRetiredAfter(
 export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
   Partial<Record<RoleKey, readonly string[]>>
 > = {
-  [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
-    (permission) =>
-      permission !== "patient_portal:manage" &&
-      !BILLING_PERMISSIONS.includes(permission) &&
-      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
-      !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
+  [ROLE_KEYS.CLINIC_ADMIN]: withRetiredAfter(
+    ALL_PERMISSIONS.filter(
+      (permission) =>
+        permission !== "patient_portal:manage" &&
+        !BILLING_PERMISSIONS.includes(permission) &&
+        !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+        !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
+    ),
+    "dashboard:clinics:view",
+    RETIRED_PERMISSIONS,
   ),
-  [ROLE_KEYS.DOCTOR]: DEFAULT_ROLES.find(
-    (role) => role.key === ROLE_KEYS.DOCTOR,
-  )!.permissions.filter(
-    (permission) =>
-      permission !== "patient_portal:manage" &&
-      !BILLING_PERMISSIONS.includes(permission) &&
-      !PRESCRIPTION_PERMISSIONS.includes(permission),
-  ).map((permission) =>
-    permission === "appointment:self:read" ? "appointment:read" : permission,
+  [ROLE_KEYS.DOCTOR]: withRetiredAfter(
+    DEFAULT_ROLES.find(
+      (role) => role.key === ROLE_KEYS.DOCTOR,
+    )!.permissions.filter(
+      (permission) =>
+        permission !== "patient_portal:manage" &&
+        !BILLING_PERMISSIONS.includes(permission) &&
+        !PRESCRIPTION_PERMISSIONS.includes(permission),
+    ).map((permission) =>
+      permission === "appointment:self:read" ? "appointment:read" : permission,
+    ),
+    "dashboard:view",
+    ["dashboard:customize"],
   ),
 };
 
