@@ -67,8 +67,9 @@ export const DASHBOARD_DATA_PERMISSIONS = [
  * grant nothing. Role writes drop them instead of rejecting them as unknown,
  * because the Roles editor sends a role's whole stored list back on save.
  *
- * RM-2 (Nov 2026) retired the adjustable dashboard. RM-3 removes these keys
- * from stored roles and then deletes this list.
+ * RM-2 (Nov 2026) retired the adjustable dashboard. RM-3's
+ * scripts/clean-retired-catalogue.mts strips these keys from stored roles; this
+ * list can go once that has run in production and a dry run reports no roles.
  */
 export const RETIRED_PERMISSIONS: readonly string[] = [
   "dashboard:customize",
@@ -115,7 +116,9 @@ const LEGACY_PERMISSION_KEYS = new Set(Object.values(LEGACY_PERMISSION_ALIASES).
  * granted to new roles, and nothing checks them — they grant nothing. They are
  * accepted as known only so that saving an existing role that still carries
  * them (the roles editor submits the stored set back) does not fail with
- * "Unknown permission". Dropped, together with a stored-data cleanup, in RM-3.
+ * "Unknown permission". RM-3's scripts/clean-retired-catalogue.mts strips them
+ * from stored roles; this set can go once that has run in production and a dry
+ * run reports no roles.
  *
  * RM-1 (Nov 2026): the Clinical AI module was removed.
  */

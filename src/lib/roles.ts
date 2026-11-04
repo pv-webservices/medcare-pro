@@ -56,7 +56,8 @@ const permissionListSchema = z
   // Deduped rather than rejected: two ticks of the same box is not a user error.
   // Retired keys are dropped rather than rejected: the Roles editor sends a
   // role's stored list back on save, so rejecting them would make every role
-  // that still holds one unsaveable until RM-3 cleans the rows.
+  // that still holds one unsaveable until scripts/clean-retired-catalogue.mts
+  // has cleaned the rows.
   .transform((values) => withoutRetiredPermissions([...new Set(values)]));
 
 export const createRoleSchema = z.object({
