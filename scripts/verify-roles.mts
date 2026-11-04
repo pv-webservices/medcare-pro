@@ -537,14 +537,14 @@ async function main(): Promise<void> {
     // PB-2 added Patient billing, opened by `invoice:read`, which Staff holds
     // per the billing PRD. It is read-only for them: the next check pins that
     // `billing:settings:manage` stays out of their reach.
-    "inside Settings Staff reach read-only billing, personal dashboard and read-only branding",
+    "inside Settings Staff reach read-only billing and read-only branding",
     staffSections.map((section) => section.href).join(",") ===
-      "/settings/billing,/settings/dashboard,/settings/branding",
+      "/settings/billing,/settings/branding",
     staffSections.map((section) => section.href),
   );
   check(
-    "Staff can customize their dashboard but cannot manage clinic branding",
-    staffSections.every((section) => canManageSection(section, staffHolds) === (section.href === "/settings/dashboard")),
+    "Staff cannot manage billing settings or clinic branding",
+    staffSections.every((section) => !canManageSection(section, staffHolds)),
   );
 
   check(

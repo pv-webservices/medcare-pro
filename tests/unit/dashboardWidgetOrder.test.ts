@@ -1,73 +1,71 @@
 import { describe, expect, it } from "vitest";
-import { reorderVisibleDashboardWidgets } from "@/lib/dashboardWidgetOrder";
-import type { DashboardWidgetId, DashboardWidgetPreference } from "@/lib/dashboardWidgets";
+import { DASHBOARD_WIDGET_LIST, type DashboardWidgetId } from "@/lib/dashboardWidgets";
+import {
+  DOCTOR_DASHBOARD_WIDGETS,
+  STANDARD_DASHBOARD_WIDGETS,
+  fixedDashboardWidgets,
+} from "@/lib/dashboardWidgetOrder";
 
-function preference(
-  widgetId: DashboardWidgetId,
-  order: number,
-  visible = true,
-): DashboardWidgetPreference {
-  return { widgetId, order, visible, size: "small" };
-}
+const all = new Set<DashboardWidgetId>(DASHBOARD_WIDGET_LIST.map((widget) => widget.id));
 
-describe("visible dashboard widget ordering", () => {
-  it("moves a trailing widget before an earlier visible widget and normalizes orders", () => {
-    const current = [
-      preference("total-patients", 0),
-      preference("todays-appointments", 1),
-      preference("todays-collection", 2),
-      preference("month-revenue", 3),
-    ];
-
-    const result = reorderVisibleDashboardWidgets(
-      current,
-      "month-revenue",
-      "todays-appointments",
-    );
-
-    expect(result.map((item) => item.widgetId)).toEqual([
-      "total-patients",
-      "month-revenue",
-      "todays-appointments",
-      "todays-collection",
+describe("fixed dashboard order", () => {
+  it("shows the standard default exactly as a user with no saved layout saw it", () => {
+    expect(fixedDashboardWidgets("standard", all)).toEqual([
+      { widgetId: "total-patients", size: "small" },
+      { widgetId: "todays-appointments", size: "small" },
+      { widgetId: "todays-collection", size: "small" },
+      { widgetId: "month-revenue", size: "small" },
+      { widgetId: "active-doctors", size: "small" },
+      { widgetId: "pending-tasks", size: "small" },
+      { widgetId: "message-acceptance", size: "small" },
+      { widgetId: "patient-overview", size: "medium" },
+      { widgetId: "appointment-overview", size: "medium" },
+      { widgetId: "revenue-trend", size: "large" },
+      { widgetId: "revenue-summary", size: "small" },
+      { widgetId: "revenue-by-doctor", size: "full" },
+      { widgetId: "today-schedule", size: "large" },
+      { widgetId: "recent-patient-activity", size: "medium" },
+      { widgetId: "doctor-overview", size: "full" },
+      { widgetId: "message-health", size: "medium" },
+      { widgetId: "task-overview", size: "medium" },
+      { widgetId: "clinic-performance", size: "full" },
     ]);
-    expect(result.map((item) => item.order)).toEqual([0, 1, 2, 3]);
   });
 
-  it("reorders visible slots deterministically without using a hidden widget index", () => {
-    const current = [
-      preference("total-patients", 0),
-      preference("todays-appointments", 1, false),
-      preference("todays-collection", 2),
-      preference("month-revenue", 3),
-    ];
-
-    const result = reorderVisibleDashboardWidgets(
-      current,
-      "month-revenue",
-      "total-patients",
-    );
-
-    expect(result.map((item) => [item.widgetId, item.visible])).toEqual([
-      ["month-revenue", true],
-      ["todays-appointments", false],
-      ["total-patients", true],
-      ["todays-collection", true],
+  it("keeps the Doctor My Day order and sizes", () => {
+    expect(fixedDashboardWidgets("doctor", all)).toEqual([
+      { widgetId: "todays-appointments", size: "small" },
+      { widgetId: "waiting-now", size: "small" },
+      { widgetId: "upcoming-appointments-count", size: "small" },
+      { widgetId: "completed-today", size: "small" },
+      { widgetId: "next-patient", size: "medium" },
+      { widgetId: "today-schedule", size: "full" },
+      { widgetId: "upcoming-schedule", size: "full" },
+      { widgetId: "task-overview", size: "medium" },
     ]);
-    expect(result.filter((item) => item.visible).map((item) => item.widgetId)).toEqual([
-      "month-revenue",
-      "total-patients",
-      "todays-collection",
-    ]);
-    expect(result.map((item) => item.order)).toEqual([0, 1, 2, 3]);
+    const ids = DOCTOR_DASHBOARD_WIDGETS.map((widget) => widget.widgetId);
+    expect(ids).not.toContain("revenue-by-doctor");
+    expect(ids).not.toContain("message-health");
+    expect(ids).not.toContain("clinic-performance");
   });
 
-  it("leaves state untouched when either drag id is outside the visible collection", () => {
-    const current = [
-      preference("total-patients", 0),
-      preference("todays-appointments", 1, false),
-    ];
-    expect(reorderVisibleDashboardWidgets(current, "todays-appointments", "total-patients")).toBe(current);
-    expect(reorderVisibleDashboardWidgets(current, "total-patients", "todays-appointments")).toBe(current);
+  it("never shows a widget the user is not eligible for", () => {
+    const eligible = new Set<DashboardWidgetId>(["task-overview", "patient-overview", "waiting-now"]);
+    expect(fixedDashboardWidgets("standard", eligible).map((widget) => widget.widgetId)).toEqual([
+      "patient-overview",
+      "task-overview",
+    ]);
+    expect(fixedDashboardWidgets("doctor", eligible).map((widget) => widget.widgetId)).toEqual([
+      "waiting-now",
+      "task-overview",
+    ]);
+    expect(fixedDashboardWidgets("standard", new Set())).toEqual([]);
+  });
+
+  it("lists every widget at most once", () => {
+    for (const order of [STANDARD_DASHBOARD_WIDGETS, DOCTOR_DASHBOARD_WIDGETS]) {
+      const ids = order.map((widget) => widget.widgetId);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
   });
 });

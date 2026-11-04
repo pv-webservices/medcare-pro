@@ -14,7 +14,6 @@ import {
   BILLING_PERMISSIONS,
   CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
-  DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   HISTORICAL_ALL_PERMISSIONS,
   PRE_STAGE_11_PERMISSIONS,
@@ -184,7 +183,6 @@ describe("the audit:read permission", () => {
       ...STAGE_AP1_PERMISSIONS,
       ...TASK_PERMISSIONS,
       ...DASHBOARD_DATA_PERMISSIONS,
-      ...DASHBOARD_LAYOUT_PERMISSIONS,
       ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
       ...PRESCRIPTION_PERMISSIONS,
       ...BILLING_PERMISSIONS,
@@ -222,8 +220,7 @@ describe("the audit:read permission", () => {
         BILLING_PERMISSIONS.length -
         CLINICAL_AI_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
-        DASHBOARD_DATA_PERMISSIONS.length -
-        DASHBOARD_LAYOUT_PERMISSIONS.length,
+        DASHBOARD_DATA_PERMISSIONS.length,
     );
     for (const permission of [
       ...STAGE_11_PERMISSIONS,
@@ -234,7 +231,6 @@ describe("the audit:read permission", () => {
       ...CLINICAL_AI_PERMISSIONS,
       ...TASK_PERMISSIONS,
       ...DASHBOARD_DATA_PERMISSIONS,
-      ...DASHBOARD_LAYOUT_PERMISSIONS,
     ]) {
       expect(PRE_STAGE_11_PERMISSIONS).not.toContain(permission);
     }

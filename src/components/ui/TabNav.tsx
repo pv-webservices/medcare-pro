@@ -38,10 +38,6 @@ export default function TabNav({ items, label, className }: TabNavProps) {
     if (pathname === href || pathname.startsWith(`${href}/`)) {
       return true;
     }
-    // On the /settings landing page, Dashboard is the active tab
-    if (pathname === "/settings" && href === "/settings/dashboard") {
-      return true;
-    }
     return false;
   }
 

@@ -1,21 +1,17 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import {
   ALL_PERMISSIONS,
   BILLING_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
   CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
-  DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   PRE_APPOINTMENTS_PERMISSIONS,
+  RETIRED_PERMISSIONS,
   STAGE_AP1_PERMISSIONS,
   TASK_PERMISSIONS,
   WILDCARD,
 } from "@/lib/permissions";
-import {
-  DASHBOARD_LAYOUT_VERSION,
-  doctorDefaultDashboardLayout,
-} from "@/lib/dashboardWidgets";
 
 /**
  * The default role set every tenant starts with — PRD §4.
@@ -107,7 +103,6 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       // Staff may edit (the edit is still logged) but cannot read the log back.
       "registration:edit",
       "dashboard:view",
-      "dashboard:customize",
       "dashboard:patients:view",
       "dashboard:tasks:view",
       "task:view",
@@ -145,7 +140,6 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "clinical-ai:facts-extract",
       "clinical-ai:facts-review",
       "dashboard:view",
-      "dashboard:customize",
       "dashboard:appointments:view",
       "dashboard:schedule:view",
       "dashboard:patients:view",
@@ -190,7 +184,6 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "appointment:checkin",
       "appointment:convert",
       "dashboard:view",
-      "dashboard:customize",
       "dashboard:appointments:view",
       "dashboard:patients:view",
       "dashboard:messages:view",
@@ -223,9 +216,6 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(
         permission as (typeof TASK_PERMISSIONS)[number],
-      ) &&
-      !DASHBOARD_LAYOUT_PERMISSIONS.includes(
-        permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
       ) &&
       !DASHBOARD_DATA_PERMISSIONS.includes(
         permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
@@ -320,9 +310,6 @@ export const PRE_TASK_ROLE_PERMISSIONS: Readonly<
       !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
       permission !== "dashboard:tasks:view" &&
-      !DASHBOARD_LAYOUT_PERMISSIONS.includes(
-        permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
-      ) &&
       !TASK_PERMISSIONS.includes(
         permission as (typeof TASK_PERMISSIONS)[number],
       ),
@@ -494,28 +481,49 @@ export const APPOINTMENT_ROLE_TOP_UPS: Readonly<
  * Frozen role states immediately before doctor-self visibility was added.
  * The one-off backfill may replace broad Doctor read only when this exact set
  * still matches; customised roles are left byte-for-byte unchanged.
+ *
+ * Both sets held the dashboard-layout keys RM-2 retired. They are put back in
+ * their original positions so the frozen sets still equal the role rows that
+ * backfill looks for (and the snapshot in prePrescriptionRoles.json).
  */
+function withRetiredAfter(
+  permissions: readonly string[],
+  anchor: string,
+  retired: readonly string[],
+): string[] {
+  const at = permissions.indexOf(anchor) + 1;
+  return [...permissions.slice(0, at), ...retired, ...permissions.slice(at)];
+}
+
 export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
   Partial<Record<RoleKey, readonly string[]>>
 > = {
-  [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
-    (permission) =>
-      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
-      permission !== "patient_portal:manage" &&
-      !BILLING_PERMISSIONS.includes(permission) &&
-      !PRESCRIPTION_PERMISSIONS.includes(permission) &&
-      !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
+  [ROLE_KEYS.CLINIC_ADMIN]: withRetiredAfter(
+    ALL_PERMISSIONS.filter(
+      (permission) =>
+        !CLINICAL_AI_PERMISSIONS.includes(permission) &&
+        permission !== "patient_portal:manage" &&
+        !BILLING_PERMISSIONS.includes(permission) &&
+        !PRESCRIPTION_PERMISSIONS.includes(permission) &&
+        !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
+    ),
+    "dashboard:clinics:view",
+    RETIRED_PERMISSIONS,
   ),
-  [ROLE_KEYS.DOCTOR]: DEFAULT_ROLES.find(
-    (role) => role.key === ROLE_KEYS.DOCTOR,
-  )!.permissions.filter(
-    (permission) =>
-      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
-      permission !== "patient_portal:manage" &&
-      !BILLING_PERMISSIONS.includes(permission) &&
-      !PRESCRIPTION_PERMISSIONS.includes(permission),
-  ).map((permission) =>
-    permission === "appointment:self:read" ? "appointment:read" : permission,
+  [ROLE_KEYS.DOCTOR]: withRetiredAfter(
+    DEFAULT_ROLES.find(
+      (role) => role.key === ROLE_KEYS.DOCTOR,
+    )!.permissions.filter(
+      (permission) =>
+        !CLINICAL_AI_PERMISSIONS.includes(permission) &&
+        permission !== "patient_portal:manage" &&
+        !BILLING_PERMISSIONS.includes(permission) &&
+        !PRESCRIPTION_PERMISSIONS.includes(permission),
+    ).map((permission) =>
+      permission === "appointment:self:read" ? "appointment:read" : permission,
+    ),
+    "dashboard:view",
+    ["dashboard:customize"],
   ),
 };
 
@@ -580,7 +588,7 @@ export async function seedDefaultRoles(
   tenantId: string,
 ): Promise<void> {
   for (const role of DEFAULT_ROLES) {
-    const stored = await client.role.upsert({
+    await client.role.upsert({
       where: { tenantId_name: { tenantId, name: role.name } },
       update: {
         permissions: [...role.permissions],
@@ -597,19 +605,6 @@ export async function seedDefaultRoles(
         permissions: [...role.permissions],
       },
     });
-    if (role.key === ROLE_KEYS.DOCTOR) {
-      await client.dashboardLayout.upsert({
-        where: { tenantId_roleId: { tenantId, roleId: stored.id } },
-        create: {
-          tenantId,
-          roleId: stored.id,
-          version: DASHBOARD_LAYOUT_VERSION,
-          layout: doctorDefaultDashboardLayout() as unknown as Prisma.InputJsonValue,
-        },
-        // Existing role defaults are administrator-owned configuration.
-        update: {},
-      });
-    }
   }
 }
 
@@ -650,7 +645,7 @@ export async function addMissingDefaultRoles(
       continue;
     }
 
-    const stored = await client.role.create({
+    await client.role.create({
       data: {
         tenantId,
         name: role.name,
@@ -660,17 +655,6 @@ export async function addMissingDefaultRoles(
         permissions: [...role.permissions],
       },
     });
-
-    if (role.key === ROLE_KEYS.DOCTOR) {
-      await client.dashboardLayout.create({
-        data: {
-          tenantId,
-          roleId: stored.id,
-          version: DASHBOARD_LAYOUT_VERSION,
-          layout: doctorDefaultDashboardLayout() as unknown as Prisma.InputJsonValue,
-        },
-      });
-    }
 
     takenNames.add(role.name);
     takenKeys.add(role.key);

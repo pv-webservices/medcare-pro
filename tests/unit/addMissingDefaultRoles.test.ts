@@ -32,9 +32,6 @@ function fakeClient(rows: FakeRole[]) {
         return { ...data, id: `role-${rows.length}` };
       },
     },
-    dashboardLayout: {
-      create: async () => undefined,
-    },
   };
   return client as unknown as PrismaClientOrTransaction;
 }

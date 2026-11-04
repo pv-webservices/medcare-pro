@@ -62,11 +62,22 @@ export const DASHBOARD_DATA_PERMISSIONS = [
   "dashboard:clinics:view",
 ] as const;
 
-/** Presentation-only rights added with versioned dashboard layouts. */
-export const DASHBOARD_LAYOUT_PERMISSIONS = [
+/**
+ * Keys that left the catalogue but may still sit in stored role rows. They
+ * grant nothing. Role writes drop them instead of rejecting them as unknown,
+ * because the Roles editor sends a role's whole stored list back on save.
+ *
+ * RM-2 (Nov 2026) retired the adjustable dashboard. RM-3 removes these keys
+ * from stored roles and then deletes this list.
+ */
+export const RETIRED_PERMISSIONS: readonly string[] = [
   "dashboard:customize",
   "dashboard:layout:manage",
-] as const;
+];
+
+export function withoutRetiredPermissions(permissions: readonly string[]): string[] {
+  return permissions.filter((permission) => !RETIRED_PERMISSIONS.includes(permission));
+}
 
 /** Task page/action permissions, kept separate from dashboard summaries. */
 export const TASK_PERMISSIONS = [
@@ -158,22 +169,6 @@ export const DASHBOARD_PERMISSION_GROUP: PermissionGroup = {
       key: "dashboard:clinics:view",
       label: "Clinic comparison",
       description: "Compare only the clinics and metrics this role may access.",
-    },
-  ],
-};
-
-export const DASHBOARD_LAYOUT_PERMISSION_GROUP: PermissionGroup = {
-  module: "Dashboard Layout",
-  permissions: [
-    {
-      key: DASHBOARD_LAYOUT_PERMISSIONS[0],
-      label: "Customize own dashboard",
-      description: "Reorder, resize, show, and hide authorized dashboard widgets for yourself.",
-    },
-    {
-      key: DASHBOARD_LAYOUT_PERMISSIONS[1],
-      label: "Manage role dashboard defaults",
-      description: "Configure dashboard defaults only for roles below your own authority.",
     },
   ],
 };
@@ -675,7 +670,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     ],
   },
   DASHBOARD_PERMISSION_GROUP,
-  DASHBOARD_LAYOUT_PERMISSION_GROUP,
   {
     module: "Billing",
     permissions: [
@@ -717,8 +711,7 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
 export const ACTION_PERMISSION_GROUPS: readonly PermissionGroup[] =
   PERMISSION_GROUPS.filter(
     (group) =>
-      group.module !== DASHBOARD_PERMISSION_GROUP.module &&
-      group.module !== DASHBOARD_LAYOUT_PERMISSION_GROUP.module,
+      group.module !== DASHBOARD_PERMISSION_GROUP.module,
   );
 
 export const ALL_PERMISSIONS: readonly string[] = PERMISSION_GROUPS.flatMap(
@@ -849,9 +842,6 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
-    !DASHBOARD_LAYOUT_PERMISSIONS.includes(
-      permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
-    ) &&
     !DASHBOARD_DATA_PERMISSIONS.includes(
       permission as DashboardDataPermission,
     ),
@@ -906,9 +896,6 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
     !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
-    !DASHBOARD_LAYOUT_PERMISSIONS.includes(
-      permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
-    ) &&
     !DASHBOARD_DATA_PERMISSIONS.includes(
       permission as DashboardDataPermission,
     ),
@@ -955,9 +942,6 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
     !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission) &&
       !TASK_PERMISSIONS.includes(permission as TaskPermission) &&
-      !DASHBOARD_LAYOUT_PERMISSIONS.includes(
-        permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
-      ) &&
       !DASHBOARD_DATA_PERMISSIONS.includes(
         permission as DashboardDataPermission,
       ),

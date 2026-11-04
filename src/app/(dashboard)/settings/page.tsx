@@ -49,12 +49,6 @@ interface SectionStyle {
 }
 
 const SECTION_STYLES: Record<string, SectionStyle> = {
-  "/settings/dashboard": {
-    icon: LayoutDashboard,
-    iconBg: "bg-[#ece9fe] dark:bg-accent-soft",
-    iconColor: "text-[#5b4bff] dark:text-accent-bright",
-    displayDescription: "Arrange your dashboard and set defaults for different user roles.",
-  },
   "/settings/roles": {
     icon: ShieldCheck,
     iconBg: "bg-[#e0f2fe] dark:bg-info-bg",
@@ -157,7 +151,6 @@ export default async function SettingsPage() {
             iconColor: "text-muted",
           };
           const Icon = style.icon;
-          const isDashboard = section.href === "/settings/dashboard";
 
           return (
             <Link
@@ -168,14 +161,6 @@ export default async function SettingsPage() {
                 "min-h-[190px]",
               )}
             >
-              {/* Active left indicator rail for Dashboard (matching screenshot) */}
-              {isDashboard && (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-y-6 left-0 w-1 rounded-r-full bg-accent"
-                />
-              )}
-
               <div>
                 <div className="flex items-start gap-4">
                   <div

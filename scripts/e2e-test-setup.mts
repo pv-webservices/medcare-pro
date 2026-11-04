@@ -1,7 +1,6 @@
-import { PrismaClient, Prisma, AppointmentStatus, AppointmentBookingSource, TaskPriority, TaskStatus } from "@prisma/client";
+import { PrismaClient, AppointmentStatus, AppointmentBookingSource, TaskPriority, TaskStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { seedDefaultRoles, ROLE_KEYS } from "../src/lib/defaultRoles";
-import { doctorDefaultDashboardLayout, DASHBOARD_LAYOUT_VERSION } from "../src/lib/dashboardWidgets";
 import {
   todayDateOnly,
   parseDateTime,
@@ -159,20 +158,6 @@ export async function setupE2ETestData() {
   await prisma.role.update({
     where: { id: adminRole.id },
     data: { permissions: adminPerms },
-  });
-
-  // Ensure Doctor Role has default dashboard layout
-  await prisma.dashboardLayout.upsert({
-    where: { tenantId_roleId: { tenantId: tenant.id, roleId: doctorRole.id } },
-    create: {
-      tenantId: tenant.id,
-      roleId: doctorRole.id,
-      version: DASHBOARD_LAYOUT_VERSION,
-      layout: doctorDefaultDashboardLayout() as unknown as Prisma.InputJsonValue,
-    },
-    update: {
-      layout: doctorDefaultDashboardLayout() as unknown as Prisma.InputJsonValue,
-    },
   });
 
   // Enable Appointments feature for Doctor, Admin, Receptionist roles (PREMIUM tier requires explicit layer-3 grant)
