@@ -14,7 +14,6 @@ import { DEFAULT_FEATURES } from "@/lib/defaultFeatures";
 export const FEATURE_INSTALL_COMMANDS: Readonly<Record<string, string>> = {
   billing: "npm run billing:backfill",
   prescriptions: "npm run prescriptions:backfill",
-  clinical_ai: "npm run clinical-ai:backfill",
   patient_portal: "npm run patient-portal:backfill",
   appointments: "npm run ap1:backfill",
   ivr: "npm run ivr:backfill",
@@ -32,7 +31,6 @@ export const SEED_COMMAND = "npm run prisma:seed";
 export const PERMISSION_GROUP_FEATURES: Readonly<Record<string, string>> = {
   Billing: "billing",
   Prescriptions: "prescriptions",
-  "Clinical AI": "clinical_ai",
   "Patient portal": "patient_portal",
   Appointments: "appointments",
   Tasks: "tasks",

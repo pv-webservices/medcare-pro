@@ -3,7 +3,6 @@ import {
   ALL_PERMISSIONS,
   BILLING_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
-  CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
@@ -138,12 +137,6 @@ export const DEFAULT_ROLES: readonly DefaultRoleDefinition[] = [
       "prescription:read",
       "prescription:draft",
       "prescription:issue",
-      "clinical-ai:writing",
-      "clinical-ai:recording",
-      "clinical-ai:transcription",
-      "clinical-ai:transcript-read",
-      "clinical-ai:facts-extract",
-      "clinical-ai:facts-review",
       "dashboard:view",
       "dashboard:customize",
       "dashboard:appointments:view",
@@ -217,7 +210,6 @@ export const PRE_DASHBOARD_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.OWNER]: [WILDCARD],
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
-      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
       !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
@@ -315,7 +307,6 @@ export const PRE_TASK_ROLE_PERMISSIONS: Readonly<
   [ROLE_KEYS.OWNER]: [WILDCARD],
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
-      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
       !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
@@ -500,7 +491,6 @@ export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
 > = {
   [ROLE_KEYS.CLINIC_ADMIN]: ALL_PERMISSIONS.filter(
     (permission) =>
-      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
       !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&
@@ -510,7 +500,6 @@ export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
     (role) => role.key === ROLE_KEYS.DOCTOR,
   )!.permissions.filter(
     (permission) =>
-      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
       !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission),

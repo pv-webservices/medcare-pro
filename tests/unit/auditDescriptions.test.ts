@@ -12,7 +12,6 @@ import {
   ALL_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
   BILLING_PERMISSIONS,
-  CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
@@ -188,7 +187,6 @@ describe("the audit:read permission", () => {
       ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
       ...PRESCRIPTION_PERMISSIONS,
       ...BILLING_PERMISSIONS,
-      ...CLINICAL_AI_PERMISSIONS,
     ];
     expect(new Set(combined).size).toBe(combined.length);
 
@@ -220,7 +218,6 @@ describe("the audit:read permission", () => {
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
         PRESCRIPTION_PERMISSIONS.length -
         BILLING_PERMISSIONS.length -
-        CLINICAL_AI_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length -
         DASHBOARD_LAYOUT_PERMISSIONS.length,
@@ -231,7 +228,6 @@ describe("the audit:read permission", () => {
       ...DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
       ...PRESCRIPTION_PERMISSIONS,
       ...BILLING_PERMISSIONS,
-      ...CLINICAL_AI_PERMISSIONS,
       ...TASK_PERMISSIONS,
       ...DASHBOARD_DATA_PERMISSIONS,
       ...DASHBOARD_LAYOUT_PERMISSIONS,
