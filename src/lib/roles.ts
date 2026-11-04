@@ -3,6 +3,7 @@ import { BadRequestError, ConflictError } from "@/lib/apiHandler";
 import {
   ALL_PERMISSIONS,
   isKnownPermission,
+  RETIRED_PERMISSION_KEYS,
   WILDCARD,
 } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -48,7 +49,8 @@ const READ = "role:read";
 
 const permissionListSchema = z
   .array(z.string().trim().min(1).max(64))
-  .max(ALL_PERMISSIONS.length)
+  // Retired keys still stored on older roles are submitted back on save.
+  .max(ALL_PERMISSIONS.length + RETIRED_PERMISSION_KEYS.size)
   // Deduped rather than rejected: two ticks of the same box is not a user error.
   .transform((values) => [...new Set(values)]);
 
