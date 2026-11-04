@@ -4,6 +4,7 @@ import {
   ALL_PERMISSIONS,
   isKnownPermission,
   RETIRED_PERMISSION_KEYS,
+  RETIRED_PERMISSIONS,
   WILDCARD,
   withoutRetiredPermissions,
 } from "@/lib/permissions";
@@ -50,8 +51,9 @@ const READ = "role:read";
 
 const permissionListSchema = z
   .array(z.string().trim().min(1).max(64))
-  // Retired keys still stored on older roles are submitted back on save.
-  .max(ALL_PERMISSIONS.length + RETIRED_PERMISSION_KEYS.size)
+  // Retired keys still stored on older roles are submitted back on save:
+  // RM-1's clinical-ai keys and RM-2's dashboard-layout keys.
+  .max(ALL_PERMISSIONS.length + RETIRED_PERMISSION_KEYS.size + RETIRED_PERMISSIONS.length)
   // Deduped rather than rejected: two ticks of the same box is not a user error.
   // Retired keys are dropped rather than rejected: the Roles editor sends a
   // role's stored list back on save, so rejecting them would make every role

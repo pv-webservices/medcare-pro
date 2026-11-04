@@ -10,11 +10,13 @@ import {
   ALL_PERMISSIONS,
   PERMISSION_GROUPS,
   RETIRED_PERMISSION_KEYS,
+  RETIRED_PERMISSIONS,
   isKnownPermission,
+  withoutRetiredPermissions,
 } from "@/lib/permissions";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
 import { CATALOGUE_FEATURE_KEYS, MODULE_FEATURES } from "@/lib/moduleFeatures";
-import { roleMutationSchema } from "@/lib/roles";
+import { createRoleSchema, roleMutationSchema, updateRoleSchema } from "@/lib/roles";
 
 // RM-1 removed Clinical AI. Roles saved before that still store its keys, and
 // the roles editor submits a role's stored set back on save, so those keys must
@@ -65,5 +67,34 @@ describe("retired Clinical AI permission keys (RM-1)", () => {
   it("removes the clinical_ai feature from the catalogue and module map", () => {
     expect(CATALOGUE_FEATURE_KEYS).not.toContain("clinical_ai");
     expect(Object.values(MODULE_FEATURES)).not.toContain("clinical_ai");
+  });
+});
+
+// RM-2 retired the adjustable dashboard. Its keys are dropped (not kept) when a
+// stored role is saved back.
+describe("retired dashboard-layout permission keys (RM-2)", () => {
+  it("are no longer in the catalogue", () => {
+    for (const permission of RETIRED_PERMISSIONS) {
+      expect(ALL_PERMISSIONS).not.toContain(permission);
+      expect(isKnownPermission(permission)).toBe(false);
+    }
+  });
+
+  it("are dropped, not rejected, when a stored role list is saved back", () => {
+    const stored = ["patient:read", "dashboard:customize", "dashboard:layout:manage", "patient:read"];
+    expect(withoutRetiredPermissions(stored)).toEqual(["patient:read", "patient:read"]);
+    expect(createRoleSchema.parse({ name: "Front desk", permissions: stored }).permissions).toEqual(["patient:read"]);
+    expect(updateRoleSchema.parse({ roleId: "role-1", permissions: stored }).permissions).toEqual(["patient:read"]);
+  });
+});
+
+describe("a role saved before both RM-1 and RM-2", () => {
+  it("still fits the save cap with every retired key it may hold", () => {
+    const storedAdmin = [...ALL_PERMISSIONS, ...RETIRED_PERMISSION_KEYS, ...RETIRED_PERMISSIONS];
+    const result = roleMutationSchema.safeParse({ action: "updateRole", roleId: "role-1", permissions: storedAdmin });
+    expect(result.success).toBe(true);
+    // RM-1 keys stay on the role; RM-2 keys are dropped.
+    const saved = result.success && "permissions" in result.data ? result.data.permissions ?? [] : [];
+    expect(saved).toEqual([...ALL_PERMISSIONS, ...RETIRED_PERMISSION_KEYS]);
   });
 });
