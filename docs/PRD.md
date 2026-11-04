@@ -134,14 +134,7 @@ not a hardcoded enum the UI locks to.
 - **FR-9.2**: Delivery status logged and visible against the message.
 
 ### 6.10 Clinical AI *(added post-v2.0)*
-Premium, doctor-controlled documentation assistance. AI output is never clinical
-authority: every AI result is a candidate that the assigned doctor explicitly
-accepts or dismisses. Detailed specs live in `docs/clinical-ai-*.md`.
-- **FR-10.1 (AI-1, built)**: Spelling/grammar suggestions for consultation notes, validated deterministically before doctor review — `docs/clinical-ai-writing-assistant.md`.
-- **FR-10.2 (AI-2, built)**: Consented consultation recording, private audio storage, Sarvam transcription, corrections, speaker confirmation and clinician review — `docs/clinical-ai-recording-transcription.md`.
-- **FR-10.3 (AI-3 v1, built — off by default via `CLINICAL_FACTS_ENABLED`)**: Evidence-linked structured fact candidates from a reviewed transcript, accepted or dismissed per fact — `docs/clinical-ai-structured-facts-prd.md`.
-- **FR-10.4 (AI-4 v1, built — off by default via `CLINICAL_RECONCILIATION_ENABLED`)**: Deterministic comparison of the unsaved prescription draft with accepted AI-3 facts (medications, allergy names, follow-up); discrepancies only, no automatic prescription change and no new tables — `docs/clinical-ai-prescription-reconciliation-prd.md`.
-- **FR-10.5 (AI-5 v1, built — off by default)**: Deterministic, versioned pre-issue prescription checks with optional AI candidate warnings; requires jurisdiction-specific legal/medical validation before any compliance claim. **v1 built — off by default via `PRESCRIPTION_CHECKS_ENABLED`**: non-blocking internal-consistency warnings (two tiers; Review-required needs one acknowledgement), no compliance claim — `docs/clinical-ai-preissue-checks-prd.md`.
+Clinical AI (writing assistant, recording/transcription, facts, reconciliation, pre-issue checks) removed in RM-1, Nov 2026; tables dropped in RM-3.
 
 ### 6.11 Patient Billing
 
@@ -166,11 +159,11 @@ Itemised billing per Registration/visit: clinic billing settings and service pri
 | `registration_edit_log` | `id`, `registration_id` (FK), `edited_by_user_id`, `role_at_time`, `changed_fields` (JSON), `timestamp` | Immutable audit trail |
 | `notifications` | `id`, `account_id`, `clinic_id` (nullable), `type`, `message`, `related_record_id`, `read`, `created_at` | |
 | `whatsapp_messages` | `id`, `clinic_id`, `patient_id`, `template_name`, `status`, `sent_at` | Logged sends via the BSP |
-| `transcript_reviews` | `id`, `tenant_id`, `clinic_id`, `transcript_id`, `transcript_version`, `effective_hash`, `reviewed_by_user_id`, `reviewed_at` | **Built (AI-3 prerequisite, migration `20260923120000_transcript_review_snapshots`).** Append-only snapshot of exactly what the doctor reviewed; DB triggers forbid update/delete and bind it to the transcript scope and current version |
-| `clinical_fact_extraction_runs` | `id`, `tenant_id`, `clinic_id`, `transcript_review_id`, `status`, `model`, `prompt_version`, `idempotency_key` | **Built (AI-3 v1, migration `20260924090000_clinical_fact_extraction`).** Identity immutable by trigger |
-| `clinical_fact_candidates` | `id`, `tenant_id`, `clinic_id`, `extraction_run_id`, `category`, `assertion`, `subject`, `statement`, `attributes` | **Built (AI-3 v1).** Immutable by trigger |
-| `clinical_fact_evidence` | `id`, `fact_id`, `segment_id`, `correction_id`, `quote`, `char_start`, `char_end` | **Built (AI-3 v1).** Immutable by trigger |
-| `clinical_fact_reviews` | `id`, `tenant_id`, `fact_id`, `decision`, `reviewed_by_user_id`, `reviewed_at` | **Built (AI-3 v1).** Append-only by trigger |
+| `transcript_reviews` | `id`, `tenant_id`, `clinic_id`, `transcript_id`, `transcript_version`, `effective_hash`, `reviewed_by_user_id`, `reviewed_at` | **Retired (RM-1), dropped in RM-3.** |
+| `clinical_fact_extraction_runs` | `id`, `tenant_id`, `clinic_id`, `transcript_review_id`, `status`, `model`, `prompt_version`, `idempotency_key` | **Retired (RM-1), dropped in RM-3.** |
+| `clinical_fact_candidates` | `id`, `tenant_id`, `clinic_id`, `extraction_run_id`, `category`, `assertion`, `subject`, `statement`, `attributes` | **Retired (RM-1), dropped in RM-3.** |
+| `clinical_fact_evidence` | `id`, `fact_id`, `segment_id`, `correction_id`, `quote`, `char_start`, `char_end` | **Retired (RM-1), dropped in RM-3.** |
+| `clinical_fact_reviews` | `id`, `tenant_id`, `fact_id`, `decision`, `reviewed_by_user_id`, `reviewed_at` | **Retired (RM-1), dropped in RM-3.** |
 | `clinic_billing_settings` | `id`, `tenant_id`, `clinic_id`, GSTIN, prefix, discount limit, footer | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
 | `service_items` | `id`, `tenant_id`, `clinic_id`, name, category, price, tax rate, SAC, active | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
 | `invoices` | ownership, active key, number, FY, lifecycle, totals, snapshot, replacement | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
