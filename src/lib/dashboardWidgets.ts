@@ -1,7 +1,4 @@
-import { z } from "zod";
 import { MODULE_FEATURES, type ModuleFeatureKey } from "@/lib/moduleFeatures";
-
-export const DASHBOARD_LAYOUT_VERSION = 1 as const;
 
 export const DASHBOARD_WIDGET_SIZES = ["small", "medium", "large", "full"] as const;
 export type DashboardWidgetSize = (typeof DASHBOARD_WIDGET_SIZES)[number];
@@ -13,18 +10,6 @@ export const DASHBOARD_SIZE_SPANS: Readonly<Record<DashboardWidgetSize, number>>
   large: 9,
   full: 12,
 };
-
-export const DASHBOARD_WIDGET_CATEGORIES = [
-  "summary",
-  "patients",
-  "appointments",
-  "revenue",
-  "doctors",
-  "tasks",
-  "messages",
-  "activity",
-] as const;
-export type DashboardWidgetCategory = (typeof DASHBOARD_WIDGET_CATEGORIES)[number];
 
 export type DashboardWidgetDataGroup =
   | "patients"
@@ -73,10 +58,9 @@ export interface DashboardWidgetDefinition {
   dataGroup: DashboardWidgetDataGroup;
   /** Extra authorized query groups needed to render the widget completely. */
   additionalDataGroups?: readonly DashboardWidgetDataGroup[];
+  /** Shown in the standard fixed order (see lib/dashboardWidgetOrder.ts). */
   defaultVisible: boolean;
   defaultSize: DashboardWidgetSize;
-  allowedSizes: readonly DashboardWidgetSize[];
-  category: DashboardWidgetCategory;
 }
 
 const kpi = (
@@ -86,7 +70,6 @@ const kpi = (
   requiredPermission: string,
   requiredModule: ModuleFeatureKey,
   dataGroup: DashboardWidgetDataGroup,
-  category: DashboardWidgetCategory,
 ): DashboardWidgetDefinition => ({
   id,
   title,
@@ -96,30 +79,28 @@ const kpi = (
   dataGroup,
   defaultVisible: true,
   defaultSize: "small",
-  allowedSizes: DASHBOARD_WIDGET_SIZES,
-  category,
 });
 
 export const DASHBOARD_WIDGET_LIST = [
-  kpi("total-patients", "Total patients", "Patient count and period growth.", "dashboard:patients:view", MODULE_FEATURES.registrations, "patients", "summary"),
-  kpi("todays-appointments", "Today's appointments", "Today's booked clinical workload.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+  kpi("total-patients", "Total patients", "Patient count and period growth.", "dashboard:patients:view", MODULE_FEATURES.registrations, "patients"),
+  kpi("todays-appointments", "Today's appointments", "Today's booked clinical workload.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments"),
   {
-    ...kpi("waiting-now", "Waiting now", "Patients currently checked in and waiting.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+    ...kpi("waiting-now", "Waiting now", "Patients currently checked in and waiting.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments"),
     defaultVisible: false,
   },
   {
-    ...kpi("upcoming-appointments-count", "Upcoming", "Active appointments still ahead.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+    ...kpi("upcoming-appointments-count", "Upcoming", "Active appointments still ahead.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments"),
     defaultVisible: false,
   },
   {
-    ...kpi("completed-today", "Completed", "Appointments converted to visits today.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments", "summary"),
+    ...kpi("completed-today", "Completed", "Appointments converted to visits today.", "dashboard:appointments:view", MODULE_FEATURES.appointments, "appointments"),
     defaultVisible: false,
   },
-  kpi("todays-collection", "Today's collection", "Registration-backed collections today.", "dashboard:revenue:view", MODULE_FEATURES.reports, "revenue", "summary"),
-  kpi("month-revenue", "Month-to-date revenue", "Collections recorded this month.", "dashboard:revenue:view", MODULE_FEATURES.reports, "revenue", "summary"),
-  kpi("active-doctors", "Active doctors", "Current doctor coverage and availability.", "dashboard:doctors:view", MODULE_FEATURES.doctors, "doctors", "summary"),
-  kpi("pending-tasks", "Pending tasks", "Personal pending and overdue work.", "dashboard:tasks:view", MODULE_FEATURES.tasks, "tasks", "summary"),
-  kpi("message-acceptance", "Message acceptance", "Today's stored messaging outcomes.", "dashboard:messages:view", MODULE_FEATURES.whatsapp, "messages", "summary"),
+  kpi("todays-collection", "Today's collection", "Registration-backed collections today.", "dashboard:revenue:view", MODULE_FEATURES.reports, "revenue"),
+  kpi("month-revenue", "Month-to-date revenue", "Collections recorded this month.", "dashboard:revenue:view", MODULE_FEATURES.reports, "revenue"),
+  kpi("active-doctors", "Active doctors", "Current doctor coverage and availability.", "dashboard:doctors:view", MODULE_FEATURES.doctors, "doctors"),
+  kpi("pending-tasks", "Pending tasks", "Personal pending and overdue work.", "dashboard:tasks:view", MODULE_FEATURES.tasks, "tasks"),
+  kpi("message-acceptance", "Message acceptance", "Today's stored messaging outcomes.", "dashboard:messages:view", MODULE_FEATURES.whatsapp, "messages"),
   {
     id: "patient-overview",
     title: "Patient overview",
@@ -129,8 +110,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "patients",
     defaultVisible: true,
     defaultSize: "medium",
-    allowedSizes: ["medium", "large", "full"],
-    category: "patients",
   },
   {
     id: "appointment-overview",
@@ -141,8 +120,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "appointments",
     defaultVisible: true,
     defaultSize: "medium",
-    allowedSizes: ["medium", "large", "full"],
-    category: "appointments",
   },
   {
     id: "revenue-trend",
@@ -153,8 +130,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "revenue",
     defaultVisible: true,
     defaultSize: "large",
-    allowedSizes: ["medium", "large", "full"],
-    category: "revenue",
   },
   {
     id: "revenue-summary",
@@ -165,8 +140,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "revenue",
     defaultVisible: true,
     defaultSize: "small",
-    allowedSizes: DASHBOARD_WIDGET_SIZES,
-    category: "revenue",
   },
   {
     id: "revenue-by-doctor",
@@ -177,8 +150,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "revenue",
     defaultVisible: true,
     defaultSize: "full",
-    allowedSizes: ["medium", "large", "full"],
-    category: "revenue",
   },
   {
     id: "today-schedule",
@@ -189,8 +160,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "schedule",
     defaultVisible: true,
     defaultSize: "large",
-    allowedSizes: ["medium", "large", "full"],
-    category: "appointments",
   },
   {
     id: "next-patient",
@@ -201,8 +170,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "schedule",
     defaultVisible: false,
     defaultSize: "medium",
-    allowedSizes: ["medium", "large", "full"],
-    category: "appointments",
   },
   {
     id: "upcoming-schedule",
@@ -213,8 +180,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "schedule",
     defaultVisible: false,
     defaultSize: "full",
-    allowedSizes: ["medium", "large", "full"],
-    category: "appointments",
   },
   {
     id: "recent-patient-activity",
@@ -225,8 +190,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "activity",
     defaultVisible: true,
     defaultSize: "medium",
-    allowedSizes: ["medium", "large", "full"],
-    category: "activity",
   },
   {
     id: "doctor-overview",
@@ -238,8 +201,6 @@ export const DASHBOARD_WIDGET_LIST = [
     additionalDataGroups: ["revenue"],
     defaultVisible: true,
     defaultSize: "full",
-    allowedSizes: ["medium", "large", "full"],
-    category: "doctors",
   },
   {
     id: "message-health",
@@ -250,8 +211,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "messages",
     defaultVisible: true,
     defaultSize: "medium",
-    allowedSizes: ["medium", "large", "full"],
-    category: "messages",
   },
   {
     id: "task-overview",
@@ -262,8 +221,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "tasks",
     defaultVisible: true,
     defaultSize: "medium",
-    allowedSizes: ["medium", "large", "full"],
-    category: "tasks",
   },
   {
     id: "clinic-performance",
@@ -274,8 +231,6 @@ export const DASHBOARD_WIDGET_LIST = [
     dataGroup: "clinics",
     defaultVisible: true,
     defaultSize: "full",
-    allowedSizes: ["medium", "large", "full"],
-    category: "summary",
   },
 ] as const satisfies readonly DashboardWidgetDefinition[];
 
@@ -283,166 +238,10 @@ export const DASHBOARD_WIDGETS = new Map<DashboardWidgetId, DashboardWidgetDefin
   DASHBOARD_WIDGET_LIST.map((widget) => [widget.id, widget]),
 );
 
-export interface DashboardWidgetPreference {
+/** One widget in the fixed dashboard: what it is and how wide it renders. */
+export interface DashboardWidgetPlacement {
   widgetId: DashboardWidgetId;
-  order: number;
-  visible: boolean;
   size: DashboardWidgetSize;
-}
-
-export interface DashboardLayoutConfig {
-  version: typeof DASHBOARD_LAYOUT_VERSION;
-  widgets: DashboardWidgetPreference[];
-}
-
-const preferenceSchema = z.object({
-  widgetId: z.string().min(1),
-  order: z.number().int().min(0).max(10_000),
-  visible: z.boolean(),
-  size: z.enum(DASHBOARD_WIDGET_SIZES),
-}).strict();
-
-const dashboardPreferenceInputSchema = preferenceSchema.extend({
-  widgetId: z.enum(DASHBOARD_WIDGET_IDS),
-});
-
-export const dashboardLayoutInputSchema = z.object({
-  version: z.literal(DASHBOARD_LAYOUT_VERSION),
-  widgets: z.array(dashboardPreferenceInputSchema).max(50, "Too many dashboard widgets."),
-}).strict().superRefine((layout, context) => {
-  const seen = new Set<string>();
-  for (const [index, preference] of layout.widgets.entries()) {
-    if (seen.has(preference.widgetId)) {
-      context.addIssue({ code: "custom", message: "A dashboard widget cannot appear twice.", path: ["widgets", index, "widgetId"] });
-      continue;
-    }
-    seen.add(preference.widgetId);
-
-    const widget = DASHBOARD_WIDGETS.get(preference.widgetId as DashboardWidgetId);
-    if (!widget) {
-      context.addIssue({ code: "custom", message: "Unknown dashboard widget.", path: ["widgets", index, "widgetId"] });
-    } else if (!widget.allowedSizes.includes(preference.size)) {
-      context.addIssue({ code: "custom", message: `“${widget.title}” does not support that size.`, path: ["widgets", index, "size"] });
-    }
-  }
-});
-
-export function systemDashboardLayout(): DashboardLayoutConfig {
-  return {
-    version: DASHBOARD_LAYOUT_VERSION,
-    widgets: DASHBOARD_WIDGET_LIST.map((widget, order) => ({
-      widgetId: widget.id,
-      order,
-      visible: widget.defaultVisible,
-      size: widget.defaultSize,
-    })),
-  };
-}
-
-/**
- * Permission-filtered Doctor role default: an operational My Day workspace.
- * Every registry id is stored so future normalization cannot make unrelated
- * system-default analytics visible. Personal layouts remain a higher layer.
- */
-export function doctorDefaultDashboardLayout(): DashboardLayoutConfig {
-  const order = [
-    "todays-appointments",
-    "waiting-now",
-    "upcoming-appointments-count",
-    "completed-today",
-    "next-patient",
-    "today-schedule",
-    "upcoming-schedule",
-    "task-overview",
-  ] as const satisfies readonly DashboardWidgetId[];
-  const selected = new Map<DashboardWidgetId, DashboardWidgetSize>([
-    ["todays-appointments", "small"],
-    ["waiting-now", "small"],
-    ["upcoming-appointments-count", "small"],
-    ["completed-today", "small"],
-    ["next-patient", "medium"],
-    ["today-schedule", "full"],
-    ["upcoming-schedule", "full"],
-    ["task-overview", "medium"],
-  ]);
-  const orderedIds = [
-    ...order,
-    ...DASHBOARD_WIDGET_IDS.filter((id) => !selected.has(id)),
-  ];
-  return {
-    version: DASHBOARD_LAYOUT_VERSION,
-    widgets: orderedIds.map((widgetId, index) => ({
-      widgetId,
-      order: index,
-      visible: selected.has(widgetId),
-      size: selected.get(widgetId) ?? DASHBOARD_WIDGETS.get(widgetId)!.defaultSize,
-    })),
-  };
-}
-
-/** Stored JSON is untrusted and may come from an older widget catalogue. */
-export function normalizeDashboardLayout(value: unknown): DashboardLayoutConfig {
-  const raw = value && typeof value === "object" && "widgets" in value
-    ? (value as { widgets?: unknown }).widgets
-    : undefined;
-  const stored = Array.isArray(raw) ? raw : [];
-  const preferences = new Map<DashboardWidgetId, DashboardWidgetPreference>();
-
-  for (const candidate of stored) {
-    const parsed = preferenceSchema.safeParse(candidate);
-    if (!parsed.success) continue;
-    const widget = DASHBOARD_WIDGETS.get(parsed.data.widgetId as DashboardWidgetId);
-    if (!widget || preferences.has(widget.id)) continue;
-    preferences.set(widget.id, {
-      widgetId: widget.id,
-      order: parsed.data.order,
-      visible: parsed.data.visible,
-      size: widget.allowedSizes.includes(parsed.data.size) ? parsed.data.size : widget.defaultSize,
-    });
-  }
-
-  const ordered = [...preferences.values()].sort((a, b) => a.order - b.order);
-  for (const fallback of systemDashboardLayout().widgets) {
-    if (!preferences.has(fallback.widgetId)) ordered.push(fallback);
-  }
-
-  return {
-    version: DASHBOARD_LAYOUT_VERSION,
-    widgets: ordered.map((preference, order) => ({ ...preference, order })),
-  };
-}
-
-export function filterDashboardLayout(
-  layout: DashboardLayoutConfig,
-  eligibleWidgetIds: ReadonlySet<DashboardWidgetId>,
-): DashboardLayoutConfig {
-  return {
-    version: DASHBOARD_LAYOUT_VERSION,
-    widgets: layout.widgets
-      .filter((preference) => eligibleWidgetIds.has(preference.widgetId))
-      .map((preference, order) => ({ ...preference, order })),
-  };
-}
-
-export function resolveDashboardLayoutLayers(options: {
-  personal?: unknown;
-  roleDefault?: unknown;
-  eligibleWidgetIds: ReadonlySet<DashboardWidgetId>;
-}): { layout: DashboardLayoutConfig; source: "personal" | "role" | "system" } {
-  const source = options.personal !== undefined
-    ? "personal"
-    : options.roleDefault !== undefined
-      ? "role"
-      : "system";
-  const raw = source === "personal"
-    ? options.personal
-    : source === "role"
-      ? options.roleDefault
-      : systemDashboardLayout();
-  return {
-    source,
-    layout: filterDashboardLayout(normalizeDashboardLayout(raw), options.eligibleWidgetIds),
-  };
 }
 
 export function dashboardDataGroupsForWidgetIds(
@@ -458,8 +257,10 @@ export function dashboardDataGroupsForWidgetIds(
   return groups;
 }
 
-export function visibleDashboardWidgetIds(layout: DashboardLayoutConfig): Set<DashboardWidgetId> {
-  return new Set(layout.widgets.filter((widget) => widget.visible).map((widget) => widget.widgetId));
+export function visibleDashboardWidgetIds(
+  widgets: readonly DashboardWidgetPlacement[],
+): Set<DashboardWidgetId> {
+  return new Set(widgets.map((widget) => widget.widgetId));
 }
 
 export function widgetGridClass(size: DashboardWidgetSize): string {

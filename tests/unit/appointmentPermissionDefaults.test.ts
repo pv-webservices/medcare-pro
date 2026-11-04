@@ -4,7 +4,6 @@ import {
   PRESCRIPTION_PERMISSIONS,
   BILLING_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
-  DASHBOARD_LAYOUT_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   HISTORICAL_ALL_PERMISSIONS,
   PERMISSION_GROUPS,
@@ -210,9 +209,6 @@ describe("the stage sets stay disjoint", () => {
         !TASK_PERMISSIONS.includes(
           permission as (typeof TASK_PERMISSIONS)[number],
         ) &&
-        !DASHBOARD_LAYOUT_PERMISSIONS.includes(
-          permission as (typeof DASHBOARD_LAYOUT_PERMISSIONS)[number],
-        ) &&
         !DASHBOARD_DATA_PERMISSIONS.includes(
           permission as (typeof DASHBOARD_DATA_PERMISSIONS)[number],
         ),
@@ -230,7 +226,6 @@ describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
         PRESCRIPTION_PERMISSIONS.length -
         BILLING_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
-        DASHBOARD_LAYOUT_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length,
     );
     for (const permission of STAGE_AP1_PERMISSIONS) {

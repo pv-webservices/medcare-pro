@@ -21,10 +21,14 @@ import {
 } from "@/lib/dashboardDateRange";
 import { dashboardBucketSql } from "@/lib/dashboardTrend";
 import {
+  DASHBOARD_WIDGET_LIST,
   dashboardDataGroupsForWidgetIds,
   type DashboardWidgetDataGroup,
   type DashboardWidgetId,
+  type DashboardWidgetPlacement,
 } from "@/lib/dashboardWidgets";
+import { fixedDashboardWidgets } from "@/lib/dashboardWidgetOrder";
+import { ROLE_KEYS } from "@/lib/defaultRoles";
 import {
   appointmentDayBounds,
   appointmentWallClockNow,
@@ -744,6 +748,53 @@ async function loadClinicPerformance(
     ...(doctorMap.has(clinic.id) ? { doctors: doctorMap.get(clinic.id) } : {}),
     ...(revenueMap.has(clinic.id) ? { revenue: revenueMap.get(clinic.id) } : {}),
   }));
+}
+
+/** Widgets the actor's permissions and the organisation's modules allow. */
+async function eligibleDashboardWidgetsForActor(actor: ActorContext): Promise<Set<DashboardWidgetId>> {
+  const permissions = [
+    "dashboard:view",
+    ...new Set(DASHBOARD_WIDGET_LIST.map((widget) => widget.requiredPermission)),
+  ];
+  const [scopes, modules] = await Promise.all([
+    accessibleClinicScopes(actor, permissions),
+    resolveModulesForActor(actor),
+  ]);
+  if (scopes.get("dashboard:view")?.scope === "none") return new Set();
+
+  return new Set(
+    DASHBOARD_WIDGET_LIST.filter(
+      (widget) =>
+        scopes.get(widget.requiredPermission)?.scope !== "none" &&
+        modules.get(widget.requiredModule)?.allowed === true,
+    ).map((widget) => widget.id),
+  );
+}
+
+/**
+ * A user whose only role is the Doctor role gets the "My Day" order, as they
+ * did before RM-2 through that role's seeded default. Multi-role users got the
+ * standard order then too. The order never grants a widget: the result is
+ * always filtered by permissions and modules.
+ */
+async function holdsOnlyDoctorRole(actor: ActorContext): Promise<boolean> {
+  const assignments = await prisma.userRole.findMany({
+    where: { userId: actor.userId, role: { tenantId: actor.tenantId } },
+    distinct: ["roleId"],
+    select: { role: { select: { key: true } } },
+  });
+  return assignments.length === 1 && assignments[0].role.key === ROLE_KEYS.DOCTOR;
+}
+
+/** The fixed dashboard for this actor, in display order. */
+export async function getDashboardWidgetsForActor(
+  actor: ActorContext,
+): Promise<DashboardWidgetPlacement[]> {
+  const [eligible, isDoctor] = await Promise.all([
+    eligibleDashboardWidgetsForActor(actor),
+    holdsOnlyDoctorRole(actor),
+  ]);
+  return fixedDashboardWidgets(isDoctor ? "doctor" : "standard", eligible);
 }
 
 export async function getAdminDashboardData(

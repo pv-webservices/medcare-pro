@@ -21,7 +21,6 @@ import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONES } from "@/component
 import AreaChart, { type AreaPoint } from "@/components/dashboard/AreaChart";
 import CallHandlingPanel from "@/components/dashboard/CallHandlingPanel";
 import BookingFollowUpsPanel from "@/components/ivr/BookingFollowUpsPanel";
-import DashboardLayoutEditor, { type DashboardWidgetSlot } from "@/components/dashboard/DashboardLayoutEditor";
 import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import {
   EmptyState,
@@ -36,21 +35,26 @@ import {
   THead,
   TR,
   buttonClasses,
+  cx,
 } from "@/components/ui";
 import type {
   AdminDashboardData,
   DashboardAppointmentScheduleItem,
   DashboardTrendPoint,
 } from "@/lib/adminDashboard";
-import type { EffectiveDashboardLayout } from "@/lib/dashboardLayouts";
-import { DASHBOARD_WIDGETS, type DashboardWidgetId } from "@/lib/dashboardWidgets";
+import {
+  DASHBOARD_WIDGETS,
+  widgetGridClass,
+  type DashboardWidgetId,
+  type DashboardWidgetPlacement,
+} from "@/lib/dashboardWidgets";
 import { formatRupees, formatRupeesCompact } from "@/lib/money";
 import type { DashboardCallHandlingModel } from "@/lib/telephony/dashboardCallHandling";
 import type { BookingFollowUpsModel } from "@/lib/telephony/bookingFollowUps";
 
 interface Props {
   data: AdminDashboardData;
-  layout: EffectiveDashboardLayout;
+  widgets: readonly DashboardWidgetPlacement[];
   callHandling: DashboardCallHandlingModel | null;
   bookingFollowUps: BookingFollowUpsModel | null;
   now?: Date;
@@ -130,12 +134,8 @@ function NoData({ title, guidance, icon }: { title: string; guidance: string; ic
   return <EmptyState isBare icon={icon} title={title} guidance={guidance} />;
 }
 
-export default function AdminDashboard({ data, layout, callHandling, bookingFollowUps, now = new Date() }: Props) {
+export default function AdminDashboard({ data, widgets, callHandling, bookingFollowUps, now = new Date() }: Props) {
   const scopeLabel = data.scope.clinicName ?? (data.scope.clinicCount > 1 ? "All accessible clinics" : "Accessible clinic");
-  const slots = layout.layout.widgets.map((preference): DashboardWidgetSlot => ({
-    id: preference.widgetId,
-    content: renderDashboardWidget(preference.widgetId, data, now),
-  }));
 
   return (
     <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
@@ -182,20 +182,23 @@ export default function AdminDashboard({ data, layout, callHandling, bookingFoll
         </div>
       )}
 
-      {layout.layout.widgets.length === 0 ? (
+      {widgets.length === 0 ? (
         <EmptyState
           icon={<CircleAlert className="h-5 w-5" />}
           title="No dashboard data is assigned"
           guidance="This role can open the dashboard, but no dashboard data permissions are enabled for the selected clinic."
         />
       ) : (
-        <DashboardLayoutEditor
-          initialLayout={layout.layout}
-          widgets={slots}
-          canCustomize={layout.canCustomize}
-          sourceLabel={layout.source === "personal" ? "your saved layout" : layout.source === "role" ? "your role default" : "system default"}
-        />
+        <DashboardWidgetGrid widgets={widgets} data={data} now={now} />
       )}
+    </div>
+  );
+}
+
+function DashboardWidgetGrid({ widgets, data, now }: { widgets: readonly DashboardWidgetPlacement[]; data: AdminDashboardData; now: Date }) {
+  return (
+    <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+      {widgets.map((item) => <div key={item.widgetId} className={cx("min-w-0", widgetGridClass(item.size))}>{renderDashboardWidget(item.widgetId, data, now)}</div>)}
     </div>
   );
 }
@@ -204,7 +207,7 @@ function DeferredWidget({ widgetId }: { widgetId: DashboardWidgetId }) {
   const widget = DASHBOARD_WIDGETS.get(widgetId)!;
   return (
     <div className="flex min-h-[116px] items-center justify-center rounded-2xl border border-line bg-canvas p-5 text-center shadow-card dashboard-card-hover">
-      <div><p className="text-label font-semibold text-ink">{widget.title}</p><p className="mt-1 text-meta text-muted">Save the layout to load this widget&apos;s current data.</p></div>
+      <div><p className="text-label font-semibold text-ink">{widget.title}</p><p className="mt-1 text-meta text-muted">This widget&apos;s data isn&apos;t available right now.</p></div>
     </div>
   );
 }

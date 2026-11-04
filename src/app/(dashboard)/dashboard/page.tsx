@@ -1,6 +1,5 @@
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import { getAdminDashboardData } from "@/lib/adminDashboard";
-import { getEffectiveDashboardLayout } from "@/lib/dashboardLayouts";
+import { getAdminDashboardData, getDashboardWidgetsForActor } from "@/lib/adminDashboard";
 import { visibleDashboardWidgetIds } from "@/lib/dashboardWidgets";
 import { parsePreset } from "@/lib/dashboardDateRange";
 import {
@@ -13,7 +12,8 @@ import { getBookingFollowUpsForActor } from "@/lib/telephony/bookingFollowUps";
 
 /**
  * One permission-driven dashboard path for every tenant user, including the
- * wildcard owner. Role names and role keys never select a dashboard variant.
+ * wildcard owner. Permissions decide which widgets appear; the Doctor role key
+ * only selects the fixed "My Day" order (see lib/dashboardWidgetOrder.ts).
  */
 export default async function DashboardPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -27,14 +27,14 @@ export default async function DashboardPage(props: {
   );
   const period = parsePreset(typeof params.range === "string" ? params.range : undefined);
   const now = new Date();
-  const layout = await getEffectiveDashboardLayout(actor);
+  const widgets = await getDashboardWidgetsForActor(actor);
   const [data, callHandling, bookingFollowUps] = await Promise.all([
     getAdminDashboardData(
       actor,
       selectedClinicId,
       period,
       now,
-      visibleDashboardWidgetIds(layout.layout),
+      visibleDashboardWidgetIds(widgets),
     ),
     operationalClinicId === null
       ? Promise.resolve(null)
@@ -45,7 +45,7 @@ export default async function DashboardPage(props: {
   return (
     <AdminDashboard
       data={data}
-      layout={layout}
+      widgets={widgets}
       callHandling={callHandling}
       bookingFollowUps={bookingFollowUps}
       now={now}

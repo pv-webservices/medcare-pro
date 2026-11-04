@@ -5,6 +5,7 @@ import {
   isKnownPermission,
   RETIRED_PERMISSION_KEYS,
   WILDCARD,
+  withoutRetiredPermissions,
 } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { evaluateRoleGrantAuthority } from "@/lib/roleAuthority";
@@ -52,7 +53,10 @@ const permissionListSchema = z
   // Retired keys still stored on older roles are submitted back on save.
   .max(ALL_PERMISSIONS.length + RETIRED_PERMISSION_KEYS.size)
   // Deduped rather than rejected: two ticks of the same box is not a user error.
-  .transform((values) => [...new Set(values)]);
+  // Retired keys are dropped rather than rejected: the Roles editor sends a
+  // role's stored list back on save, so rejecting them would make every role
+  // that still holds one unsaveable until RM-3 cleans the rows.
+  .transform((values) => withoutRetiredPermissions([...new Set(values)]));
 
 export const createRoleSchema = z.object({
   name: z.string().trim().min(1, "Role name is required.").max(255),

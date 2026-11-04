@@ -106,9 +106,9 @@ describe("dashboard call-handling UI contract", () => {
     expect(pageSource).toContain("resolveDashboardOperationalClinicId");
   });
 
-  it("keeps Call Handling fixed before and outside DashboardLayoutEditor", () => {
+  it("keeps Call Handling fixed before and outside the widget grid", () => {
     expect(dashboardSource.indexOf("<CallHandlingPanel")).toBeGreaterThan(-1);
-    expect(dashboardSource.indexOf("<DashboardLayoutEditor")).toBeGreaterThan(
+    expect(dashboardSource.indexOf("<DashboardWidgetGrid")).toBeGreaterThan(
       dashboardSource.indexOf("<CallHandlingPanel"),
     );
     expect(

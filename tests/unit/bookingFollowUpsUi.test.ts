@@ -39,7 +39,7 @@ describe("booking follow-up and caller-number UI", () => {
     expect(dashboard.indexOf("<BookingFollowUpsPanel")).toBeGreaterThan(
       dashboard.indexOf("<CallHandlingPanel"),
     );
-    expect(dashboard.indexOf("<DashboardLayoutEditor")).toBeGreaterThan(
+    expect(dashboard.indexOf("<DashboardWidgetGrid")).toBeGreaterThan(
       dashboard.indexOf("<BookingFollowUpsPanel"),
     );
   });

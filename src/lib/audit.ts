@@ -314,8 +314,8 @@ export const AUDIT_ACTIONS = {
   TASK_COMPLETED: "TASK_COMPLETED",
   TASK_ARCHIVED: "TASK_ARCHIVED",
 
-  // Dashboard layouts store presentation preferences only — widget ids,
-  // order, visibility and size. They never contain dashboard data.
+  // Retired with the adjustable dashboard (RM-2): nothing writes these now.
+  // Kept so existing activity-log rows still render with their description.
   DASHBOARD_LAYOUT_PERSONAL_SAVED: "DASHBOARD_LAYOUT_PERSONAL_SAVED",
   DASHBOARD_LAYOUT_PERSONAL_RESET: "DASHBOARD_LAYOUT_PERSONAL_RESET",
   DASHBOARD_LAYOUT_ROLE_SAVED: "DASHBOARD_LAYOUT_ROLE_SAVED",

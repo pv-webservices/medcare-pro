@@ -1,4 +1,4 @@
-import { WILDCARD } from "@/lib/permissions";
+import { RETIRED_PERMISSIONS, WILDCARD, withoutRetiredPermissions } from "@/lib/permissions";
 
 export type RoleGrantRefusal =
   | "tenant-wide-owner-only"
@@ -18,11 +18,19 @@ export function evaluateRoleGrantAuthority(options: {
   isAccountOwner: boolean;
   tenantWide: boolean;
 }): RoleGrantRefusal | null {
+  // Retired keys grant nothing, so they count on neither side. Otherwise a role
+  // still holding one could not be granted by someone whose own role has
+  // already been saved without it.
+  const actorPermissions = new Set(
+    [...options.actorPermissions].filter((permission) => !RETIRED_PERMISSIONS.includes(permission)),
+  );
+  const targetPermissions = withoutRetiredPermissions(options.targetPermissions);
+
   if (options.tenantWide && !options.isAccountOwner) {
     return "tenant-wide-owner-only";
   }
   if (
-    options.targetPermissions.includes(WILDCARD) &&
+    targetPermissions.includes(WILDCARD) &&
     !options.isAccountOwner
   ) {
     return "owner-role-owner-only";
@@ -31,15 +39,15 @@ export function evaluateRoleGrantAuthority(options: {
     return null;
   }
   if (
-    options.targetPermissions.some(
-      (permission) => !options.actorPermissions.has(permission),
+    targetPermissions.some(
+      (permission) => !actorPermissions.has(permission),
     )
   ) {
     return "beyond-actor-permissions";
   }
 
-  const target = new Set(options.targetPermissions);
-  const hasStrictlyMoreAuthority = [...options.actorPermissions].some(
+  const target = new Set(targetPermissions);
+  const hasStrictlyMoreAuthority = [...actorPermissions].some(
     (permission) => permission !== WILDCARD && !target.has(permission),
   );
   return hasStrictlyMoreAuthority ? null : "not-below-actor-authority";
