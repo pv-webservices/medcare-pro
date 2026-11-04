@@ -1,19 +1,14 @@
 /**
  * Safely migrates exact historical seeded Doctor roles from broad appointment
  * read to self read. Dry-run by default. A remote write requires both --apply
- * and --allow-remote; custom roles and saved layouts are never overwritten.
+ * and --allow-remote; custom roles are never overwritten.
  */
 import "dotenv/config";
-import type { Prisma } from "@prisma/client";
 import {
   planDoctorSelfRoleMigration,
   type DoctorSelfRoleMigrationPlan,
 } from "@/lib/doctorSelfRoleMigration";
 import { ROLE_KEYS } from "@/lib/defaultRoles";
-import {
-  DASHBOARD_LAYOUT_VERSION,
-  doctorDefaultDashboardLayout,
-} from "@/lib/dashboardWidgets";
 import { prisma } from "@/lib/prisma";
 import { toPermissionList } from "@/lib/rbac";
 
@@ -53,7 +48,6 @@ interface Summary {
   nonSystem: number;
   unlinkedDoctorUsers: number;
   doctorLinksFound: number;
-  layoutsToCreate: number;
   adminRolesToUpdate: number;
 }
 
@@ -71,7 +65,6 @@ function printRole(
   },
   current: readonly string[],
   plan: DoctorSelfRoleMigrationPlan,
-  willCreateLayout: boolean,
 ): void {
   const action =
     plan.action === "MIGRATE"
@@ -93,7 +86,6 @@ function printRole(
       `  Matched state: ${plan.classification}`,
       `  Current appointment permissions: ${appointmentPermissions(current).join(", ") || "(none)"}`,
       `  Proposed appointment permissions: ${appointmentPermissions(plan.nextPermissions).join(", ") || "(none)"}`,
-      `  Role layout: ${willCreateLayout ? (APPLY ? "created My Day layout" : "would create My Day layout") : "unchanged"}`,
       `  Reason: ${plan.reason}`,
     ].join("\n"),
   );
@@ -221,7 +213,6 @@ async function main(): Promise<void> {
       isSystem: true,
       tenantId: true,
       tenant: { select: { businessName: true } },
-      dashboardLayouts: { where: { userId: null }, select: { id: true } },
     },
     orderBy: [{ tenantId: "asc" }, { key: "asc" }, { id: "asc" }],
   });
@@ -237,7 +228,6 @@ async function main(): Promise<void> {
     nonSystem: 0,
     unlinkedDoctorUsers: 0,
     doctorLinksFound: 0,
-    layoutsToCreate: 0,
     adminRolesToUpdate: 0,
   };
 
@@ -249,8 +239,6 @@ async function main(): Promise<void> {
       permissions: current,
     });
     const isDoctor = role.key === ROLE_KEYS.DOCTOR;
-    const willCreateLayout =
-      isDoctor && plan.action === "MIGRATE" && role.dashboardLayouts.length === 0;
 
     if (isDoctor) {
       summary.doctorRolesScanned += 1;
@@ -262,12 +250,11 @@ async function main(): Promise<void> {
       } else if (plan.classification === "NON_SYSTEM_ROLE") {
         summary.nonSystem += 1;
       } else summary.unknown += 1;
-      if (willCreateLayout) summary.layoutsToCreate += 1;
     } else if (plan.action === "MIGRATE") {
       summary.adminRolesToUpdate += 1;
     }
 
-    printRole(role, current, plan, willCreateLayout);
+    printRole(role, current, plan);
 
     if (isDoctor && plan.action === "MIGRATE") {
       const diagnostics = await doctorLinkDiagnostics(role);
@@ -285,17 +272,6 @@ async function main(): Promise<void> {
             where: { id: role.id },
             data: { permissions: [...plan.nextPermissions] },
           });
-          if (willCreateLayout) {
-            await tx.dashboardLayout.create({
-              data: {
-                tenantId: role.tenantId,
-                roleId: role.id,
-                version: DASHBOARD_LAYOUT_VERSION,
-                layout:
-                  doctorDefaultDashboardLayout() as unknown as Prisma.InputJsonValue,
-              },
-            });
-          }
         });
       } catch (error) {
         console.error(
@@ -320,7 +296,6 @@ async function main(): Promise<void> {
       `  Non-system Doctor roles skipped: ${summary.nonSystem}`,
       `  Unlinked Doctor users: ${summary.unlinkedDoctorUsers}`,
       `  Doctor links found: ${summary.doctorLinksFound}`,
-      `  Role layouts that ${APPLY ? "were" : "would be"} created: ${summary.layoutsToCreate}`,
       `  Clinic Admin roles that ${APPLY ? "were" : "would be"} updated additively: ${summary.adminRolesToUpdate}`,
       !APPLY
         ? "\nNothing was written. Review every candidate before using --apply; remote writes also require --allow-remote."

@@ -57,14 +57,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     feature: "billing",
   },
   {
-    href: "/settings/dashboard",
-    title: "Dashboard",
-    description:
-      "Arrange your dashboard and, when authorized, configure defaults for lower-authority roles.",
-    viewPermissions: ["dashboard:view", "dashboard:customize", "dashboard:layout:manage"],
-    managePermissions: ["dashboard:customize", "dashboard:layout:manage"],
-  },
-  {
     href: "/settings/roles",
     title: "Roles & permissions",
     description:

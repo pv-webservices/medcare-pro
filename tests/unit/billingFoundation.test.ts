@@ -6,7 +6,7 @@ import { amountInWords } from "@/lib/billing/amountInWords";
 import { isValidGstin } from "@/lib/billing/gstin";
 import { planBillingRoleMigration, PRE_BILLING_ROLE_PERMISSIONS, BILLING_ROLE_TOP_UPS } from "@/lib/billingRoleMigration";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
-import { BILLING_PERMISSIONS, STAGE_1_PERMISSIONS, PRE_STAGE_11_PERMISSIONS, PRE_APPOINTMENTS_PERMISSIONS, findPermission } from "@/lib/permissions";
+import { BILLING_PERMISSIONS, STAGE_1_PERMISSIONS, PRE_STAGE_11_PERMISSIONS, PRE_APPOINTMENTS_PERMISSIONS, findPermission, withoutRetiredPermissions } from "@/lib/permissions";
 import { DEFAULT_FEATURES } from "@/lib/defaultFeatures";
 import { MODULE_FEATURES } from "@/lib/moduleFeatures";
 
@@ -123,7 +123,8 @@ describe("billing catalogue and role migration", () => {
     const before = PRE_BILLING_ROLE_PERMISSIONS[key];
     const role = { key, isSystem: true, permissions: before };
     expect(planBillingRoleMigration(role)).toEqual({ status: "ELIGIBLE", additions: BILLING_ROLE_TOP_UPS[key] });
-    expect(DEFAULT_ROLES.find((r) => r.key === key)!.permissions).toEqual([...before, ...BILLING_ROLE_TOP_UPS[key]]);
+    // RM-2 retired dashboard-layout keys from today's defaults; the frozen snapshot keeps them.
+    expect(DEFAULT_ROLES.find((r) => r.key === key)!.permissions).toEqual(withoutRetiredPermissions([...before, ...BILLING_ROLE_TOP_UPS[key]]));
     expect(planBillingRoleMigration({ ...role, permissions: [...before].reverse() }).status).toBe("ELIGIBLE");
     expect(planBillingRoleMigration({ ...role, isSystem: false }).status).toBe("CUSTOMIZED_OR_OLDER");
     expect(planBillingRoleMigration({ ...role, permissions: before.slice(1) }).status).toBe("CUSTOMIZED_OR_OLDER");
