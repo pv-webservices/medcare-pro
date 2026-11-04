@@ -108,6 +108,26 @@ const LEGACY_PERMISSION_ALIASES: Readonly<Record<string, readonly string[]>> = {
 
 const LEGACY_PERMISSION_KEYS = new Set(Object.values(LEGACY_PERMISSION_ALIASES).flat());
 
+/**
+ * Keys of a removed module that roles saved before the removal may still hold.
+ *
+ * Not in PERMISSION_GROUPS, so they are never offered as checkboxes, never
+ * granted to new roles, and nothing checks them — they grant nothing. They are
+ * accepted as known only so that saving an existing role that still carries
+ * them (the roles editor submits the stored set back) does not fail with
+ * "Unknown permission". Dropped, together with a stored-data cleanup, in RM-3.
+ *
+ * RM-1 (Nov 2026): the Clinical AI module was removed.
+ */
+export const RETIRED_PERMISSION_KEYS: ReadonlySet<string> = new Set([
+  "clinical-ai:writing",
+  "clinical-ai:recording",
+  "clinical-ai:transcription",
+  "clinical-ai:transcript-read",
+  "clinical-ai:facts-extract",
+  "clinical-ai:facts-review",
+]);
+
 export function permissionGrantKeys(permission: string): readonly string[] {
   return [permission, ...(LEGACY_PERMISSION_ALIASES[permission] ?? [])];
 }
@@ -177,14 +197,6 @@ export const PRESCRIPTION_PERMISSIONS: readonly string[] = [
   "prescription:read", "prescription:draft", "prescription:issue", "prescription:cancel",
 ];
 
-export const CLINICAL_AI_PERMISSIONS: readonly string[] = [
-  "clinical-ai:writing",
-  "clinical-ai:recording",
-  "clinical-ai:transcription",
-  "clinical-ai:transcript-read",
-  "clinical-ai:facts-extract",
-  "clinical-ai:facts-review",
-];
 export const BILLING_PERMISSIONS: readonly string[] = [
   "invoice:read",
   "invoice:create",
@@ -195,14 +207,6 @@ export const BILLING_PERMISSIONS: readonly string[] = [
 ];
 
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
-  { module: "Clinical AI", permissions: [
-    { key: "clinical-ai:writing", label: "Clinical writing assistance", description: "Request language suggestions for an authorized consultation." },
-    { key: "clinical-ai:recording", label: "Consultation recording", description: "Record consented face-to-face consultations." },
-    { key: "clinical-ai:transcription", label: "Clinical transcription", description: "Request and review transcription processing." },
-    { key: "clinical-ai:transcript-read", label: "Transcript access", description: "View consented consultation transcripts and playback." },
-    { key: "clinical-ai:facts-extract", label: "Clinical fact extraction", description: "Request evidence-linked fact candidates from a reviewed transcript." },
-    { key: "clinical-ai:facts-review", label: "Clinical fact review", description: "Accept or dismiss extracted fact candidates." },
-  ] },
   { module: "Patient portal", permissions: [{ key: "patient_portal:manage", label: "Manage patient portal access", description: "Activate, resend and revoke portal access for verified patients." }] },
   {
     module: "Prescriptions",
@@ -732,7 +736,11 @@ const BY_KEY = new Map(
  * account owner". `lib/roles.ts` rejects it explicitly for the same reason.
  */
 export function isKnownPermission(value: string): boolean {
-  return BY_KEY.has(value) || LEGACY_PERMISSION_KEYS.has(value);
+  return (
+    BY_KEY.has(value) ||
+    LEGACY_PERMISSION_KEYS.has(value) ||
+    RETIRED_PERMISSION_KEYS.has(value)
+  );
 }
 
 export function findPermission(key: string): PermissionDefinition | undefined {
@@ -836,7 +844,6 @@ export const STAGE_1_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filter(
     !HISTORICAL_ALL_PERMISSIONS.includes(permission) &&
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
-    !CLINICAL_AI_PERMISSIONS.includes(permission) &&
     permission !== "patient_portal:manage" &&
     !BILLING_PERMISSIONS.includes(permission) &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
@@ -890,7 +897,6 @@ export const PRE_STAGE_11_PERMISSIONS: readonly string[] = ALL_PERMISSIONS.filte
   (permission) =>
     !STAGE_11_PERMISSIONS.includes(permission) &&
     !STAGE_AP1_PERMISSIONS.includes(permission) &&
-    !CLINICAL_AI_PERMISSIONS.includes(permission) &&
     permission !== "patient_portal:manage" &&
     !BILLING_PERMISSIONS.includes(permission) &&
     !PRESCRIPTION_PERMISSIONS.includes(permission) &&
@@ -936,7 +942,6 @@ export const PRE_APPOINTMENTS_PERMISSIONS: readonly string[] =
   ALL_PERMISSIONS.filter(
     (permission) =>
       !STAGE_AP1_PERMISSIONS.includes(permission) &&
-      !CLINICAL_AI_PERMISSIONS.includes(permission) &&
       permission !== "patient_portal:manage" &&
       !BILLING_PERMISSIONS.includes(permission) &&
       !PRESCRIPTION_PERMISSIONS.includes(permission) &&

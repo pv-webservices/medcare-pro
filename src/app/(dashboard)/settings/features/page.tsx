@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import FeatureMatrix from "@/components/settings/FeatureMatrix";
-import ClinicalAiSettings from "@/components/settings/ClinicalAiSettings";
 import MissingFeaturesBanner from "@/components/settings/MissingFeaturesBanner";
 import { listMissingCatalogueFeatures } from "@/lib/featureInstallationStatus";
 import PageHeader from "@/components/ui/PageHeader";
@@ -75,7 +74,6 @@ export default async function FeatureSettingsPage() {
 
       <MissingFeaturesBanner missing={missing} />
       <FeatureMatrix features={overview.features} canManage={overview.canManage} />
-      <ClinicalAiSettings canManage={overview.canManage} />
     </section>
   );
 }

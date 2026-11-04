@@ -23,7 +23,6 @@ import { DEFAULT_FEATURES } from "@/lib/defaultFeatures";
  */
 export const MODULE_FEATURES = {
   billing: "billing",
-  clinical_ai: "clinical_ai",
   prescriptions: "prescriptions",
   registrations: "registrations",
   doctors: "doctors",

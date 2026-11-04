@@ -3,7 +3,6 @@ import {
   ALL_PERMISSIONS,
   PRESCRIPTION_PERMISSIONS,
   BILLING_PERMISSIONS,
-  CLINICAL_AI_PERMISSIONS,
   DASHBOARD_DATA_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   HISTORICAL_ALL_PERMISSIONS,
@@ -203,7 +202,6 @@ describe("the stage sets stay disjoint", () => {
       (permission) =>
         !STAGE_11_PERMISSIONS.includes(permission) &&
         !STAGE_AP1_PERMISSIONS.includes(permission) &&
-        !CLINICAL_AI_PERMISSIONS.includes(permission) &&
         permission !== "patient_portal:manage" &&
         !BILLING_PERMISSIONS.includes(permission) &&
         !PRESCRIPTION_PERMISSIONS.includes(permission) &&
@@ -227,7 +225,6 @@ describe("PRE_APPOINTMENTS_PERMISSIONS", () => {
         DOCTOR_SELF_APPOINTMENT_PERMISSIONS.length -
         PRESCRIPTION_PERMISSIONS.length -
         BILLING_PERMISSIONS.length -
-        CLINICAL_AI_PERMISSIONS.length -
         TASK_PERMISSIONS.length -
         DASHBOARD_DATA_PERMISSIONS.length,
     );
@@ -476,7 +473,6 @@ describe("what the backfill would append", () => {
       const expected = role.permissions.filter(
         (permission) =>
           !permission.startsWith("dashboard:") &&
-          !CLINICAL_AI_PERMISSIONS.includes(permission) &&
           permission !== "patient_portal:manage" &&
           !BILLING_PERMISSIONS.includes(permission) &&
           !PRESCRIPTION_PERMISSIONS.includes(permission) &&
