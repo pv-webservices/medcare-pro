@@ -112,19 +112,23 @@ async function listObjects(s3: { client: S3Client; bucket: string }) {
   return objects;
 }
 
+/**
+ * Lists the whole bucket's unfinished uploads and filters by prefix here: some
+ * S3-compatible stores (MinIO) match a ListMultipartUploads Prefix only against
+ * a complete key, so a folder prefix would silently return nothing.
+ */
 async function listUploads(s3: { client: S3Client; bucket: string }) {
   const uploads = new Map<string, { key: string; uploadId: string }>();
-  for (const prefix of BUCKET_PREFIXES) {
-    let keyMarker: string | undefined;
-    let uploadIdMarker: string | undefined;
-    do {
-      const page = await s3.client.send(new ListMultipartUploadsCommand({ Bucket: s3.bucket, Prefix: prefix, KeyMarker: keyMarker, UploadIdMarker: uploadIdMarker }));
-      for (const upload of page.Uploads ?? [])
-        if (upload.Key && upload.UploadId) uploads.set(upload.UploadId, { key: upload.Key, uploadId: upload.UploadId });
-      keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
-      uploadIdMarker = page.IsTruncated ? page.NextUploadIdMarker : undefined;
-    } while (keyMarker);
-  }
+  let keyMarker: string | undefined;
+  let uploadIdMarker: string | undefined;
+  do {
+    const page = await s3.client.send(new ListMultipartUploadsCommand({ Bucket: s3.bucket, KeyMarker: keyMarker, UploadIdMarker: uploadIdMarker }));
+    for (const upload of page.Uploads ?? [])
+      if (upload.Key && upload.UploadId && BUCKET_PREFIXES.some((prefix) => upload.Key!.startsWith(prefix)))
+        uploads.set(upload.UploadId, { key: upload.Key, uploadId: upload.UploadId });
+    keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
+    uploadIdMarker = page.IsTruncated ? page.NextUploadIdMarker : undefined;
+  } while (keyMarker);
   return uploads;
 }
 
@@ -193,13 +197,15 @@ async function main() {
   if (s3) {
     const objects = await listObjects(s3);
     const uploads = await listUploads(s3);
-    // An upload the bucket no longer lists was already completed or aborted.
-    for (const id of [...dbUploads.keys()]) if (!uploads.has(id)) dbUploads.delete(id);
+    // Every upload id the database recorded is aborted too, even when the
+    // listing does not show it: aborting one that already finished is a
+    // harmless NoSuchUpload, while trusting the listing could leave parts behind.
+    const recordedOnly = [...dbUploads.keys()].filter((id) => !uploads.has(id)).length;
     for (const [id, upload] of uploads) dbUploads.set(id, upload);
     const listedBytes = [...objects.values()].reduce((sum, size) => sum + size, 0);
     const knownToDb = [...objects.keys()].filter((key) => dbKeys.has(key)).length;
     const missing = [...dbKeys].filter((key) => !objects.has(key)).length;
-    say(`Bucket: ${objects.size} audio objects (${mb(listedBytes)}); ${knownToDb} match a database row, ${objects.size - knownToDb} are orphans; ${missing} database keys are already gone; ${dbUploads.size} unfinished multipart uploads.`);
+    say(`Bucket: ${objects.size} audio objects (${mb(listedBytes)}); ${knownToDb} match a database row, ${objects.size - knownToDb} are orphans; ${missing} database keys are already gone; ${uploads.size} unfinished multipart uploads listed, plus ${recordedOnly} recorded only in the database.`);
     if (apply) {
       let deleted = 0;
       for (const key of objects.keys()) {
@@ -223,8 +229,9 @@ async function main() {
         }
       }
       const left = await listObjects(s3);
-      say(`Bucket: deleted ${deleted} objects, aborted ${aborted} uploads; ${left.size} audio objects remain.`);
-      if (left.size > 0) failures += 1;
+      const leftUploads = await listUploads(s3);
+      say(`Bucket: deleted ${deleted} objects, aborted ${aborted} uploads; ${left.size} audio objects and ${leftUploads.size} unfinished uploads remain.`);
+      if (left.size > 0 || leftUploads.size > 0) failures += 1;
     }
   } else if (dbKeys.size > 0) {
     say("Bucket: RECORDING_S3_* is not configured, so stored audio cannot be listed or deleted.");
