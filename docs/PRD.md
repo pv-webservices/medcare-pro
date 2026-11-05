@@ -159,11 +159,6 @@ Itemised billing per Registration/visit: clinic billing settings and service pri
 | `registration_edit_log` | `id`, `registration_id` (FK), `edited_by_user_id`, `role_at_time`, `changed_fields` (JSON), `timestamp` | Immutable audit trail |
 | `notifications` | `id`, `account_id`, `clinic_id` (nullable), `type`, `message`, `related_record_id`, `read`, `created_at` | |
 | `whatsapp_messages` | `id`, `clinic_id`, `patient_id`, `template_name`, `status`, `sent_at` | Logged sends via the BSP |
-| `transcript_reviews` | `id`, `tenant_id`, `clinic_id`, `transcript_id`, `transcript_version`, `effective_hash`, `reviewed_by_user_id`, `reviewed_at` | **Retired (RM-1), dropped in RM-3.** |
-| `clinical_fact_extraction_runs` | `id`, `tenant_id`, `clinic_id`, `transcript_review_id`, `status`, `model`, `prompt_version`, `idempotency_key` | **Retired (RM-1), dropped in RM-3.** |
-| `clinical_fact_candidates` | `id`, `tenant_id`, `clinic_id`, `extraction_run_id`, `category`, `assertion`, `subject`, `statement`, `attributes` | **Retired (RM-1), dropped in RM-3.** |
-| `clinical_fact_evidence` | `id`, `fact_id`, `segment_id`, `correction_id`, `quote`, `char_start`, `char_end` | **Retired (RM-1), dropped in RM-3.** |
-| `clinical_fact_reviews` | `id`, `tenant_id`, `fact_id`, `decision`, `reviewed_by_user_id`, `reviewed_at` | **Retired (RM-1), dropped in RM-3.** |
 | `clinic_billing_settings` | `id`, `tenant_id`, `clinic_id`, GSTIN, prefix, discount limit, footer | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
 | `service_items` | `id`, `tenant_id`, `clinic_id`, name, category, price, tax rate, SAC, active | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
 | `invoices` | ownership, active key, number, FY, lifecycle, totals, snapshot, replacement | **Built (PB-1–PB-5, migration `20260927211833_patient_billing`).** See [implementation report](patient-billing-implementation-report.md) |
@@ -207,6 +202,7 @@ user's role is clinic-scoped) — this is a deliberate reversal of the old
 - **Patient identity is per clinic** *(decided post-v2.0)*: `patients.clinic_id` is not nullable, so a person known at Clinic A is a separate record at Clinic B even under the same account. Return-visit lookup (FR-3.1a) therefore searches within one clinic. Revisit if group-wide patient identity is ever wanted — it is a data-model change, not a UI one.
 - **Currency is Indian rupees (₹)** *(decided post-v2.0)*: amounts are stored as unformatted `Decimal(10, 2)` and rendered with the ₹ symbol and `en-IN` grouping. CSV export stays unformatted under an `Amount (INR)` header so a spreadsheet can sum it.
 - **Server clock = clinic clock** *(decided post-v2.0)*: `visit_date` stores the wall-clock time entered, tagged UTC, and the "now" default is taken from the server. Set `TZ` on the host (e.g. `Asia/Kolkata`) or a late-evening registration defaults to the wrong day.
+- Clinical AI and dashboard customisation were removed in Nov 2026 (RM-1..RM-3); their tables were dropped after a backup.
 
 ## 11. Constraints
 

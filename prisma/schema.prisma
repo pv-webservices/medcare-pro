@@ -36,23 +36,21 @@ datasource db {
 /// The top-level tenant. One signup = one Tenant, which can own many Clinics.
 /// Holds no credentials of its own — see the note on User.passwordHash.
 model Tenant {
-  clinicBillingSettings            ClinicBillingSettings[]
-  serviceItems                     ServiceItem[]
-  invoices                         Invoice[]
-  invoicePayments                  InvoicePayment[]
-  allowGeminiTranscriptionFallback Boolean @default(false) @map("allow_gemini_transcription_fallback")
-  aiRuns            AiRun[]
-  portalAuditEvents PatientPortalAuditEvent[]
-  id                String                    @id @default(cuid())
-  businessName      String                    @map("business_name")
+  clinicBillingSettings ClinicBillingSettings[]
+  serviceItems          ServiceItem[]
+  invoices              Invoice[]
+  invoicePayments       InvoicePayment[]
+  portalAuditEvents     PatientPortalAuditEvent[]
+  id                    String                    @id @default(cuid())
+  businessName          String                    @map("business_name")
   /// Contact address collected at signup, and the address the FR-1.2
   /// verification link is sent to.
-  email             String                    @unique
+  email                 String                    @unique
   /// FR-1.2 / PRD §9 — login is blocked for every User under this Tenant until
   /// this is set. Verification is a property of the business, not of each
   /// individual login, so it lives here and not on User.
-  emailVerifiedAt   DateTime?                 @map("email_verified_at")
-  createdAt         DateTime                  @default(now()) @map("created_at")
+  emailVerifiedAt       DateTime?                 @map("email_verified_at")
+  createdAt             DateTime                  @default(now()) @map("created_at")
 
   // --- Stage 1: platform lifecycle (Owner-controlled) ---------------------
   /// URL-safe identifier for this organisation. Used for the cosmetic half of
@@ -132,7 +130,6 @@ model Tenant {
   sessions                     AppSession[]
   auditLogs                    AuditLog[]
   tasks                        Task[]
-  dashboardLayouts             DashboardLayout[]
   telephonyBookingRequests     TelephonyBookingRequest[]
   platformPlivoNumbers         PlatformPlivoNumber[]       @relation("PlatformPlivoAssignedTenant")
   quarantineSourcePlivoNumbers PlatformPlivoNumber[]       @relation("PlatformPlivoQuarantineSourceTenant")
@@ -140,21 +137,13 @@ model Tenant {
   clinicCapacityGrants         TenantClinicCapacityGrant[]
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
-  appointments           Appointment[]
-  appointmentTypes       AppointmentType[]
-  clinicalConsultations  ClinicalConsultation[]
-  prescriptions          Prescription[]
-  recordingConsents      ConsultationRecordingConsent[]
-  consultationRecordings ConsultationRecording[]
-  transcriptionRuns      TranscriptionRun[]
-  clinicalTranscripts    ClinicalTranscript[]
-  transcriptReviews      TranscriptReview[]
+  appointments          Appointment[]
+  appointmentTypes      AppointmentType[]
+  clinicalConsultations ClinicalConsultation[]
+  prescriptions         Prescription[]
 
   /// Enforced from the constrain migration onward, once the backfill has
   /// generated and validated a slug for every existing row.
-  factExtractionRuns     ClinicalFactExtractionRun[]
-  clinicalFactCandidates ClinicalFactCandidate[]
-  clinicalFactReviews    ClinicalFactReview[]
   @@unique([slug])
   @@index([status])
   @@index([isPlatform])
@@ -173,8 +162,6 @@ model User {
   cancelledInvoices           Invoice[]                 @relation("InvoiceCancelledBy")
   recordedInvoicePayments     InvoicePayment[]          @relation("InvoicePaymentRecordedBy")
   voidedInvoicePayments       InvoicePayment[]          @relation("InvoicePaymentVoidedBy")
-  transcriptDerivedViews TranscriptDerivedView[] @relation("TranscriptDerivedViewCreatedBy")
-  aiRuns                      AiRun[]
   portalIdentityVerifications PatientPortalLink[]       @relation("PortalIdentityVerifier")
   portalRevocations           PatientPortalLink[]       @relation("PortalRevoker")
   portalActivationsCreated    PatientPortalActivation[]
@@ -234,7 +221,6 @@ model User {
   /// Tenant.updatedAt for the three-step path.
   updatedAt            DateTime              @updatedAt @map("updated_at")
   userRoles            UserRole[]
-  dashboardLayouts     DashboardLayout[]
   registrationsCreated Registration[]        @relation("RegistrationCreatedBy")
   registrationEdits    RegistrationEditLog[]
   mediaAssetsUploaded  MediaAsset[]          @relation("MediaAssetUploadedBy")
@@ -284,20 +270,12 @@ model User {
   /// the login is removed.
   doctorProfiles Doctor[] @relation("DoctorPortalUser")
 
-  tasksCreated               Task[]                         @relation("TaskCreatedBy")
-  tasksAssigned              Task[]                         @relation("TaskAssignedTo")
-  tasksCompleted             Task[]                         @relation("TaskCompletedBy")
-  consultationsCreated       ClinicalConsultation[]         @relation("ConsultationCreatedBy")
-  prescriptionsIssued        Prescription[]                 @relation("PrescriptionIssuedBy")
-  prescriptionsCancelled     Prescription[]                 @relation("PrescriptionCancelledBy")
-  recordingConsentsCaptured  ConsultationRecordingConsent[] @relation("RecordingConsentCapturedBy")
-  recordingConsentsWithdrawn ConsultationRecordingConsent[] @relation("RecordingConsentWithdrawnBy")
-  recordingsCreated          ConsultationRecording[]        @relation("RecordingCreatedBy")
-  transcriptionRunsRequested TranscriptionRun[]             @relation("TranscriptionRunRequestedBy")
-  transcriptCorrections      TranscriptCorrection[]         @relation("TranscriptCorrectionCreatedBy")
-  transcriptReviews          TranscriptReview[]             @relation("TranscriptReviewedBy")
-  factExtractionsRequested   ClinicalFactExtractionRun[]    @relation("FactExtractionRequestedBy")
-  factReviews                ClinicalFactReview[]           @relation("FactReviewedBy")
+  tasksCreated           Task[]                 @relation("TaskCreatedBy")
+  tasksAssigned          Task[]                 @relation("TaskAssignedTo")
+  tasksCompleted         Task[]                 @relation("TaskCompletedBy")
+  consultationsCreated   ClinicalConsultation[] @relation("ConsultationCreatedBy")
+  prescriptionsIssued    Prescription[]         @relation("PrescriptionIssuedBy")
+  prescriptionsCancelled Prescription[]         @relation("PrescriptionCancelledBy")
 
   @@index([tenantId])
   @@index([accountStatus])
@@ -371,10 +349,9 @@ model Role {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  userRoles        UserRole[]
-  featureAccess    RoleFeatureAccess[]
-  invitations      Invitation[]
-  dashboardLayouts DashboardLayout[]
+  userRoles     UserRole[]
+  featureAccess RoleFeatureAccess[]
+  invitations   Invitation[]
 
   /// Role names are unique within a tenant, not globally.
   @@unique([tenantId, name])
@@ -420,30 +397,6 @@ model UserRole {
   @@map("user_roles")
 }
 
-/// A normalized presentation preference. Exactly one of userId / roleId is set:
-/// personal overrides and role defaults deliberately share no row or scope.
-model DashboardLayout {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  userId    String?  @map("user_id")
-  roleId    String?  @map("role_id")
-  layout    Json
-  version   Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role   Role?  @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, userId])
-  @@unique([tenantId, roleId])
-  @@index([tenantId])
-  @@index([userId])
-  @@index([roleId])
-  @@map("dashboard_layouts")
-}
-
 // ---------------------------------------------------------------------------
 // Clinics — PRD §7 `clinics`, FR-2.x / FR-8.3 / FR-8.4
 // ---------------------------------------------------------------------------
@@ -454,16 +407,15 @@ model Clinic {
   invoices               Invoice[]
   invoicePayments        InvoicePayment[]
   invoiceNumberSequences InvoiceNumberSequence[]
-  aiRuns     AiRun[]
-  id         String   @id @default(cuid())
-  tenantId   String   @map("tenant_id")
-  name       String
-  address    String?  @db.Text
-  city       String?
+  id                     String                  @id @default(cuid())
+  tenantId               String                  @map("tenant_id")
+  name                   String
+  address                String?                 @db.Text
+  city                   String?
   /// FR-8.3 / FR-8.4 — per-clinic branding overrides.
-  logoUrl    String?  @map("logo_url") @db.LongText
-  themeColor String?  @map("theme_color") @db.VarChar(9)
-  createdAt  DateTime @default(now()) @map("created_at")
+  logoUrl                String?                 @map("logo_url") @db.LongText
+  themeColor             String?                 @map("theme_color") @db.VarChar(9)
+  createdAt              DateTime                @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -488,18 +440,11 @@ model Clinic {
   telephonyBookingRequests     TelephonyBookingRequest[]
   telephonyCalls               ClinicTelephonyCall[]
   telephonyTestCalls           ClinicTelephonyTestCall[]
-  platformPlivoNumber          PlatformPlivoNumber?           @relation("PlatformPlivoAssignedClinic")
-  quarantineSourcePlivoNumbers PlatformPlivoNumber[]          @relation("PlatformPlivoQuarantineSourceClinic")
+  platformPlivoNumber          PlatformPlivoNumber?      @relation("PlatformPlivoAssignedClinic")
+  quarantineSourcePlivoNumbers PlatformPlivoNumber[]     @relation("PlatformPlivoQuarantineSourceClinic")
   tasks                        Task[]
   clinicalConsultations        ClinicalConsultation[]
   prescriptions                Prescription[]
-  recordingConsents            ConsultationRecordingConsent[]
-  consultationRecordings       ConsultationRecording[]
-  transcriptionRuns            TranscriptionRun[]
-  clinicalTranscripts          ClinicalTranscript[]
-  transcriptReviews            TranscriptReview[]
-  factExtractionRuns           ClinicalFactExtractionRun[]
-  clinicalFactCandidates       ClinicalFactCandidate[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -821,9 +766,9 @@ model TelephonyBookingRequest {
 
 model Doctor {
   invoices   Invoice[]
-  id         String  @id @default(cuid())
-  clinicId   String  @map("clinic_id")
-  userId     String? @map("user_id")
+  id         String    @id @default(cuid())
+  clinicId   String    @map("clinic_id")
+  userId     String?   @map("user_id")
   name       String
   department String
   /// Free-text rather than an enum: the PRD does not fix the accepted values,
@@ -843,13 +788,11 @@ model Doctor {
 
   // --- AP-1 relations (back-relations only; no column on this table) -------
   /// Restrict on the owning side: an appointment is history once booked.
-  appointments           Appointment[]
+  appointments          Appointment[]
   /// Cascade on the owning side — these rows carry no data, only a lock.
-  scheduleLocks          DoctorScheduleLock[]
-  clinicalConsultations  ClinicalConsultation[]
-  prescriptions          Prescription[]
-  recordingConsents      ConsultationRecordingConsent[]
-  consultationRecordings ConsultationRecording[]
+  scheduleLocks         DoctorScheduleLock[]
+  clinicalConsultations ClinicalConsultation[]
+  prescriptions         Prescription[]
 
   qualification             String? @db.VarChar(255)
   medicalRegistrationNumber String? @map("medical_registration_number") @db.VarChar(255)
@@ -938,11 +881,9 @@ model Patient {
   /// which cascades. An appointment must survive as a record of what was booked
   /// even if the patient row it was later linked to is deleted — the
   /// denormalised name/mobileNumber on the appointment keep it readable.
-  appointments                  Appointment[]
-  clinicalConsultations         ClinicalConsultation[]
-  prescriptions                 Prescription[]
-  consultationRecordingConsents ConsultationRecordingConsent[]
-  consultationRecordings        ConsultationRecording[]
+  appointments          Appointment[]
+  clinicalConsultations ClinicalConsultation[]
+  prescriptions         Prescription[]
 
   /// Tenant-scoped, so two tenants can each independently hold PT-2026-0001.
   @@unique([tenantId, patientCode])
@@ -957,28 +898,27 @@ model Patient {
 model Registration {
   /// D8: billing issue/cancel synchronizes amount with the live invoice total and writes an edit log.
   invoices   Invoice[]
-  aiRuns     AiRun[]
-  id         String   @id @default(cuid())
-  clinicId   String   @map("clinic_id")
-  patientId  String   @map("patient_id")
-  doctorId   String?  @map("doctor_id")
+  id         String    @id @default(cuid())
+  clinicId   String    @map("clinic_id")
+  patientId  String    @map("patient_id")
+  doctorId   String?   @map("doctor_id")
   /// FR-3.1 — required on the registration form.
   department String
-  amount     Decimal  @db.Decimal(10, 2)
+  amount     Decimal   @db.Decimal(10, 2)
   /// Date AND time of the visit. A patient returning for a follow-up needs the
   /// appointment time recorded, not just the day, so this carries a clock time
   /// rather than being pinned to midnight like the DATE columns above.
   /// Stored as the clinic's wall-clock time tagged UTC — see src/lib/dates.ts.
-  visitDate  DateTime @map("visit_date")
+  visitDate  DateTime  @map("visit_date")
   /// "NEW" for a patient's first visit here, "FOLLOW_UP" for a return. Derived
   /// on create (an existing patient means a follow-up) but overridable by the
   /// front desk, since a return patient presenting a new complaint is a new
   /// case. Values live in src/lib/registrations.ts; a String rather than an
   /// enum so a clinic-specific visit type can be added without a migration.
-  visitType  String   @default("NEW") @map("visit_type") @db.VarChar(20)
-  createdBy  String   @map("created_by")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  visitType  String    @default("NEW") @map("visit_type") @db.VarChar(20)
+  createdBy  String    @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   // --- AP-1: the appointment this visit came from, if any -----------------
   /// NULL on every registration created before appointments existed, and NULL
@@ -1003,21 +943,14 @@ model Registration {
   /// nothing deletes appointments anyway — they retire by status.
   appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
 
-  editLog                RegistrationEditLog[]
-  clinicalConsultation   ClinicalConsultation?
-  prescriptions          Prescription[]
-  recordingConsents      ConsultationRecordingConsent[]
-  consultationRecordings ConsultationRecording[]
-  transcriptionRuns      TranscriptionRun[]
-  clinicalTranscripts    ClinicalTranscript[]
-  transcriptReviews      TranscriptReview[]
+  editLog              RegistrationEditLog[]
+  clinicalConsultation ClinicalConsultation?
+  prescriptions        Prescription[]
 
   /// One registration per appointment. This is the database-level guard against
   /// converting the same appointment twice: AP-5's second attempt hits this
   /// index rather than racing past an application check. Unlimited rows may
   /// hold NULL, which is what every pre-AP-1 registration holds.
-  factExtractionRuns     ClinicalFactExtractionRun[]
-  clinicalFactCandidates ClinicalFactCandidate[]
   @@unique([appointmentId])
   @@index([clinicId])
   @@index([patientId])
@@ -2390,377 +2323,6 @@ model PrescriptionItem {
   @@map("prescription_items")
 }
 
-/// Metadata only: never store clinical text, prompts, errors or provider bodies.
-model AiRun {
-  id                   String       @id @default(cuid())
-  tenantId             String       @map("tenant_id")
-  clinicId             String       @map("clinic_id")
-  userId               String       @map("user_id")
-  registrationId       String       @map("registration_id")
-  feature              String       @db.VarChar(64)
-  field                String       @db.VarChar(64)
-  mode                 String       @db.VarChar(32)
-  provider             String       @db.VarChar(32)
-  model                String       @db.VarChar(101)
-  status               String       @db.VarChar(32)
-  inputCharacterCount  Int          @map("input_character_count")
-  outputCharacterCount Int          @default(0) @map("output_character_count")
-  inputTokens          Int?         @map("input_tokens")
-  outputTokens         Int?         @map("output_tokens")
-  latencyMs            Int?         @map("latency_ms")
-  createdAt            DateTime     @default(now()) @map("created_at")
-  tenant               Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic               Clinic       @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  user                 User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  registration         Registration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-
-  @@index([tenantId, createdAt])
-  @@index([tenantId, userId, createdAt])
-  @@index([tenantId, registrationId, createdAt])
-  @@map("ai_runs")
-}
-
-enum RecordingConsentMethod {
-  VERBAL
-  WRITTEN
-  DIGITAL
-}
-
-enum RecordingConsenterType {
-  PATIENT
-  GUARDIAN
-  AUTHORIZED_REPRESENTATIVE
-}
-
-enum ConsultationRecordingStatus {
-  CREATED
-  RECORDING
-  PAUSED
-  STOPPED
-  UPLOADING
-  READY
-  ABORTED
-  FAILED
-}
-
-enum ConsultationRecordingEventType {
-  START
-  PAUSE
-  RESUME
-  STOP
-  CONSENT_WITHDRAWN
-}
-
-enum TranscriptionProvider {
-  SARVAM
-  GEMINI
-}
-
-enum TranscriptionRunStatus {
-  QUEUED
-  PREPARING
-  SUBMITTED
-  PROCESSING
-  COMPLETED
-  FAILED
-  TIMED_OUT
-  CANCELLED
-}
-
-enum TranscriptionMode {
-  VERBATIM
-}
-
-model ConsultationRecordingConsent {
-  id                String                 @id @default(cuid())
-  tenantId          String                 @map("tenant_id")
-  clinicId          String                 @map("clinic_id")
-  registrationId    String                 @map("registration_id")
-  patientId         String                 @map("patient_id")
-  doctorId          String                 @map("doctor_id")
-  capturedByUserId  String                 @map("captured_by_user_id")
-  method            RecordingConsentMethod
-  consenterType     RecordingConsenterType @map("consenter_type")
-  consentedAt       DateTime               @map("consented_at")
-  withdrawnAt       DateTime?              @map("withdrawn_at")
-  withdrawnByUserId String?                @map("withdrawn_by_user_id")
-  createdAt         DateTime               @default(now()) @map("created_at")
-
-  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic       Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  registration Registration           @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  patient      Patient                @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  doctor       Doctor                 @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-  capturedBy   User                   @relation("RecordingConsentCapturedBy", fields: [capturedByUserId], references: [id], onDelete: Restrict)
-  withdrawnBy  User?                  @relation("RecordingConsentWithdrawnBy", fields: [withdrawnByUserId], references: [id], onDelete: Restrict)
-  recording    ConsultationRecording?
-
-  @@index([tenantId, clinicId, createdAt], map: "recording_consent_tenant_clinic_created_idx")
-  @@index([registrationId, createdAt])
-  @@map("consultation_recording_consents")
-}
-
-model ConsultationRecording {
-  id               String                      @id @default(cuid())
-  tenantId         String                      @map("tenant_id")
-  clinicId         String                      @map("clinic_id")
-  registrationId   String                      @map("registration_id")
-  patientId        String                      @map("patient_id")
-  doctorId         String                      @map("doctor_id")
-  createdByUserId  String                      @map("created_by_user_id")
-  consentId        String                      @unique @map("consent_id")
-  status           ConsultationRecordingStatus @default(CREATED)
-  activeKey        String?                     @unique @map("active_key") @db.VarChar(191)
-  uploadId         String?                     @map("upload_id") @db.VarChar(1024)
-  uploadPartSize   Int?                        @map("upload_part_size")
-  uploadPartCount  Int?                        @map("upload_part_count")
-  uploadExpectedBytes BigInt?                  @map("upload_expected_bytes")
-  uploadCompletedPartsHash String?             @map("upload_completed_parts_hash") @db.Char(64)
-  mimeType         String?                     @map("mime_type") @db.VarChar(128)
-  durationMs       Int?                        @map("duration_ms")
-  byteSize         BigInt?                     @map("byte_size")
-  storageProvider  String?                     @map("storage_provider") @db.VarChar(32)
-  storageKey       String?                     @map("storage_key") @db.VarChar(512)
-  sha256           String?                     @db.Char(64)
-  startedAt        DateTime?                   @map("started_at")
-  stoppedAt        DateTime?                   @map("stopped_at")
-  uploadedAt       DateTime?                   @map("uploaded_at")
-  audioDeleteAfter DateTime?                   @map("audio_delete_after")
-  audioDeletedAt   DateTime?                   @map("audio_deleted_at")
-  audioCleanupToken String? @map("audio_cleanup_token") @db.Char(36)
-  audioCleanupLeaseExpiresAt DateTime? @map("audio_cleanup_lease_expires_at")
-  audioCleanupNextAttemptAt DateTime? @map("audio_cleanup_next_attempt_at")
-  version          Int                         @default(1)
-  createdAt        DateTime                    @default(now()) @map("created_at")
-  updatedAt        DateTime                    @updatedAt @map("updated_at")
-
-  tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic              Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  registration        Registration                 @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  patient             Patient                      @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  doctor              Doctor                       @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-  createdBy           User                         @relation("RecordingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  consent             ConsultationRecordingConsent @relation(fields: [consentId], references: [id], onDelete: Restrict)
-  events              ConsultationRecordingEvent[]
-  transcriptionRuns   TranscriptionRun[]
-  clinicalTranscripts ClinicalTranscript[]
-
-  @@index([tenantId, clinicId, createdAt])
-  @@index([registrationId, createdAt])
-  @@index([status])
-  @@index([audioDeleteAfter])
-  @@map("consultation_recordings")
-}
-
-model ConsultationRecordingEvent {
-  id              String                         @id @default(cuid())
-  recordingId     String                         @map("recording_id")
-  type            ConsultationRecordingEventType
-  clientElapsedMs Int                            @map("client_elapsed_ms")
-  createdAt       DateTime                       @default(now()) @map("created_at")
-  recording       ConsultationRecording          @relation(fields: [recordingId], references: [id], onDelete: Restrict)
-
-  @@index([recordingId, createdAt])
-  @@map("consultation_recording_events")
-}
-
-model TranscriptionRun {
-  id                    String                 @id @default(cuid())
-  tenantId              String                 @map("tenant_id")
-  clinicId              String                 @map("clinic_id")
-  registrationId        String                 @map("registration_id")
-  recordingId           String                 @map("recording_id")
-  requestedByUserId     String                 @map("requested_by_user_id")
-  provider              TranscriptionProvider
-  model                 String                 @db.VarChar(101)
-  status                TranscriptionRunStatus @default(QUEUED)
-  mode                  TranscriptionMode      @default(VERBATIM)
-  providerJobId         String?                @map("provider_job_id") @db.VarChar(255)
-  activeKey             String?                @unique @map("active_key") @db.VarChar(191)
-  leaseToken            String?                @map("lease_token") @db.Char(36)
-  submissionIntentAt    DateTime?              @map("submission_intent_at")
-  uploadCompletedAt     DateTime?              @map("upload_completed_at")
-  lastPollAt            DateTime?              @map("last_poll_at")
-  callbackState         String?                @map("callback_state") @db.VarChar(32)
-  providerRequestId     String?                @map("provider_request_id") @db.VarChar(255)
-  languageCode          String?                @map("language_code") @db.VarChar(32)
-  requestedSpeakerCount Int?                   @map("requested_speaker_count")
-  attemptNumber         Int                    @default(1) @map("attempt_number")
-  failureCode           String?                @map("failure_code") @db.VarChar(64)
-  queuedAt              DateTime               @default(now()) @map("queued_at")
-  startedAt             DateTime?              @map("started_at")
-  submittedAt           DateTime?              @map("submitted_at")
-  completedAt           DateTime?              @map("completed_at")
-  nextAttemptAt         DateTime?              @map("next_attempt_at")
-  lockedAt              DateTime?              @map("locked_at")
-  leaseExpiresAt        DateTime?              @map("lease_expires_at")
-  lockedBy              String?                @map("locked_by") @db.VarChar(128)
-  audioDurationMs       Int?                   @map("audio_duration_ms")
-  audioBytes            BigInt?                @map("audio_bytes")
-  latencyMs             Int?                   @map("latency_ms")
-  fallbackFromRunId     String?                @map("fallback_from_run_id")
-  fallbackKey String? @unique @map("fallback_key") @db.VarChar(191)
-  providerArtifactName String? @map("provider_artifact_name") @db.VarChar(255)
-  providerArtifactDeletePendingAt DateTime? @map("provider_artifact_delete_pending_at")
-  providerArtifactDeletedAt DateTime? @map("provider_artifact_deleted_at")
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
-  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic                Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  registration          Registration           @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  recording             ConsultationRecording  @relation(fields: [recordingId], references: [id], onDelete: Restrict)
-  requestedBy           User                   @relation("TranscriptionRunRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
-  transcript            ClinicalTranscript?
-  fallbackFrom          TranscriptionRun?      @relation("TranscriptionFallback", fields: [fallbackFromRunId], references: [id], onDelete: Restrict)
-  fallbackRuns          TranscriptionRun[]     @relation("TranscriptionFallback")
-
-  @@index([provider, status, nextAttemptAt])
-  @@unique([provider, providerJobId])
-  @@index([leaseExpiresAt])
-  @@index([providerArtifactDeletePendingAt, providerArtifactDeletedAt], map: "transcription_artifact_cleanup_idx")
-  @@index([tenantId, createdAt])
-  @@map("transcription_runs")
-}
-
-model ClinicalTranscript {
-  id                 String                      @id @default(cuid())
-  tenantId           String                      @map("tenant_id")
-  clinicId           String                      @map("clinic_id")
-  registrationId     String                      @map("registration_id")
-  recordingId        String                      @map("recording_id")
-  transcriptionRunId String                      @unique @map("transcription_run_id")
-  sourceText         String                      @map("source_text") @db.LongText
-  sourceHash         String                      @map("source_hash") @db.Char(64)
-  version            Int                         @default(1)
-  reviewedAt         DateTime?                   @map("reviewed_at")
-  reviewedByUserId   String?                     @map("reviewed_by_user_id")
-  createdAt          DateTime                    @default(now()) @map("created_at")
-  updatedAt          DateTime                    @updatedAt @map("updated_at")
-  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic             Clinic                      @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  registration       Registration                @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  recording          ConsultationRecording       @relation(fields: [recordingId], references: [id], onDelete: Restrict)
-  transcriptionRun   TranscriptionRun            @relation(fields: [transcriptionRunId], references: [id], onDelete: Restrict)
-  segments           ClinicalTranscriptSegment[]
-  speakerMappings    TranscriptSpeakerMapping[]
-  corrections        TranscriptCorrection[]
-  derivedViews TranscriptDerivedView[]
-  reviews      TranscriptReview[]
-  factExtractionRuns ClinicalFactExtractionRun[]
-
-  @@index([tenantId, clinicId, createdAt])
-  @@map("clinical_transcripts")
-}
-
-/// AI-3 prerequisite: append-only snapshot of exactly what a clinician
-/// reviewed. A review is current only while transcriptVersion equals the
-/// transcript's version; DB triggers forbid update/delete and bind the row to
-/// the transcript's tenant, clinic, registration and current version.
-model TranscriptReview {
-  id                String             @id @default(cuid())
-  tenantId          String             @map("tenant_id")
-  clinicId          String             @map("clinic_id")
-  registrationId    String             @map("registration_id")
-  transcriptId      String             @map("transcript_id")
-  transcriptVersion Int                @map("transcript_version")
-  effectiveHash     String             @map("effective_hash") @db.Char(64)
-  reviewedByUserId  String             @map("reviewed_by_user_id")
-  reviewedAt        DateTime           @default(now()) @map("reviewed_at")
-  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic            Clinic             @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  registration      Registration       @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  transcript        ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
-  reviewedBy        User               @relation("TranscriptReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
-  factExtractionRuns ClinicalFactExtractionRun[]
-
-  @@unique([transcriptId, transcriptVersion])
-  @@index([tenantId, clinicId, reviewedAt])
-  @@map("transcript_reviews")
-}
-
-model ClinicalTranscriptSegment {
-  id           String             @id @default(cuid())
-  transcriptId String             @map("transcript_id")
-  ordinal      Int
-  speakerLabel String             @map("speaker_label") @db.VarChar(64)
-  startMs      Int                @map("start_ms")
-  endMs        Int                @map("end_ms")
-  text         String             @db.Text
-  transcript   ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
-  derivedSegments TranscriptDerivedSegment[]
-  factEvidence ClinicalFactEvidence[]
-
-  @@unique([transcriptId, ordinal])
-  @@index([transcriptId, ordinal])
-  @@map("clinical_transcript_segments")
-}
-
-model TranscriptDerivedView {
-  id String @id @default(cuid())
-  transcriptId String @map("transcript_id")
-  sourceHash String @map("source_hash") @db.Char(64)
-  type String @default("ROMANIZED") @db.VarChar(32)
-  provider String @default("SARVAM") @db.VarChar(32)
-  status String @default("QUEUED") @db.VarChar(32)
-  isPartial Boolean @default(false) @map("is_partial")
-  createdByUserId String @map("created_by_user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  completedAt DateTime? @map("completed_at")
-  leaseToken String? @map("lease_token") @db.Char(36)
-  leaseExpiresAt DateTime? @map("lease_expires_at")
-  transcript ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
-  createdBy User @relation("TranscriptDerivedViewCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, map: "derived_view_created_by_fkey")
-  segments TranscriptDerivedSegment[]
-  @@unique([transcriptId, sourceHash, type], map: "derived_source_type_key")
-  @@index([status, leaseExpiresAt], map: "derived_queue_idx")
-  @@map("transcript_derived_views")
-}
-
-model TranscriptDerivedSegment {
-  id String @id @default(cuid())
-  derivedViewId String @map("derived_view_id")
-  sourceSegmentId String @map("source_segment_id")
-  text String @db.Text
-  status String @db.VarChar(32)
-  sourceLanguageCode String? @map("source_language_code") @db.VarChar(32)
-  view TranscriptDerivedView @relation(fields: [derivedViewId], references: [id], onDelete: Restrict)
-  sourceSegment ClinicalTranscriptSegment @relation(fields: [sourceSegmentId], references: [id], onDelete: Restrict)
-  @@unique([derivedViewId, sourceSegmentId], map: "derived_segment_key")
-  @@index([sourceSegmentId], map: "derived_segment_source_idx")
-  @@map("transcript_derived_segments")
-}
-
-model TranscriptSpeakerMapping {
-  id           String             @id @default(cuid())
-  transcriptId String             @map("transcript_id")
-  speakerLabel String             @map("speaker_label") @db.VarChar(64)
-  speakerType  String             @map("speaker_type") @db.VarChar(32)
-  confirmedAt  DateTime?          @map("confirmed_at")
-  confirmedByUserId String?       @map("confirmed_by_user_id")
-  createdAt    DateTime           @default(now()) @map("created_at")
-  transcript   ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
-
-  @@unique([transcriptId, speakerLabel])
-  @@map("transcript_speaker_mappings")
-}
-
-model TranscriptCorrection {
-  id            String             @id @default(cuid())
-  transcriptId  String             @map("transcript_id")
-  createdById   String             @map("created_by_id")
-  segmentId     String?            @map("segment_id")
-  supersedesCorrectionId String?   @unique @map("supersedes_correction_id")
-  originalText  String             @map("original_text") @db.Text
-  correctedText String             @map("corrected_text") @db.Text
-  createdAt     DateTime           @default(now()) @map("created_at")
-  transcript    ClinicalTranscript @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
-  createdBy     User               @relation("TranscriptCorrectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  factEvidence  ClinicalFactEvidence[]
-
-  @@index([transcriptId, createdAt])
-  @@map("transcript_corrections")
-}
-
 enum PatientPortalAccountStatus {
   ACTIVE
   DISABLED
@@ -2933,112 +2495,6 @@ model PatientPortalAuditEvent {
   @@index([portalAccountId, createdAt])
   @@index([tenantId, createdAt])
   @@map("patient_portal_audit_events")
-}
-
-/// AI-3: one extraction per current transcript review (idempotency_key), run by
-/// the leased worker. Identity columns are immutable (DB trigger).
-model ClinicalFactExtractionRun {
-  id                 String                  @id @default(cuid())
-  tenantId           String                  @map("tenant_id")
-  clinicId           String                  @map("clinic_id")
-  registrationId     String                  @map("registration_id")
-  transcriptId       String                  @map("transcript_id")
-  transcriptReviewId String                  @map("transcript_review_id")
-  effectiveHash      String                  @map("effective_hash") @db.Char(64)
-  status             String                  @default("QUEUED") @db.VarChar(32)
-  failureCode        String?                 @map("failure_code") @db.VarChar(64)
-  provider           String                  @db.VarChar(32)
-  model              String                  @db.VarChar(101)
-  promptVersion      String                  @map("prompt_version") @db.VarChar(32)
-  schemaVersion      String                  @map("schema_version") @db.VarChar(32)
-  chunkCount         Int                     @default(0) @map("chunk_count")
-  candidateCount     Int                     @default(0) @map("candidate_count")
-  rejectedCount      Int                     @default(0) @map("rejected_count")
-  /// Counts per rejection reason code only; never clinical text.
-  rejectionCounts    Json?                   @map("rejection_counts")
-  attemptNumber      Int                     @default(1) @map("attempt_number")
-  nextAttemptAt      DateTime?               @map("next_attempt_at")
-  activeKey          String?                 @unique @map("active_key") @db.VarChar(191)
-  idempotencyKey     String                  @unique @map("idempotency_key") @db.Char(64)
-  leaseToken         String?                 @map("lease_token") @db.Char(36)
-  leaseExpiresAt     DateTime?               @map("lease_expires_at")
-  requestedByUserId  String                  @map("requested_by_user_id")
-  createdAt          DateTime                @default(now()) @map("created_at")
-  startedAt          DateTime?               @map("started_at")
-  completedAt        DateTime?               @map("completed_at")
-  tenant             Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic             Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  registration       Registration            @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  transcript         ClinicalTranscript      @relation(fields: [transcriptId], references: [id], onDelete: Restrict)
-  transcriptReview   TranscriptReview        @relation(fields: [transcriptReviewId], references: [id], onDelete: Restrict)
-  requestedBy        User                    @relation("FactExtractionRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
-  facts              ClinicalFactCandidate[]
-
-  @@index([status, nextAttemptAt, leaseExpiresAt], map: "fact_extraction_queue_idx")
-  @@index([tenantId, transcriptId, createdAt], map: "fact_extraction_transcript_idx")
-  @@map("clinical_fact_extraction_runs")
-}
-
-/// AI-3 candidate fact: immutable once written. The decision of the doctor
-/// lives in append-only ClinicalFactReview rows.
-model ClinicalFactCandidate {
-  id              String                    @id @default(cuid())
-  tenantId        String                    @map("tenant_id")
-  clinicId        String                    @map("clinic_id")
-  registrationId  String                    @map("registration_id")
-  extractionRunId String                    @map("extraction_run_id")
-  category        String                    @db.VarChar(32)
-  assertion       String                    @db.VarChar(16)
-  subject         String                    @db.VarChar(16)
-  statement       String                    @db.VarChar(500)
-  attributes      Json
-  createdAt       DateTime                  @default(now()) @map("created_at")
-  tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  clinic          Clinic                    @relation(fields: [clinicId], references: [id], onDelete: Restrict)
-  registration    Registration              @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  extractionRun   ClinicalFactExtractionRun @relation(fields: [extractionRunId], references: [id], onDelete: Restrict)
-  evidence        ClinicalFactEvidence[]
-  reviews         ClinicalFactReview[]
-
-  @@index([extractionRunId])
-  @@index([tenantId, registrationId])
-  @@map("clinical_fact_candidates")
-}
-
-/// Exact transcript span supporting a fact, validated before insert.
-model ClinicalFactEvidence {
-  id           String                    @id @default(cuid())
-  factId       String                    @map("fact_id")
-  segmentId    String                    @map("segment_id")
-  correctionId String?                   @map("correction_id")
-  speakerType  String                    @map("speaker_type") @db.VarChar(32)
-  quote        String                    @db.VarChar(300)
-  charStart    Int                       @map("char_start")
-  charEnd      Int                       @map("char_end")
-  fact         ClinicalFactCandidate     @relation(fields: [factId], references: [id], onDelete: Restrict)
-  segment      ClinicalTranscriptSegment @relation(fields: [segmentId], references: [id], onDelete: Restrict)
-  correction   TranscriptCorrection?     @relation(fields: [correctionId], references: [id], onDelete: Restrict)
-
-  @@index([factId])
-  @@index([segmentId])
-  @@map("clinical_fact_evidence")
-}
-
-/// Append-only doctor decision; the latest row per fact is current.
-model ClinicalFactReview {
-  id               String                @id @default(cuid())
-  tenantId         String                @map("tenant_id")
-  factId           String                @map("fact_id")
-  decision         String                @db.VarChar(16)
-  reason           String?               @db.VarChar(500)
-  reviewedByUserId String                @map("reviewed_by_user_id")
-  reviewedAt       DateTime              @default(now()) @map("reviewed_at")
-  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  fact             ClinicalFactCandidate @relation(fields: [factId], references: [id], onDelete: Restrict)
-  reviewedBy       User                  @relation("FactReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
-
-  @@index([factId, reviewedAt])
-  @@map("clinical_fact_reviews")
 }
 
 // ---------------------------------------------------------------------------
