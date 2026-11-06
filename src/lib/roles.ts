@@ -3,10 +3,7 @@ import { BadRequestError, ConflictError } from "@/lib/apiHandler";
 import {
   ALL_PERMISSIONS,
   isKnownPermission,
-  RETIRED_PERMISSION_KEYS,
-  RETIRED_PERMISSIONS,
   WILDCARD,
-  withoutRetiredPermissions,
 } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { evaluateRoleGrantAuthority } from "@/lib/roleAuthority";
@@ -51,14 +48,9 @@ const READ = "role:read";
 
 const permissionListSchema = z
   .array(z.string().trim().min(1).max(64))
-  // Retired keys still stored on older roles are submitted back on save.
-  .max(ALL_PERMISSIONS.length + RETIRED_PERMISSION_KEYS.size + RETIRED_PERMISSIONS.length)
+  .max(ALL_PERMISSIONS.length)
   // Deduped rather than rejected: two ticks of the same box is not a user error.
-  // Retired keys are dropped rather than rejected: the Roles editor sends a
-  // role's stored list back on save, so rejecting them would make every role
-  // that still holds one unsaveable until scripts/clean-retired-catalogue.mts
-  // has cleaned the rows.
-  .transform((values) => withoutRetiredPermissions([...new Set(values)]));
+  .transform((values) => [...new Set(values)]);
 
 export const createRoleSchema = z.object({
   name: z.string().trim().min(1, "Role name is required.").max(255),

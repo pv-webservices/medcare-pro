@@ -1,4 +1,4 @@
-import { RETIRED_PERMISSIONS, WILDCARD, withoutRetiredPermissions } from "@/lib/permissions";
+import { WILDCARD } from "@/lib/permissions";
 
 export type RoleGrantRefusal =
   | "tenant-wide-owner-only"
@@ -18,13 +18,7 @@ export function evaluateRoleGrantAuthority(options: {
   isAccountOwner: boolean;
   tenantWide: boolean;
 }): RoleGrantRefusal | null {
-  // Retired keys grant nothing, so they count on neither side. Otherwise a role
-  // still holding one could not be granted by someone whose own role has
-  // already been saved without it.
-  const actorPermissions = new Set(
-    [...options.actorPermissions].filter((permission) => !RETIRED_PERMISSIONS.includes(permission)),
-  );
-  const targetPermissions = withoutRetiredPermissions(options.targetPermissions);
+  const { actorPermissions, targetPermissions } = options;
 
   if (options.tenantWide && !options.isAccountOwner) {
     return "tenant-wide-owner-only";

@@ -75,9 +75,7 @@ describe("role assignment authority", () => {
     ).toBeNull();
   });
 
-  it("ignores retired keys a stored role still holds", () => {
-    // An Admin whose own role was re-saved without the retired key can still
-    // assign a Doctor role that holds it.
+  it("compares the supplied permission sets without filtering unknown keys", () => {
     expect(
       evaluateRoleGrantAuthority({
         actorPermissions: new Set(["role:manage", "patient:read", "task:view"]),
@@ -85,15 +83,14 @@ describe("role assignment authority", () => {
         isAccountOwner: false,
         tenantWide: false,
       }),
-    ).toBeNull();
-    // And a retired key does not count as extra authority over an equal role.
+    ).toBe("beyond-actor-permissions");
     expect(
       evaluateRoleGrantAuthority({
-        actorPermissions: new Set(["patient:read", "dashboard:layout:manage"]),
+        actorPermissions: new Set(["patient:read", "unknown:permission"]),
         targetPermissions: ["patient:read"],
         isAccountOwner: false,
         tenantWide: false,
       }),
-    ).toBe("not-below-actor-authority");
+    ).toBeNull();
   });
 });
