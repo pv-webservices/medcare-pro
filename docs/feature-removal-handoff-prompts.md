@@ -1,4 +1,4 @@
-# Feature removal — Coding-agent handoff prompts (RM-1 → RM-3)
+# Feature removal — Coding-agent handoff prompts (RM-1 → RM-4)
 
 Written against `main` @ `dd1c3f4` (4 Nov 2026). Owner decisions (4 Nov 2026):
 
@@ -10,10 +10,11 @@ Written against `main` @ `dd1c3f4` (4 Nov 2026). Owner decisions (4 Nov 2026):
 | R4 | Remove the **adjustable dashboard** (personal layouts and role defaults). The dashboard stays, with a fixed widget order. |
 | R5 | **Two-phase removal.** RM-1 and RM-2 remove code only and leave tables in place, unused. RM-3 drops tables and deletes stored audio only after a verified backup. |
 | R6 | **GMB** was never built in the repo. Its PRD files are removed from the claude.ai Project; nothing to do in code. |
+| R7 | (6 Nov 2026) The project is no longer hosted, so no live database holds retired keys or stored audio. **RM-4** removes the one-off RM-3 clean-up scripts and the retired-permission compatibility code they made temporary. |
 
 **Do not touch:** prescriptions/consultations (`ClinicalConsultation`, prescription issue/print), billing, registrations, appointments, Tasks, IVR/Plivo, WhatsApp, patient portal, Revenue/Collections reports.
 
-Order: RM-1 and RM-2 are independent (either first), one branch/PR each. Deploy both. RM-3 only after both are live and the backup in RM-3 step 1 exists.
+Order: RM-1 and RM-2 are independent (either first), one branch/PR each. Deploy both. RM-3 only after both are live and the backup in RM-3 step 1 exists. RM-4 only after RM-3 is merged, and only while no old database is due to be restored (see its STOP AND ASK).
 
 ---
 
@@ -304,4 +305,112 @@ ACCEPTANCE
 
 STOP AND ASK if any kept table has a foreign key to a table being dropped that
 is not listed here, or if the owner has not confirmed the backup.
+```
+
+---
+
+## RM-4: Remove the RM-3 clean-up scripts and the retired-permission compatibility code (run only after RM-3 is merged)
+
+```
+TASK: MedCare Pro — RM-4 retire the RM-3 one-off tooling and retired-key compatibility. Branch: chore/rm-4-retire-cleanup-tooling
+
+[Paste GROUND RULES above. Rule 5 does not apply: RM-4 needs no schema change
+and no migration — do not create one. Rule 8's `npm run build` runs
+`prisma migrate deploy`, so point DATABASE_URL at an empty disposable local
+database only.]
+
+CONTEXT
+RM-1 retired the clinical-ai:* permission keys and RM-2 retired
+dashboard:customize and dashboard:layout:manage. Because the Roles editor sends
+a role's whole stored permission list back on save, RM-1/RM-2 kept those keys
+"known but granting nothing" so old roles stayed saveable, and RM-3 added
+scripts/clean-retired-catalogue.mts to strip them from stored roles and
+scripts/purge-clinical-audio.mts to delete stored audio. The code says this
+compatibility "can go once that has run in production". The project is no
+longer hosted (owner decision R7), so RM-4 removes it.
+
+PRECONDITION — verify on main before changing anything, STOP if any fails
+- prisma/migrations/20261104202151_drop_clinical_ai_and_dashboard_layouts exists.
+- tests/unit/rm3DropMigration.test.ts passes.
+- No model for any table RM-3 dropped is in prisma/schema.prisma.
+
+DO
+1. src/lib/permissions.ts: delete RETIRED_PERMISSIONS, RETIRED_PERMISSION_KEYS
+   and withoutRetiredPermissions(), with their doc comments, and drop the
+   RETIRED_PERMISSION_KEYS clause from isKnownPermission(). Do not touch
+   LEGACY_PERMISSION_ALIASES or LEGACY_PERMISSION_KEYS (live dashboard
+   vocabulary aliases, not retired keys).
+2. src/lib/roles.ts: permissionListSchema keeps .max(ALL_PERMISSIONS.length)
+   and the de-duplication, drops the withoutRetiredPermissions transform and
+   its comments. A retired key on save must now fail the existing
+   "Unknown permission" check in the role write path (the isKnownPermission
+   filter in src/lib/roles.ts) exactly like any other unknown key — do not add
+   a special message for it.
+3. src/lib/roleAuthority.ts: evaluateRoleGrantAuthority uses
+   options.actorPermissions and options.targetPermissions directly; delete the
+   retired-key filtering and its comment.
+4. src/lib/defaultRoles.ts: PRE_DOCTOR_SELF_ROLE_PERMISSIONS is a FROZEN
+   historical snapshot used to recognise old stored roles. Keep its output
+   byte-identical: replace the RETIRED_PERMISSIONS argument with the literal
+   ["dashboard:customize", "dashboard:layout:manage"] and drop the import.
+   Prove it with a unit assertion of the exact array before and after.
+5. Delete scripts/purge-clinical-audio.mts and
+   scripts/clean-retired-catalogue.mts (grep first: no package.json script or
+   CI step references them today).
+6. Remove @aws-sdk/client-s3 from package.json and package-lock.json
+   (`npm uninstall @aws-sdk/client-s3`) after grep shows no other import.
+   This is the only dependency change allowed.
+7. .env.example: delete the "Retired consultation-recording storage" block
+   (its comment and the RECORDING_* lines).
+8. Delete the stray committed files AGENTS.md.tmp and CLAUDE.md.tmp at the
+   repo root.
+9. Tests:
+   - tests/unit/retiredPermissions.test.ts: replace with checks that each of the
+     eight retired keys is NOT known (isKnownPermission false), is not in
+     ALL_PERMISSIONS, PERMISSION_GROUPS or any DEFAULT_ROLES entry, and that
+     a role create/update carrying one is REJECTED with "Unknown permission"
+     by the role write path; and that a role holding only current keys still
+     saves. roleMutationSchema itself only parses (max length, de-duplication).
+   - tests/unit/billingFoundation.test.ts line ~128: express the expected
+     DEFAULT_ROLES permissions without the deleted helpers (filter the literal
+     retired keys inline). The assertion must keep checking the same thing.
+   - Any other test importing a deleted export: edit minimally, list it in the
+     PR.
+10. docs/PRD.md §10: change "(RM-1..RM-3)" to "(RM-1..RM-4)" and append
+    "; RM-4 removed the one-off clean-up scripts." Nothing else in the PRD.
+
+DO NOT TOUCH
+- Historical role snapshots: src/lib/preBillingRoles.json, the
+  dashboard:customize literals in src/lib/doctorSelfRoleMigration.ts, and every
+  other PRE_* constant. They identify roles created before earlier upgrades.
+- Any file under prisma/migrations/, including the RM-3 migration's SQL
+  comment that names clean-retired-catalogue.mts (migrations are checksummed).
+- tests/unit/rm3DropMigration.test.ts.
+- The RM-1..RM-3 sections of this file and docs/releases/* (history).
+- Everything in the "Do not touch" line at the top of this file.
+
+ACCEPTANCE
+- grep -rnE "RETIRED_PERMISSIONS|RETIRED_PERMISSION_KEYS|withoutRetiredPermissions|purge-clinical-audio|clean-retired-catalogue|@aws-sdk|RECORDING_S3" \
+    --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git .
+  returns only: prisma/migrations/** and docs/feature-removal-handoff-prompts.md
+  (plus tsconfig.tsbuildinfo if present, which is generated).
+- clinical-ai: and dashboard:customize / dashboard:layout:manage appear only in
+  historical snapshots, migrations, tests asserting rejection, and docs.
+- PRE_DOCTOR_SELF_ROLE_PERMISSIONS is unchanged (asserted by a test).
+- npx prisma validate passes; `prisma migrate diff` (migrations vs schema) is
+  empty; no new migration folder.
+- npm run typecheck, npm run lint (no new errors), npm test pass.
+- npm run build against an EMPTY disposable local DB applies all migrations.
+- Manual: on that local DB, sign up, open Settings → Roles as Owner, edit and
+  save a system role and a custom role; assign a role to a Staff user. All
+  succeed.
+
+STOP AND ASK if
+- an old production database, or a backup of one, will ever be restored or
+  imported. Both clean-up scripts must run on it (dry run, review, --apply)
+  BEFORE RM-4 merges, because they will not exist afterwards and saving any
+  role that still holds a retired key would then fail.
+- any kept code needs a retired key for something other than recognising a
+  historical snapshot.
+- removing @aws-sdk/client-s3 breaks anything other than the deleted script.
 ```
