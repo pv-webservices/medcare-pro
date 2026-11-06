@@ -62,24 +62,6 @@ export const DASHBOARD_DATA_PERMISSIONS = [
   "dashboard:clinics:view",
 ] as const;
 
-/**
- * Keys that left the catalogue but may still sit in stored role rows. They
- * grant nothing. Role writes drop them instead of rejecting them as unknown,
- * because the Roles editor sends a role's whole stored list back on save.
- *
- * RM-2 (Nov 2026) retired the adjustable dashboard. RM-3's
- * scripts/clean-retired-catalogue.mts strips these keys from stored roles; this
- * list can go once that has run in production and a dry run reports no roles.
- */
-export const RETIRED_PERMISSIONS: readonly string[] = [
-  "dashboard:customize",
-  "dashboard:layout:manage",
-];
-
-export function withoutRetiredPermissions(permissions: readonly string[]): string[] {
-  return permissions.filter((permission) => !RETIRED_PERMISSIONS.includes(permission));
-}
-
 /** Task page/action permissions, kept separate from dashboard summaries. */
 export const TASK_PERMISSIONS = [
   "task:view",
@@ -108,28 +90,6 @@ const LEGACY_PERMISSION_ALIASES: Readonly<Record<string, readonly string[]>> = {
 };
 
 const LEGACY_PERMISSION_KEYS = new Set(Object.values(LEGACY_PERMISSION_ALIASES).flat());
-
-/**
- * Keys of a removed module that roles saved before the removal may still hold.
- *
- * Not in PERMISSION_GROUPS, so they are never offered as checkboxes, never
- * granted to new roles, and nothing checks them — they grant nothing. They are
- * accepted as known only so that saving an existing role that still carries
- * them (the roles editor submits the stored set back) does not fail with
- * "Unknown permission". RM-3's scripts/clean-retired-catalogue.mts strips them
- * from stored roles; this set can go once that has run in production and a dry
- * run reports no roles.
- *
- * RM-1 (Nov 2026): the Clinical AI module was removed.
- */
-export const RETIRED_PERMISSION_KEYS: ReadonlySet<string> = new Set([
-  "clinical-ai:writing",
-  "clinical-ai:recording",
-  "clinical-ai:transcription",
-  "clinical-ai:transcript-read",
-  "clinical-ai:facts-extract",
-  "clinical-ai:facts-review",
-]);
 
 export function permissionGrantKeys(permission: string): readonly string[] {
   return [permission, ...(LEGACY_PERMISSION_ALIASES[permission] ?? [])];
@@ -741,8 +701,7 @@ const BY_KEY = new Map(
 export function isKnownPermission(value: string): boolean {
   return (
     BY_KEY.has(value) ||
-    LEGACY_PERMISSION_KEYS.has(value) ||
-    RETIRED_PERMISSION_KEYS.has(value)
+    LEGACY_PERMISSION_KEYS.has(value)
   );
 }
 

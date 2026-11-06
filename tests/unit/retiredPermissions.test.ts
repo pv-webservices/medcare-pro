@@ -1,74 +1,92 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// lib/roles reaches next-auth through the session module; only its schema is
-// exercised here.
 vi.mock("@/lib/session", () => ({
   requireActor: vi.fn(),
   UnauthenticatedError: class UnauthenticatedError extends Error {},
 }));
-import {
-  ALL_PERMISSIONS,
-  PERMISSION_GROUPS,
-  RETIRED_PERMISSION_KEYS,
-  RETIRED_PERMISSIONS,
-  isKnownPermission,
-} from "@/lib/permissions";
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    userRole: { findMany: vi.fn() },
+    role: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+  },
+}));
+import { ALL_PERMISSIONS, PERMISSION_GROUPS, isKnownPermission } from "@/lib/permissions";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
 import { CATALOGUE_FEATURE_KEYS, MODULE_FEATURES } from "@/lib/moduleFeatures";
-import { roleMutationSchema } from "@/lib/roles";
+import { prisma } from "@/lib/prisma";
+import { createRole, createRoleSchema, roleMutationSchema, updateRole } from "@/lib/roles";
 
-// RM-1 removed Clinical AI. Roles saved before that still store its keys, and
-// the roles editor submits a role's stored set back on save, so those keys must
-// stay acceptable without being offered, granted or seeded.
-describe("retired Clinical AI permission keys (RM-1)", () => {
-  const retired = [...RETIRED_PERMISSION_KEYS];
+const retired = [
+  "clinical-ai:writing",
+  "clinical-ai:recording",
+  "clinical-ai:transcription",
+  "clinical-ai:transcript-read",
+  "clinical-ai:facts-extract",
+  "clinical-ai:facts-review",
+  "dashboard:customize",
+  "dashboard:layout:manage",
+];
+const actor = { userId: "owner-1", tenantId: "tenant-1" };
+const role = { id: "role-1", name: "Reception", permissions: ["patient:read"] };
 
-  it("covers exactly the six removed clinical-ai keys", () => {
-    expect(retired.sort()).toEqual([
-      "clinical-ai:facts-extract",
-      "clinical-ai:facts-review",
-      "clinical-ai:recording",
-      "clinical-ai:transcript-read",
-      "clinical-ai:transcription",
-      "clinical-ai:writing",
-    ]);
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(prisma.userRole.findMany).mockResolvedValue([
+    { role: { permissions: ["*"] } },
+  ] as never);
+  vi.mocked(prisma.role.findFirst).mockResolvedValue(role as never);
+});
+
+describe("retired permissions after RM-4", () => {
+  it.each(retired)("does not recognise or offer %s", (key) => {
+    expect(isKnownPermission(key)).toBe(false);
+    expect(ALL_PERMISSIONS).not.toContain(key);
+    expect(PERMISSION_GROUPS.flatMap((group) => group.permissions.map((p) => p.key))).not.toContain(key);
+    for (const seeded of DEFAULT_ROLES) expect(seeded.permissions).not.toContain(key);
   });
 
-  it("are still accepted when an existing role is saved", () => {
-    for (const key of retired) expect(isKnownPermission(key)).toBe(true);
+  it.each(retired)("rejects creating and updating roles with %s in the write path", async (key) => {
+    const permissions = ["patient:read", key];
+    const create = createRoleSchema.parse({ name: "Reception", permissions });
+    const update = roleMutationSchema.parse({ action: "updateRole", roleId: role.id, permissions });
+    expect(create.permissions).toEqual(permissions);
+    expect(update.action).toBe("updateRole");
+    if (update.action !== "updateRole") throw new Error("Wrong mutation");
+    const message = `Unknown permission: ${key}. Pick from the listed permissions.`;
+    await expect(createRole(actor, create)).rejects.toThrow(message);
+    await expect(updateRole(actor, update)).rejects.toThrow(message);
+    expect(prisma.role.create).not.toHaveBeenCalled();
+    expect(prisma.role.update).not.toHaveBeenCalled();
   });
 
-  it("are not offered, grantable or seeded", () => {
-    const offered = PERMISSION_GROUPS.flatMap((group) =>
-      group.permissions.map((permission) => permission.key),
-    );
-    for (const key of retired) {
-      expect(offered).not.toContain(key);
-      expect(ALL_PERMISSIONS).not.toContain(key);
-      for (const role of DEFAULT_ROLES) expect(role.permissions).not.toContain(key);
-    }
+  it("still creates and saves a role carrying only current permissions", async () => {
+    const permissions = ["patient:read", "registration:read"];
+    vi.mocked(prisma.role.create).mockResolvedValue({ ...role, permissions } as never);
+    vi.mocked(prisma.role.update).mockResolvedValue({ ...role, permissions, _count: { userRoles: 0 } } as never);
+    await expect(createRole(actor, createRoleSchema.parse({ name: "Reception", permissions })))
+      .resolves.toMatchObject({ permissions });
+    await expect(updateRole(actor, { action: "updateRole", roleId: role.id, permissions }))
+      .resolves.toMatchObject({ permissions });
+  });
+
+  it("keeps schema de-duplication and the current catalogue length limit", () => {
+    expect(createRoleSchema.parse({ name: "Reception", permissions: ["patient:read", "patient:read"] }).permissions)
+      .toEqual(["patient:read"]);
+    expect(roleMutationSchema.safeParse({
+      action: "updateRole", roleId: role.id, permissions: [...ALL_PERMISSIONS, "patient:read"],
+    }).success).toBe(false);
+  });
+
+  it("preserves live dashboard vocabulary aliases", async () => {
+    const permissions = ["dashboard:registrations:view", "dashboard:notifications:view"];
+    vi.mocked(prisma.role.create).mockResolvedValue({ ...role, permissions } as never);
+    for (const key of permissions) expect(isKnownPermission(key)).toBe(true);
+    await expect(createRole(actor, createRoleSchema.parse({ name: "Legacy vocabulary", permissions })))
+      .resolves.toMatchObject({ permissions });
+  });
+
+  it("keeps Clinical AI out of the feature catalogue and module map", () => {
     expect(PERMISSION_GROUPS.map((group) => group.module)).not.toContain("Clinical AI");
-  });
-
-  it("fit in a role save that still carries them on a full-catalogue role", () => {
-    // Worst case: a role stored before RM-1 and RM-2 holds both retired sets.
-    const result = roleMutationSchema.safeParse({
-      action: "updateRole",
-      roleId: "role-1",
-      permissions: [...ALL_PERMISSIONS, ...retired, ...RETIRED_PERMISSIONS],
-    });
-    expect(result.success).toBe(true);
-    // RM-1 keys are kept on the role (option A); RM-2 keys are dropped.
-    const saved = result.success && result.data.action === "updateRole" ? result.data.permissions ?? [] : [];
-    for (const key of retired) expect(saved).toContain(key);
-    for (const key of RETIRED_PERMISSIONS) expect(saved).not.toContain(key);
-  });
-
-  it("does not make unrelated strings known", () => {
-    expect(isKnownPermission("clinical-ai:anything-else")).toBe(false);
-  });
-
-  it("removes the clinical_ai feature from the catalogue and module map", () => {
     expect(CATALOGUE_FEATURE_KEYS).not.toContain("clinical_ai");
     expect(Object.values(MODULE_FEATURES)).not.toContain("clinical_ai");
   });

@@ -6,7 +6,7 @@ import { amountInWords } from "@/lib/billing/amountInWords";
 import { isValidGstin } from "@/lib/billing/gstin";
 import { planBillingRoleMigration, PRE_BILLING_ROLE_PERMISSIONS, BILLING_ROLE_TOP_UPS } from "@/lib/billingRoleMigration";
 import { DEFAULT_ROLES } from "@/lib/defaultRoles";
-import { BILLING_PERMISSIONS, STAGE_1_PERMISSIONS, PRE_STAGE_11_PERMISSIONS, PRE_APPOINTMENTS_PERMISSIONS, RETIRED_PERMISSION_KEYS, findPermission, withoutRetiredPermissions } from "@/lib/permissions";
+import { BILLING_PERMISSIONS, STAGE_1_PERMISSIONS, PRE_STAGE_11_PERMISSIONS, PRE_APPOINTMENTS_PERMISSIONS, findPermission } from "@/lib/permissions";
 import { DEFAULT_FEATURES } from "@/lib/defaultFeatures";
 import { MODULE_FEATURES } from "@/lib/moduleFeatures";
 
@@ -125,7 +125,13 @@ describe("billing catalogue and role migration", () => {
     expect(planBillingRoleMigration(role)).toEqual({ status: "ELIGIBLE", additions: BILLING_ROLE_TOP_UPS[key] });
     // The snapshot stays literal (stored roles still carry the RM-1 clinical-ai
     // and RM-2 dashboard-layout keys); the current seed holds neither.
-    expect(DEFAULT_ROLES.find((r) => r.key === key)!.permissions).toEqual(withoutRetiredPermissions([...before.filter((p) => !RETIRED_PERMISSION_KEYS.has(p)), ...BILLING_ROLE_TOP_UPS[key]]));
+    expect(DEFAULT_ROLES.find((r) => r.key === key)!.permissions).toEqual(
+      [...before, ...BILLING_ROLE_TOP_UPS[key]].filter((permission) => ![
+        "clinical-ai:writing", "clinical-ai:recording", "clinical-ai:transcription",
+        "clinical-ai:transcript-read", "clinical-ai:facts-extract", "clinical-ai:facts-review",
+        "dashboard:customize", "dashboard:layout:manage",
+      ].includes(permission)),
+    );
     expect(planBillingRoleMigration({ ...role, permissions: [...before].reverse() }).status).toBe("ELIGIBLE");
     expect(planBillingRoleMigration({ ...role, isSystem: false }).status).toBe("CUSTOMIZED_OR_OLDER");
     expect(planBillingRoleMigration({ ...role, permissions: before.slice(1) }).status).toBe("CUSTOMIZED_OR_OLDER");

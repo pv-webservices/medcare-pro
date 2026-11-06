@@ -202,7 +202,7 @@ user's role is clinic-scoped) — this is a deliberate reversal of the old
 - **Patient identity is per clinic** *(decided post-v2.0)*: `patients.clinic_id` is not nullable, so a person known at Clinic A is a separate record at Clinic B even under the same account. Return-visit lookup (FR-3.1a) therefore searches within one clinic. Revisit if group-wide patient identity is ever wanted — it is a data-model change, not a UI one.
 - **Currency is Indian rupees (₹)** *(decided post-v2.0)*: amounts are stored as unformatted `Decimal(10, 2)` and rendered with the ₹ symbol and `en-IN` grouping. CSV export stays unformatted under an `Amount (INR)` header so a spreadsheet can sum it.
 - **Server clock = clinic clock** *(decided post-v2.0)*: `visit_date` stores the wall-clock time entered, tagged UTC, and the "now" default is taken from the server. Set `TZ` on the host (e.g. `Asia/Kolkata`) or a late-evening registration defaults to the wrong day.
-- Clinical AI and dashboard customisation were removed in Nov 2026 (RM-1..RM-3); their tables were dropped after a backup.
+- Clinical AI and dashboard customisation were removed in Nov 2026 (RM-1..RM-4); their tables were dropped after a backup; RM-4 removed the one-off clean-up scripts.
 
 ## 11. Constraints
 

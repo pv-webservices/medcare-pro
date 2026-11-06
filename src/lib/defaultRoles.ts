@@ -6,7 +6,6 @@ import {
   DASHBOARD_DATA_PERMISSIONS,
   DOCTOR_SELF_APPOINTMENT_PERMISSIONS,
   PRE_APPOINTMENTS_PERMISSIONS,
-  RETIRED_PERMISSIONS,
   STAGE_AP1_PERMISSIONS,
   TASK_PERMISSIONS,
   WILDCARD,
@@ -498,7 +497,7 @@ export const PRE_DOCTOR_SELF_ROLE_PERMISSIONS: Readonly<
         !DOCTOR_SELF_APPOINTMENT_PERMISSIONS.includes(permission),
     ),
     "dashboard:clinics:view",
-    RETIRED_PERMISSIONS,
+    ["dashboard:customize", "dashboard:layout:manage"],
   ),
   [ROLE_KEYS.DOCTOR]: withRetiredAfter(
     DEFAULT_ROLES.find(
